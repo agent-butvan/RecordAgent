@@ -7,7 +7,6 @@
         <version>0.0.1-SNAPSHOT</version>
     </parent>
 
-    <groupId>butvan.top</groupId>
     <artifactId>server-network</artifactId>
     <packaging>jar</packaging>
 
