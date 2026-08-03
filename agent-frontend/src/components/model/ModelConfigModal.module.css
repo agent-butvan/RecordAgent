@@ -2,7 +2,7 @@
   position: fixed;
   inset: 0;
   background-color: var(--bg-modal-overlay);
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -14,8 +14,7 @@
   width: 720px;
   max-height: 85vh;
   background-color: var(--bg-surface);
-  border: 1px solid var(--border-medium);
-  border-radius: var(--radius-lg);
+  border: none;
   box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
@@ -27,13 +26,14 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border-subtle);
+  padding: 18px 24px;
+  background-color: var(--bg-surface);
+  border: none;
 }
 
 .title {
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-primary);
   display: flex;
   align-items: center;
@@ -44,7 +44,6 @@
   background: transparent;
   border: none;
   color: var(--text-muted);
-  border-radius: var(--radius-sm);
   padding: 4px;
   display: flex;
   align-items: center;
@@ -66,7 +65,7 @@
 .sidebar {
   width: 220px;
   background-color: var(--bg-sidebar);
-  border-right: 1px solid var(--border-subtle);
+  border: none;
   padding: 12px;
   display: flex;
   flex-direction: column;
@@ -79,8 +78,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 10px 12px;
-  border-radius: var(--radius-md);
-  border: 1px solid transparent;
+  border: none;
   background: transparent;
   color: var(--text-secondary);
   font-size: 13px;
@@ -96,17 +94,18 @@
 
 .providerTabActive {
   background-color: var(--bg-surface);
-  border-color: var(--border-medium);
   color: var(--text-primary);
+  font-weight: 700;
 }
 
 .content {
   flex: 1;
-  padding: 20px;
+  padding: 24px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
+  background-color: var(--bg-surface);
 }
 
 .fieldGroup {
@@ -117,8 +116,10 @@
 
 .label {
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
 }
 
 .inputWrapper {
@@ -129,19 +130,18 @@
 
 .input {
   width: 100%;
-  background-color: var(--bg-input);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: 8px 12px;
+  background-color: var(--bg-sidebar);
+  border: none;
+  padding: 10px 12px;
   color: var(--text-primary);
   font-size: 13px;
   font-family: var(--font-mono);
   outline: none;
-  transition: border-color var(--transition-fast);
+  transition: background-color var(--transition-fast);
 }
 
 .input:focus {
-  border-color: var(--border-focus);
+  background-color: var(--bg-surface-hover);
 }
 
 .eyeBtn {
@@ -171,23 +171,22 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background-color: var(--bg-surface-hover);
-  border: 1px solid var(--border-medium);
-  border-radius: var(--radius-md);
-  padding: 6px 14px;
-  color: var(--text-primary);
+  background-color: var(--text-primary);
+  border: none;
+  padding: 8px 16px;
+  color: var(--bg-surface);
   font-size: 12px;
-  font-weight: 500;
-  transition: all var(--transition-fast);
+  font-weight: 600;
+  transition: opacity var(--transition-fast);
 }
 
 .testBtn:hover {
-  background-color: var(--bg-surface-active);
-  border-color: var(--border-focus);
+  opacity: 0.88;
 }
 
 .statusMsg {
   font-size: 12px;
+  font-weight: 500;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -204,18 +203,17 @@
 .modelList {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-top: 12px;
+  gap: 6px;
+  margin-top: 8px;
 }
 
 .modelCard {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: var(--bg-input);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: 10px 12px;
+  background: var(--bg-sidebar);
+  border: none;
+  padding: 10px 14px;
 }
 
 @keyframes fadeIn {
@@ -224,6 +222,6 @@
 }
 
 @keyframes scaleUp {
-  from { opacity: 0; transform: scale(0.96); }
+  from { opacity: 0; transform: scale(0.98); }
   to { opacity: 1; transform: scale(1); }
 }
