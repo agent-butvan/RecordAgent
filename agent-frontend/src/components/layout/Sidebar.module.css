@@ -1,75 +1,99 @@
 .sidebar {
-  width: 240px;
+  width: 230px;
   height: 100vh;
   background-color: var(--bg-sidebar);
-  border: none;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 16px 12px;
+  padding: 12px;
   user-select: none;
 }
 
-.topSection {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.brand {
+.trafficLights {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 4px 8px;
-  font-weight: 700;
-  font-size: 15px;
-  letter-spacing: -0.3px;
-  color: var(--text-primary);
+  gap: 7px;
+  padding: 4px 6px 10px;
 }
 
-.brandLogo {
-  width: 24px;
-  height: 24px;
-  background: var(--text-primary);
+.dot {
+  width: 11px;
+  height: 11px;
+  border-radius: var(--radius-full);
+}
+
+.red { background-color: #FF5F56; }
+.yellow { background-color: #FFBD2E; }
+.green { background-color: #27C93F; }
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px 8px;
+}
+
+.headerTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.searchBtn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  padding: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--bg-surface);
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast);
+}
+
+.searchBtn:hover {
+  background-color: var(--bg-sidebar-hover);
+  color: var(--text-primary);
 }
 
 .newChatBtn {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 8px;
   width: 100%;
-  padding: 10px 14px;
-  background-color: var(--text-primary);
+  padding: 8px 10px;
+  background: transparent;
   border: none;
-  color: var(--bg-surface);
+  color: var(--text-primary);
   font-size: 13px;
   font-weight: 600;
-  transition: opacity var(--transition-fast);
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast);
+  margin-bottom: 8px;
 }
 
 .newChatBtn:hover {
-  opacity: 0.88;
+  background-color: var(--bg-sidebar-hover);
 }
 
 .sessionList {
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  margin-top: 8px;
   overflow-y: auto;
-  max-height: calc(100vh - 220px);
+  padding-right: 2px;
 }
 
 .sessionItem {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
+  padding: 7px 10px;
+  border-radius: var(--radius-md);
   background: transparent;
   border: none;
   color: var(--text-secondary);
@@ -83,37 +107,65 @@
 }
 
 .sessionItem:hover {
-  background-color: var(--bg-surface-hover);
+  background-color: var(--bg-sidebar-hover);
   color: var(--text-primary);
 }
 
 .sessionActive {
-  background-color: var(--bg-surface);
+  background-color: var(--bg-sidebar-active);
   color: var(--text-primary);
   font-weight: 600;
 }
 
-.bottomSection {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding-top: 12px;
-}
-
-.footerBtn {
+.footer {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  font-size: 13px;
-  width: 100%;
-  transition: all var(--transition-fast);
+  justify-content: space-between;
+  padding-top: 8px;
 }
 
-.footerBtn:hover {
-  background-color: var(--bg-surface-hover);
+.userProfile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast);
+}
+
+.userProfile:hover {
+  background-color: var(--bg-sidebar-hover);
+}
+
+.avatarCircle {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  background-color: #9CA3AF;
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-transform: lowercase;
+}
+
+.userName {
+  font-size: 13px;
+  font-weight: 600;
   color: var(--text-primary);
+}
+
+.actionIcon {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  background-color: #3B82F6;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
 }

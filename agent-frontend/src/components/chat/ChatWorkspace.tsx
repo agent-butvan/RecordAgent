@@ -1,7 +1,20 @@
 import React, { useState } from 'react';
 import { ModelSelector } from '../model/ModelSelector';
 import { useModel } from '../../context/ModelContext';
-import { Send, Bot, Brain, Sparkles, ChevronRight, Terminal } from 'lucide-react';
+import {
+  Sparkles,
+  Plus,
+  ArrowUp,
+  Folder,
+  Settings2,
+  Mic,
+  Compass,
+  Wrench,
+  RotateCcw,
+  Bug,
+  Cloud,
+  Clock
+} from 'lucide-react';
 import styles from './ChatWorkspace.module.css';
 
 interface ChatWorkspaceProps {
@@ -21,17 +34,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({ onOpenSettings }) 
   const activeModel = getActiveModel();
 
   const [inputPrompt, setInputPrompt] = useState('');
-  const [showReasoning, setShowReasoning] = useState(true);
-
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      role: 'assistant',
-      modelName: 'DeepSeek R1 (Reasoner)',
-      reasoning: '用户进入了 ButvanAgent 桌面工作台。\n解析需求：展示极致简约 Codex / 大厂风格 AI 桌面界面，支持模型选型与 API Key 配置。',
-      content: '你好！我是你的 Agent 智能助手。当前已为你准备好大厂极简 Codex 风格桌面工作台，你可以点击顶部下拉框自由切换 DeepSeek、OpenAI、Ollama 或通义千问模型，也可以点击配置图标设置 API Key。',
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
 
   const handleSend = () => {
     if (!inputPrompt.trim()) return;
@@ -45,23 +48,26 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({ onOpenSettings }) 
     setMessages((prev) => [...prev, userMsg]);
     setInputPrompt('');
 
-    // Simulate AI response with Reasoning Chain
     setTimeout(() => {
       const assistantMsg: Message = {
         id: String(Date.now() + 1),
         role: 'assistant',
-        modelName: activeModel?.name || 'Agent',
+        modelName: activeModel?.name || 'ButvanAgent',
         reasoning: activeModel?.supportsReasoning
-          ? `1. 分析当前选中模型: ${activeModel.name}\n2. 检测 API Endpoint 连通状态\n3. 构建打字机式流式数据返回`
+          ? '分析用户指令，连接当前配置的 AI 模型服务...'
           : undefined,
-        content: `收到你的指令！使用【${activeModel?.name || '未选定模型'}】已就绪，可以在顶部“配置”按钮中随时修改 Endpoint 及 API Key。`,
+        content: `指令已接收！【${activeModel?.name || 'Default Model'}】已完成解析并准备就绪。`,
       };
       setMessages((prev) => [...prev, assistantMsg]);
-    }, 600);
+    }, 500);
+  };
+
+  const handleQuickCardClick = (promptText: string) => {
+    setInputPrompt(promptText);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
@@ -69,75 +75,141 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({ onOpenSettings }) 
 
   return (
     <div className={styles.workspace}>
-      {/* Top Bar with ModelSelector */}
-      <div className={styles.header}>
-        <div className={styles.headerTitle}>
-          <Sparkles size={16} style={{ color: '#818cf8' }} />
-          Butvan Agent Workspace
+      {/* Top Bar with Plus Tag & Right window controls */}
+      <div className={styles.topBar}>
+        <div className={styles.plusTag} onClick={onOpenSettings}>
+          <Sparkles size={12} />
+          获取 Plus
         </div>
-        <ModelSelector onOpenSettings={onOpenSettings} />
       </div>
 
-      {/* Main Messages List */}
-      <div className={styles.chatArea}>
-        {messages.map((msg) => (
-          <div key={msg.id} className={styles.messageRow}>
-            {msg.role === 'user' ? (
-              <div className={styles.userMessage}>
-                {msg.content}
-              </div>
-            ) : (
-              <div className={styles.assistantMessage}>
-                <div className={styles.avatar}>
-                  <Bot size={14} style={{ color: '#818cf8' }} />
-                  <span>{msg.modelName || 'Agent'}</span>
-                </div>
+      {/* Hero Empty State OR Chat Messages */}
+      {messages.length === 0 ? (
+        <div className={styles.centerHero}>
+          <Cloud className={styles.cloudIcon} />
+          <h1 className={styles.heroTitle}>我们该构建什么？</h1>
 
-                {msg.reasoning && (
-                  <div className={styles.reasoningBox}>
-                    <div 
-                      style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontWeight: 600, color: '#34d399' }}
-                      onClick={() => setShowReasoning(!showReasoning)}
-                    >
-                      <Brain size={12} />
-                      深度思考 (Chain of Thought)
-                      <ChevronRight size={12} style={{ transform: showReasoning ? 'rotate(90deg)' : 'none', transition: 'transform 150ms' }} />
-                    </div>
-                    {showReasoning && (
-                      <div style={{ marginTop: '4px', whiteSpace: 'pre-line', opacity: 0.85 }}>
-                        {msg.reasoning}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div className={styles.messageContent}>
-                  {msg.content}
-                </div>
+          {/* 4 Quick Action Cards matching Image 1 */}
+          <div className={styles.cardGrid}>
+            <div
+              className={styles.quickCard}
+              onClick={() => handleQuickCardClick('探索并理解当前项目代码结构与架构设计')}
+            >
+              <div className={styles.cardIcon}>
+                <Compass size={20} style={{ color: '#2563EB' }} />
               </div>
-            )}
+              <span className={styles.cardText}>探索并理解代码</span>
+            </div>
+
+            <div
+              className={styles.quickCard}
+              onClick={() => handleQuickCardClick('构建新功能、应用或工具模块')}
+            >
+              <div className={styles.cardIcon}>
+                <Wrench size={20} style={{ color: '#9333EA' }} />
+              </div>
+              <span className={styles.cardText}>构建新功能、应用或工具</span>
+            </div>
+
+            <div
+              className={styles.quickCard}
+              onClick={() => handleQuickCardClick('审查代码并提出重构及修改建议')}
+            >
+              <div className={styles.cardIcon}>
+                <RotateCcw size={20} style={{ color: '#059669' }} />
+              </div>
+              <span className={styles.cardText}>审查代码并提出修改建议</span>
+            </div>
+
+            <div
+              className={styles.quickCard}
+              onClick={() => handleQuickCardClick('定位并修复项目中出现的 Bug 和报错')}
+            >
+              <div className={styles.cardIcon}>
+                <Bug size={20} style={{ color: '#EA580C' }} />
+              </div>
+              <span className={styles.cardText}>修复问题和失败</span>
+            </div>
           </div>
-        ))}
-      </div>
+        </div>
+      ) : (
+        <div className={styles.messagesArea}>
+          {messages.map((msg) => (
+            <div key={msg.id} className={styles.messageRow}>
+              {msg.role === 'user' ? (
+                <div className={styles.userMessage}>{msg.content}</div>
+              ) : (
+                <div className={styles.assistantMessage}>
+                  <div className={styles.avatar}>
+                    <span>{msg.modelName || 'ButvanAgent'}</span>
+                  </div>
+                  {msg.reasoning && (
+                    <div className={styles.reasoningBox}>
+                      <strong>思考过程:</strong> {msg.reasoning}
+                    </div>
+                  )}
+                  <div style={{ fontSize: '14px', lineHeight: 1.6 }}>{msg.content}</div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
-      {/* Floating Prompt Input */}
-      <div className={styles.inputContainer}>
+      {/* Bottom Floating Codex Style Input Area */}
+      <div className={styles.bottomContainer}>
+        {/* Top Notice Pill Bar */}
+        <div className={styles.noticeBar}>
+          <div className={styles.noticeText}>
+            <Clock size={14} />
+            <span>你的 ButvanAgent 配额已就绪 · 点击右侧随时配置多厂商 AI 密匙</span>
+          </div>
+          <button className={styles.upgradeBtn} onClick={onOpenSettings}>
+            升级/配置
+          </button>
+        </div>
+
+        {/* Input Box Capsule Container */}
         <div className={styles.inputBox}>
+          <div className={styles.projectPill}>
+            <Folder size={13} />
+            选择项目
+          </div>
+
           <textarea
             className={styles.textarea}
-            placeholder="输入对话或 Agent 任务指令..."
+            placeholder="随心输入..."
             value={inputPrompt}
             onChange={(e) => setInputPrompt(e.target.value)}
             onKeyDown={handleKeyDown}
           />
-          <div className={styles.inputFooter}>
-            <div className={styles.hint}>
-              <Terminal size={11} style={{ display: 'inline', marginRight: '4px' }} />
-              按 Cmd + Enter 发送
+
+          <div className={styles.inputToolbar}>
+            <div className={styles.toolbarLeft}>
+              <button className={styles.toolBtn} title="添加文件/图片">
+                <Plus size={16} />
+              </button>
+              <button className={styles.toolBtn} title="审批与自动运行设置">
+                <Settings2 size={14} />
+                替我审批
+              </button>
             </div>
-            <button className={styles.sendBtn} onClick={handleSend}>
-              <Send size={15} />
-            </button>
+
+            <div className={styles.toolbarRight}>
+              {/* Model selector dropdown embedded inside input bar */}
+              <ModelSelector onOpenSettings={onOpenSettings} />
+              <button className={styles.toolBtn} title="语音输入">
+                <Mic size={15} />
+              </button>
+              <button
+                className={`${styles.sendCircleBtn} ${
+                  inputPrompt.trim() ? styles.sendCircleBtnActive : ''
+                }`}
+                onClick={handleSend}
+              >
+                <ArrowUp size={16} />
+              </button>
+            </div>
           </div>
         </div>
       </div>

@@ -1,56 +1,49 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
-  /* Ivory White (象牙白) & Swiss Minimal Palette */
-  --bg-app: #FAF9F6;            /* 象牙白主背景 */
-  --bg-sidebar: #F2F0E9;        /* 柔和象牙灰/米色侧边栏 */
-  --bg-surface: #FFFFFF;        /* 纯白抬升面板 */
-  --bg-surface-hover: #EBE8DE;  /* 悬停微深象牙调 */
-  --bg-surface-active: #E0DDD0; /* 点击激活调 */
-  --bg-input: #FFFFFF;          /* 输入框纯白 */
-  --bg-modal-overlay: rgba(26, 26, 26, 0.4);
+  /* Codex Desktop Standard Palette (Aligned with Screenshots) */
+  --bg-app: #FFFFFF;            /* 主画板纯白 */
+  --bg-sidebar: #E5E9EE;        /* Codex 经典冰蓝灰侧边栏 */
+  --bg-sidebar-hover: #DCE1E7;  /* 侧边栏悬停 */
+  --bg-sidebar-active: #D3D9E0; /* 侧边栏激活 */
 
-  /* No Border Line Separators (无明显线条分隔) */
-  --border-subtle: transparent;
-  --border-medium: transparent;
-  --border-focus: #1A1A1A;
+  --bg-surface: #F8F9FA;        /* 卡片与浮层浅灰 */
+  --bg-surface-hover: #F1F3F5;
+  --bg-input: #F8F9FA;
+  --bg-modal-overlay: rgba(0, 0, 0, 0.35);
 
-  /* High Contrast Swiss Typography Colors */
-  --text-primary: #1A1A1A;
-  --text-secondary: #555555;
-  --text-muted: #888888;
+  /* Borders & Dividers */
+  --border-subtle: #E5E7EB;
+  --border-medium: #D1D5DB;
+  --border-focus: #3B82F6;
+
+  /* Typography Colors */
+  --text-primary: #111827;
+  --text-secondary: #4B5563;
+  --text-muted: #9CA3AF;
   --text-inverse: #FFFFFF;
 
-  /* Accent Colors - Crisp & Minimalist */
-  --accent-primary: #1A1A1A;
-  --accent-primary-hover: #333333;
-  --accent-glow: #EBE8DE;
-
-  --color-success: #059669;
-  --color-warning: #D97706;
-  --color-error: #DC2626;
-
-  /* Vendor Tag Accents (Ivory Neutral Tone) */
-  --openai-color: #1A1A1A;
-  --deepseek-color: #1A1A1A;
-  --anthropic-color: #1A1A1A;
-  --ollama-color: #1A1A1A;
-  --qwen-color: #1A1A1A;
+  /* Accents */
+  --accent-purple: #9333EA;
+  --accent-purple-bg: #F3E8FF;
+  --accent-blue: #2563EB;
+  --accent-dark: #111827;
 
   /* Fonts */
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
-  /* 0px Radius (严格直角无圆角) */
-  --radius-sm: 0px;
-  --radius-md: 0px;
-  --radius-lg: 0px;
-  --radius-full: 0px;
+  /* Codex Rounded Corners Design */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-full: 9999px;
 
-  /* Shadows - Minimal Soft Ambient Depth without harsh borders */
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.1);
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.08);
 
   /* Transitions */
   --transition-fast: 150ms ease;
@@ -61,7 +54,6 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  border-radius: 0 !important; /* 强制严格无圆角 */
 }
 
 body {
@@ -75,10 +67,10 @@ body {
   user-select: none;
 }
 
-/* Custom Scrollbars - Straight & Sharp */
+/* Custom Scrollbars */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -86,12 +78,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.15);
-  border-radius: 0px !important;
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: var(--radius-full);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.25);
 }
 
 /* Code & Pre */
@@ -106,5 +98,5 @@ button, a, input[type="button"], select {
 
 button:disabled, input:disabled {
   cursor: not-allowed;
-  opacity: 0.4;
+  opacity: 0.45;
 }
