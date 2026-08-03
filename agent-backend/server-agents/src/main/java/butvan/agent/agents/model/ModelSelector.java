@@ -1,18 +1,13 @@
-package butvan.agent.agents.model.dto;
+package butvan.agent.agents.model;
 
-/**
- * 运行时模型选择器
- * ModelSelector
- */
 public record ModelSelector(
-                String vendor,
-                String modelName,
-                Double temperature,
-                String customBaseUrl,
-                String customApiKey) {
+        String vendor,
+        String name,
+        String apiKey,
+        Double temperature,
+        Boolean stream) {
 
-        public static ModelSelector of(String vendor, String modelName) {
-            return new ModelSelector(vendor, modelName, 0.7, null, null);
-        }
-                
+    public static ModelSelector of(String vendor, String name, String apiKey) {
+        return new ModelSelector(vendor, name, apiKey, 0.7, true);
+    }
 }
