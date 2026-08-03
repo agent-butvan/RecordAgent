@@ -79,21 +79,30 @@ flowchart TD
 
 #### 2. 修改子模块 `agent-backend/server-agents/pom.xml`
 
-在 `<dependencies>` 中引入对应的扩展依赖：
+因为 `server-agents` 模块需要使用 `@Component` 和 `@ConfigurationProperties` 等 Spring 核心注解，需要在此模块添加 `spring-boot-starter` 依赖：
 
 ```xml
 <!-- agent-backend/server-agents/pom.xml -->
 <dependencies>
+    <!-- Spring Boot 基础核心依赖 (提供 @Component, @ConfigurationProperties 等) -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter</artifactId>
+    </dependency>
+
+    <!-- AgentScope 核心依赖 -->
     <dependency>
         <groupId>io.agentscope</groupId>
         <artifactId>agentscope-harness</artifactId>
     </dependency>
 
+    <!-- AgentScope 阿里云 DashScope 模型扩展 -->
     <dependency>
         <groupId>io.agentscope</groupId>
         <artifactId>agentscope-extensions-model-dashscope</artifactId>
     </dependency>
 
+    <!-- AgentScope OpenAI / OpenAI-Compat 模型扩展 -->
     <dependency>
         <groupId>io.agentscope</groupId>
         <artifactId>agentscope-extensions-model-openai</artifactId>
@@ -148,6 +157,10 @@ agent:
 ### 步骤三：创建厂商配置实体类 (`VendorProviderProperties.java`)
 
 新建文件路径：`agent-backend/server-agents/src/main/java/butvan/agent/agents/model/config/VendorProviderProperties.java`
+
+注解对应包路径为：
+- `@Component`: `import org.springframework.stereotype.Component;`
+- `@ConfigurationProperties`: `import org.springframework.boot.context.properties.ConfigurationProperties;`
 
 ```java
 package butvan.agent.agents.model.config;
