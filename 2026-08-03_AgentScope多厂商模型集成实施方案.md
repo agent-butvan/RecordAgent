@@ -1,35 +1,47 @@
-# AgentScope-Java 2.0 多厂商大模型集成架构与手动实施指南
+# AgentScope-Java 2.0 动态多厂商大模型集成架构与手动实施指南
 
 > **文档日期**: 2026-08-03  
 > **目标模块**: `agent-backend` (`server-agents` 模块)  
 > **框架规范**: AgentScope-Java 2.0 + Spring Boot 3.4  
-> **参考开源项目**: `mewcode-java` (`com.mewcode.llm` / `com.mewcode.config`)
+> **设计目标**: 实现“厂商端点凭证 (BaseURL + Key) 配置”与“运行时动态模型 ID (Model Name)”彻底解耦，支持前端选择厂商与自由输入/切换任意模型。
 
 ---
 
-## 一、 方案设计背景与参考架构分析
+## 一、 方案设计背景与架构升级说明
 
-本项目 (`ButvanAgent`) 后端基于 **AgentScope-Java 2.0** 构建。在参考项目 `mewcode-java` 中，其多厂商 LLM 集成模块具备极强的工业级完备性与可扩展性。本方案深度吸收 `mewcode-java` 的核心设计理念，将其迁移并升级至 AgentScope-Java 与 Spring Boot 3.4 架构下。
+### 1.1 传统硬编码模型配置痛点
+在传统的配置方式中，YAML 文件强绑定了具体的模型实例（如 `qwen-max`, `deepseek-r1`, `gpt-4o`）。这种方式存在明显缺陷：
+- **死板固化**：每次厂商推出了新模型（如 `qwen-turbo-latest` 或 `gpt-4.5`），系统都必须修改 YAML 甚至重启后端。
+- **缺乏前端交互**：无法在 Web 前端让用户自行填写个人/企业的 API Key 和 Base URL，也无法动态下拉选择新模型。
 
-### 1.1 `mewcode-java` 核心设计要素借鉴
+### 1.2 动态厂商驱动架构 (Dynamic Vendor-Driven Architecture)
 
-- **统一配置驱动 (`ProviderConfig`)**：将厂商协议 (`protocol`)、模型标识 (`model`)、BaseURL、API Key、思考模式 (`thinking`) 和上下文窗口集中配置化管理。
-- **多级 API Key 隐蔽解析 (`resolvedApiKey`)**：当 API Key 未显式配置时，系统根据 `protocol` 自动隐蔽读取环境变量（如 `DASHSCOPE_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `DEEPSEEK_API_KEY`）。
-- **上下文窗口 4 层兜底算法 (`resolvedContextWindow`)**：采用 4 层优先顺序计算有效 Context Window：显式 YAML 配置 > 动态端点拉取缓存 > 内置模型 ID 名称契约矩阵 > 默认 128k 保守兜底值。
-- **模型能力与别名解析器 (`ModelResolver`)**：负责模型简写别名（如 `sonnet`, `qwen`, `deepseek`）到全量模型 ID 的映射，并检测模型是否支持 Reasoning/Thinking 特性。
+本升级方案将集成层拆分为两级架构：
 
-### 1.2 AgentScope-Java 2.0 模型组件体系
+```mermaid
+flowchart TD
+    UI[Web前端 / 交互界面] -->|发送请求: vendor='deepseek', model='deepseek-r1'| Controller[后端 API]
+    
+    subgraph 厂商凭证管理 (Vendor Credential Layer)
+        ConfigDB[(YAML / Nacos / 数据库)] -->|定义厂商凭证| Registry[AgentScopeModelRegistry]
+        VendorOpenAI[OpenAI: baseUrl + apiKey] --> Registry
+        VendorDashscope[DashScope: apiKey] --> Registry
+        VendorDeepSeek[DeepSeek: baseUrl + apiKey] --> Registry
+        VendorOllama[Ollama: baseUrl] --> Registry
+    end
+    
+    Controller -->|按厂商与模型请求| Registry
+    Registry -->|动态匹配/复用模型| Factory[AgentScopeModelFactory]
+    Factory -->|实例化 AgentScope Model| Agent[ReActAgent / Workflow]
+```
 
-AgentScope-Java 2.0 采用了高度模块化的 Model 抽象架构：
-- **DashScope 厂商扩展**：扩展依赖包 `io.agentscope:agentscope-extensions-model-dashscope`，内置 `DashScopeChatModel`。
-- **OpenAI / OpenAI-Compat 厂商扩展**：扩展依赖包 `io.agentscope:agentscope-extensions-model-openai`，内置 `OpenAIChatModel`，天然兼容 DeepSeek, Ollama, vLLM, SiliconFlow 等标准 OpenAI 兼容端点。
-- **Anthropic 厂商扩展**：扩展依赖包 `io.agentscope:agentscope-extensions-model-anthropic`，内置 `AnthropicChatModel`。
+1. **厂商凭证配置 (Vendor Config)**：仅需在配置/数据库中保存不同厂商（如 `dashscope`, `openai`, `deepseek`, `siliconflow`, `ollama`）的 **Protocol**、**Base URL** 和 **API Key**。
+2. **运行时模型选择 (Runtime Model Resolution)**：在前端或对话请求中，用户只需选择厂商，并指定具体想要调用的 `model`（模型标识）。
+3. **动态工厂与智能缓存 (Dynamic Factory & Caching)**：后端根据“厂商凭证 + 模型标识”即时构造对应的 AgentScope `Model` 实例（`DashScopeChatModel` 或 `OpenAIChatModel`），并进行高效内存缓存。
 
 ---
 
 ## 二、 详细实施步骤指南 (Step-by-Step)
-
-请按照以下步骤依次在 `agent-backend` 工程中新建与修改代码文件。
 
 ---
 
@@ -91,48 +103,51 @@ AgentScope-Java 2.0 采用了高度模块化的 Model 抽象架构：
 
 ---
 
-### 步骤二：配置应用 YAML (`application.yml`)
+### 步骤二：厂商级配置声明 (`application.yml`)
 
-在 `server-network/src/main/resources/application.yml`（或 `server-agents` 相应配置文件）中加入以下模型多厂商配置：
+在配置文件中，**仅配置厂商粒度**的通信凭证，无需死板写死具体模型列表：
 
 ```yaml
 agent:
   model:
-    default-provider: qwen-max
-    providers:
-      qwen-max:
+    default-vendor: dashscope
+    default-model: qwen-max
+    vendors:
+      # 阿里云 DashScope
+      dashscope:
         protocol: dashscope
-        model: qwen-max
         api-key: ${DASHSCOPE_API_KEY:}
-        thinking: false
-        context-window: 32768
-        max-output-tokens: 8192
-        temperature: 0.7
       
-      deepseek-r1:
+      # DeepSeek 官方 API
+      deepseek:
         protocol: openai-compat
         base-url: https://api.deepseek.com/v1
-        model: deepseek-reasoner
         api-key: ${DEEPSEEK_API_KEY:}
-        thinking: true
-        context-window: 64000
-        max-output-tokens: 8192
-        temperature: 0.6
+      
+      # 硅基流动 SiliconFlow
+      siliconflow:
+        protocol: openai-compat
+        base-url: https://api.siliconflow.cn/v1
+        api-key: ${SILICONFLOW_API_KEY:}
 
-      gpt-4o:
+      # 本地 Ollama
+      ollama:
+        protocol: openai-compat
+        base-url: http://localhost:11434/v1
+        api-key: "ollama"
+
+      # OpenAI 官方
+      openai:
         protocol: openai
-        model: gpt-4o
+        base-url: https://api.openai.com/v1
         api-key: ${OPENAI_API_KEY:}
-        thinking: false
-        context-window: 128000
-        max-output-tokens: 4096
 ```
 
 ---
 
-### 步骤三：创建配置映射类 `ModelProviderProperties.java`
+### 步骤三：创建厂商配置实体类 (`VendorProviderProperties.java`)
 
-新建文件路径：`agent-backend/server-agents/src/main/java/butvan/agent/agents/model/config/ModelProviderProperties.java`
+新建文件路径：`agent-backend/server-agents/src/main/java/butvan/agent/agents/model/config/VendorProviderProperties.java`
 
 ```java
 package butvan.agent.agents.model.config;
@@ -144,48 +159,45 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * AgentScope 多厂商模型配置映射类。
+ * 厂商级（Vendor Level）大模型凭证配置类。
  */
 @Component
 @ConfigurationProperties(prefix = "agent.model")
-public class ModelProviderProperties {
+public class VendorProviderProperties {
 
     /**
-     * 默认模型提供者名称
+     * 默认厂商名称
      */
-    private String defaultProvider = "qwen-max";
+    private String defaultVendor = "dashscope";
 
     /**
-     * 多厂商模型配置字典 (providerName -> ProviderConfig)
+     * 默认模型 ID
      */
-    private Map<String, ProviderConfig> providers = new HashMap<>();
+    private String defaultModel = "qwen-max";
 
-    public String getDefaultProvider() {
-        return defaultProvider;
-    }
+    /**
+     * 厂商凭证配置字典 (vendorName -> VendorConfig)
+     */
+    private Map<String, VendorConfig> vendors = new HashMap<>();
 
-    public void setDefaultProvider(String defaultProvider) {
-        this.defaultProvider = defaultProvider;
-    }
+    public String getDefaultVendor() { return defaultVendor; }
+    public void setDefaultVendor(String defaultVendor) { this.defaultVendor = defaultVendor; }
 
-    public Map<String, ProviderConfig> getProviders() {
-        return providers;
-    }
+    public String getDefaultModel() { return defaultModel; }
+    public void setDefaultModel(String defaultModel) { this.defaultModel = defaultModel; }
 
-    public void setProviders(Map<String, ProviderConfig> providers) {
-        this.providers = providers;
-    }
+    public Map<String, VendorConfig> getVendors() { return vendors; }
+    public void setVendors(Map<String, VendorConfig> vendors) { this.vendors = vendors; }
 
-    public static class ProviderConfig {
+    /**
+     * 厂商凭证配置
+     */
+    public static class VendorConfig {
         private String name;
-        private String protocol; // "dashscope", "openai", "openai-compat", "anthropic"
+        private String protocol; // "dashscope", "openai", "openai-compat"
         private String baseUrl;
-        private String model;
         private String apiKey;
-        private boolean thinking;
-        private int contextWindow;
-        private int maxOutputTokens;
-        private Double temperature = 0.7;
+        private boolean enabled = true;
 
         public String getName() { return name; }
         public void setName(String name) { this.name = name; }
@@ -196,138 +208,55 @@ public class ModelProviderProperties {
         public String getBaseUrl() { return baseUrl; }
         public void setBaseUrl(String baseUrl) { this.baseUrl = baseUrl; }
 
-        public String getModel() { return model; }
-        public void setModel(String model) { this.model = model; }
-
         public String getApiKey() { return apiKey; }
         public void setApiKey(String apiKey) { this.apiKey = apiKey; }
 
-        public boolean isThinking() { return thinking; }
-        public void setThinking(boolean thinking) { this.thinking = thinking; }
-
-        public int getContextWindow() { return contextWindow; }
-        public void setContextWindow(int contextWindow) { this.contextWindow = contextWindow; }
-
-        public int getMaxOutputTokens() { return maxOutputTokens; }
-        public void setMaxOutputTokens(int maxOutputTokens) { this.maxOutputTokens = maxOutputTokens; }
-
-        public Double getTemperature() { return temperature; }
-        public void setTemperature(Double temperature) { this.temperature = temperature; }
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
     }
 }
 ```
 
 ---
 
-### 步骤四：创建别名与能力解析器 `ModelResolver.java`
+### 步骤四：创建动态模型请求上下文 (`ModelSelector.java`)
 
-新建文件路径：`agent-backend/server-agents/src/main/java/butvan/agent/agents/model/resolver/ModelResolver.java`
+用于在运行时传递“厂商 + 动态模型 ID”：
+
+新建文件路径：`agent-backend/server-agents/src/main/java/butvan/agent/agents/model/dto/ModelSelector.java`
 
 ```java
-package butvan.agent.agents.model.resolver;
-
-import butvan.agent.agents.model.config.ModelProviderProperties.ProviderConfig;
-
-import java.util.Map;
+package butvan.agent.agents.model.dto;
 
 /**
- * 模型别名映射、能力探测与多级 Context Window 兜底解析器。
+ * 运行时模型选择器 DTO。
  */
-public class ModelResolver {
-
-    /**
-     * 常用模型别名映射表
-     */
-    private static final Map<String, String> ALIASES = Map.of(
-            "qwen", "qwen-max",
-            "sonnet", "claude-3-5-sonnet-20241022",
-            "haiku", "claude-3-5-haiku-20241022",
-            "deepseek", "deepseek-reasoner",
-            "gpt4", "gpt-4o"
-    );
-
-    /**
-     * 协议与其对应的环境变量 API Key 映射
-     */
-    private static final Map<String, String> ENV_KEY_MAP = Map.of(
-            "dashscope", "DASHSCOPE_API_KEY",
-            "openai", "OPENAI_API_KEY",
-            "openai-compat", "OPENAI_API_KEY",
-            "anthropic", "ANTHROPIC_API_KEY"
-    );
-
-    /**
-     * 解析模型名称或别名
-     */
-    public static String resolveModelId(String modelOrAlias) {
-        if (modelOrAlias == null) return "";
-        return ALIASES.getOrDefault(modelOrAlias.toLowerCase(), modelOrAlias);
-    }
-
-    /**
-     * 判断模型是否具备 Reasoning / Thinking 特性
-     */
-    public static boolean supportsThinking(String model) {
-        if (model == null) return false;
-        String m = model.toLowerCase();
-        return m.contains("reasoner") || m.contains("o1") || m.contains("o3") || m.contains("claude-3-7");
-    }
-
-    /**
-     * 隐蔽解析有效 API Key (配置显示 Key > 系统环境变量)
-     */
-    public static String resolveApiKey(ProviderConfig cfg) {
-        if (cfg.getApiKey() != null && !cfg.getApiKey().isBlank()) {
-            return cfg.getApiKey();
-        }
-        String envName = ENV_KEY_MAP.get(cfg.getProtocol());
-        if (envName != null) {
-            String val = System.getenv(envName);
-            if (val != null && !val.isBlank()) {
-                return val;
-            }
-        }
-        // 特殊 fallback：若为 deepseek 可尝试 DEEPSEEK_API_KEY
-        if ("openai-compat".equals(cfg.getProtocol())) {
-            String dsKey = System.getenv("DEEPSEEK_API_KEY");
-            if (dsKey != null && !dsKey.isBlank()) return dsKey;
-        }
-        return "";
-    }
-
-    /**
-     * 4 层 Context Window 兜底解析机制
-     */
-    public static int resolveContextWindow(ProviderConfig cfg) {
-        // Layer 1: 手写显式配置
-        if (cfg.getContextWindow() > 0) {
-            return cfg.getContextWindow();
-        }
-        // Layer 2 & 3: 模型契约匹配矩阵
-        String m = cfg.getModel() != null ? cfg.getModel().toLowerCase() : "";
-        if (m.contains("1m") || m.contains("gpt-4.1")) return 1_000_000;
-        if (m.contains("gpt-4o") || m.contains("gpt-4-turbo")) return 128_000;
-        if (m.contains("o1") || m.contains("o3") || m.contains("claude")) return 200_000;
-        if (m.contains("deepseek")) return 64_000;
-        if (m.contains("qwen")) return 32_768;
-
-        // Layer 4: 保守兜底
-        return 128_000;
+public record ModelSelector(
+        String vendor,      // 厂商标识，如 "deepseek", "dashscope", "openai"
+        String modelName,   // 动态输入的模型标识，如 "deepseek-reasoner", "qwen-plus", "gpt-4o-mini"
+        Double temperature, // 温度系数 (选填)
+        String customBaseUrl,// 自定义临时 BaseURL (选填，支持前端覆盖)
+        String customApiKey  // 自定义临时 APIKey (选填，支持前端覆盖)
+) {
+    public static ModelSelector of(String vendor, String modelName) {
+        return new ModelSelector(vendor, modelName, 0.7, null, null);
     }
 }
 ```
 
 ---
 
-### 步骤五：创建模型工厂类 `AgentScopeModelFactory.java`
+### 步骤五：升级模型工厂类 (`AgentScopeModelFactory.java`)
+
+支持基于“厂商配置 + 动态模型 ID”即时创建 AgentScope Model：
 
 新建文件路径：`agent-backend/server-agents/src/main/java/butvan/agent/agents/model/factory/AgentScopeModelFactory.java`
 
 ```java
 package butvan.agent.agents.model.factory;
 
-import butvan.agent.agents.model.config.ModelProviderProperties.ProviderConfig;
-import butvan.agent.agents.model.resolver.ModelResolver;
+import butvan.agent.agents.model.config.VendorProviderProperties.VendorConfig;
+import butvan.agent.agents.model.dto.ModelSelector;
 import io.agentscope.core.model.Model;
 import io.agentscope.model.DashScopeChatModel;
 import io.agentscope.model.OpenAIChatModel;
@@ -335,62 +264,88 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * AgentScope Java 模型构建工厂。
+ * 动态 AgentScope Java 模型构建工厂。
  */
 public class AgentScopeModelFactory {
 
     private static final Logger log = LoggerFactory.getLogger(AgentScopeModelFactory.class);
 
     /**
-     * 根据 ProviderConfig 构建对应的 AgentScope Model 实例
+     * 根据厂商凭证与动态模型请求构建对应的 AgentScope Model 实例
      */
-    public static Model createModel(String providerName, ProviderConfig cfg) {
-        String protocol = cfg.getProtocol() != null ? cfg.getProtocol().toLowerCase() : "";
-        String apiKey = ModelResolver.resolveApiKey(cfg);
-        String modelId = ModelResolver.resolveModelId(cfg.getModel());
+    public static Model createModel(VendorConfig vendorConfig, ModelSelector selector) {
+        String protocol = vendorConfig.getProtocol() != null ? vendorConfig.getProtocol().toLowerCase() : "";
+        
+        // 优先使用请求级自定 Key/Url，未提供则使用厂商默认配置
+        String apiKey = (selector.customApiKey() != null && !selector.customApiKey().isBlank())
+                ? selector.customApiKey()
+                : resolveApiKey(vendorConfig);
 
-        log.info("Initializing AgentScope Model [{}] - Protocol: {}, ModelId: {}", providerName, protocol, modelId);
+        String baseUrl = (selector.customBaseUrl() != null && !selector.customBaseUrl().isBlank())
+                ? selector.customBaseUrl()
+                : vendorConfig.getBaseUrl();
+
+        String targetModelId = selector.modelName();
+        Double temp = selector.temperature() != null ? selector.temperature() : 0.7;
+
+        log.info("Creating dynamic AgentScope Model - Vendor: [{}], Protocol: [{}], Target Model: [{}], BaseUrl: [{}]",
+                vendorConfig.getName(), protocol, targetModelId, baseUrl);
 
         switch (protocol) {
             case "dashscope":
                 return DashScopeChatModel.builder()
-                        .modelName(modelId)
+                        .modelName(targetModelId)
                         .apiKey(apiKey)
-                        .temperature(cfg.getTemperature())
+                        .temperature(temp)
                         .build();
 
             case "openai":
             case "openai-compat":
                 var openAiBuilder = OpenAIChatModel.builder()
-                        .modelName(modelId)
+                        .modelName(targetModelId)
                         .apiKey(apiKey)
-                        .temperature(cfg.getTemperature());
+                        .temperature(temp);
                 
-                if (cfg.getBaseUrl() != null && !cfg.getBaseUrl().isBlank()) {
-                    openAiBuilder.baseUrl(cfg.getBaseUrl());
+                if (baseUrl != null && !baseUrl.isBlank()) {
+                    openAiBuilder.baseUrl(baseUrl);
                 }
                 return openAiBuilder.build();
 
             default:
-                throw new IllegalArgumentException("Unsupported model protocol: [" + protocol + "] for provider [" + providerName + "]");
+                throw new IllegalArgumentException("Unsupported protocol: [" + protocol + "] for vendor [" + vendorConfig.getName() + "]");
         }
+    }
+
+    private static String resolveApiKey(VendorConfig config) {
+        if (config.getApiKey() != null && !config.getApiKey().isBlank()) {
+            return config.getApiKey();
+        }
+        // 环境变量读取
+        String envKey = switch (config.getProtocol()) {
+            case "dashscope" -> System.getenv("DASHSCOPE_API_KEY");
+            case "openai", "openai-compat" -> System.getenv("OPENAI_API_KEY");
+            default -> null;
+        };
+        return envKey != null ? envKey : "";
     }
 }
 ```
 
 ---
 
-### 步骤六：创建模型注册中心 `AgentScopeModelRegistry.java`
+### 步骤六：创建厂商注册与动态模型路由中心 (`AgentScopeModelRegistry.java`)
+
+支持在线更新厂商配置、动态路由模型、线程安全缓存：
 
 新建文件路径：`agent-backend/server-agents/src/main/java/butvan/agent/agents/model/registry/AgentScopeModelRegistry.java`
 
 ```java
 package butvan.agent.agents.model.registry;
 
-import butvan.agent.agents.model.config.ModelProviderProperties;
-import butvan.agent.agents.model.config.ModelProviderProperties.ProviderConfig;
+import butvan.agent.agents.model.config.VendorProviderProperties;
+import butvan.agent.agents.model.config.VendorProviderProperties.VendorConfig;
+import butvan.agent.agents.model.dto.ModelSelector;
 import butvan.agent.agents.model.factory.AgentScopeModelFactory;
-import butvan.agent.agents.model.resolver.ModelResolver;
 import io.agentscope.core.model.Model;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
@@ -401,115 +356,110 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * AgentScope 模型注册中心与生命周期托管。
+ * 厂商凭证注册中心与动态模型路由。
  */
 @Component
 public class AgentScopeModelRegistry {
 
     private static final Logger log = LoggerFactory.getLogger(AgentScopeModelRegistry.class);
 
-    private final ModelProviderProperties properties;
-    private final Map<String, Model> modelCache = new ConcurrentHashMap<>();
+    private final VendorProviderProperties properties;
+    
+    // 厂商配置表 (vendorName -> VendorConfig)
+    private final Map<String, VendorConfig> vendorCache = new ConcurrentHashMap<>();
 
-    public AgentScopeModelRegistry(ModelProviderProperties properties) {
+    // 动态 Model 实例缓存 (cacheKey: vendor:modelName -> Model)
+    private final Map<String, Model> modelInstanceCache = new ConcurrentHashMap<>();
+
+    public AgentScopeModelRegistry(VendorProviderProperties properties) {
         this.properties = properties;
     }
 
     @PostConstruct
     public void init() {
-        log.info("Starting initializing AgentScope ModelRegistry...");
-        Map<String, ProviderConfig> providers = properties.getProviders();
-        if (providers == null || providers.isEmpty()) {
-            log.warn("No model providers configured under agent.model.providers!");
-            return;
+        log.info("Initializing AgentScope VendorRegistry...");
+        Map<String, VendorConfig> vendors = properties.getVendors();
+        if (vendors != null) {
+            vendors.forEach((name, config) -> {
+                config.setName(name);
+                vendorCache.put(name, config);
+                log.info("Registered Vendor Provider: [{}] - Protocol: {}", name, config.getProtocol());
+            });
         }
-
-        providers.forEach((name, cfg) -> {
-            try {
-                cfg.setName(name);
-                Model model = AgentScopeModelFactory.createModel(name, cfg);
-                modelCache.put(name, model);
-                log.info("Successfully registered AgentScope Model [{}]", name);
-            } catch (Exception e) {
-                log.error("Failed to initialize model provider [{}]", name, e);
-            }
-        });
     }
 
     /**
-     * 根据厂商配置名或别名获取 AgentScope Model 实例
+     * 根据 ModelSelector (厂商 + 动态模型标识) 获取或构建 AgentScope Model
      */
-    public Model getModel(String providerOrAlias) {
-        if (providerOrAlias == null || providerOrAlias.isBlank()) {
-            return getDefaultModel();
+    public Model getModel(ModelSelector selector) {
+        String vendorName = (selector.vendor() != null && !selector.vendor().isBlank())
+                ? selector.vendor()
+                : properties.getDefaultVendor();
+
+        String modelName = (selector.modelName() != null && !selector.modelName().isBlank())
+                ? selector.modelName()
+                : properties.getDefaultModel();
+
+        VendorConfig vendorConfig = vendorCache.get(vendorName);
+        if (vendorConfig == null) {
+            throw new IllegalArgumentException("Vendor provider [" + vendorName + "] is not registered in system!");
         }
 
-        // 1. 精确配置名匹配
-        if (modelCache.containsKey(providerOrAlias)) {
-            return modelCache.get(providerOrAlias);
-        }
+        // 缓存 Key: vendor:modelName
+        String cacheKey = vendorName + ":" + modelName;
+        return modelInstanceCache.computeIfAbsent(cacheKey, k -> 
+                AgentScopeModelFactory.createModel(vendorConfig, selector)
+        );
+    }
 
-        // 2. 别名解析匹配
-        String resolvedName = ModelResolver.resolveModelId(providerOrAlias);
-        if (modelCache.containsKey(resolvedName)) {
-            return modelCache.get(resolvedName);
-        }
+    /**
+     * 快捷调用接口：指定厂商与动态模型名
+     */
+    public Model getModel(String vendor, String modelName) {
+        return getModel(ModelSelector.of(vendor, modelName));
+    }
 
-        log.warn("Model provider [{}] not found, falling back to default provider [{}]", 
-                providerOrAlias, properties.getDefaultProvider());
-        return getDefaultModel();
+    /**
+     * 动态注册或更改厂商配置 (支持前端设置页面在线更新)
+     */
+    public void updateVendorConfig(String vendorName, VendorConfig config) {
+        config.setName(vendorName);
+        vendorCache.put(vendorName, config);
+        // 清理该厂商旧模型缓存
+        modelInstanceCache.keySet().removeIf(key -> key.startsWith(vendorName + ":"));
+        log.info("Updated Vendor Config for [{}] and invalidated model caches.", vendorName);
     }
 
     /**
      * 获取系统默认模型
      */
     public Model getDefaultModel() {
-        String defaultName = properties.getDefaultProvider();
-        Model defaultModel = modelCache.get(defaultName);
-        if (defaultModel == null) {
-            throw new IllegalStateException("Default AgentScope Model [" + defaultName + "] is not initialized!");
-        }
-        return defaultModel;
+        return getModel(properties.getDefaultVendor(), properties.getDefaultModel());
     }
 }
 ```
 
 ---
 
-## 三、 测试验证与故障排查 (Verification & Troubleshooting)
+## 三、 扩展使用说明（前端与业务层调用）
 
-### 3.1 单元测试验证样例
-
-在 `agent-backend/server-agents/src/test/java` 中新建单元测试类：
+在业务 Service 或 Controller 中，你可以极其灵活地指定厂商和调用的任意模型：
 
 ```java
-package butvan.agent.agents.model;
-
-import butvan.agent.agents.model.config.ModelProviderProperties;
-import butvan.agent.agents.model.registry.AgentScopeModelRegistry;
-import io.agentscope.core.model.Model;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-
-@SpringBootTest
-public class ModelRegistryTest {
+@Service
+public class AgentChatService {
 
     @Autowired
     private AgentScopeModelRegistry modelRegistry;
 
-    @Test
-    public void testGetDefaultModel() {
-        Model defaultModel = modelRegistry.getDefaultModel();
-        assertNotNull(defaultModel, "Default model should be properly initialized!");
+    public void startChat(String userVendor, String userModelName, String userPrompt) {
+        // 1. 动态获取用户选定的厂商+任意模型 (如: vendor="deepseek", modelName="deepseek-r1")
+        Model agentModel = modelRegistry.getModel(userVendor, userModelName);
+
+        // 2. 传递给 AgentScope 智能体使用
+        // ReActAgent agent = ReActAgent.builder().model(agentModel)...
     }
 }
 ```
 
-### 3.2 常见问题速查
-
-- **API Key 未找到错误**：请确保在环境变量中 `export DASHSCOPE_API_KEY=your_key` 或在 `application.yml` 中配置 `api-key` 参数。
-- **OpenAI-Compat 端点连接错误**：使用 deepseek, ollama 或第三方兼容端点时，请在 `application.yml` 中配置正确的 `base-url` (如 `https://api.deepseek.com/v1`)。
-- **Maven 类加载错误**：如遇 `NoSuchMethodError` 或无法找到 `DashScopeChatModel`，请执行 `mvn clean compile` 确保 parent 与 sub-module pom 文件同步拉取了 2.0.0 依赖。
+如此一来，无论厂商未来发布什么新模型，前端界面均可直接传入模型名称进行通信，无需改动后端配置与重新部署服务。
