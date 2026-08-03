@@ -24,6 +24,7 @@
 
     <properties>
         <java.version>21</java.version>
+        <lombok.version>1.18.34</lombok.version>
         <agentscope.version>2.0.0</agentscope.version>
     </properties>
 
@@ -36,6 +37,11 @@
 
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>1.18.34</version>
+            </dependency>
             <dependency>
                 <groupId>io.agentscope</groupId>
                 <artifactId>agentscope-harness</artifactId>

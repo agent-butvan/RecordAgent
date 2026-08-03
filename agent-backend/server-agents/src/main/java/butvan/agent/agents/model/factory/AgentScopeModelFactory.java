@@ -5,15 +5,13 @@ import butvan.agent.agents.model.dto.ModelSelector;
 import io.agentscope.core.model.Model;
 import io.agentscope.extensions.model.dashscope.DashScopeChatModel;
 import io.agentscope.extensions.model.openai.OpenAIChatModel;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * 模型构建工厂
  */
+@Slf4j
 public class AgentScopeModelFactory {
-
-    private static final Logger log = LoggerFactory.getLogger(AgentScopeModelFactory.class);
 
     public static Model createModel(ProviderConfig providerConfig, ModelSelector selector) {
         String protocol = providerConfig.getProtocol() != null ? providerConfig.getProtocol().toLowerCase() : "";
@@ -50,7 +48,7 @@ public class AgentScopeModelFactory {
 
                 return openAiBuilder.build();
             default:
-                throw new IllegalArgumentException("Unsupported protocol: [" + protocol + "] for vendor [" + providerConfig.getName() + "]");
+                throw new IllegalArgumentException("Unsupported protocol:[" + protocol + "] for vendor [" + providerConfig.getName() + "]");
         }
     }
 

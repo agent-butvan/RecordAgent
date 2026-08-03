@@ -5,17 +5,17 @@ import butvan.agent.agents.model.dto.ModelSelector;
 import butvan.agent.agents.model.factory.AgentScopeModelFactory;
 import io.agentscope.core.model.Model;
 import jakarta.annotation.PostConstruct;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+@Slf4j
 @Component
+@RequiredArgsConstructor
 public class AgentScopeModelRegistry {
-
-    private static final Logger log = LoggerFactory.getLogger(AgentScopeModelRegistry.class);
 
     private final ModelProviderProperties modelProviderProperties;
 
@@ -24,10 +24,6 @@ public class AgentScopeModelRegistry {
 
     // 动态 Model 实例缓存 (cacheKey: vendor:modelName -> Model)
     private final Map<String, Model> modelInstanceCache = new ConcurrentHashMap<>();
-
-    public AgentScopeModelRegistry(ModelProviderProperties modelProviderProperties) {
-        this.modelProviderProperties = modelProviderProperties;
-    }
 
     @PostConstruct
     public void init() {
@@ -74,7 +70,7 @@ public class AgentScopeModelRegistry {
     public void updateVendorConfig(String vendorName, ModelProviderProperties.ProviderConfig config) {
         config.setName(vendorName);
         vendorCache.put(vendorName, config);
-        // 清理该厂商模型缓存
+        // 清理改厂商模型缓存
         modelInstanceCache.keySet().removeIf(key -> key.startsWith(vendorName + ":"));
         log.info("Updated Vendor Config for [{}] and invalidated model caches.", vendorName);
     }
