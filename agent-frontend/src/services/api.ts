@@ -66,6 +66,9 @@ export async function saveModelConfig(params: {
     }
     return { success: false, message: json.message || '更新配置失败' };
   } catch (err: any) {
-    return { success: false, message: err.message || '无法连接至后端服务' };
+    const errMsg = err?.message === 'Load failed' || err?.message === 'Failed to fetch'
+      ? '后端网络请求被拒绝：请确认后端服务已启动且支持跨域访问'
+      : (err.message || '无法连接至后端服务');
+    return { success: false, message: errMsg };
   }
 }

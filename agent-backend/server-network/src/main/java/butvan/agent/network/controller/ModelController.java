@@ -15,6 +15,7 @@ import java.util.List;
  */
 @Slf4j
 @RestController
+@CrossOrigin(origins = "*")
 @RequestMapping("/agent/model")
 @RequiredArgsConstructor
 public class ModelController {
