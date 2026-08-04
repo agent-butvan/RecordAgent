@@ -1,6 +1,7 @@
 package butvan.agent.network.controller;
 
 import butvan.agent.agents.model.ModelSelector;
+import butvan.agent.network.annotation.ApiLog;
 import butvan.agent.network.common.Result;
 import butvan.agent.network.dto.SetModel;
 import butvan.agent.network.service.ModelService;
@@ -28,6 +29,7 @@ public class ModelController {
      * @param model 模型配置参数
      * @return 状态响应
      */
+    @ApiLog("更新与保存模型配置")
     @PostMapping
     public Result<String> updateModelConfig(@RequestBody SetModel model) {
         modelService.updateModelConfig(model);
@@ -39,6 +41,7 @@ public class ModelController {
      *
      * @return 当前 ModelSelector 配置
      */
+    @ApiLog("查询当前本地模型配置")
     @GetMapping("/config")
     public Result<ModelSelector> getModelConfig() {
         ModelSelector selector = modelService.getModelConfig();
@@ -50,6 +53,7 @@ public class ModelController {
      *
      * @return 支持的 vendor 列表
      */
+    @ApiLog("获取系统支持的模型供应商列表")
     @GetMapping("/vendors")
     public Result<List<String>> getSupportedVendors() {
         List<String> vendors = modelService.getSupportedVendors();
