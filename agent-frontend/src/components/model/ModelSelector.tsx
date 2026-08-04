@@ -72,20 +72,23 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ onOpenSettings }) 
 
       {isOpen && (
         <div className={styles.dropdown}>
-          {providers.filter(p => p.isEnabled).map((provider) => (
-            <div key={provider.id}>
-              <div className={styles.groupTitle}>{provider.name}</div>
-              {provider.models.map((model) => {
+          {providers
+            .filter((p) => p.isEnabled)
+            .flatMap((provider) =>
+              provider.models.map((model) => {
                 const isSelected = provider.id === activeProviderId && model.id === activeModelId;
                 return (
                   <button
-                    key={model.id}
+                    key={`${provider.id}-${model.id}`}
                     className={`${styles.modelOption} ${isSelected ? styles.modelOptionActive : ''}`}
                     onClick={() => handleSelectModel(provider.id, model.id)}
                   >
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 500 }}>
-                        {model.name}
+                        <span className={`${styles.providerBadge} ${getProviderClass(provider.type)}`} style={{ fontSize: '10px', padding: '1px 4px' }}>
+                          {provider.name}
+                        </span>
+                        <span>{model.name}</span>
                         {model.supportsReasoning && (
                           <span className={styles.reasoningBadge} style={{ fontSize: '9px' }}>
                             <Brain size={9} /> Reasoning
@@ -98,12 +101,11 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ onOpenSettings }) 
                         </span>
                       )}
                     </div>
-                    {isSelected && <Check size={14} style={{ color: '#818cf8' }} />}
+                    {isSelected && <Check size={14} style={{ color: '#818cf8', flexShrink: 0 }} />}
                   </button>
                 );
-              })}
-            </div>
-          ))}
+              })
+            )}
         </div>
       )}
     </div>

@@ -1,5 +1,6 @@
 package butvan.agent.network.service;
 
+import butvan.agent.agents.config.LocalConfigService;
 import butvan.agent.agents.model.ModelSelector;
 import butvan.agent.network.dto.SetModel;
 

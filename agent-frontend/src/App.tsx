@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ModelProviderContext } from './context/ModelContext';
 import { Sidebar } from './components/layout/Sidebar';
 import { ChatWorkspace } from './components/chat/ChatWorkspace';
-import { ModelConfigModal } from './components/model/ModelConfigModal';
+import { ModelSettingsPage } from './components/model/ModelSettingsPage';
 import { ModelInitPage } from './components/model/ModelInitPage';
 import { fetchModelConfig, fetchSupportedVendors } from './services/api';
 
@@ -80,17 +80,19 @@ export const App: React.FC = () => {
   return (
     <ModelProviderContext>
       <div style={{ display: 'flex', width: '100vw', height: '100vh', overflow: 'hidden' }}>
-        <Sidebar
-          activeSessionId={activeSessionId}
-          onSelectSession={setActiveSessionId}
-          onNewChat={() => setActiveSessionId(String(Date.now()))}
-          onOpenSettings={() => setIsSettingsOpen(true)}
-        />
-        <ChatWorkspace onOpenSettings={() => setIsSettingsOpen(true)} />
-        <ModelConfigModal
-          isOpen={isSettingsOpen}
-          onClose={() => setIsSettingsOpen(false)}
-        />
+        {isSettingsOpen ? (
+          <ModelSettingsPage onBack={() => setIsSettingsOpen(false)} />
+        ) : (
+          <>
+            <Sidebar
+              activeSessionId={activeSessionId}
+              onSelectSession={setActiveSessionId}
+              onNewChat={() => setActiveSessionId(String(Date.now()))}
+              onOpenSettings={() => setIsSettingsOpen(true)}
+            />
+            <ChatWorkspace onOpenSettings={() => setIsSettingsOpen(true)} />
+          </>
+        )}
       </div>
     </ModelProviderContext>
   );
