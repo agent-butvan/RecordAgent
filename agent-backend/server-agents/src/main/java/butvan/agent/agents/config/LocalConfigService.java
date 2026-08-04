@@ -72,7 +72,6 @@ public class LocalConfigService {
         private String id = "";
         private String name = "";
         private String type = "";
-        private String baseUrl = "";
         private String apiKey = "";
         private Boolean isEnabled = true;
         private java.util.List<ModelItemData> models = new java.util.ArrayList<>();
@@ -80,11 +79,10 @@ public class LocalConfigService {
         public ProviderConfigData() {
         }
 
-        public ProviderConfigData(String id, String name, String type, String baseUrl, String apiKey, Boolean isEnabled, java.util.List<ModelItemData> models) {
+        public ProviderConfigData(String id, String name, String type, String apiKey, Boolean isEnabled, java.util.List<ModelItemData> models) {
             this.id = id;
             this.name = name;
             this.type = type;
-            this.baseUrl = baseUrl;
             this.apiKey = apiKey;
             this.isEnabled = isEnabled;
             this.models = models != null ? models : new java.util.ArrayList<>();

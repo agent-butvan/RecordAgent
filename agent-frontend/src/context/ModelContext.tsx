@@ -117,7 +117,6 @@ export const ModelProviderContext: React.FC<{ children: React.ReactNode }> = ({ 
         id: p.id,
         name: p.name,
         type: p.type,
-        baseUrl: p.baseUrl,
         apiKey: p.apiKey,
         isEnabled: p.isEnabled,
         models: p.models.map((m) => ({

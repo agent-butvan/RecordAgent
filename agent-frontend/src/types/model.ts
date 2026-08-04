@@ -14,7 +14,7 @@ export interface ModelProvider {
   id: string;
   name: string;
   type: ProviderType;
-  baseUrl: string;
+  baseUrl?: string;
   apiKey: string;
   isEnabled: boolean;
   isOfficial?: boolean;

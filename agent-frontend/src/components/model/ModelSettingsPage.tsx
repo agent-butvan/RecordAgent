@@ -505,11 +505,7 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack }) 
 
                       {/* Details Row */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '12px', color: '#475569', background: '#f8fafc', padding: '8px 12px', borderRadius: '6px' }}>
-                        <div>
-                          <strong>Endpoint:</strong> <code style={{ color: '#0f172a' }}>{item.baseUrl || '系统默认'}</code>
-                        </div>
-
-                        {item.providerType !== 'ollama' && (
+                        {item.providerType !== 'ollama' ? (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <strong>API Key:</strong>
                             <code>
@@ -525,6 +521,10 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack }) 
                             >
                               {isMasked ? <Eye size={13} /> : <EyeOff size={13} />}
                             </button>
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: '12px', color: '#64748b' }}>
+                            Ollama 本地开放服务
                           </div>
                         )}
 
