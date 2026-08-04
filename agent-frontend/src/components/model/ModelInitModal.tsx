@@ -73,17 +73,17 @@ export const ModelInitModal: React.FC<ModelInitModalProps> = ({ vendors, onSucce
       <div className={styles.card}>
         <div className={styles.header}>
           <div className={styles.iconWrapper}>
-            <Sparkles size={28} color="#ffffff" />
+            <Sparkles size={24} />
           </div>
-          <h2 className={styles.title}>欢迎使用 ButvanAgent</h2>
+          <h2 className={styles.title}>初始化模型设置</h2>
           <p className={styles.subtitle}>
-            初始化配置：检测到尚未配置模型或 API Key，请完成基础模型设置以启动 Agent 对话
+            请完成初始模型厂商与 API Key 设置以开启 Agent 体验
           </p>
         </div>
 
         {errorMsg && (
           <div className={styles.errorAlert}>
-            <AlertCircle size={16} />
+            <AlertCircle size={14} />
             <span>{errorMsg}</span>
           </div>
         )}
@@ -124,7 +124,7 @@ export const ModelInitModal: React.FC<ModelInitModalProps> = ({ vendors, onSucce
                 <input
                   className={styles.input}
                   type={showApiKey ? 'text' : 'password'}
-                  placeholder="请输入您的模型服务 API Key"
+                  placeholder="请输入您的 API Key"
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
                 />
@@ -133,7 +133,7 @@ export const ModelInitModal: React.FC<ModelInitModalProps> = ({ vendors, onSucce
                   className={styles.eyeBtn}
                   onClick={() => setShowApiKey(!showApiKey)}
                 >
-                  {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                  {showApiKey ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
               </div>
             </div>
@@ -141,8 +141,8 @@ export const ModelInitModal: React.FC<ModelInitModalProps> = ({ vendors, onSucce
 
           {/* 提交按钮 */}
           <button type="submit" className={styles.submitBtn} disabled={isSubmitting}>
-            {isSubmitting ? '正在初始化...' : '保存配置并开启体验'}
-            {!isSubmitting && <ArrowRight size={16} />}
+            {isSubmitting ? '保存中...' : '保存配置并开启体验'}
+            {!isSubmitting && <ArrowRight size={15} />}
           </button>
         </form>
       </div>
