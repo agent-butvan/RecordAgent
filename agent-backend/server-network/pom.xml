@@ -19,6 +19,11 @@
         </dependency>
 
         <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+        </dependency>
+
+        <dependency>
             <groupId>butvan.agent</groupId>
             <artifactId>server-agents</artifactId>
             <version>${project.version}</version>
