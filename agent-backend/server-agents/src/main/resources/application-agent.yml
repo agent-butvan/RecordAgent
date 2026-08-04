@@ -1,7 +1,0 @@
-agent:
-  model:
-    vendor: gemini
-    name: gemini-3.6-flash
-    api-key: ${GEMINI_API_KEY:default-api-key}
-    temperature: 0.7
-    stream: true
