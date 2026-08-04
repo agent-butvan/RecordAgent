@@ -19,8 +19,8 @@
         </dependency>
 
         <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
         </dependency>
 
         <dependency>
@@ -28,6 +28,7 @@
             <artifactId>server-agents</artifactId>
             <version>${project.version}</version>
         </dependency>
+
     </dependencies>
 
     <properties>
