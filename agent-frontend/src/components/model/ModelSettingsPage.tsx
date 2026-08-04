@@ -21,14 +21,12 @@ import {
   Plus,
   Trash2,
   Brain,
-  Check,
   Zap,
   Eye,
   EyeOff,
   CheckCircle2,
   AlertCircle,
   RefreshCw,
-  Cpu,
   Inbox
 } from 'lucide-react';
 import styles from './ModelSettingsPage.module.css';

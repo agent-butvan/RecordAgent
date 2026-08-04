@@ -1,39 +1,28 @@
 import React from 'react';
-import { ChevronDown, Search, SquarePen, Download } from 'lucide-react';
+import { ChevronDown, Search, SquarePen, Trash2, Settings } from 'lucide-react';
+import type { ChatSession } from '../../types/chat';
 import styles from './Sidebar.module.css';
 
 interface SidebarProps {
+  sessions: ChatSession[];
   activeSessionId: string;
   onSelectSession: (id: string) => void;
   onNewChat: () => void;
+  onDeleteSession: (id: string, e: React.MouseEvent) => void;
   onOpenSettings: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
+  sessions,
   activeSessionId,
   onSelectSession,
   onNewChat,
+  onDeleteSession,
   onOpenSettings,
 }) => {
-  const dummySessions = [
-    { id: '1', title: '显示隐藏文件' },
-    { id: '2', title: '取免费记账App名' },
-    { id: '3', title: '提取PPT备注到Word' },
-    { id: '4', title: '介绍插件用途' },
-    { id: '5', title: '请你使用ssh root@10.100.242.163' },
-    { id: '6', title: '导出台词到Word' },
-    { id: '7', title: '定位项目级 rules 配置' },
-    { id: '8', title: '请你阅读理解一下这个ppt总体' },
-    { id: '9', title: '排查显卡无显示' },
-    { id: '10', title: '按页总结PPT备注' },
-    { id: '11', title: '分析PPT评分标准' },
-    { id: '12', title: '解读这份PPT' },
-    { id: '13', title: '小红书搜瑞幸考试题目' },
-  ];
-
   return (
     <aside className={styles.sidebar}>
-      <div>
+      <div className={styles.topContainer}>
         {/* macOS Traffic Light Buttons */}
         <div className={styles.trafficLights}>
           <div className={`${styles.dot} ${styles.red}`} />
@@ -43,11 +32,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Header Title Dropdown & Search Icon */}
         <div className={styles.header}>
-          <div className={styles.headerTitle} onClick={onOpenSettings}>
-            Codex
+          <div className={styles.headerTitle} onClick={onOpenSettings} title="点击进行系统与模型设置">
+            ButvanAgent
             <ChevronDown size={14} style={{ opacity: 0.7 }} />
           </div>
-          <button className={styles.searchBtn} title="搜索设置与历史">
+          <button className={styles.searchBtn} title="查看设置" onClick={onOpenSettings}>
             <Search size={14} />
           </button>
         </div>
@@ -60,29 +49,45 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Conversation Tasks List */}
         <div className={styles.sessionList}>
-          {dummySessions.map((session) => {
-            const isActive = session.id === activeSessionId;
-            return (
-              <button
-                key={session.id}
-                className={`${styles.sessionItem} ${isActive ? styles.sessionActive : ''}`}
-                onClick={() => onSelectSession(session.id)}
-              >
-                {session.title}
-              </button>
-            );
-          })}
+          {sessions.length === 0 ? (
+            <div className={styles.emptySessionState}>
+              <span>暂无历史任务</span>
+              <p>点击上方“新建任务”开始对话</p>
+            </div>
+          ) : (
+            sessions.map((session) => {
+              const isActive = session.id === activeSessionId;
+              return (
+                <div
+                  key={session.id}
+                  className={`${styles.sessionItem} ${isActive ? styles.sessionActive : ''}`}
+                  onClick={() => onSelectSession(session.id)}
+                >
+                  <span className={styles.sessionTitle} title={session.title}>
+                    {session.title || '新对话'}
+                  </span>
+                  <button
+                    className={styles.deleteBtn}
+                    title="删除会话"
+                    onClick={(e) => onDeleteSession(session.id, e)}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 
       {/* Footer Profile Pill & Action Icon */}
       <div className={styles.footer}>
-        <div className={styles.userProfile} onClick={onOpenSettings}>
-          <div className={styles.avatarCircle}>wj</div>
-          <span className={styles.userName}>wj</span>
+        <div className={styles.userProfile} onClick={onOpenSettings} title="个人中心与模型配置">
+          <div className={styles.avatarCircle}>BA</div>
+          <span className={styles.userName}>ButvanAgent</span>
         </div>
-        <button className={styles.actionIcon} title="导出/下载">
-          <Download size={13} />
+        <button className={styles.actionIcon} title="模型配置与设置" onClick={onOpenSettings}>
+          <Settings size={13} />
         </button>
       </div>
     </aside>

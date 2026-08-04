@@ -4,10 +4,199 @@ import { Sidebar } from './components/layout/Sidebar';
 import { ChatWorkspace } from './components/chat/ChatWorkspace';
 import { ModelSettingsPage } from './components/model/ModelSettingsPage';
 import { ModelInitPage } from './components/model/ModelInitPage';
-import { fetchModelConfig, fetchSupportedVendors } from './services/api';
+import { fetchModelConfig, fetchSupportedVendors, streamAgentChat } from './services/api';
+import type { ChatSession, ChatMessage } from './types/chat';
+
+const SESSIONS_STORAGE_KEY = 'butvan_agent_sessions_v1';
+
+export const MainLayout: React.FC<{
+  onOpenSettings: () => void;
+  isSettingsOpen: boolean;
+  setIsSettingsOpen: (open: boolean) => void;
+}> = ({ isSettingsOpen, setIsSettingsOpen }) => {
+  const [sessions, setSessions] = useState<ChatSession[]>(() => {
+    const saved = localStorage.getItem(SESSIONS_STORAGE_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {
+        console.error('读取保存的会话列表失败', e);
+      }
+    }
+    return [];
+  });
+
+  const [activeSessionId, setActiveSessionId] = useState<string>(() => {
+    return sessions[0]?.id || '';
+  });
+
+  // 变动时持久化保存会话列表
+  useEffect(() => {
+    localStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(sessions));
+  }, [sessions]);
+
+  const activeSession = sessions.find((s) => s.id === activeSessionId);
+  const activeMessages = activeSession?.messages || [];
+
+  const handleNewChat = () => {
+    const newSessionId = String(Date.now());
+    const newSession: ChatSession = {
+      id: newSessionId,
+      title: '新对话',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      messages: [],
+    };
+    setSessions((prev) => [newSession, ...prev]);
+    setActiveSessionId(newSessionId);
+  };
+
+  const handleDeleteSession = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSessions((prev) => {
+      const updated = prev.filter((s) => s.id !== id);
+      if (activeSessionId === id) {
+        setActiveSessionId(updated[0]?.id || '');
+      }
+      return updated;
+    });
+  };
+
+  const handleSendMessage = (prompt: string) => {
+    let currentSessionId = activeSessionId;
+    let targetSession = sessions.find((s) => s.id === currentSessionId);
+
+    // 若无任何激活会话，自动新建
+    if (!targetSession) {
+      currentSessionId = String(Date.now());
+      const newSession: ChatSession = {
+        id: currentSessionId,
+        title: prompt.length > 18 ? prompt.substring(0, 18) + '...' : prompt,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        messages: [],
+      };
+      setSessions((prev) => [newSession, ...prev]);
+      setActiveSessionId(currentSessionId);
+      targetSession = newSession;
+    }
+
+    const userMsg: ChatMessage = {
+      id: String(Date.now()),
+      role: 'user',
+      content: prompt,
+      createdAt: Date.now(),
+    };
+
+    const assistantMsgId = String(Date.now() + 1);
+    const assistantMsg: ChatMessage = {
+      id: assistantMsgId,
+      role: 'assistant',
+      modelName: 'ButvanAgent',
+      content: '',
+      createdAt: Date.now(),
+    };
+
+    // 追加消息并自动将新会话首句设为 Title
+    setSessions((prev) =>
+      prev.map((s) => {
+        if (s.id === currentSessionId) {
+          const isFirstMessage = s.messages.length === 0;
+          const newTitle = isFirstMessage
+            ? prompt.length > 18
+              ? prompt.substring(0, 18) + '...'
+              : prompt
+            : s.title;
+
+          return {
+            ...s,
+            title: newTitle,
+            updatedAt: Date.now(),
+            messages: [...s.messages, userMsg, assistantMsg],
+          };
+        }
+        return s;
+      })
+    );
+
+    // 发起 SSE 流式调用
+    streamAgentChat(
+      {
+        sessionId: currentSessionId,
+        context: prompt,
+      },
+      (chunkText) => {
+        setSessions((prev) =>
+          prev.map((s) => {
+            if (s.id === currentSessionId) {
+              return {
+                ...s,
+                messages: s.messages.map((msg) =>
+                  msg.id === assistantMsgId
+                    ? { ...msg, content: msg.content + chunkText }
+                    : msg
+                ),
+              };
+            }
+            return s;
+          })
+        );
+      },
+      () => {
+        console.log('Session 流式对话完成:', currentSessionId);
+      },
+      (err) => {
+        console.error('Session 流式对话异常:', err);
+        setSessions((prev) =>
+          prev.map((s) => {
+            if (s.id === currentSessionId) {
+              return {
+                ...s,
+                messages: s.messages.map((msg) =>
+                  msg.id === assistantMsgId && !msg.content
+                    ? {
+                        ...msg,
+                        content:
+                          '连接 Agent 对话服务失败或发生错误，请检查后端网络与 API Key 配置。',
+                      }
+                    : msg
+                ),
+              };
+            }
+            return s;
+          })
+        );
+      }
+    );
+  };
+
+  return (
+    <div style={{ display: 'flex', width: '100vw', height: '100vh', overflow: 'hidden' }}>
+      {isSettingsOpen ? (
+        <ModelSettingsPage onBack={() => setIsSettingsOpen(false)} />
+      ) : (
+        <>
+          <Sidebar
+            sessions={sessions}
+            activeSessionId={activeSessionId}
+            onSelectSession={setActiveSessionId}
+            onNewChat={handleNewChat}
+            onDeleteSession={handleDeleteSession}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+          />
+          <ChatWorkspace
+            messages={activeMessages}
+            onSendMessage={handleSendMessage}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+          />
+        </>
+      )}
+    </div>
+  );
+};
 
 export const App: React.FC = () => {
-  const [activeSessionId, setActiveSessionId] = useState('1');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [needsInit, setNeedsInit] = useState<boolean>(false);
   const [vendors, setVendors] = useState<string[]>(['gemini', 'openai', 'dashscope', 'deepseek', 'anthropic', 'ollama']);
@@ -79,21 +268,11 @@ export const App: React.FC = () => {
 
   return (
     <ModelProviderContext>
-      <div style={{ display: 'flex', width: '100vw', height: '100vh', overflow: 'hidden' }}>
-        {isSettingsOpen ? (
-          <ModelSettingsPage onBack={() => setIsSettingsOpen(false)} />
-        ) : (
-          <>
-            <Sidebar
-              activeSessionId={activeSessionId}
-              onSelectSession={setActiveSessionId}
-              onNewChat={() => setActiveSessionId(String(Date.now()))}
-              onOpenSettings={() => setIsSettingsOpen(true)}
-            />
-            <ChatWorkspace onOpenSettings={() => setIsSettingsOpen(true)} />
-          </>
-        )}
-      </div>
+      <MainLayout
+        isSettingsOpen={isSettingsOpen}
+        setIsSettingsOpen={setIsSettingsOpen}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+      />
     </ModelProviderContext>
   );
 };
