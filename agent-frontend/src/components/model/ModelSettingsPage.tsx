@@ -276,16 +276,16 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack }) 
               </div>
             </div>
 
-            {/* Inline Add Model Form Card */}
+            {/* Inline Add Model Form Card - 精简至仅包含【模型供应商】、【模型名称】与【API Key】 3 项 */}
             {showAddForm && (
               <form onSubmit={handleSaveModel} style={{ background: '#f8fafc', padding: '20px', borderRadius: '12px', marginBottom: '24px', border: '1px solid #cbd5e1', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
                 <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '16px', color: '#0f172a' }}>
                   新增 AI 大模型配置
                 </h3>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', marginBottom: '14px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                   <div>
-                    <label className={styles.label}>模型厂商 Vendor</label>
+                    <label className={styles.label}>模型供应商</label>
                     <select
                       className={styles.input}
                       value={formVendor}
@@ -299,71 +299,49 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack }) 
                     </select>
                   </div>
                   <div>
-                    <label className={styles.label}>Base URL (API Endpoint)</label>
+                    <label className={styles.label}>模型名称</label>
                     <input
                       className={styles.input}
-                      value={formBaseUrl}
-                      onChange={(e) => setFormBaseUrl(e.target.value)}
-                      placeholder="https://..."
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '14px' }}>
-                  <div>
-                    <label className={styles.label}>模型 ID (API Model Code)</label>
-                    <input
-                      className={styles.input}
-                      value={formModelId}
-                      onChange={(e) => setFormModelId(e.target.value)}
+                      value={formName}
+                      onChange={(e) => {
+                        setFormName(e.target.value);
+                        setFormModelId(e.target.value);
+                      }}
                       placeholder="例如 gemini-2.5-flash / deepseek-chat"
                       required
                     />
                   </div>
-                  <div>
-                    <label className={styles.label}>模型显示名称 Display Name</label>
-                    <input
-                      className={styles.input}
-                      value={formName}
-                      onChange={(e) => setFormName(e.target.value)}
-                      placeholder="例如 Gemini 2.5 Flash"
-                      required
-                    />
-                  </div>
                 </div>
 
-                <div style={{ marginBottom: '14px' }}>
-                  <label className={styles.label}>API Key 密匙</label>
+                <div style={{ marginBottom: '20px' }}>
+                  <label className={styles.label}>API Key 密钥</label>
                   <input
                     className={styles.input}
                     type="password"
                     value={formApiKey}
                     onChange={(e) => setFormApiKey(e.target.value)}
-                    placeholder={formVendor === 'ollama' ? 'Ollama 本地无需 API Key (选填)' : 'sk-...'}
+                    placeholder={formVendor === 'ollama' ? 'Ollama 本地无需 API Key (选填)' : 'sk-... / AIza...'}
                     required={formVendor !== 'ollama'}
                   />
                 </div>
 
-                <div style={{ marginBottom: '16px' }}>
-                  <label className={styles.label}>描述说明 (选填)</label>
-                  <input
-                    className={styles.input}
-                    value={formDesc}
-                    onChange={(e) => setFormDesc(e.target.value)}
-                    placeholder="模型适用场景说明"
-                  />
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer', fontWeight: 500 }}>
-                    <input
-                      type="checkbox"
-                      checked={formReasoning}
-                      onChange={(e) => setFormReasoning(e.target.checked)}
-                    />
-                    支持逻辑 Reasoning 推理 (思考模型)
-                  </label>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddForm(false)}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      background: '#ffffff',
+                      color: '#475569',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    取消
+                  </button>
                   <button
                     type="submit"
                     style={{
