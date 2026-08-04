@@ -1,16 +1,33 @@
 package butvan.agent.network.service;
 
-import butvan.agent.network.dto.ModelFetchRequest;
+import butvan.agent.agents.model.ModelSelector;
+import butvan.agent.network.dto.SetModel;
 
 import java.util.List;
 
+/**
+ * 模型网络接口服务层定义
+ */
 public interface ModelService {
 
     /**
-     * 根据厂商与 API Key 获取/验证可用模型列表
+     * 更新并持久化模型配置
      *
-     * @param request 包含 vendor 与 apiKey 的请求参数
-     * @return 模型名称列表
+     * @param model 模型设置对象
      */
-    List<String> fetchModels(ModelFetchRequest request);
+    void updateModelConfig(SetModel model);
+
+    /**
+     * 获取当前加载的模型配置选择器
+     *
+     * @return ModelSelector
+     */
+    ModelSelector getModelConfig();
+
+    /**
+     * 获取支持的模型厂商列表
+     *
+     * @return 厂商列表
+     */
+    List<String> getSupportedVendors();
 }
