@@ -1,58 +1,56 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-08-04T18:21:30.000Z",
-  "title": "Design System: ButvanAgent",
+  "generatedAt": "2026-08-04T18:23:15.000Z",
+  "title": "Design System: ButvanAgent (Flat Tech Style)",
   "extensions": {
     "colorMeta": {
-      "primary": { "role": "primary", "displayName": "Royal Cobalt Blue", "canonical": "#2563eb" },
-      "sidebar-bg": { "role": "neutral", "displayName": "Ice Blue Sidebar", "canonical": "#e5e9ee" }
+      "primary": { "role": "primary", "displayName": "Tech Royal Blue", "canonical": "#2563eb" },
+      "sidebar-bg": { "role": "neutral", "displayName": "Technical Surface Slate", "canonical": "#f8fafc" },
+      "border-subtle": { "role": "neutral", "displayName": "Subtle Border", "canonical": "#e2e8f0" }
     },
     "typographyMeta": {
       "display": { "displayName": "Display", "purpose": "Hero headlines" },
-      "body": { "displayName": "Body", "purpose": "Chat messages and general text" },
-      "code": { "displayName": "Code & Reasoning", "purpose": "Thought process and monospace code" }
+      "body": { "displayName": "Body", "purpose": "Chat text" },
+      "code": { "displayName": "Code", "purpose": "Monospace output and reasoning" }
     },
-    "shadows": [
-      { "name": "capsule-rest", "value": "0 8px 24px rgba(0, 0, 0, 0.06)", "purpose": "Input capsule floating shadow" },
-      { "name": "capsule-active", "value": "0 8px 30px rgba(37, 99, 235, 0.12)", "purpose": "Input capsule focus glow" }
-    ]
+    "shadows": []
   },
   "components": [
     {
       "name": "New Task Button",
       "kind": "button",
       "refersTo": "button-new-chat",
-      "description": "Sidebar primary action to create a new session.",
+      "description": "Flat sidebar action to create a new session.",
       "html": "<button class=\"ds-new-chat-btn\">+ 新建任务</button>",
-      "css": ".ds-new-chat-btn { background: rgba(255,255,255,0.65); border: 1px solid rgba(0,0,0,0.06); color: #111827; font-size: 13px; font-weight: 600; padding: 9px 12px; border-radius: 10px; transition: all 150ms ease; } .ds-new-chat-btn:hover { background: #ffffff; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }"
+      "css": ".ds-new-chat-btn { background: #ffffff; border: 1px solid #cbd5e1; color: #0f172a; font-size: 13px; font-weight: 600; padding: 8px 12px; border-radius: 6px; box-shadow: none; } .ds-new-chat-btn:hover { background: #f1f5f9; border-color: #94a3b8; }"
     },
     {
-      "name": "Input Capsule",
+      "name": "Input Container",
       "kind": "input",
-      "refersTo": "input-capsule",
-      "description": "Bottom floating Codex style prompt capsule.",
-      "html": "<div class=\"ds-input-box\"><textarea class=\"ds-textarea\" placeholder=\"随心输入需求...\"></textarea></div>",
-      "css": ".ds-input-box { background: #ffffff; border: 1px solid rgba(0,0,0,0.09); border-radius: 18px; padding: 14px 18px; box-shadow: 0 8px 24px rgba(0,0,0,0.06); } .ds-textarea { width: 100%; border: none; outline: none; font-size: 14px; color: #111827; }"
+      "refersTo": "input-box",
+      "description": "Flat prompt container with crisp 1px stroke border.",
+      "html": "<div class=\"ds-input-box\"><textarea class=\"ds-textarea\" placeholder=\"输入需求...\"></textarea></div>",
+      "css": ".ds-input-box { background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px 16px; box-shadow: none; } .ds-input-box:focus-within { border-color: #2563eb; } .ds-textarea { width: 100%; border: none; outline: none; font-size: 14px; color: #0f172a; }"
     }
   ],
   "narrative": {
-    "northStar": "The Iceberg Workspace",
-    "overview": "ButvanAgent 旨在提供一种沉稳、透亮、低干扰的桌面端 AI Agent 交互环境。视觉系统借鉴了经典的 Codex 冰蓝灰桌面壳层，将绝大部分 UI 隐藏在视线背后，如同冰山沉浸在水面之下。",
+    "northStar": "The Technical Minimalist Studio",
+    "overview": "ButvanAgent 采用一线科技大厂极简、平整、强对齐的视觉体系。系统彻底去除了重阴影与大圆角包覆，依赖精确的 1px 细线条描边与轻量小圆角 (4px-8px)。",
     "keyCharacteristics": [
-      "冰清透亮：采用冰蓝灰侧边栏 (#E5E9EE) 与纯白画板 (#FFFFFF)。",
-      "胶囊浮雕：底部 Floating Capsule 输入框搭配微羽化阴影。",
-      "高阶推理展示：专属蓝边框 Reasoning 思考过程盒。"
+      "零阴影纯平设计：全局放弃 Drop Shadows 模糊阴影。",
+      "精致小圆角：4px - 8px 紧凑圆角比例。",
+      "1px 细线描边：清晰的高对比描边分割与焦点高亮。"
     ],
     "rules": [
-      { "name": "The Rarity Accent Rule", "body": "经典蓝色高亮 (#2563EB) 仅应用于屏幕中不到 5% 的关键交互元素。", "section": "colors" }
+      { "name": "The Border-Over-Shadow Rule", "body": "切断所有 box-shadow 投影；层次与状态一律通过 1px 描边划分。", "section": "elevation" }
     ],
     "dos": [
-      "Do 保持侧边栏冰蓝灰背景与主视窗纯白背景的明晰对比。",
-      "Do 保持中央区域内容的最大宽度限定在 840px 以内。"
+      "Do 坚持使用 4px、6px、8px 小圆角。",
+      "Do 使用 box-shadow: none 彻底消除阴影。"
     ],
     "donts": [
-      "Don't 在界面中使用饱和度过高的纯红、纯绿大面积底色。",
-      "Don't 使用写死的硬编码死数据会话或营销弹窗。"
+      "Don't 使用大圆角或 9999px 胶囊形框架。",
+      "Don't 添加任何 box-shadow 或 drop-shadow 滤镜。"
     ]
   }
 }
