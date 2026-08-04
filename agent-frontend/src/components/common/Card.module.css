@@ -1,0 +1,29 @@
+.card {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  transition: all var(--transition-normal);
+}
+
+.default {
+  background-color: #ffffff;
+}
+
+.interactive {
+  cursor: pointer;
+}
+
+.interactive:hover {
+  border-color: #2563eb;
+  background-color: #f8fafc;
+}
+
+.bordered {
+  border: 1px solid #cbd5e1;
+}
+
+.flat {
+  background-color: #f8fafc;
+  border-color: #e2e8f0;
+}

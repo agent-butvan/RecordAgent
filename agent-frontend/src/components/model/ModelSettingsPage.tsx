@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useModel } from '../../context/ModelContext';
 import { fetchSupportedVendors } from '../../services/api';
+import { Button } from '../common/Button';
+import { Card } from '../common/Card';
+import { Toggle } from '../common/Toggle';
+import { Select } from '../common/Select';
+import { Badge } from '../common/Badge';
 import {
   ArrowLeft,
   User,
@@ -64,13 +69,22 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack }) 
     getAllModels
   } = useModel();
 
-  const [activeTab, setActiveTab] = useState<string>('config');
+  const [activeTab, setActiveTab] = useState<string>('general');
   const [supportedVendors, setSupportedVendors] = useState<string[]>(['gemini', 'openai', 'dashscope', 'deepseek', 'anthropic', 'ollama']);
   
-  // 所有目前在 config.json 中真实配置的模型列表
+  // General Tab State matching Screenshot 3
+  const [defaultPermission, setDefaultPermission] = useState(true);
+  const [fullPermission, setFullPermission] = useState(true);
+  const [openTarget, setOpenTarget] = useState('vscode');
+  const [language, setLanguage] = useState('auto');
+  const [showInMenuBar, setShowInMenuBar] = useState(true);
+  const [showBottomPanel, setShowBottomPanel] = useState(true);
+  const [terminalPos, setTerminalPos] = useState<'bottom' | 'right'>('bottom');
+  const [preventSleep, setPreventSleep] = useState(false);
+
   const allModels = getAllModels();
 
-  // 展开表单 / 模态状态
+  // Form State
   const [showAddForm, setShowAddForm] = useState(false);
   const [formVendor, setFormVendor] = useState('gemini');
   const [formBaseUrl, setFormBaseUrl] = useState(VENDOR_DEFAULT_URLS.gemini);
@@ -81,11 +95,9 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack }) 
   const [formReasoning, setFormReasoning] = useState(false);
   const [showApiKeyMask, setShowApiKeyMask] = useState<Record<string, boolean>>({});
 
-  // 连接测试结果 map
   const [testResults, setTestResults] = useState<Record<string, { success: boolean; message: string }>>({});
   const [testingMap, setTestingMap] = useState<Record<string, boolean>>({});
 
-  // 1. 动态从后端 /agent/model/vendors (application-vendor.yml) 拉取支持厂商列表
   useEffect(() => {
     const loadVendors = async () => {
       const vendorList = await fetchSupportedVendors();
@@ -143,10 +155,10 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack }) 
 
   return (
     <div className={styles.pageContainer}>
-      {/* Left Settings Navigation Sidebar */}
+      {/* Left Settings Navigation Sidebar matching Screenshot 3 */}
       <div className={styles.settingsSidebar}>
         <button className={styles.backBtn} onClick={onBack}>
-          <ArrowLeft size={15} />
+          <ArrowLeft size={14} />
           返回应用
         </button>
 
@@ -165,6 +177,12 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack }) 
             <Settings size={14} /> 常规
           </button>
           <button
+            className={`${styles.navItem} ${activeTab === 'config' ? styles.navItemActive : ''}`}
+            onClick={() => setActiveTab('config')}
+          >
+            <Sliders size={14} /> 配置 (模型 API Key)
+          </button>
+          <button
             className={`${styles.navItem} ${activeTab === 'profile' ? styles.navItemActive : ''}`}
             onClick={() => setActiveTab('profile')}
           >
@@ -181,12 +199,6 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack }) 
             onClick={() => setActiveTab('voice')}
           >
             <Mic size={14} /> 语音
-          </button>
-          <button
-            className={`${styles.navItem} ${activeTab === 'config' ? styles.navItemActive : ''}`}
-            onClick={() => setActiveTab('config')}
-          >
-            <Sliders size={14} /> 配置 (模型 API Key)
           </button>
           <button
             className={`${styles.navItem} ${activeTab === 'personalize' ? styles.navItemActive : ''}`}
@@ -232,14 +244,145 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack }) 
         {/* Group 4: 已归档 */}
         <div className={styles.navGroup}>
           <div className={styles.groupLabel}>已归档</div>
-          <button className={styles.navItem}><FolderArchive size={14} /> 已归档任务</button>
+          <button className={styles.navItem}><FolderArchive size={14} /> 已归档的聊天</button>
         </div>
       </div>
 
       {/* Right Settings Content Section */}
       <div className={styles.settingsContent}>
+        {/* TAB 1: 常规设置 (Matching Screenshot 3) */}
+        {activeTab === 'general' && (
+          <div className={styles.sectionContainer}>
+            <h1 className={styles.pageTitle}>常规</h1>
+
+            {/* Permission Card Section */}
+            <div className={styles.sectionHeader}>权限</div>
+            <Card variant="flat" className={styles.settingsCard}>
+              <div className={styles.settingRow}>
+                <div className={styles.rowInfo}>
+                  <div className={styles.rowTitle}>默认权限</div>
+                  <div className={styles.rowSub}>默认情况下，ButvanAgent 可以读取和编辑其工作空间中的文件。需要时，它可以请求额外访问权限。</div>
+                </div>
+                <Toggle checked={defaultPermission} onChange={setDefaultPermission} />
+              </div>
+
+              <div className={styles.divider} />
+
+              <div className={styles.settingRow}>
+                <div className={styles.rowInfo}>
+                  <div className={styles.rowTitle}>完全访问权限</div>
+                  <div className={styles.rowSub}>当以完整访问权限运行时，它无需你的批准即可编辑你电脑上的任何文件，并运行可访问网络的命令。<a href="#" style={{ color: '#2563eb' }}>了解更多</a></div>
+                </div>
+                <Toggle checked={fullPermission} onChange={setFullPermission} />
+              </div>
+            </Card>
+
+            {/* General Settings Card Section */}
+            <div className={styles.sectionHeader} style={{ marginTop: '28px' }}>常规</div>
+            <Card variant="flat" className={styles.settingsCard}>
+              <div className={styles.settingRow}>
+                <div className={styles.rowInfo}>
+                  <div className={styles.rowTitle}>默认文件打开目标</div>
+                  <div className={styles.rowSub}>默认打开文件和文件夹的位置</div>
+                </div>
+                <Select
+                  value={openTarget}
+                  onChange={(e) => setOpenTarget(e.target.value)}
+                  options={[
+                    { label: 'VS Code', value: 'vscode' },
+                    { label: 'Cursor', value: 'cursor' },
+                    { label: 'IntelliJ IDEA', value: 'idea' },
+                  ]}
+                />
+              </div>
+
+              <div className={styles.divider} />
+
+              <div className={styles.settingRow}>
+                <div className={styles.rowInfo}>
+                  <div className={styles.rowTitle}>语言</div>
+                  <div className={styles.rowSub}>应用 UI 语言</div>
+                </div>
+                <Select
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value)}
+                  options={[
+                    { label: '自动检测', value: 'auto' },
+                    { label: '简体中文', value: 'zh' },
+                    { label: 'English', value: 'en' },
+                  ]}
+                />
+              </div>
+
+              <div className={styles.divider} />
+
+              <div className={styles.settingRow}>
+                <div className={styles.rowInfo}>
+                  <div className={styles.rowTitle}>在菜单栏中显示</div>
+                  <div className={styles.rowSub}>关闭主窗口后，仍在 macOS 菜单栏中保留 ButvanAgent</div>
+                </div>
+                <Toggle checked={showInMenuBar} onChange={setShowInMenuBar} />
+              </div>
+
+              <div className={styles.divider} />
+
+              <div className={styles.settingRow}>
+                <div className={styles.rowInfo}>
+                  <div className={styles.rowTitle}>底部面板</div>
+                  <div className={styles.rowSub}>在应用标题栏中显示底部面板控件</div>
+                </div>
+                <Toggle checked={showBottomPanel} onChange={setShowBottomPanel} />
+              </div>
+
+              <div className={styles.divider} />
+
+              <div className={styles.settingRow}>
+                <div className={styles.rowInfo}>
+                  <div className={styles.rowTitle}>默认终端位置</div>
+                  <div className={styles.rowSub}>选择终端快捷键和环境操作在何处打开终端标签页</div>
+                </div>
+                <div className={styles.segmentControl}>
+                  <button
+                    className={`${styles.segmentBtn} ${terminalPos === 'bottom' ? styles.segmentActive : ''}`}
+                    onClick={() => setTerminalPos('bottom')}
+                  >
+                    底部
+                  </button>
+                  <button
+                    className={`${styles.segmentBtn} ${terminalPos === 'right' ? styles.segmentActive : ''}`}
+                    onClick={() => setTerminalPos('right')}
+                  >
+                    右侧
+                  </button>
+                </div>
+              </div>
+
+              <div className={styles.divider} />
+
+              <div className={styles.settingRow}>
+                <div className={styles.rowInfo}>
+                  <div className={styles.rowTitle}>运行时防止系统休眠</div>
+                  <div className={styles.rowSub}>在 Agent 运行任务时，让电脑保持唤醒状态</div>
+                </div>
+                <Toggle checked={preventSleep} onChange={setPreventSleep} />
+              </div>
+
+              <div className={styles.divider} />
+
+              <div className={styles.settingRow}>
+                <div className={styles.rowInfo}>
+                  <div className={styles.rowTitle}>打开开源许可证</div>
+                  <div className={styles.rowSub}>捆绑依赖项的第三方声明</div>
+                </div>
+                <Button variant="secondary" size="sm">查看</Button>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* TAB 2: 模型配置列表 (Config) */}
         {activeTab === 'config' && (
-          <>
+          <div>
             <div className={styles.topHeader}>
               <div>
                 <h2 className={styles.title}>模型配置列表 (Model List)</h2>
@@ -249,34 +392,16 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack }) 
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={{ fontSize: '13px', color: '#475569', background: '#f1f5f9', padding: '6px 12px', borderRadius: '20px', fontWeight: 500 }}>
-                  已配置模型: <strong>{allModels.length}</strong> 个
-                </span>
-                <button
-                  onClick={() => setShowAddForm(!showAddForm)}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '8px 16px',
-                    borderRadius: '8px',
-                    border: 'none',
-                    background: '#2563eb',
-                    color: '#ffffff',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-                  }}
-                >
-                  <Plus size={15} /> {showAddForm ? '取消添加' : '新增配置模型'}
-                </button>
+                <Badge variant="primary">已配置 {allModels.length} 个模型</Badge>
+                <Button variant="primary" icon={<Plus size={15} />} onClick={() => setShowAddForm(!showAddForm)}>
+                  {showAddForm ? '取消添加' : '新增配置模型'}
+                </Button>
               </div>
             </div>
 
-            {/* Inline Add Model Form Card - 精简至仅包含【模型供应商】、【模型名称】与【API Key】 3 项 */}
+            {/* Inline Add Model Form Card */}
             {showAddForm && (
-              <form onSubmit={handleSaveModel} style={{ background: '#f8fafc', padding: '20px', borderRadius: '12px', marginBottom: '24px', border: '1px solid #cbd5e1', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
+              <form onSubmit={handleSaveModel} style={{ background: '#f8fafc', padding: '20px', borderRadius: '8px', marginBottom: '24px', border: '1px solid #cbd5e1' }}>
                 <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '16px', color: '#0f172a' }}>
                   新增 AI 大模型配置
                 </h3>
@@ -324,42 +449,13 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack }) 
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-                  <button
-                    type="button"
-                    onClick={() => setShowAddForm(false)}
-                    style={{
-                      padding: '8px 16px',
-                      borderRadius: '8px',
-                      border: '1px solid #cbd5e1',
-                      background: '#ffffff',
-                      color: '#475569',
-                      fontSize: '13px',
-                      fontWeight: 500,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    取消
-                  </button>
-                  <button
-                    type="submit"
-                    style={{
-                      padding: '8px 20px',
-                      borderRadius: '8px',
-                      border: 'none',
-                      background: '#2563eb',
-                      color: '#ffffff',
-                      fontSize: '13px',
-                      fontWeight: 600,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    保存配置模型
-                  </button>
+                  <Button type="button" variant="outline" onClick={() => setShowAddForm(false)}>取消</Button>
+                  <Button type="submit" variant="primary">保存配置模型</Button>
                 </div>
               </form>
             )}
 
-            {/* EMPTY STATE: config.json 中没有任何配置的模型时 */}
+            {/* EMPTY STATE */}
             {allModels.length === 0 ? (
               <div style={{
                 display: 'flex',
@@ -367,7 +463,7 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack }) 
                 alignItems: 'center',
                 justifyContent: 'center',
                 padding: '60px 20px',
-                borderRadius: '16px',
+                borderRadius: '8px',
                 border: '2px dashed #e2e8f0',
                 background: '#fafafa',
                 textAlign: 'center',
@@ -382,24 +478,9 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack }) 
                 <p style={{ fontSize: '13px', color: '#64748b', maxWidth: '440px', lineHeight: 1.5, margin: '0 0 20px' }}>
                   本地配置文件 <code>~/.butvan-agent/config.json</code> 当前无任何有效模型。请点击下方按钮添加您的第一个 Gemini、DeepSeek 或 OpenAI 模型。
                 </p>
-                <button
-                  onClick={() => setShowAddForm(true)}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '10px 20px',
-                    borderRadius: '8px',
-                    border: 'none',
-                    background: '#2563eb',
-                    color: '#ffffff',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
-                >
-                  <Plus size={16} /> 新增配置模型
-                </button>
+                <Button variant="primary" icon={<Plus size={16} />} onClick={() => setShowAddForm(true)}>
+                  新增配置模型
+                </Button>
               </div>
             ) : (
               /* REAL MODEL LIST CARDS FROM config.json */
@@ -412,31 +493,20 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack }) 
                   const isTesting = !!testingMap[key];
 
                   return (
-                    <div
+                    <Card
                       key={key}
+                      variant={isActive ? 'bordered' : 'default'}
                       style={{
-                        padding: '16px 20px',
-                        borderRadius: '12px',
-                        border: isActive ? '2px solid #6366f1' : '1px solid #e2e8f0',
-                        background: isActive ? '#f5f3ff' : '#ffffff',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-                        transition: 'all 0.15s ease'
+                        borderColor: isActive ? '#2563eb' : '#e2e8f0',
+                        backgroundColor: isActive ? '#f8fafc' : '#ffffff'
                       }}
                     >
                       {/* Top Header Row */}
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <span style={{
-                            padding: '3px 8px',
-                            borderRadius: '4px',
-                            background: '#312e81',
-                            color: '#ffffff',
-                            fontSize: '11px',
-                            fontWeight: 700,
-                            letterSpacing: '0.5px'
-                          }}>
+                          <Badge variant="primary">
                             {(VENDOR_DISPLAY_NAMES[item.providerType] || item.providerName || 'VENDOR').toUpperCase()}
-                          </span>
+                          </Badge>
 
                           <span style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>
                             {item.name}
@@ -447,33 +517,19 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack }) 
                           </span>
 
                           {item.supportsReasoning && (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '11px', background: '#dbeafe', color: '#1e40af', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
-                              <Brain size={11} /> 推理
-                            </span>
+                            <Badge variant="purple" icon={<Brain size={11} />}>推理</Badge>
                           )}
                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                           {isActive ? (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '13px', fontWeight: 700, color: '#6366f1' }}>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '13px', fontWeight: 700, color: '#2563eb' }}>
                               <CheckCircle2 size={16} /> 当前激活
                             </span>
                           ) : (
-                            <button
-                              onClick={() => selectActiveModel(item.providerId, item.id)}
-                              style={{
-                                padding: '5px 12px',
-                                borderRadius: '6px',
-                                border: '1px solid #cbd5e1',
-                                background: '#ffffff',
-                                fontSize: '12px',
-                                cursor: 'pointer',
-                                color: '#334155',
-                                fontWeight: 500
-                              }}
-                            >
+                            <Button size="sm" variant="outline" onClick={() => selectActiveModel(item.providerId, item.id)}>
                               设为当前
-                            </button>
+                            </Button>
                           )}
 
                           <button
@@ -502,7 +558,7 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack }) 
                       )}
 
                       {/* Details Row */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '12px', color: '#475569', background: '#f8fafc', padding: '8px 12px', borderRadius: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '12px', color: '#475569', background: '#f8fafc', padding: '8px 12px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
                         {item.providerType !== 'ollama' ? (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <strong>API Key:</strong>
@@ -527,24 +583,15 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack }) 
                         )}
 
                         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <button
+                          <Button
+                            size="sm"
+                            variant="secondary"
                             onClick={() => handleTestItem(item)}
                             disabled={isTesting}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              padding: '3px 8px',
-                              borderRadius: '4px',
-                              border: '1px solid #cbd5e1',
-                              background: '#fff',
-                              fontSize: '11px',
-                              cursor: 'pointer'
-                            }}
+                            icon={isTesting ? <RefreshCw size={11} className="animate-spin" /> : <Zap size={11} />}
                           >
-                            {isTesting ? <RefreshCw size={11} className="animate-spin" /> : <Zap size={11} />}
                             测试连接
-                          </button>
+                          </Button>
 
                           {testRes && (
                             <span style={{ fontSize: '11px', color: testRes.success ? '#047857' : '#b91c1c', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
@@ -554,18 +601,18 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack }) 
                           )}
                         </div>
                       </div>
-                    </div>
+                    </Card>
                   );
                 })}
               </div>
             )}
-          </>
+          </div>
         )}
 
-        {activeTab !== 'config' && (
+        {activeTab !== 'config' && activeTab !== 'general' && (
           <div style={{ padding: '40px 0', color: '#64748b' }}>
             <h3 style={{ fontSize: '16px', fontWeight: 600 }}>{activeTab.toUpperCase()} 设置页面</h3>
-            <p style={{ marginTop: '8px', fontSize: '13px' }}>可在“配置 (模型 API Key)”中查看与修改您的 Model List。</p>
+            <p style={{ marginTop: '8px', fontSize: '13px' }}>可在“常规”或“配置 (模型 API Key)”中查看与修改配置。</p>
           </div>
         )}
       </div>

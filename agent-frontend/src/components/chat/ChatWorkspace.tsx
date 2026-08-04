@@ -2,20 +2,24 @@ import React, { useState } from 'react';
 import { ModelSelector } from '../model/ModelSelector';
 import { useModel } from '../../context/ModelContext';
 import type { ChatMessage } from '../../types/chat';
+import { Card } from '../common/Card';
+import { Badge } from '../common/Badge';
 import {
   Plus,
   ArrowUp,
   Folder,
-  Settings2,
   Mic,
   Compass,
   Wrench,
   RotateCcw,
   Bug,
   Cloud,
-  CheckCircle2,
   Cpu,
-  Sliders
+  Sliders,
+  Laptop,
+  GitBranch,
+  Timer,
+  Sparkles
 } from 'lucide-react';
 import styles from './ChatWorkspace.module.css';
 
@@ -56,16 +60,15 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
 
   return (
     <div className={styles.workspace}>
-      {/* Top Bar showing current AI Model Badge */}
+      {/* Top Bar showing current AI Model Badge & Plus Tag matching Screenshot 1 */}
       <div className={styles.topBar}>
+        <Badge variant="purple" icon={<Sparkles size={12} />} onClick={onOpenSettings} title="获取 Plus 共享更高级额">
+          获取 Plus
+        </Badge>
+
         <div className={styles.currentModelBadge} onClick={onOpenSettings} title="点击配置/切换模型">
           <Cpu size={13} style={{ color: '#2563eb' }} />
-          <span>当前模型: {activeProvider && activeModel ? `${activeProvider.name} (${activeModel.name})` : '未配置模型'}</span>
-        </div>
-
-        <div className={styles.statusTag} onClick={onOpenSettings} title="系统与 API 连接状态">
-          <CheckCircle2 size={12} style={{ color: '#10b981' }} />
-          Agent 服务就绪
+          <span>{activeProvider && activeModel ? `${activeProvider.name} (${activeModel.name})` : '未配置模型'}</span>
         </div>
       </div>
 
@@ -73,49 +76,53 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
       {messages.length === 0 ? (
         <div className={styles.centerHero}>
           <Cloud className={styles.cloudIcon} />
-          <h1 className={styles.heroTitle}>我们该构建什么？</h1>
+          <h1 className={styles.heroTitle}>要在 <span style={{ textDecoration: 'underline', textUnderlineOffset: '6px' }}>ButvanAgent</span> 内开发什么？</h1>
 
-          {/* 4 Quick Action Cards */}
+          {/* 4 Quick Action Cards using extracted Card component */}
           <div className={styles.cardGrid}>
-            <div
+            <Card
+              variant="interactive"
               className={styles.quickCard}
               onClick={() => handleQuickCardClick('探索并理解当前项目代码结构与架构设计')}
             >
               <div className={styles.cardIcon}>
-                <Compass size={20} style={{ color: '#2563EB' }} />
+                <Compass size={18} style={{ color: '#0284c7' }} />
               </div>
               <span className={styles.cardText}>探索并理解代码</span>
-            </div>
+            </Card>
 
-            <div
+            <Card
+              variant="interactive"
               className={styles.quickCard}
               onClick={() => handleQuickCardClick('构建新功能、应用或工具模块')}
             >
               <div className={styles.cardIcon}>
-                <Wrench size={20} style={{ color: '#9333EA' }} />
+                <Wrench size={18} style={{ color: '#9333ea' }} />
               </div>
               <span className={styles.cardText}>构建新功能、应用或工具</span>
-            </div>
+            </Card>
 
-            <div
+            <Card
+              variant="interactive"
               className={styles.quickCard}
               onClick={() => handleQuickCardClick('审查代码并提出重构及修改建议')}
             >
               <div className={styles.cardIcon}>
-                <RotateCcw size={20} style={{ color: '#059669' }} />
+                <RotateCcw size={18} style={{ color: '#16a34a' }} />
               </div>
               <span className={styles.cardText}>审查代码并提出修改建议</span>
-            </div>
+            </Card>
 
-            <div
+            <Card
+              variant="interactive"
               className={styles.quickCard}
               onClick={() => handleQuickCardClick('定位并修复项目中出现的 Bug 和报错')}
             >
               <div className={styles.cardIcon}>
-                <Bug size={20} style={{ color: '#EA580C' }} />
+                <Bug size={18} style={{ color: '#ea580c' }} />
               </div>
               <span className={styles.cardText}>修复问题和失败</span>
-            </div>
+            </Card>
           </div>
         </div>
       ) : (
@@ -145,60 +152,63 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
         </div>
       )}
 
-      {/* Bottom Floating Codex Style Input Area */}
+      {/* Bottom Floating Input Area matching Screenshot 1 */}
       <div className={styles.bottomContainer}>
-        {/* Top Notice Pill Bar */}
-        <div className={styles.noticeBar}>
-          <div className={styles.noticeText}>
-            <CheckCircle2 size={13} style={{ color: '#10b981' }} />
-            <span>ButvanAgent 本地开发环境就绪 · 支持多厂商 AI 引擎随时配置</span>
-          </div>
-          <button className={styles.upgradeBtn} onClick={onOpenSettings}>
-            <Sliders size={12} />
-            模型配置
-          </button>
-        </div>
-
-        {/* Input Box Capsule Container */}
-        <div className={styles.inputBox}>
-          <div className={styles.projectPill}>
-            <Folder size={13} />
-            当前项目
-          </div>
-
-          <textarea
-            className={styles.textarea}
-            placeholder="随心输入需求或提出指令..."
-            value={inputPrompt}
-            onChange={(e) => setInputPrompt(e.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-
-          <div className={styles.inputToolbar}>
-            <div className={styles.toolbarLeft}>
-              <button className={styles.toolBtn} title="添加文件/图片">
-                <Plus size={16} />
-              </button>
-              <button className={styles.toolBtn} title="审批与自动运行设置">
-                <Settings2 size={14} />
-                自动运行
-              </button>
+        {/* Input Box Capsule Container with attached Top Tag Bar */}
+        <div className={styles.inputBoxContainer}>
+          <div className={styles.attachedPillsBar}>
+            <div className={styles.pillItem}>
+              <Folder size={13} style={{ color: '#64748b' }} />
+              <span>ButvanAgent</span>
             </div>
+            <div className={styles.pillItem}>
+              <Laptop size={13} style={{ color: '#64748b' }} />
+              <span>本地</span>
+            </div>
+            <div className={styles.pillItem}>
+              <GitBranch size={13} style={{ color: '#64748b' }} />
+              <span>develop</span>
+            </div>
+          </div>
 
-            <div className={styles.toolbarRight}>
-              {/* Model selector dropdown embedded inside input bar */}
-              <ModelSelector onOpenSettings={onOpenSettings} />
-              <button className={styles.toolBtn} title="语音输入">
-                <Mic size={15} />
-              </button>
-              <button
-                className={`${styles.sendCircleBtn} ${
-                  inputPrompt.trim() ? styles.sendCircleBtnActive : ''
-                }`}
-                onClick={handleSend}
-              >
-                <ArrowUp size={16} />
-              </button>
+          <div className={styles.inputBox}>
+            <textarea
+              className={styles.textarea}
+              placeholder="随心输入"
+              value={inputPrompt}
+              onChange={(e) => setInputPrompt(e.target.value)}
+              onKeyDown={handleKeyDown}
+            />
+
+            <div className={styles.inputToolbar}>
+              <div className={styles.toolbarLeft}>
+                <button className={styles.toolIconBtn} title="添加文件/图片">
+                  <Plus size={16} />
+                </button>
+                <button className={styles.toolTextBtn} title="审批与自动运行设置">
+                  <Timer size={14} />
+                  请求批准
+                </button>
+              </div>
+
+              <div className={styles.toolbarRight}>
+                <div className={styles.presetDropdown} onClick={onOpenSettings} title="自定义轻度配置">
+                  <span>自定义 轻度</span>
+                  <Sliders size={12} />
+                </div>
+                <ModelSelector onOpenSettings={onOpenSettings} />
+                <button className={styles.toolIconBtn} title="语音输入">
+                  <Mic size={15} />
+                </button>
+                <button
+                  className={`${styles.sendCircleBtn} ${
+                    inputPrompt.trim() ? styles.sendCircleBtnActive : ''
+                  }`}
+                  onClick={handleSend}
+                >
+                  <ArrowUp size={16} />
+                </button>
+              </div>
             </div>
           </div>
         </div>
