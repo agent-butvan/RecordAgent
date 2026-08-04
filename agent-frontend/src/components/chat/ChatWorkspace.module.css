@@ -15,48 +15,47 @@
   justify-content: space-between;
   padding: 0 20px;
   z-index: 10;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .currentModelBadge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background-color: #EFF6FF;
-  border: 1px solid #BFDBFE;
-  color: #1D4ED8;
+  background-color: #f8fafc;
+  border: 1px solid #cbd5e1;
+  color: #1d4ed8;
   font-size: 12px;
   font-weight: 600;
-  padding: 5px 14px;
-  border-radius: var(--radius-full);
+  padding: 4px 12px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: all var(--transition-fast);
-  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.05);
+  box-shadow: none;
 }
 
 .currentModelBadge:hover {
-  background-color: #DBEAFE;
-  border-color: #93C5FD;
-  transform: translateY(-1px);
+  background-color: #eff6ff;
+  border-color: #2563eb;
 }
 
 .statusTag {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background-color: #ECFDF5;
-  border: 1px solid #A7F3D0;
-  color: #065F46;
+  background-color: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
   font-size: 12px;
   font-weight: 600;
-  padding: 4px 12px;
-  border-radius: var(--radius-full);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all var(--transition-fast);
 }
 
 .statusTag:hover {
-  background-color: #D1FAE5;
+  background-color: #dcfce7;
 }
 
 .centerHero {
@@ -70,47 +69,45 @@
 }
 
 .cloudIcon {
-  width: 52px;
-  height: 52px;
-  color: #94A3B8;
+  width: 48px;
+  height: 48px;
+  color: #64748b;
   stroke-width: 1.5;
-  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.04));
 }
 
 .heroTitle {
-  font-size: 26px;
+  font-size: 24px;
   font-weight: 700;
   color: var(--text-primary);
-  letter-spacing: -0.5px;
+  letter-spacing: -0.4px;
 }
 
 .cardGrid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
+  gap: 12px;
   width: 100%;
   max-width: 840px;
 }
 
 .quickCard {
   background-color: #FFFFFF;
-  border: 1px solid rgba(0, 0, 0, 0.07);
+  border: 1px solid #e2e8f0;
   border-radius: var(--radius-lg);
-  padding: 18px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 16px;
-  min-height: 115px;
+  gap: 14px;
+  min-height: 110px;
   cursor: pointer;
   transition: all var(--transition-normal);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+  box-shadow: none;
 }
 
 .quickCard:hover {
-  border-color: rgba(37, 99, 235, 0.3);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
-  transform: translateY(-2px);
+  border-color: #2563eb;
+  background-color: #f8fafc;
 }
 
 .cardIcon {
@@ -119,24 +116,25 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
-  background-color: #F8FAFC;
+  border-radius: var(--radius-sm);
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
 }
 
 .cardText {
   font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
-  line-height: 1.45;
+  line-height: 1.4;
 }
 
 .messagesArea {
   flex: 1;
   overflow-y: auto;
-  padding: 28px 16%;
+  padding: 24px 16%;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
 }
 
 .messageRow {
@@ -148,14 +146,14 @@
 .userMessage {
   align-self: flex-end;
   max-width: 78%;
-  background-color: #F1F5F9;
-  border: 1px solid #E2E8F0;
-  border-radius: 16px 16px 4px 16px;
-  padding: 12px 18px;
+  background-color: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: var(--radius-md);
+  padding: 10px 16px;
   color: var(--text-primary);
   font-size: 14px;
   line-height: 1.6;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  box-shadow: none;
 }
 
 .assistantMessage {
@@ -176,15 +174,16 @@
 }
 
 .reasoningBox {
-  background: #F8FAFC;
-  border-left: 3px solid #3B82F6;
-  padding: 12px 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-left: 3px solid #2563eb;
+  padding: 10px 14px;
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--text-secondary);
   line-height: 1.6;
-  border-radius: 0 10px 10px 0;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+  border-radius: var(--radius-sm);
+  box-shadow: none;
 }
 
 .bottomContainer {
@@ -194,18 +193,18 @@
   padding: 0 20px 24px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .noticeBar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background-color: #FFFFFF;
-  border: 1px solid rgba(0, 0, 0, 0.07);
-  border-radius: var(--radius-full);
-  padding: 6px 12px 6px 16px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius-md);
+  padding: 6px 12px;
+  box-shadow: none;
 }
 
 .noticeText {
@@ -218,11 +217,11 @@
 }
 
 .upgradeBtn {
-  background-color: #0F172A;
+  background-color: #0f172a;
   color: #FFFFFF;
   border: none;
-  border-radius: var(--radius-full);
-  padding: 5px 14px;
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
   font-size: 12px;
   font-weight: 600;
   display: flex;
@@ -232,35 +231,33 @@
 }
 
 .upgradeBtn:hover {
-  background-color: #1E293B;
-  transform: translateY(-1px);
+  background-color: #1e293b;
 }
 
 .inputBox {
   background-color: #FFFFFF;
-  border: 1px solid rgba(0, 0, 0, 0.09);
-  border-radius: var(--radius-xl);
-  padding: 14px 18px;
+  border: 1px solid #cbd5e1;
+  border-radius: var(--radius-lg);
+  padding: 12px 16px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+  gap: 8px;
+  box-shadow: none;
   transition: all var(--transition-fast);
 }
 
 .inputBox:focus-within {
-  border-color: #2563EB;
-  box-shadow: 0 8px 30px rgba(37, 99, 235, 0.12);
+  border-color: #2563eb;
 }
 
 .projectPill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background-color: #F1F5F9;
-  border: 1px solid #E2E8F0;
-  padding: 4px 10px;
-  border-radius: var(--radius-md);
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
   font-size: 12px;
   font-weight: 600;
   color: var(--text-secondary);
@@ -270,7 +267,7 @@
 }
 
 .projectPill:hover {
-  background-color: #E2E8F0;
+  background-color: #e2e8f0;
   color: var(--text-primary);
 }
 
@@ -283,7 +280,7 @@
   font-size: 14px;
   resize: none;
   outline: none;
-  min-height: 48px;
+  min-height: 44px;
   max-height: 140px;
   line-height: 1.5;
 }
@@ -298,7 +295,7 @@
 .toolbarLeft {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .toolBtn {
@@ -310,15 +307,15 @@
   color: var(--text-secondary);
   font-size: 12px;
   font-weight: 500;
-  padding: 5px 10px;
+  padding: 4px 8px;
   border-radius: var(--radius-sm);
   transition: all var(--transition-fast);
 }
 
 .toolBtn:hover {
-  background-color: #F1F5F9;
+  background-color: #f8fafc;
   color: var(--text-primary);
-  border-color: #E2E8F0;
+  border-color: #e2e8f0;
 }
 
 .toolbarRight {
@@ -328,10 +325,10 @@
 }
 
 .sendCircleBtn {
-  width: 34px;
-  height: 34px;
-  border-radius: var(--radius-full);
-  background-color: #CBD5E1;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background-color: #cbd5e1;
   border: none;
   color: #FFFFFF;
   display: flex;
@@ -341,12 +338,12 @@
 }
 
 .sendCircleBtnActive {
-  background-color: #2563EB;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+  background-color: #2563eb;
+  box-shadow: none;
 }
 
 .sendCircleBtnActive:hover {
-  background-color: #1D4ED8;
-  transform: scale(1.04);
+  background-color: #1d4ed8;
 }
+
 

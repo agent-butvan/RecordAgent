@@ -10,17 +10,19 @@
   align-items: center;
   gap: 8px;
   background-color: var(--bg-surface);
-  border: none;
+  border: 1px solid #cbd5e1;
+  border-radius: var(--radius-md);
   padding: 6px 12px;
   color: var(--text-primary);
   font-size: 13px;
   font-weight: 500;
-  box-shadow: var(--shadow-sm);
-  transition: background-color var(--transition-fast);
+  box-shadow: none;
+  transition: all var(--transition-fast);
 }
 
 .selectorBtn:hover {
   background-color: var(--bg-surface-hover);
+  border-color: #2563eb;
 }
 
 .providerBadge {
@@ -33,6 +35,7 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
   background: var(--bg-sidebar);
+  border-radius: var(--radius-sm);
   color: var(--text-primary);
 }
 
@@ -40,10 +43,11 @@
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  background: #1A1A1A;
+  background: #0f172a;
   color: #FFFFFF;
   font-size: 10px;
   padding: 2px 6px;
+  border-radius: var(--radius-sm);
   font-weight: 600;
 }
 
@@ -53,8 +57,9 @@
   left: 0;
   width: 320px;
   background-color: var(--bg-surface);
-  border: none;
-  box-shadow: var(--shadow-lg);
+  border: 1px solid #cbd5e1;
+  border-radius: var(--radius-md);
+  box-shadow: none;
   padding: 8px 0;
   z-index: 100;
   animation: fadeIn 150ms ease;
@@ -100,14 +105,16 @@
   width: 32px;
   height: 32px;
   background: var(--bg-surface);
-  border: none;
+  border: 1px solid #cbd5e1;
+  border-radius: var(--radius-md);
   color: var(--text-secondary);
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
   transition: all var(--transition-fast);
 }
 
 .configBtn:hover {
   background: var(--bg-surface-hover);
+  border-color: #2563eb;
   color: var(--text-primary);
 }
 
@@ -121,3 +128,4 @@
     transform: translateY(0);
   }
 }
+

@@ -2,7 +2,7 @@
   width: 240px;
   height: 100vh;
   background-color: var(--bg-sidebar);
-  border-right: 1px solid rgba(0, 0, 0, 0.06);
+  border-right: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -73,22 +73,21 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 9px 12px;
-  background-color: rgba(255, 255, 255, 0.65);
-  border: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 8px 12px;
+  background-color: #FFFFFF;
+  border: 1px solid #cbd5e1;
   color: var(--text-primary);
   font-size: 13px;
   font-weight: 600;
   border-radius: var(--radius-md);
   transition: all var(--transition-fast);
   margin-bottom: 12px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  box-shadow: none;
 }
 
 .newChatBtn:hover {
-  background-color: #FFFFFF;
-  border-color: rgba(0, 0, 0, 0.12);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  background-color: #f1f5f9;
+  border-color: #94a3b8;
 }
 
 .sessionList {
@@ -172,10 +171,10 @@
 }
 
 .sessionActive {
-  background-color: var(--bg-sidebar-active);
+  background-color: #FFFFFF;
   color: var(--text-primary);
   font-weight: 600;
-  border-color: rgba(0, 0, 0, 0.05);
+  border-color: #cbd5e1;
 }
 
 .footer {
@@ -183,7 +182,7 @@
   align-items: center;
   justify-content: space-between;
   padding-top: 10px;
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  border-top: 1px solid #e2e8f0;
 }
 
 .userProfile {
@@ -203,8 +202,8 @@
 .avatarCircle {
   width: 26px;
   height: 26px;
-  border-radius: var(--radius-full);
-  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  border-radius: var(--radius-sm);
+  background-color: #2563eb;
   color: #FFFFFF;
   font-size: 11px;
   font-weight: 700;
@@ -212,7 +211,7 @@
   align-items: center;
   justify-content: center;
   letter-spacing: -0.5px;
-  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.3);
+  box-shadow: none;
 }
 
 .userName {
@@ -224,19 +223,21 @@
 .actionIcon {
   width: 26px;
   height: 26px;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-sm);
   background-color: #ffffff;
   color: var(--text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  box-shadow: var(--shadow-sm);
+  border: 1px solid #cbd5e1;
+  box-shadow: none;
   transition: all var(--transition-fast);
 }
 
 .actionIcon:hover {
   color: var(--accent-blue);
-  border-color: rgba(37, 99, 235, 0.3);
+  border-color: #2563eb;
+  background-color: #f8fafc;
 }
+
 
