@@ -254,12 +254,13 @@ public class LocalConfigService {
 
     /**
      * 保存最新模型选择器配置到本地配置文件 ~/.butvan-agent/config.json
+     * 当初始化页面或模型选择器保存配置时，自动将配置的模型同步追加至 providers 列表中
      *
      * @param selector 需要保存的模型选择器对象
      */
     public synchronized void saveConfig(ModelSelector selector) {
         ModelConfigData fullData = loadFullConfigData();
-        if (selector != null) {
+        if (selector != null && selector.vendor() != null && !selector.vendor().isBlank()) {
             fullData.setVendor(selector.vendor());
             fullData.setName(selector.name());
             fullData.setApiKey(selector.apiKey());
@@ -269,15 +270,63 @@ public class LocalConfigService {
             if (selector.temperature() != null) fullData.setTemperature(selector.temperature());
             if (selector.stream() != null) fullData.setStream(selector.stream());
 
-            // 同步更新相应 provider 的 apiKey
-            if (fullData.getProviders() != null && selector.vendor() != null) {
-                for (ProviderConfigData p : fullData.getProviders()) {
-                    if (selector.vendor().equalsIgnoreCase(p.getId()) || selector.vendor().equalsIgnoreCase(p.getType())) {
-                        if (selector.apiKey() != null && !selector.apiKey().isBlank()) {
-                            p.setApiKey(selector.apiKey());
-                        }
+            // 自动同步/创建到 providers 数组中，确保初始化页面配置的项目即刻出现在模型列表中
+            java.util.List<ProviderConfigData> providers = fullData.getProviders();
+            if (providers == null) {
+                providers = new java.util.ArrayList<>();
+                fullData.setProviders(providers);
+            }
+
+            String targetVendor = selector.vendor();
+            String targetModelName = (selector.name() != null && !selector.name().isBlank()) ? selector.name() : "default-model";
+
+            ProviderConfigData matchingProvider = null;
+            for (ProviderConfigData p : providers) {
+                if (targetVendor.equalsIgnoreCase(p.getId()) || targetVendor.equalsIgnoreCase(p.getType())) {
+                    matchingProvider = p;
+                    break;
+                }
+            }
+
+            if (matchingProvider == null) {
+                matchingProvider = new ProviderConfigData(
+                        targetVendor,
+                        targetVendor.toUpperCase(),
+                        targetVendor,
+                        selector.apiKey() != null ? selector.apiKey() : "",
+                        true,
+                        new java.util.ArrayList<>()
+                );
+                providers.add(matchingProvider);
+            } else {
+                if (selector.apiKey() != null && !selector.apiKey().isBlank()) {
+                    matchingProvider.setApiKey(selector.apiKey());
+                }
+            }
+
+            // 检查 provider 的 models 列表中是否已包含该模型
+            boolean hasModel = false;
+            if (matchingProvider.getModels() != null) {
+                for (ModelItemData m : matchingProvider.getModels()) {
+                    if (targetModelName.equalsIgnoreCase(m.getId()) || targetModelName.equalsIgnoreCase(m.getModelName())) {
+                        hasModel = true;
+                        break;
                     }
                 }
+            } else {
+                matchingProvider.setModels(new java.util.ArrayList<>());
+            }
+
+            if (!hasModel) {
+                ModelItemData newItem = new ModelItemData(
+                        targetModelName,
+                        targetModelName,
+                        targetModelName,
+                        targetVendor,
+                        "",
+                        false
+                );
+                matchingProvider.getModels().add(newItem);
             }
         }
         saveFullConfigData(fullData);
