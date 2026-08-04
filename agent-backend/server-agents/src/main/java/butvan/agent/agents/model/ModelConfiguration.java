@@ -15,18 +15,21 @@ import org.springframework.context.annotation.Configuration;
 public class ModelConfiguration {
 
     /**
-     * 初始化 Agent 核心 Model Bean
+     * 初始化 Agent 核心 Model 代理 Bean
+     * 允许在未完成模型配置时后端仍能安全启动服务，并在用户在界面配置后动态转发调用
      *
      * @param localConfigService 本地配置管理服务
      * @param modelHolder        模型持有组件
-     * @return Model 实例
+     * @return Model 代理实例
      */
     @Bean
     public Model agentModel(LocalConfigService localConfigService,
                            ModelHolder modelHolder) {
-        // 直接从本地 ~/.butvan-agent/config.json 加载或自动初始化
+        // 从本地 ~/.butvan-agent/config.json 加载配置并更新 ModelHolder
         ModelSelector selector = localConfigService.loadOrInitializeConfig();
         modelHolder.updateModel(selector);
-        return modelHolder.getModel();
+
+        // 返回动态代理转发对象
+        return (request, options) -> modelHolder.getModel().call(request, options);
     }
 }

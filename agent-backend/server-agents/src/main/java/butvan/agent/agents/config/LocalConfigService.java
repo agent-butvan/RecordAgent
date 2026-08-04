@@ -50,17 +50,17 @@ public class LocalConfigService {
     public static class ModelConfigData {
 
         /**
-         * 模型厂商（如 gemini, openai, deepseek, dashscope, anthropic）
+         * 模型厂商（初次初始化时为空字符串）
          */
-        private String vendor = "gemini";
+        private String vendor = "";
 
         /**
-         * 模型具体名称（如 gemini-3.6-flash, gpt-4o 等）
+         * 模型具体名称（初次初始化时为空字符串）
          */
-        private String name = "gemini-3.6-flash";
+        private String name = "";
 
         /**
-         * 模型 API Key
+         * 模型 API Key（初次初始化时为空字符串）
          */
         private String apiKey = "";
 
@@ -91,11 +91,11 @@ public class LocalConfigService {
          */
         public static ModelConfigData fromSelector(ModelSelector selector) {
             return new ModelConfigData(
-                    selector.vendor(),
-                    selector.name(),
-                    selector.apiKey(),
-                    selector.temperature(),
-                    selector.stream()
+                    selector != null ? selector.vendor() : "",
+                    selector != null ? selector.name() : "",
+                    selector != null ? selector.apiKey() : "",
+                    selector != null && selector.temperature() != null ? selector.temperature() : 0.7,
+                    selector != null && selector.stream() != null ? selector.stream() : true
             );
         }
     }
@@ -103,7 +103,7 @@ public class LocalConfigService {
     /**
      * 加载本地配置：
      * 优先读取 ~/.butvan-agent/config.json；
-     * 若文件不存在或读取失败，则自动基于代码内置的预设默认值创建并持久化写出 ~/.butvan-agent/config.json
+     * 若文件不存在或读取失败，则自动创建含有空字段属性的模板 ~/.butvan-agent/config.json 写出
      *
      * @return 当前生效的 ModelSelector
      */
@@ -115,15 +115,15 @@ public class LocalConfigService {
                 log.info("成功从本地文件读取模型配置: {}", configPath);
                 return data.toSelector();
             } catch (Exception e) {
-                log.error("读取本地模型配置文件失败 [{}]，将重置为默认初始配置并写出", configPath, e);
+                log.error("读取本地模型配置文件失败 [{}]，将自动初始化为空配置模板并写出", configPath, e);
             }
         }
 
-        // 文件不存在或读取异常：使用内置初始化配置生成 Selector 并写入本地 JSON 文件
-        ModelConfigData defaultData = new ModelConfigData();
-        ModelSelector defaultSelector = defaultData.toSelector();
-        saveConfig(defaultSelector);
-        return defaultSelector;
+        // 文件不存在或读取异常：自动创建所有内容字段均为空的配置模板文件
+        ModelConfigData emptyData = new ModelConfigData("", "", "", 0.7, true);
+        ModelSelector emptySelector = emptyData.toSelector();
+        saveConfig(emptySelector);
+        return emptySelector;
     }
 
     /**

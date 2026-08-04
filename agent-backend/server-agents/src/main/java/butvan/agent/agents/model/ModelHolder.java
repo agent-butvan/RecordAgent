@@ -1,40 +1,65 @@
 package butvan.agent.agents.model;
 
 import io.agentscope.core.model.Model;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.atomic.AtomicReference;
 
+/**
+ * 运行时模型持有者组件
+ * 用于在内存中保存当前激活的 Model 实例和 ModelSelector 配置，并支持动态更新热刷新
+ */
+@Slf4j
 @Component
 public class ModelHolder {
 
-    private static final Logger log = LoggerFactory.getLogger(ModelHolder.class);
-
+    /**
+     * 当前激活的 AgentScope Model 原子引用（保证多线程线程安全）
+     */
     private final AtomicReference<Model> currentModel = new AtomicReference<>();
 
+    /**
+     * 当前激活的模型选择器配置属性
+     */
+    @Getter
     private volatile ModelSelector currentSelector;
 
+    /**
+     * 动态更新并重新创建模型实例
+     *
+     * @param selector 新的模型选择器配置
+     */
     public void updateModel(ModelSelector selector) {
         if (selector == null) {
-            throw new IllegalArgumentException("ModelSelector cannot be null");
+            throw new IllegalArgumentException("模型选择器参数 ModelSelector 不能为 null");
         }
+        this.currentSelector = selector;
+
+        // 如果 vendor 或 name 为空，说明用户尚未完成初次配置，暂不触发模型实例化
+        if (selector.vendor() == null || selector.vendor().isBlank() ||
+            selector.name() == null || selector.name().isBlank()) {
+            log.info("本地模型配置尚未完成初始化（包含空字段），等待用户在前端进行界面配置...");
+            return;
+        }
+
+        // 使用工厂方法重新实例化 Model
         Model newModel = ModelFactory.create(selector);
         this.currentModel.set(newModel);
-        this.currentSelector = selector;
-        log.info("ModelHolder updated with new model: Vendor=[{}], Name=[{}]", selector.vendor(), selector.name());
+        log.info("ModelHolder 成功更新激活模型: Vendor=[{}], Name=[{}]", selector.vendor(), selector.name());
     }
 
+    /**
+     * 获取当前激活的模型实例
+     *
+     * @return Model 实例
+     */
     public Model getModel() {
         Model model = currentModel.get();
         if (model == null) {
-            throw new IllegalStateException("Model has not been initialized in ModelHolder");
+            throw new IllegalStateException("ModelHolder 中的 Model 尚未完成初始化，请先在前端配置模型信息");
         }
         return model;
-    }
-
-    public ModelSelector getCurrentSelector() {
-        return currentSelector;
     }
 }

@@ -16,23 +16,26 @@ export const App: React.FC = () => {
   const checkConfig = async () => {
     setLoading(true);
     try {
+      // 1. 从后端获取支持的厂商列表
       const supportedVendors = await fetchSupportedVendors();
       if (supportedVendors && supportedVendors.length > 0) {
         setVendors(supportedVendors);
       }
 
+      // 2. 从后端获取当前本地 config.json 中的模型配置
       const config = await fetchModelConfig();
-      if (config && config.vendor && config.name) {
-        if (config.vendor !== 'ollama' && !config.apiKey) {
-          setNeedsInit(true);
-        } else {
-          setNeedsInit(false);
-        }
+      
+      // 判断逻辑：若无配置，或字段内容为空（vendor/name/apiKey为空），则判定需要初始化
+      if (!config || 
+          !config.vendor || !config.vendor.trim() || 
+          !config.name || !config.name.trim() || 
+          (config.vendor !== 'ollama' && (!config.apiKey || !config.apiKey.trim()))) {
+        setNeedsInit(true);
       } else {
         setNeedsInit(false);
       }
     } catch (e) {
-      console.error('检查模型配置状态异常:', e);
+      console.error('检查模型配置状态失败:', e);
       setNeedsInit(false);
     } finally {
       setLoading(false);
@@ -61,7 +64,7 @@ export const App: React.FC = () => {
     );
   }
 
-  // 若未初始化配置，直接全屏渲染初始化设置页面 ModelInitPage
+  // 若未初始化配置（字段为空），全屏展示初始化设置页面 ModelInitPage
   if (needsInit) {
     return (
       <ModelInitPage
