@@ -92,10 +92,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({ onOpenSettings }) 
         setMessages((prevMessages) =>
           prevMessages.map((msg) => {
             if (msg.id === assistantMsgId) {
-              const updatedContent = msg.content && chunkText.startsWith(msg.content)
-                ? chunkText
-                : (msg.content + chunkText);
-              return { ...msg, content: updatedContent };
+              return { ...msg, content: msg.content + chunkText };
             }
             return msg;
           })

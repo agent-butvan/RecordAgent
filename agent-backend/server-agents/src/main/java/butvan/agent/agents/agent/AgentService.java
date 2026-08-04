@@ -70,7 +70,7 @@ public class AgentService {
 
         String contextText = agentUserCall != null && agentUserCall.context() != null ? agentUserCall.context() : "";
 
-        // 3. 参考 mewcode-java 模式订阅事件流推送到 SSE 节点
+        // 3. 订阅事件流并精准提取增量文本推送到 SSE 节点
         harnessAgent.streamEvents(new UserMessage(contextText), ctx)
                 .doOnNext(event -> {
                     try {
@@ -101,24 +101,45 @@ public class AgentService {
     }
 
     /**
-     * 提炼事件数据字符串（参考 mewcode-java 事件结构解析与通用提取）
+     * 提炼 AgentScope 事件增量文本内容，自动过滤控制类事件
      *
      * @param event 事件对象
-     * @return 文本
+     * @return 纯文本（非文本增量事件返回 null 忽略）
      */
     private String extractContent(Object event) {
         if (event == null) return null;
         if (event instanceof String str) return str;
 
+        String className = event.getClass().getSimpleName();
+
+        // 过滤忽略 AgentScope 控制类与描述类事件
+        if (className.contains("StartEvent") ||
+            className.contains("EndEvent") ||
+            className.contains("ResultEvent") ||
+            className.contains("CallEvent")) {
+
+            // 唯独 TextBlockDeltaEvent 包含文本增量片段，需深入提取
+            if (!className.equals("TextBlockDeltaEvent")) {
+                return null;
+            }
+        }
+
         try {
             var methods = event.getClass().getMethods();
+            // 优先提取增量文本属性：text(), getText(), delta(), getDelta()
             for (var m : methods) {
-                if (m.getParameterCount() == 0 && (m.getName().equals("text") || m.getName().equals("getTextContent"))) {
+                if (m.getParameterCount() == 0 &&
+                   (m.getName().equals("text") || m.getName().equals("getText") ||
+                    m.getName().equals("delta") || m.getName().equals("getDelta") ||
+                    m.getName().equals("getTextContent"))) {
                     Object val = m.invoke(event);
-                    if (val != null) return val.toString();
+                    if (val != null && !val.toString().isEmpty()) {
+                        return val.toString();
+                    }
                 }
             }
 
+            // 若嵌套有 Message 对象，递归解包
             for (var m : methods) {
                 if (m.getParameterCount() == 0 && (m.getName().equals("getMsg") || m.getName().equals("message"))) {
                     Object msgObj = m.invoke(event);
@@ -130,6 +151,6 @@ public class AgentService {
         } catch (Exception ignored) {
         }
 
-        return event.toString();
+        return null;
     }
 }
