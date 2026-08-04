@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { ModelProvider, ModelItem } from '../types/model';
-import { DEFAULT_PROVIDERS } from '../services/modelPreset';
 import { fetchFullModelConfig, saveFullModelConfig, saveModelConfig } from '../services/api';
 
 interface ModelContextType {
@@ -15,16 +14,23 @@ interface ModelContextType {
   setTemperature: (temp: number) => void;
   setMaxTokens: (tokens: number) => void;
   updateProvider: (providerId: string, updates: Partial<ModelProvider>) => void;
-  addCustomProvider: (provider: Omit<ModelProvider, 'id'>) => void;
-  addModelToProvider: (providerId: string, model: Omit<ModelItem, 'providerId'>) => void;
-  removeModelFromProvider: (providerId: string, modelId: string) => void;
-  updateModelInProvider: (providerId: string, modelId: string, updates: Partial<ModelItem>) => void;
-  testConnection: (providerId: string) => Promise<{ success: boolean; message: string }>;
+  addModelItem: (params: {
+    vendor: string;
+    baseUrl: string;
+    apiKey: string;
+    modelId: string;
+    name: string;
+    description?: string;
+    supportsReasoning?: boolean;
+  }) => void;
+  deleteModelItem: (providerId: string, modelId: string) => void;
+  testConnectionByUrl: (baseUrl: string, apiKey: string, type: string) => Promise<{ success: boolean; message: string }>;
   getActiveModel: () => ModelItem | undefined;
   getActiveProvider: () => ModelProvider | undefined;
+  getAllModels: () => (ModelItem & { providerName: string; providerType: string; baseUrl: string; apiKey: string })[];
 }
 
-const STORAGE_KEY_PROVIDERS = 'butvan_agent_providers_v1';
+const STORAGE_KEY_PROVIDERS = 'butvan_agent_providers_v2';
 const STORAGE_KEY_ACTIVE_PROVIDER = 'butvan_agent_active_provider';
 const STORAGE_KEY_ACTIVE_MODEL = 'butvan_agent_active_model';
 
@@ -36,83 +42,67 @@ export const ModelProviderContext: React.FC<{ children: React.ReactNode }> = ({ 
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       } catch (e) {
         console.error('Failed to parse saved providers', e);
       }
     }
-    return DEFAULT_PROVIDERS;
+    return [];
   });
 
   const [activeProviderId, setActiveProviderId] = useState<string>(() => {
-    return localStorage.getItem(STORAGE_KEY_ACTIVE_PROVIDER) || 'gemini';
+    return localStorage.getItem(STORAGE_KEY_ACTIVE_PROVIDER) || '';
   });
 
   const [activeModelId, setActiveModelId] = useState<string>(() => {
-    return localStorage.getItem(STORAGE_KEY_ACTIVE_MODEL) || 'gemini-2.5-flash';
+    return localStorage.getItem(STORAGE_KEY_ACTIVE_MODEL) || '';
   });
 
   const [temperature, setTemperature] = useState<number>(0.7);
   const [maxTokens, setMaxTokens] = useState<number>(4096);
 
-  // 初始化从后端拉取全量配置
+  // 挂载时严格同步 backend config.json 真实数据
   useEffect(() => {
     const syncFromBackend = async () => {
       const fullConfig = await fetchFullModelConfig();
       if (fullConfig) {
-        if (fullConfig.activeVendor) {
-          setActiveProviderId(fullConfig.activeVendor);
-        } else if (fullConfig.vendor) {
-          setActiveProviderId(fullConfig.vendor);
-        }
+        const actVendor = fullConfig.activeVendor || fullConfig.vendor || '';
+        const actModel = fullConfig.activeModel || fullConfig.name || '';
+        setActiveProviderId(actVendor);
+        setActiveModelId(actModel);
 
-        if (fullConfig.activeModel) {
-          setActiveModelId(fullConfig.activeModel);
-        } else if (fullConfig.name) {
-          setActiveModelId(fullConfig.name);
-        }
-
-        if (Array.isArray(fullConfig.providers) && fullConfig.providers.length > 0) {
-          setProviders((prev) => {
-            // 合并后端 providers 数据
-            return DEFAULT_PROVIDERS.map((defaultP) => {
-              const backendP = fullConfig.providers.find(
-                (p: any) => p.id === defaultP.id || p.type === defaultP.type
-              );
-              if (backendP) {
-                return {
-                  ...defaultP,
-                  baseUrl: backendP.baseUrl || defaultP.baseUrl,
-                  apiKey: backendP.apiKey || defaultP.apiKey,
-                  isEnabled: backendP.isEnabled !== undefined ? backendP.isEnabled : defaultP.isEnabled,
-                  models: Array.isArray(backendP.models) && backendP.models.length > 0
-                    ? backendP.models.map((m: any) => ({
-                        id: m.id || m.modelName,
-                        name: m.name || m.modelName,
-                        providerId: defaultP.id,
-                        description: m.description || '',
-                        supportsReasoning: !!m.supportsReasoning,
-                      }))
-                    : defaultP.models,
-                };
-              }
-              return defaultP;
-            });
-          });
+        if (Array.isArray(fullConfig.providers)) {
+          const loadedProviders: ModelProvider[] = fullConfig.providers.map((p: any) => ({
+            id: p.id || p.type || p.vendor || 'custom',
+            name: p.name || p.vendor || 'Custom Vendor',
+            type: p.type || p.vendor || 'custom',
+            baseUrl: p.baseUrl || '',
+            apiKey: p.apiKey || '',
+            isEnabled: p.isEnabled !== undefined ? p.isEnabled : true,
+            models: Array.isArray(p.models)
+              ? p.models.map((m: any) => ({
+                  id: m.id || m.modelName,
+                  name: m.name || m.modelName,
+                  providerId: p.id || p.type || 'custom',
+                  description: m.description || '',
+                  supportsReasoning: !!m.supportsReasoning,
+                }))
+              : [],
+          }));
+          setProviders(loadedProviders);
         }
       }
     };
     syncFromBackend();
   }, []);
 
-  // 持久化保存与同步
+  // 变动时进行本地与后端持久化同步
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_PROVIDERS, JSON.stringify(providers));
     localStorage.setItem(STORAGE_KEY_ACTIVE_PROVIDER, activeProviderId);
     localStorage.setItem(STORAGE_KEY_ACTIVE_MODEL, activeModelId);
 
-    // 结构化全量配置发往后端保存
-    const activeProvider = providers.find((p) => p.id === activeProviderId);
+    const activeProvider = providers.find((p) => p.id === activeProviderId || p.type === activeProviderId);
     const activeApiKey = activeProvider?.apiKey || '';
 
     saveFullModelConfig({
@@ -146,7 +136,7 @@ export const ModelProviderContext: React.FC<{ children: React.ReactNode }> = ({ 
     setActiveProviderId(providerId);
     setActiveModelId(modelId);
 
-    const targetProvider = providers.find((p) => p.id === providerId);
+    const targetProvider = providers.find((p) => p.id === providerId || p.type === providerId);
     if (targetProvider) {
       await saveModelConfig({
         vendor: providerId,
@@ -162,74 +152,102 @@ export const ModelProviderContext: React.FC<{ children: React.ReactNode }> = ({ 
     );
   };
 
-  const addCustomProvider = (providerData: Omit<ModelProvider, 'id'>) => {
-    const newId = `custom-${Date.now()}`;
-    const newProvider: ModelProvider = {
-      ...providerData,
-      id: newId,
-    };
-    setProviders((prev) => [...prev, newProvider]);
+  const addModelItem = (params: {
+    vendor: string;
+    baseUrl: string;
+    apiKey: string;
+    modelId: string;
+    name: string;
+    description?: string;
+    supportsReasoning?: boolean;
+  }) => {
+    const { vendor, baseUrl, apiKey, modelId, name, description, supportsReasoning } = params;
+
+    setProviders((prev) => {
+      const existingProviderIndex = prev.findIndex((p) => p.id === vendor || p.type === vendor);
+      const newModel: ModelItem = {
+        id: modelId,
+        name: name || modelId,
+        providerId: vendor,
+        description: description || '',
+        supportsReasoning: !!supportsReasoning,
+      };
+
+      if (existingProviderIndex >= 0) {
+        return prev.map((p, idx) => {
+          if (idx === existingProviderIndex) {
+            const existsModel = p.models.some((m) => m.id === modelId);
+            const updatedModels = existsModel
+              ? p.models.map((m) => (m.id === modelId ? newModel : m))
+              : [...p.models, newModel];
+
+            return {
+              ...p,
+              baseUrl: baseUrl || p.baseUrl,
+              apiKey: apiKey !== undefined ? apiKey : p.apiKey,
+              models: updatedModels,
+            };
+          }
+          return p;
+        });
+      } else {
+        const newProvider: ModelProvider = {
+          id: vendor,
+          name: vendor.toUpperCase(),
+          type: vendor as any,
+          baseUrl: baseUrl || '',
+          apiKey: apiKey || '',
+          isEnabled: true,
+          models: [newModel],
+        };
+        return [...prev, newProvider];
+      }
+    });
+
+    // 如果当前没有任何激活模型，自动将新增的模型设为激活模型
+    if (!activeProviderId || !activeModelId) {
+      setActiveProviderId(vendor);
+      setActiveModelId(modelId);
+    }
   };
 
-  const addModelToProvider = (providerId: string, modelData: Omit<ModelItem, 'providerId'>) => {
-    setProviders((prev) =>
-      prev.map((p) => {
-        if (p.id === providerId) {
-          const newModel: ModelItem = {
-            ...modelData,
-            providerId,
-          };
-          return {
-            ...p,
-            models: [...p.models, newModel],
-          };
-        }
-        return p;
-      })
-    );
-  };
-
-  const removeModelFromProvider = (providerId: string, modelId: string) => {
-    setProviders((prev) =>
-      prev.map((p) => {
-        if (p.id === providerId) {
+  const deleteModelItem = (providerId: string, modelId: string) => {
+    setProviders((prev) => {
+      const updated = prev.map((p) => {
+        if (p.id === providerId || p.type === providerId) {
           return {
             ...p,
             models: p.models.filter((m) => m.id !== modelId),
           };
         }
         return p;
-      })
-    );
+      }).filter((p) => p.models.length > 0); // 移除没有模型的空 provider
+
+      return updated;
+    });
+
+    if (activeProviderId === providerId && activeModelId === modelId) {
+      const allLeft = getAllModels().filter((m) => !(m.providerId === providerId && m.id === modelId));
+      if (allLeft.length > 0) {
+        setActiveProviderId(allLeft[0].providerId);
+        setActiveModelId(allLeft[0].id);
+      } else {
+        setActiveProviderId('');
+        setActiveModelId('');
+      }
+    }
   };
 
-  const updateModelInProvider = (providerId: string, modelId: string, updates: Partial<ModelItem>) => {
-    setProviders((prev) =>
-      prev.map((p) => {
-        if (p.id === providerId) {
-          return {
-            ...p,
-            models: p.models.map((m) => (m.id === modelId ? { ...m, ...updates } : m)),
-          };
-        }
-        return p;
-      })
-    );
-  };
-
-  const testConnection = async (providerId: string): Promise<{ success: boolean; message: string }> => {
-    const provider = providers.find((p) => p.id === providerId);
-    if (!provider) return { success: false, message: '未找到指定 Provider' };
-
-    if (!provider.apiKey && provider.type !== 'ollama') {
+  const testConnectionByUrl = async (baseUrl: string, apiKey: string, type: string): Promise<{ success: boolean; message: string }> => {
+    if (!apiKey && type !== 'ollama') {
       return { success: false, message: '请先填写 API Key' };
     }
 
     try {
-      const res = await fetch(`${provider.baseUrl.replace(/\/$/, '')}/models`, {
+      const res = await fetch(`${baseUrl.replace(/\/$/, '')}/models`, {
         method: 'GET',
         headers: {
-          Authorization: `Bearer ${provider.apiKey}`,
+          Authorization: `Bearer ${apiKey}`,
         },
       });
 
@@ -239,11 +257,27 @@ export const ModelProviderContext: React.FC<{ children: React.ReactNode }> = ({ 
         return { success: false, message: `连接失败: HTTP Status ${res.status}` };
       }
     } catch (err: any) {
-      return { success: false, message: `网络连接异常或 CORS 拦截: ${err.message || '未知错误'}` };
+      return { success: false, message: `网络连接异常: ${err.message || '未知错误'}` };
     }
   };
 
-  const getActiveProvider = () => providers.find((p) => p.id === activeProviderId);
+  const getAllModels = () => {
+    const list: (ModelItem & { providerName: string; providerType: string; baseUrl: string; apiKey: string })[] = [];
+    providers.forEach((p) => {
+      p.models.forEach((m) => {
+        list.push({
+          ...m,
+          providerName: p.name || p.id,
+          providerType: p.type || p.id,
+          baseUrl: p.baseUrl || '',
+          apiKey: p.apiKey || '',
+        });
+      });
+    });
+    return list;
+  };
+
+  const getActiveProvider = () => providers.find((p) => p.id === activeProviderId || p.type === activeProviderId);
 
   const getActiveModel = () => {
     const provider = getActiveProvider();
@@ -264,13 +298,12 @@ export const ModelProviderContext: React.FC<{ children: React.ReactNode }> = ({ 
         setTemperature,
         setMaxTokens,
         updateProvider,
-        addCustomProvider,
-        addModelToProvider,
-        removeModelFromProvider,
-        updateModelInProvider,
-        testConnection,
+        addModelItem,
+        deleteModelItem,
+        testConnectionByUrl,
         getActiveModel,
         getActiveProvider,
+        getAllModels,
       }}
     >
       {children}
