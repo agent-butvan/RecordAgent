@@ -15,12 +15,11 @@ import org.springframework.context.annotation.Configuration;
 public class ModelConfiguration {
 
     /**
-     * 初始化 Agent 核心 Model 代理 Bean
-     * 允许在未完成模型配置时后端仍能安全启动服务，并在用户在界面配置后动态转发调用
+     * 初始化 Agent 核心 Model Bean
      *
      * @param localConfigService 本地配置管理服务
      * @param modelHolder        模型持有组件
-     * @return Model 代理实例
+     * @return Model 实例
      */
     @Bean
     public Model agentModel(LocalConfigService localConfigService,
@@ -29,7 +28,12 @@ public class ModelConfiguration {
         ModelSelector selector = localConfigService.loadOrInitializeConfig();
         modelHolder.updateModel(selector);
 
-        // 返回动态代理转发对象
-        return (request, options) -> modelHolder.getModel().call(request, options);
+        // 若当前未完成初始化配置，则安全返回 null，后续在控制台提交后由 ModelHolder 统一维护
+        if (!modelHolder.isInitialized()) {
+            log.info("初始模型配置包含空字段，暂不生成 Agent Model Bean 实例，等待用户完成初始化设置...");
+            return null;
+        }
+
+        return modelHolder.getModel();
     }
 }

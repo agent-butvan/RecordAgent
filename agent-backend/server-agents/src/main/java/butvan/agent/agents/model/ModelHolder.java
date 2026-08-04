@@ -51,6 +51,15 @@ public class ModelHolder {
     }
 
     /**
+     * 判断当前 ModelHolder 是否已成功初始化 Model 实例
+     *
+     * @return 是否初始化
+     */
+    public boolean isInitialized() {
+        return currentModel.get() != null;
+    }
+
+    /**
      * 获取当前激活的模型实例
      *
      * @return Model 实例

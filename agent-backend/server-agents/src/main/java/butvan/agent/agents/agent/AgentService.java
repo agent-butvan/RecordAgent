@@ -4,24 +4,37 @@ import butvan.agent.agents.model.ModelHolder;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+/**
+ * Agent 核心服务类
+ * 负责组装并运行 AgentScope ReActAgent
+ */
+@Slf4j
 @Component
+@RequiredArgsConstructor
 public class AgentService {
 
-    private static final Logger log = LoggerFactory.getLogger(AgentService.class);
-
+    /**
+     * 模型持有者组件，动态提供当前激活的 Model 实例
+     */
     private final ModelHolder modelHolder;
 
-    public AgentService(ModelHolder modelHolder) {
-        this.modelHolder = modelHolder;
-    }
-
+    /**
+     * 运行 ReActAgent 示例方法
+     */
     public void runAgent() {
+        if (!modelHolder.isInitialized()) {
+            log.info("当前模型尚未完成初始化配置，跳过自动运行示例 Agent");
+            return;
+        }
+
+        // 从 ModelHolder 中动态获取最新的 Model 实例构建 Agent
         ReActAgent agent = ReActAgent.builder().model(modelHolder.getModel()).build();
 
+        // 构造用户消息并调用 Agent
         Msg msg = agent.call(
                 Msg.builder()
                         .role(MsgRole.USER)
@@ -29,6 +42,6 @@ public class AgentService {
                         .build())
                 .block();
 
-        log.info("agent say: [{}]", msg.getTextContent());
+        log.info("Agent 响应内容: [{}]", msg != null ? msg.getTextContent() : "");
     }
 }
