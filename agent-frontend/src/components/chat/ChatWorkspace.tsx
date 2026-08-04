@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ModelSelector } from '../model/ModelSelector';
 import { useModel } from '../../context/ModelContext';
-import { streamAgentChat } from '../../services/api';
+import { streamAgentChat, fetchModelConfig } from '../../services/api';
 import {
   Sparkles,
   Plus,
@@ -14,7 +14,8 @@ import {
   RotateCcw,
   Bug,
   Cloud,
-  Clock
+  Clock,
+  Cpu
 } from 'lucide-react';
 import styles from './ChatWorkspace.module.css';
 
@@ -36,6 +37,24 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({ onOpenSettings }) 
 
   const [inputPrompt, setInputPrompt] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
+  const [currentModelInfo, setCurrentModelInfo] = useState<{ vendor: string; name: string }>({
+    vendor: '',
+    name: '',
+  });
+
+  // 挂载时从后端获取最新的生效模型配置信息
+  useEffect(() => {
+    const loadCurrentModel = async () => {
+      const config = await fetchModelConfig();
+      if (config && config.vendor && config.name) {
+        setCurrentModelInfo({
+          vendor: config.vendor,
+          name: config.name,
+        });
+      }
+    };
+    loadCurrentModel();
+  }, []);
 
   const handleSend = () => {
     if (!inputPrompt.trim()) return;
@@ -46,11 +65,15 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({ onOpenSettings }) 
       content: inputPrompt.trim(),
     };
 
+    const modelDisplayName = currentModelInfo.name
+      ? `${currentModelInfo.vendor.toUpperCase()} (${currentModelInfo.name})`
+      : (activeModel?.name || 'ButvanAgent');
+
     const assistantMsgId = String(Date.now() + 1);
     const assistantMsg: Message = {
       id: assistantMsgId,
       role: 'assistant',
-      modelName: activeModel?.name || 'ButvanAgent',
+      modelName: modelDisplayName,
       content: '', // 初始为空，随着 SSE 推流实时流式填充
     };
 
@@ -108,8 +131,13 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({ onOpenSettings }) 
 
   return (
     <div className={styles.workspace}>
-      {/* Top Bar with Plus Tag & Right window controls */}
+      {/* Top Bar showing current AI Model Badge */}
       <div className={styles.topBar}>
+        <div className={styles.currentModelBadge} onClick={onOpenSettings} title="点击配置/切换模型">
+          <Cpu size={13} style={{ color: '#2563eb' }} />
+          <span>当前模型: {currentModelInfo.name ? `${currentModelInfo.vendor.toUpperCase()} (${currentModelInfo.name})` : '加载中...'}</span>
+        </div>
+
         <div className={styles.plusTag} onClick={onOpenSettings}>
           <Sparkles size={12} />
           获取 Plus
@@ -122,7 +150,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({ onOpenSettings }) 
           <Cloud className={styles.cloudIcon} />
           <h1 className={styles.heroTitle}>我们该构建什么？</h1>
 
-          {/* 4 Quick Action Cards matching Image 1 */}
+          {/* 4 Quick Action Cards */}
           <div className={styles.cardGrid}>
             <div
               className={styles.quickCard}
@@ -174,6 +202,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({ onOpenSettings }) 
               ) : (
                 <div className={styles.assistantMessage}>
                   <div className={styles.avatar}>
+                    <Cpu size={14} style={{ color: '#2563eb' }} />
                     <span>{msg.modelName || 'ButvanAgent'}</span>
                   </div>
                   {msg.reasoning && (

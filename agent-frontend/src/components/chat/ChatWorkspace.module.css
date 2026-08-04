@@ -17,6 +17,26 @@
   z-index: 10;
 }
 
+.currentModelBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  color: #1D4ED8;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.currentModelBadge:hover {
+  background-color: #DBEAFE;
+  border-color: #93C5FD;
+}
+
 .plusTag {
   display: inline-flex;
   align-items: center;
