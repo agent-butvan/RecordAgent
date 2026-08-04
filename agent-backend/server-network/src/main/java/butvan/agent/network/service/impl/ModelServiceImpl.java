@@ -1,39 +1,51 @@
 package butvan.agent.network.service.impl;
 
-import butvan.agent.agents.model.ModelFactory;
-import butvan.agent.network.dto.ModelFetchRequest;
+import butvan.agent.agents.config.LocalConfigService;
+import butvan.agent.agents.model.ModelHolder;
+import butvan.agent.agents.model.ModelSelector;
+import butvan.agent.network.dto.SetModel;
 import butvan.agent.network.service.ModelService;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-
-@Slf4j
 @Service
 public class ModelServiceImpl implements ModelService {
 
+    private static final Logger log = LoggerFactory.getLogger(ModelServiceImpl.class);
+
+    private final LocalConfigService localConfigService;
+    private final ModelHolder modelHolder;
+
+    public ModelServiceImpl(LocalConfigService localConfigService, ModelHolder modelHolder) {
+        this.localConfigService = localConfigService;
+        this.modelHolder = modelHolder;
+    }
+
     @Override
-    public List<String> fetchModels(ModelFetchRequest request) {
-        if (request == null || request.getVendor() == null || request.getVendor().isBlank()) {
-            throw new IllegalArgumentException("Model vendor cannot be empty");
-        }
-        if (request.getApiKey() == null || request.getApiKey().isBlank()) {
-            throw new IllegalArgumentException("API key cannot be empty");
+    public void updateModelConfig(SetModel model) {
+        if (model == null) {
+            throw new IllegalArgumentException("SetModel param cannot be null");
         }
 
-        String vendor = request.getVendor().trim().toLowerCase();
-        log.info("Fetching models for vendor: [{}]", vendor);
+        ModelSelector currentSelector = modelHolder.getCurrentSelector();
+        Double temperature = currentSelector != null ? currentSelector.temperature() : 0.7;
+        Boolean stream = currentSelector != null ? currentSelector.stream() : true;
 
-        // 验证 vendor 是否受 ModelFactory 支持
-        ModelFactory.fromVendor(vendor);
+        ModelSelector newSelector = new ModelSelector(
+                model.vendor(),
+                model.modelName(),
+                model.apiKey(),
+                temperature,
+                stream
+        );
 
-        // 根据 vendor 返回模型列表
-        return switch (vendor) {
-            case "openai" -> List.of("gpt-4o", "gpt-4o-mini", "o3-mini", "gpt-4-turbo");
-            case "deepseek" -> List.of("deepseek-chat", "deepseek-reasoner");
-            case "dashscope" -> List.of("qwen-max", "qwen-plus", "qwen-turbo", "qwen-long");
-            case "gemini" -> List.of("gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash");
-            default -> List.of();
-        };
+        // 1. 持久化到 ~/.butvan-agent/config.json
+        localConfigService.saveConfig(newSelector);
+
+        // 2. 刷新内存模型
+        modelHolder.updateModel(newSelector);
+
+        log.info("Successfully updated model configuration: vendor={}, modelName={}", model.vendor(), model.modelName());
     }
 }
