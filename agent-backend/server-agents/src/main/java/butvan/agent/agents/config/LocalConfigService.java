@@ -3,9 +3,7 @@ package butvan.agent.agents.config;
 import butvan.agent.agents.model.ModelSelector;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -45,8 +43,6 @@ public class LocalConfigService {
      * 本地持久化模型配置数据结构
      */
     @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
     public static class ModelConfigData {
 
         /**
@@ -73,6 +69,17 @@ public class LocalConfigService {
          * 是否开启流式输出（默认 true）
          */
         private Boolean stream = true;
+
+        public ModelConfigData() {
+        }
+
+        public ModelConfigData(String vendor, String name, String apiKey, Double temperature, Boolean stream) {
+            this.vendor = vendor;
+            this.name = name;
+            this.apiKey = apiKey;
+            this.temperature = temperature;
+            this.stream = stream;
+        }
 
         /**
          * 将本地配置转换为 ModelSelector 领域模型

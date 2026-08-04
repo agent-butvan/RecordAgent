@@ -8,7 +8,7 @@ import io.agentscope.harness.agent.HarnessAgent;
 import io.agentscope.harness.agent.memory.compaction.CompactionConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
@@ -16,10 +16,10 @@ import java.nio.file.Paths;
 
 /**
  * Agent 核心服务类
- * 负责组装 HarnessAgent 并实现基于 SSE 的响应事件流输出
+ * 参考 mewcode-java 项目与 AgentScope 官网规范实现 Agent 的 SSE 流式响应
  */
 @Slf4j
-@Component
+@Service
 @RequiredArgsConstructor
 public class AgentService {
 
@@ -29,18 +29,18 @@ public class AgentService {
     private final ModelHolder modelHolder;
 
     /**
-     * 运行 HarnessAgent 并推送 SSE 流式事件
+     * 运行 HarnessAgent 并通过 SseEmitter 推送流式响应
      *
-     * @param agentUserCall 用户发起的对话调用对象
-     * @return SseEmitter SSE 响应流对象
+     * @param agentUserCall 用户发起的对话请求
+     * @return SseEmitter
      */
     public SseEmitter streamAgent(AgentUserCall agentUserCall) {
-        SseEmitter emitter = new SseEmitter(0L); // 设置为永超时
+        SseEmitter emitter = new SseEmitter(0L); // 永超时
 
         if (!modelHolder.isInitialized()) {
             log.warn("当前模型尚未完成初始化配置，无法启动 Agent 对话");
             try {
-                emitter.send(SseEmitter.event().data("错误：模型尚未完成初始化配置，请先在界面设置 API 密钥。"));
+                emitter.send(SseEmitter.event().name("error").data("当前模型尚未完成初始化配置，请先在界面设置 API 密钥。"));
                 emitter.complete();
             } catch (IOException e) {
                 emitter.completeWithError(e);
@@ -50,6 +50,7 @@ public class AgentService {
 
         Model model = modelHolder.getModel();
 
+        // 1. 根据 AgentScope 规范构造 HarnessAgent
         HarnessAgent harnessAgent = HarnessAgent.builder()
                 .name("butvan-agent")
                 .sysPrompt("你是一个全能智能助手，请简洁、清晰地解答用户的各种技术与日常问题。")
@@ -61,6 +62,7 @@ public class AgentService {
                         .build())
                 .build();
 
+        // 2. 构建 RuntimeContext 上下文
         RuntimeContext ctx = RuntimeContext.builder()
                 .sessionId(agentUserCall != null && agentUserCall.sessionId() != null ? agentUserCall.sessionId() : "default_session")
                 .userId("butvan")
@@ -68,40 +70,66 @@ public class AgentService {
 
         String contextText = agentUserCall != null && agentUserCall.context() != null ? agentUserCall.context() : "";
 
+        // 3. 参考 mewcode-java 模式订阅事件流推送到 SSE 节点
         harnessAgent.streamEvents(new UserMessage(contextText), ctx)
-                .subscribe(
-                        event -> {
-                            try {
-                                if (event != null) {
-                                    String text = null;
-                                    if (event.getMsg() != null && event.getMsg().getTextContent() != null) {
-                                        text = event.getMsg().getTextContent();
-                                    } else {
-                                        text = event.toString();
-                                    }
-                                    if (text != null && !text.isEmpty()) {
-                                        emitter.send(SseEmitter.event().data(text));
-                                    }
-                                }
-                            } catch (IOException e) {
-                                log.error("推送 SSE 消息增量块失败", e);
-                                emitter.completeWithError(e);
-                            }
-                        },
-                        error -> {
-                            log.error("HarnessAgent 事件流处理过程异常", error);
-                            try {
-                                emitter.send(SseEmitter.event().data("处理异常: " + error.getMessage()));
-                            } catch (IOException ignored) {
-                            }
-                            emitter.completeWithError(error);
-                        },
-                        () -> {
-                            log.info("HarnessAgent 事件流成功完成");
-                            emitter.complete();
+                .doOnNext(event -> {
+                    try {
+                        String data = extractContent(event);
+                        if (data != null && !data.isEmpty()) {
+                            emitter.send(SseEmitter.event().data(data));
                         }
-                );
+                    } catch (Exception e) {
+                        log.error("推送 SSE 增量事件失败", e);
+                        emitter.completeWithError(e);
+                    }
+                })
+                .doOnError(error -> {
+                    log.error("HarnessAgent 发生异常", error);
+                    try {
+                        emitter.send(SseEmitter.event().name("error").data("处理异常: " + error.getMessage()));
+                    } catch (IOException ignored) {
+                    }
+                    emitter.completeWithError(error);
+                })
+                .doOnComplete(() -> {
+                    log.info("HarnessAgent 对话流事件处理完成");
+                    emitter.complete();
+                })
+                .subscribe();
 
         return emitter;
+    }
+
+    /**
+     * 提炼事件数据字符串（参考 mewcode-java 事件结构解析与通用提取）
+     *
+     * @param event 事件对象
+     * @return 文本
+     */
+    private String extractContent(Object event) {
+        if (event == null) return null;
+        if (event instanceof String str) return str;
+
+        try {
+            var methods = event.getClass().getMethods();
+            for (var m : methods) {
+                if (m.getParameterCount() == 0 && (m.getName().equals("text") || m.getName().equals("getTextContent"))) {
+                    Object val = m.invoke(event);
+                    if (val != null) return val.toString();
+                }
+            }
+
+            for (var m : methods) {
+                if (m.getParameterCount() == 0 && (m.getName().equals("getMsg") || m.getName().equals("message"))) {
+                    Object msgObj = m.invoke(event);
+                    if (msgObj != null) {
+                        return extractContent(msgObj);
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
+        return event.toString();
     }
 }
