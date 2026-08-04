@@ -72,3 +72,61 @@ export async function saveModelConfig(params: {
     return { success: false, message: errMsg };
   }
 }
+
+/**
+ * Agent 对话流式 SSE 交互函数
+ * 利用 fetch + ReadableStream 实时解析后端推流
+ */
+export async function streamAgentChat(
+  params: { sessionId: string; context: string },
+  onChunk: (text: string) => void,
+  onComplete?: () => void,
+  onError?: (err: any) => void
+): Promise<void> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/agent/chat/stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(params),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP 响应异常: Status ${response.status}`);
+    }
+
+    if (!response.body) {
+      throw new Error('ReadableStream 不可用');
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        if (onComplete) onComplete();
+        break;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || ''; // 保留未完整的行
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('data:')) {
+          const dataText = trimmed.substring(5).trim();
+          if (dataText) {
+            onChunk(dataText);
+          }
+        }
+      }
+    }
+  } catch (err: any) {
+    console.error('SSE 流数据解析失败:', err);
+    if (onError) onError(err);
+  }
+}

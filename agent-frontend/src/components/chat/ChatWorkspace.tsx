@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ModelSelector } from '../model/ModelSelector';
 import { useModel } from '../../context/ModelContext';
+import { streamAgentChat } from '../../services/api';
 import {
   Sparkles,
   Plus,
@@ -45,21 +46,53 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({ onOpenSettings }) 
       content: inputPrompt.trim(),
     };
 
-    setMessages((prev) => [...prev, userMsg]);
+    const assistantMsgId = String(Date.now() + 1);
+    const assistantMsg: Message = {
+      id: assistantMsgId,
+      role: 'assistant',
+      modelName: activeModel?.name || 'ButvanAgent',
+      content: '', // 初始为空，随着 SSE 推流实时流式填充
+    };
+
+    setMessages((prev) => [...prev, userMsg, assistantMsg]);
+    const currentPrompt = inputPrompt.trim();
     setInputPrompt('');
 
-    setTimeout(() => {
-      const assistantMsg: Message = {
-        id: String(Date.now() + 1),
-        role: 'assistant',
-        modelName: activeModel?.name || 'ButvanAgent',
-        reasoning: activeModel?.supportsReasoning
-          ? '分析用户指令，连接当前配置的 AI 模型服务...'
-          : undefined,
-        content: `指令已接收！【${activeModel?.name || 'Default Model'}】已完成解析并准备就绪。`,
-      };
-      setMessages((prev) => [...prev, assistantMsg]);
-    }, 500);
+    // 发起 SSE 流式调用
+    streamAgentChat(
+      {
+        sessionId: 'session_default',
+        context: currentPrompt,
+      },
+      (chunkText) => {
+        // 增量流式渲染打字效果
+        setMessages((prevMessages) =>
+          prevMessages.map((msg) => {
+            if (msg.id === assistantMsgId) {
+              const updatedContent = msg.content && chunkText.startsWith(msg.content)
+                ? chunkText
+                : (msg.content + chunkText);
+              return { ...msg, content: updatedContent };
+            }
+            return msg;
+          })
+        );
+      },
+      () => {
+        console.log('Agent 流式传输完毕');
+      },
+      (err) => {
+        console.error('Agent 对话流传输异常:', err);
+        setMessages((prevMessages) =>
+          prevMessages.map((msg) => {
+            if (msg.id === assistantMsgId && !msg.content) {
+              return { ...msg, content: '连接 Agent 对话服务失败或发生错误，请检查后端网络与 API Key 配置。' };
+            }
+            return msg;
+          })
+        );
+      }
+    );
   };
 
   const handleQuickCardClick = (promptText: string) => {
@@ -148,7 +181,9 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({ onOpenSettings }) 
                       <strong>思考过程:</strong> {msg.reasoning}
                     </div>
                   )}
-                  <div style={{ fontSize: '14px', lineHeight: 1.6 }}>{msg.content}</div>
+                  <div style={{ fontSize: '14px', lineHeight: 1.6 }}>
+                    {msg.content || <span style={{ opacity: 0.5 }}>正在思考并生成回答...</span>}
+                  </div>
                 </div>
               )}
             </div>
