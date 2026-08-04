@@ -59,4 +59,29 @@ public class ModelController {
         List<String> vendors = modelService.getSupportedVendors();
         return Result.success(vendors);
     }
+
+    /**
+     * 获取全量多厂商模型配置数据
+     *
+     * @return 全量模型配置对象
+     */
+    @ApiLog("获取全量多厂商模型配置")
+    @GetMapping("/full-config")
+    public Result<butvan.agent.agents.config.LocalConfigService.ModelConfigData> getFullModelConfig() {
+        butvan.agent.agents.config.LocalConfigService.ModelConfigData fullConfig = modelService.getFullModelConfig();
+        return Result.success(fullConfig);
+    }
+
+    /**
+     * 保存全量多厂商模型配置数据
+     *
+     * @param fullData 全量配置对象
+     * @return 响应消息
+     */
+    @ApiLog("保存全量多厂商模型配置")
+    @PostMapping("/full-config")
+    public Result<String> saveFullModelConfig(@RequestBody butvan.agent.agents.config.LocalConfigService.ModelConfigData fullData) {
+        modelService.saveFullModelConfig(fullData);
+        return Result.success("全量多厂商模型配置保存成功！");
+    }
 }

@@ -4,4 +4,4 @@ server:
 spring:
   config:
     import:
-      - classpath:application-agent.yml
+      - classpath:application-vendor.yml

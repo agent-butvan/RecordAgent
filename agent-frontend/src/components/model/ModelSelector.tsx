@@ -8,7 +8,7 @@ interface ModelSelectorProps {
 }
 
 export const ModelSelector: React.FC<ModelSelectorProps> = ({ onOpenSettings }) => {
-  const { providers, activeProviderId, activeModelId, setActiveProviderId, setActiveModelId, getActiveModel, getActiveProvider } = useModel();
+  const { providers, activeProviderId, activeModelId, selectActiveModel, getActiveModel, getActiveProvider } = useModel();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -27,19 +27,19 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ onOpenSettings }) 
   }, []);
 
   const handleSelectModel = (providerId: string, modelId: string) => {
-    setActiveProviderId(providerId);
-    setActiveModelId(modelId);
+    selectActiveModel(providerId, modelId);
     setIsOpen(false);
   };
 
   const getProviderClass = (type: string) => {
     switch (type) {
+      case 'gemini': return styles.gemini;
       case 'deepseek': return styles.deepseek;
       case 'openai': return styles.openai;
       case 'anthropic': return styles.anthropic;
       case 'ollama': return styles.ollama;
       case 'qwen': return styles.qwen;
-      default: return styles.deepseek;
+      default: return styles.gemini;
     }
   };
 

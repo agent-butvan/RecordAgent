@@ -1,0 +1,2 @@
+{"type":"message","id":"01e60e27-ab1d-4d91-9f93-f99795193ae6","timestamp":1785737544.878260000,"role":"USER","content":"你好，你是什么模型？"}
+{"type":"message","id":"OzFwaq2rNt2bqtsPvJOCmQ0","parentId":"01e60e27-ab1d-4d91-9f93-f99795193ae6","timestamp":1785737544.878433000,"role":"ASSISTANT","content":"你好！我是 Gemini 3.6 Flash，由 Google 训练的大型语言模型。有什么我可以帮您的吗？"}

@@ -40,23 +40,85 @@ public class LocalConfigService {
     }
 
     /**
+     * 单个模型明细配置数据结构
+     */
+    @Data
+    public static class ModelItemData {
+        private String id = "";
+        private String name = "";
+        private String modelName = "";
+        private String providerId = "";
+        private String description = "";
+        private Boolean supportsReasoning = false;
+
+        public ModelItemData() {
+        }
+
+        public ModelItemData(String id, String name, String modelName, String providerId, String description, Boolean supportsReasoning) {
+            this.id = id;
+            this.name = name;
+            this.modelName = modelName;
+            this.providerId = providerId;
+            this.description = description;
+            this.supportsReasoning = supportsReasoning;
+        }
+    }
+
+    /**
+     * 模型厂商 Provider 配置数据结构
+     */
+    @Data
+    public static class ProviderConfigData {
+        private String id = "";
+        private String name = "";
+        private String type = "";
+        private String baseUrl = "";
+        private String apiKey = "";
+        private Boolean isEnabled = true;
+        private java.util.List<ModelItemData> models = new java.util.ArrayList<>();
+
+        public ProviderConfigData() {
+        }
+
+        public ProviderConfigData(String id, String name, String type, String baseUrl, String apiKey, Boolean isEnabled, java.util.List<ModelItemData> models) {
+            this.id = id;
+            this.name = name;
+            this.type = type;
+            this.baseUrl = baseUrl;
+            this.apiKey = apiKey;
+            this.isEnabled = isEnabled;
+            this.models = models != null ? models : new java.util.ArrayList<>();
+        }
+    }
+
+    /**
      * 本地持久化模型配置数据结构
      */
     @Data
     public static class ModelConfigData {
 
         /**
-         * 模型厂商（初次初始化时为空字符串）
+         * 当前激活厂商类型标识
+         */
+        private String activeVendor = "";
+
+        /**
+         * 当前激活模型标识/名称
+         */
+        private String activeModel = "";
+
+        /**
+         * 模型厂商（兼容单字段配置）
          */
         private String vendor = "";
 
         /**
-         * 模型具体名称（初次初始化时为空字符串）
+         * 模型具体名称（兼容单字段配置）
          */
         private String name = "";
 
         /**
-         * 模型 API Key（初次初始化时为空字符串）
+         * 模型 API Key（兼容单字段配置）
          */
         private String apiKey = "";
 
@@ -70,6 +132,11 @@ public class LocalConfigService {
          */
         private Boolean stream = true;
 
+        /**
+         * 多厂商模型配置列表
+         */
+        private java.util.List<ProviderConfigData> providers = new java.util.ArrayList<>();
+
         public ModelConfigData() {
         }
 
@@ -79,6 +146,8 @@ public class LocalConfigService {
             this.apiKey = apiKey;
             this.temperature = temperature;
             this.stream = stream;
+            this.activeVendor = vendor;
+            this.activeModel = name;
         }
 
         /**
@@ -87,7 +156,23 @@ public class LocalConfigService {
          * @return ModelSelector
          */
         public ModelSelector toSelector() {
-            return new ModelSelector(vendor, name, apiKey, temperature, stream);
+            String targetVendor = (vendor != null && !vendor.isBlank()) ? vendor : activeVendor;
+            String targetName = (name != null && !name.isBlank()) ? name : activeModel;
+            String targetApiKey = apiKey != null ? apiKey : "";
+
+            // 若在 providers 中找到了匹配的 vendor，且当前 apiKey 为空，提取 provider 级别的 apiKey
+            if ((targetApiKey == null || targetApiKey.isBlank()) && providers != null && targetVendor != null) {
+                for (ProviderConfigData p : providers) {
+                    if (targetVendor.equalsIgnoreCase(p.getId()) || targetVendor.equalsIgnoreCase(p.getType())) {
+                        if (p.getApiKey() != null && !p.getApiKey().isBlank()) {
+                            targetApiKey = p.getApiKey();
+                            break;
+                        }
+                    }
+                }
+            }
+
+            return new ModelSelector(targetVendor, targetName, targetApiKey, temperature, stream);
         }
 
         /**
@@ -115,43 +200,89 @@ public class LocalConfigService {
      * @return 当前生效的 ModelSelector
      */
     public ModelSelector loadOrInitializeConfig() {
+        ModelConfigData fullData = loadFullConfigData();
+        return fullData.toSelector();
+    }
+
+    /**
+     * 读取全量多厂商模型配置数据
+     *
+     * @return ModelConfigData
+     */
+    public ModelConfigData loadFullConfigData() {
         File configFile = configPath.toFile();
         if (configFile.exists() && configFile.isFile()) {
             try {
                 ModelConfigData data = objectMapper.readValue(configFile, ModelConfigData.class);
-                log.info("成功从本地文件读取模型配置: {}", configPath);
-                return data.toSelector();
+                log.info("成功从本地文件读取多厂商模型配置: {}", configPath);
+                return data;
             } catch (Exception e) {
                 log.error("读取本地模型配置文件失败 [{}]，将自动初始化为空配置模板并写出", configPath, e);
             }
         }
 
-        // 文件不存在或读取异常：自动创建所有内容字段均为空的配置模板文件
+        // 文件不存在或读取异常：自动创建配置模板
         ModelConfigData emptyData = new ModelConfigData("", "", "", 0.7, true);
-        ModelSelector emptySelector = emptyData.toSelector();
-        saveConfig(emptySelector);
-        return emptySelector;
+        saveFullConfigData(emptyData);
+        return emptyData;
     }
 
     /**
-     * 保存最新模型配置到本地配置文件 ~/.butvan-agent/config.json
+     * 保存全量多厂商模型配置数据到本地配置文件 ~/.butvan-agent/config.json
+     *
+     * @param fullData 全量模型配置数据
+     */
+    public synchronized void saveFullConfigData(ModelConfigData fullData) {
+        try {
+            File configFile = configPath.toFile();
+            File parentDir = configFile.getParentFile();
+            if (parentDir != null && !parentDir.exists()) {
+                parentDir.mkdirs();
+            }
+
+            if (fullData.getVendor() == null || fullData.getVendor().isBlank()) {
+                fullData.setVendor(fullData.getActiveVendor());
+            }
+            if (fullData.getName() == null || fullData.getName().isBlank()) {
+                fullData.setName(fullData.getActiveModel());
+            }
+
+            objectMapper.writeValue(configFile, fullData);
+            log.info("成功保存全量多厂商模型配置至本地文件: {}", configPath);
+        } catch (IOException e) {
+            log.error("保存全量模型配置到本地文件失败: {}", configPath, e);
+        }
+    }
+
+    /**
+     * 保存最新模型选择器配置到本地配置文件 ~/.butvan-agent/config.json
      *
      * @param selector 需要保存的模型选择器对象
      */
     public synchronized void saveConfig(ModelSelector selector) {
-        try {
-            File configFile = configPath.toFile();
-            File parentDir = configFile.getParentFile();
-            // 如果父目录 ~/.butvan-agent 不存在，则自动创建
-            if (parentDir != null && !parentDir.exists()) {
-                parentDir.mkdirs();
+        ModelConfigData fullData = loadFullConfigData();
+        if (selector != null) {
+            fullData.setVendor(selector.vendor());
+            fullData.setName(selector.name());
+            fullData.setApiKey(selector.apiKey());
+            fullData.setActiveVendor(selector.vendor());
+            fullData.setActiveModel(selector.name());
+
+            if (selector.temperature() != null) fullData.setTemperature(selector.temperature());
+            if (selector.stream() != null) fullData.setStream(selector.stream());
+
+            // 同步更新相应 provider 的 apiKey
+            if (fullData.getProviders() != null && selector.vendor() != null) {
+                for (ProviderConfigData p : fullData.getProviders()) {
+                    if (selector.vendor().equalsIgnoreCase(p.getId()) || selector.vendor().equalsIgnoreCase(p.getType())) {
+                        if (selector.apiKey() != null && !selector.apiKey().isBlank()) {
+                            p.setApiKey(selector.apiKey());
+                        }
+                    }
+                }
             }
-            ModelConfigData data = ModelConfigData.fromSelector(selector);
-            objectMapper.writeValue(configFile, data);
-            log.info("成功保存模型配置至本地文件: {}", configPath);
-        } catch (IOException e) {
-            log.error("保存模型配置到本地文件失败: {}", configPath, e);
         }
+        saveFullConfigData(fullData);
     }
 
     /**

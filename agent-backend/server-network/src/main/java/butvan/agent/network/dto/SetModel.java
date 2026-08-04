@@ -1,4 +1,8 @@
 package butvan.agent.network.dto;
 
-public class SetModel {
+public record SetModel(
+        String modelName,
+        String vendor,
+        String apiKey
+) {
 }

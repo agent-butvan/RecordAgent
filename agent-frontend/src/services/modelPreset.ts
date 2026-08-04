@@ -2,6 +2,49 @@ import type { ModelProvider } from '../types/model';
 
 export const DEFAULT_PROVIDERS: ModelProvider[] = [
   {
+    id: 'gemini',
+    name: 'Google Gemini',
+    type: 'gemini',
+    baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+    apiKey: '',
+    isEnabled: true,
+    isOfficial: true,
+    models: [
+      {
+        id: 'gemini-2.5-flash',
+        name: 'Gemini 2.5 Flash',
+        providerId: 'gemini',
+        description: 'Google 新一代超快速多模态模型',
+        supportsReasoning: false,
+        contextWindow: 1000000,
+      },
+      {
+        id: 'gemini-2.5-pro',
+        name: 'Gemini 2.5 Pro',
+        providerId: 'gemini',
+        description: 'Google 强力复杂逻辑推理与 Coding 旗舰模型',
+        supportsReasoning: true,
+        contextWindow: 2000000,
+      },
+      {
+        id: 'gemini-1.5-flash',
+        name: 'Gemini 1.5 Flash',
+        providerId: 'gemini',
+        description: '轻量轻快高性价比多模态模型',
+        supportsReasoning: false,
+        contextWindow: 1000000,
+      },
+      {
+        id: 'gemini-3.6-flash',
+        name: 'Gemini 3.6 Flash (High)',
+        providerId: 'gemini',
+        description: '高级智能加速模型',
+        supportsReasoning: true,
+        contextWindow: 1000000,
+      },
+    ],
+  },
+  {
     id: 'deepseek',
     name: 'DeepSeek',
     type: 'deepseek',
@@ -24,6 +67,14 @@ export const DEFAULT_PROVIDERS: ModelProvider[] = [
         providerId: 'deepseek',
         description: '逻辑推理强化模型，输出深度思考 Chain-of-Thought',
         supportsReasoning: true,
+        contextWindow: 64000,
+      },
+      {
+        id: 'deepseek-coder',
+        name: 'DeepSeek Coder',
+        providerId: 'deepseek',
+        description: '专业代码生成与重构模型',
+        supportsReasoning: false,
         contextWindow: 64000,
       },
     ],
@@ -101,7 +152,7 @@ export const DEFAULT_PROVIDERS: ModelProvider[] = [
     type: 'qwen',
     baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
     apiKey: '',
-    isEnabled: false,
+    isEnabled: true,
     isOfficial: true,
     models: [
       {
@@ -124,7 +175,7 @@ export const DEFAULT_PROVIDERS: ModelProvider[] = [
     type: 'anthropic',
     baseUrl: 'https://api.anthropic.com/v1',
     apiKey: '',
-    isEnabled: false,
+    isEnabled: true,
     isOfficial: true,
     models: [
       {

@@ -1,0 +1,8 @@
+model:
+  vendor:
+    - gemini
+    - openai
+    - dashscope
+    - deepseek
+    - anthropic
+    - ollama

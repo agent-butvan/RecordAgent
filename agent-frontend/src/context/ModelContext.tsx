@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { ModelProvider, ModelItem } from '../types/model';
 import { DEFAULT_PROVIDERS } from '../services/modelPreset';
+import { fetchFullModelConfig, saveFullModelConfig, saveModelConfig } from '../services/api';
 
 interface ModelContextType {
   providers: ModelProvider[];
@@ -10,12 +11,14 @@ interface ModelContextType {
   maxTokens: number;
   setActiveProviderId: (id: string) => void;
   setActiveModelId: (id: string) => void;
+  selectActiveModel: (providerId: string, modelId: string) => Promise<void>;
   setTemperature: (temp: number) => void;
   setMaxTokens: (tokens: number) => void;
   updateProvider: (providerId: string, updates: Partial<ModelProvider>) => void;
   addCustomProvider: (provider: Omit<ModelProvider, 'id'>) => void;
   addModelToProvider: (providerId: string, model: Omit<ModelItem, 'providerId'>) => void;
   removeModelFromProvider: (providerId: string, modelId: string) => void;
+  updateModelInProvider: (providerId: string, modelId: string, updates: Partial<ModelItem>) => void;
   testConnection: (providerId: string) => Promise<{ success: boolean; message: string }>;
   getActiveModel: () => ModelItem | undefined;
   getActiveProvider: () => ModelProvider | undefined;
@@ -32,7 +35,8 @@ export const ModelProviderContext: React.FC<{ children: React.ReactNode }> = ({ 
     const saved = localStorage.getItem(STORAGE_KEY_PROVIDERS);
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch (e) {
         console.error('Failed to parse saved providers', e);
       }
@@ -41,29 +45,116 @@ export const ModelProviderContext: React.FC<{ children: React.ReactNode }> = ({ 
   });
 
   const [activeProviderId, setActiveProviderId] = useState<string>(() => {
-    return localStorage.getItem(STORAGE_KEY_ACTIVE_PROVIDER) || 'deepseek';
+    return localStorage.getItem(STORAGE_KEY_ACTIVE_PROVIDER) || 'gemini';
   });
 
   const [activeModelId, setActiveModelId] = useState<string>(() => {
-    return localStorage.getItem(STORAGE_KEY_ACTIVE_MODEL) || 'deepseek-reasoner';
+    return localStorage.getItem(STORAGE_KEY_ACTIVE_MODEL) || 'gemini-2.5-flash';
   });
 
   const [temperature, setTemperature] = useState<number>(0.7);
   const [maxTokens, setMaxTokens] = useState<number>(4096);
 
-  // Persist providers
+  // 初始化从后端拉取全量配置
+  useEffect(() => {
+    const syncFromBackend = async () => {
+      const fullConfig = await fetchFullModelConfig();
+      if (fullConfig) {
+        if (fullConfig.activeVendor) {
+          setActiveProviderId(fullConfig.activeVendor);
+        } else if (fullConfig.vendor) {
+          setActiveProviderId(fullConfig.vendor);
+        }
+
+        if (fullConfig.activeModel) {
+          setActiveModelId(fullConfig.activeModel);
+        } else if (fullConfig.name) {
+          setActiveModelId(fullConfig.name);
+        }
+
+        if (Array.isArray(fullConfig.providers) && fullConfig.providers.length > 0) {
+          setProviders((prev) => {
+            // 合并后端 providers 数据
+            return DEFAULT_PROVIDERS.map((defaultP) => {
+              const backendP = fullConfig.providers.find(
+                (p: any) => p.id === defaultP.id || p.type === defaultP.type
+              );
+              if (backendP) {
+                return {
+                  ...defaultP,
+                  baseUrl: backendP.baseUrl || defaultP.baseUrl,
+                  apiKey: backendP.apiKey || defaultP.apiKey,
+                  isEnabled: backendP.isEnabled !== undefined ? backendP.isEnabled : defaultP.isEnabled,
+                  models: Array.isArray(backendP.models) && backendP.models.length > 0
+                    ? backendP.models.map((m: any) => ({
+                        id: m.id || m.modelName,
+                        name: m.name || m.modelName,
+                        providerId: defaultP.id,
+                        description: m.description || '',
+                        supportsReasoning: !!m.supportsReasoning,
+                      }))
+                    : defaultP.models,
+                };
+              }
+              return defaultP;
+            });
+          });
+        }
+      }
+    };
+    syncFromBackend();
+  }, []);
+
+  // 持久化保存与同步
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_PROVIDERS, JSON.stringify(providers));
-  }, [providers]);
-
-  // Persist active selections
-  useEffect(() => {
     localStorage.setItem(STORAGE_KEY_ACTIVE_PROVIDER, activeProviderId);
-  }, [activeProviderId]);
-
-  useEffect(() => {
     localStorage.setItem(STORAGE_KEY_ACTIVE_MODEL, activeModelId);
-  }, [activeModelId]);
+
+    // 结构化全量配置发往后端保存
+    const activeProvider = providers.find((p) => p.id === activeProviderId);
+    const activeApiKey = activeProvider?.apiKey || '';
+
+    saveFullModelConfig({
+      activeVendor: activeProviderId,
+      activeModel: activeModelId,
+      vendor: activeProviderId,
+      name: activeModelId,
+      apiKey: activeApiKey,
+      temperature,
+      stream: true,
+      providers: providers.map((p) => ({
+        id: p.id,
+        name: p.name,
+        type: p.type,
+        baseUrl: p.baseUrl,
+        apiKey: p.apiKey,
+        isEnabled: p.isEnabled,
+        models: p.models.map((m) => ({
+          id: m.id,
+          name: m.name,
+          modelName: m.id,
+          providerId: p.id,
+          description: m.description || '',
+          supportsReasoning: !!m.supportsReasoning,
+        })),
+      })),
+    });
+  }, [providers, activeProviderId, activeModelId, temperature]);
+
+  const selectActiveModel = async (providerId: string, modelId: string) => {
+    setActiveProviderId(providerId);
+    setActiveModelId(modelId);
+
+    const targetProvider = providers.find((p) => p.id === providerId);
+    if (targetProvider) {
+      await saveModelConfig({
+        vendor: providerId,
+        modelName: modelId,
+        apiKey: targetProvider.apiKey || '',
+      });
+    }
+  };
 
   const updateProvider = (providerId: string, updates: Partial<ModelProvider>) => {
     setProviders((prev) =>
@@ -112,6 +203,20 @@ export const ModelProviderContext: React.FC<{ children: React.ReactNode }> = ({ 
     );
   };
 
+  const updateModelInProvider = (providerId: string, modelId: string, updates: Partial<ModelItem>) => {
+    setProviders((prev) =>
+      prev.map((p) => {
+        if (p.id === providerId) {
+          return {
+            ...p,
+            models: p.models.map((m) => (m.id === modelId ? { ...m, ...updates } : m)),
+          };
+        }
+        return p;
+      })
+    );
+  };
+
   const testConnection = async (providerId: string): Promise<{ success: boolean; message: string }> => {
     const provider = providers.find((p) => p.id === providerId);
     if (!provider) return { success: false, message: '未找到指定 Provider' };
@@ -121,7 +226,6 @@ export const ModelProviderContext: React.FC<{ children: React.ReactNode }> = ({ 
     }
 
     try {
-      // Direct REST fetch test to models endpoint
       const res = await fetch(`${provider.baseUrl.replace(/\/$/, '')}/models`, {
         method: 'GET',
         headers: {
@@ -129,7 +233,7 @@ export const ModelProviderContext: React.FC<{ children: React.ReactNode }> = ({ 
         },
       });
 
-      if (res.ok || res.status === 404 /* some standard endpoints return 404 for /models but API is active */) {
+      if (res.ok || res.status === 404) {
         return { success: true, message: '连接成功！Endpoint 可达' };
       } else {
         return { success: false, message: `连接失败: HTTP Status ${res.status}` };
@@ -156,12 +260,14 @@ export const ModelProviderContext: React.FC<{ children: React.ReactNode }> = ({ 
         maxTokens,
         setActiveProviderId,
         setActiveModelId,
+        selectActiveModel,
         setTemperature,
         setMaxTokens,
         updateProvider,
         addCustomProvider,
         addModelToProvider,
         removeModelFromProvider,
+        updateModelInProvider,
         testConnection,
         getActiveModel,
         getActiveProvider,

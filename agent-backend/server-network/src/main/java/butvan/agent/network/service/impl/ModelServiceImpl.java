@@ -94,4 +94,36 @@ public class ModelServiceImpl implements ModelService {
         }
         return Collections.emptyList();
     }
+
+    /**
+     * 获取全量多厂商模型配置数据
+     *
+     * @return LocalConfigService.ModelConfigData
+     */
+    @Override
+    public LocalConfigService.ModelConfigData getFullModelConfig() {
+        return localConfigService.loadFullConfigData();
+    }
+
+    /**
+     * 保存全量多厂商模型配置数据并实时刷新 ModelHolder
+     *
+     * @param fullData 全量配置对象
+     */
+    @Override
+    public void saveFullModelConfig(LocalConfigService.ModelConfigData fullData) {
+        if (fullData == null) {
+            throw new IllegalArgumentException("全量模型配置对象 fullData 不能为 null");
+        }
+        localConfigService.saveFullConfigData(fullData);
+
+        // 刷新内存模型
+        ModelSelector selector = fullData.toSelector();
+        if (selector.vendor() != null && !selector.vendor().isBlank() &&
+            selector.name() != null && !selector.name().isBlank()) {
+            modelHolder.updateModel(selector);
+        }
+        log.info("成功保存并应用全量多厂商模型配置: activeVendor={}, activeModel={}",
+                fullData.getActiveVendor(), fullData.getActiveModel());
+    }
 }

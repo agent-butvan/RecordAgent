@@ -30,4 +30,18 @@ public interface ModelService {
      * @return 厂商列表
      */
     List<String> getSupportedVendors();
+
+    /**
+     * 获取全量多厂商模型配置数据
+     *
+     * @return LocalConfigService.ModelConfigData
+     */
+    LocalConfigService.ModelConfigData getFullModelConfig();
+
+    /**
+     * 保存全量多厂商模型配置数据
+     *
+     * @param fullData 全量配置对象
+     */
+    void saveFullModelConfig(LocalConfigService.ModelConfigData fullData);
 }

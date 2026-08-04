@@ -30,6 +30,43 @@ export async function fetchModelConfig(): Promise<ModelConfig | null> {
 }
 
 /**
+ * 获取全量多厂商模型配置
+ */
+export async function fetchFullModelConfig(): Promise<any | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/agent/model/full-config`);
+    if (!res.ok) return null;
+    const json: ApiResponse<any> = await res.json();
+    return json.data;
+  } catch (err) {
+    console.error('获取全量模型配置失败:', err);
+    return null;
+  }
+}
+
+/**
+ * 保存全量多厂商模型配置
+ */
+export async function saveFullModelConfig(fullConfig: any): Promise<{ success: boolean; message: string }> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/agent/model/full-config`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(fullConfig),
+    });
+    const json: ApiResponse<string> = await res.json();
+    if (res.ok && json.code === 200) {
+      return { success: true, message: json.data || '全量模型配置保存成功！' };
+    }
+    return { success: false, message: json.message || '保存失败' };
+  } catch (err: any) {
+    return { success: false, message: err.message || '网络无法连接' };
+  }
+}
+
+/**
  * 获取系统支持的供应商列表（从后端 yml 中拉取）
  */
 export async function fetchSupportedVendors(): Promise<string[]> {

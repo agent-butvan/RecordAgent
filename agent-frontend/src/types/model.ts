@@ -1,4 +1,4 @@
-export type ProviderType = 'deepseek' | 'openai' | 'anthropic' | 'ollama' | 'qwen' | 'zhipu' | 'custom';
+export type ProviderType = 'gemini' | 'deepseek' | 'openai' | 'anthropic' | 'ollama' | 'qwen' | 'zhipu' | 'custom';
 
 export interface ModelItem {
   id: string;

@@ -25,7 +25,11 @@ import {
   EyeOff,
   CheckCircle2,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Plus,
+  Trash2,
+  Brain,
+  Check
 } from 'lucide-react';
 import styles from './ModelConfigModal.module.css';
 
@@ -35,12 +39,29 @@ interface ModelConfigModalProps {
 }
 
 export const ModelConfigModal: React.FC<ModelConfigModalProps> = ({ isOpen, onClose }) => {
-  const { providers, updateProvider, testConnection } = useModel();
-  const [activeTab, setActiveTab] = useState<string>('profile');
-  const [selectedProviderId, setSelectedProviderId] = useState<string>('deepseek');
+  const {
+    providers,
+    activeProviderId,
+    activeModelId,
+    selectActiveModel,
+    updateProvider,
+    addModelToProvider,
+    removeModelFromProvider,
+    testConnection
+  } = useModel();
+
+  const [activeTab, setActiveTab] = useState<string>('config');
+  const [selectedProviderId, setSelectedProviderId] = useState<string>('gemini');
   const [showApiKey, setShowApiKey] = useState<boolean>(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [isTesting, setIsTesting] = useState<boolean>(false);
+
+  // 新增模型表单状态
+  const [newModelId, setNewModelId] = useState('');
+  const [newModelName, setNewModelName] = useState('');
+  const [newModelDesc, setNewModelDesc] = useState('');
+  const [newModelReasoning, setNewModelReasoning] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
 
   if (!isOpen) return null;
 
@@ -52,6 +73,24 @@ export const ModelConfigModal: React.FC<ModelConfigModalProps> = ({ isOpen, onCl
     const result = await testConnection(currentProvider.id);
     setTestResult(result);
     setIsTesting(false);
+  };
+
+  const handleAddModel = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newModelId.trim() || !newModelName.trim()) return;
+
+    addModelToProvider(currentProvider.id, {
+      id: newModelId.trim(),
+      name: newModelName.trim(),
+      description: newModelDesc.trim() || '自定义配置模型',
+      supportsReasoning: newModelReasoning,
+    });
+
+    setNewModelId('');
+    setNewModelName('');
+    setNewModelDesc('');
+    setNewModelReasoning(false);
+    setShowAddForm(false);
   };
 
   return (
@@ -275,18 +314,21 @@ export const ModelConfigModal: React.FC<ModelConfigModalProps> = ({ isOpen, onCl
                 <h2 className={styles.title}>多厂商 AI 模型与 API Key 配置</h2>
               </div>
 
-              <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
+              {/* Vendor Switcher Tabs */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
                 {providers.map((p) => (
                   <button
                     key={p.id}
                     className={`${styles.headerBtn} ${selectedProviderId === p.id ? styles.navItemActive : ''}`}
                     onClick={() => setSelectedProviderId(p.id)}
+                    style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '13px', fontWeight: 500 }}
                   >
                     {p.name}
                   </button>
                 ))}
               </div>
 
+              {/* Base URL & API Key */}
               <div className={styles.fieldGroup} style={{ marginBottom: '12px' }}>
                 <label className={styles.label}>Base URL (API Endpoint)</label>
                 <input
@@ -305,6 +347,7 @@ export const ModelConfigModal: React.FC<ModelConfigModalProps> = ({ isOpen, onCl
                       type={showApiKey ? 'text' : 'password'}
                       value={currentProvider.apiKey}
                       onChange={(e) => updateProvider(currentProvider.id, { apiKey: e.target.value })}
+                      placeholder="sk-..."
                     />
                     <button
                       type="button"
@@ -317,7 +360,7 @@ export const ModelConfigModal: React.FC<ModelConfigModalProps> = ({ isOpen, onCl
                 </div>
               )}
 
-              <div className={styles.testBar}>
+              <div className={styles.testBar} style={{ marginBottom: '24px' }}>
                 <button className={styles.testBtn} onClick={handleTestConnection} disabled={isTesting}>
                   {isTesting ? <RefreshCw size={14} className="animate-spin" /> : <Zap size={14} />}
                   {isTesting ? '测试中...' : '测试 API 连接'}
@@ -329,6 +372,173 @@ export const ModelConfigModal: React.FC<ModelConfigModalProps> = ({ isOpen, onCl
                     {testResult.message}
                   </div>
                 )}
+              </div>
+
+              {/* Model Management Panel for Selected Provider */}
+              <div style={{ borderTop: '1px solid var(--border-color, #e5e7eb)', paddingTop: '16px', marginTop: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-main, #111827)' }}>
+                    {currentProvider.name} 包含的模型配置列表 ({currentProvider.models.length})
+                  </h3>
+                  <button
+                    onClick={() => setShowAddForm(!showAddForm)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '5px 10px',
+                      borderRadius: '6px',
+                      border: '1px solid #d1d5db',
+                      background: '#fff',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                      color: '#2563eb'
+                    }}
+                  >
+                    <Plus size={13} /> {showAddForm ? '取消添加' : '添加模型'}
+                  </button>
+                </div>
+
+                {/* Add New Model Form */}
+                {showAddForm && (
+                  <form onSubmit={handleAddModel} style={{ background: '#f9fafb', padding: '12px', borderRadius: '8px', marginBottom: '16px', border: '1px dashed #cbd5e1' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                      <div>
+                        <label style={{ fontSize: '11px', fontWeight: 500, color: '#64748b' }}>模型 ID (API Name)</label>
+                        <input
+                          style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px' }}
+                          placeholder="例如 gemini-1.5-pro"
+                          value={newModelId}
+                          onChange={(e) => setNewModelId(e.target.value)}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '11px', fontWeight: 500, color: '#64748b' }}>显示名称</label>
+                        <input
+                          style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px' }}
+                          placeholder="例如 Gemini 1.5 Pro"
+                          value={newModelName}
+                          onChange={(e) => setNewModelName(e.target.value)}
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div style={{ marginBottom: '10px' }}>
+                      <label style={{ fontSize: '11px', fontWeight: 500, color: '#64748b' }}>描述说明 (选填)</label>
+                      <input
+                        style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px' }}
+                        placeholder="例如 Google 超长上下文推理模型"
+                        value={newModelDesc}
+                        onChange={(e) => setNewModelDesc(e.target.value)}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={newModelReasoning}
+                          onChange={(e) => setNewModelReasoning(e.target.checked)}
+                        />
+                        支持逻辑 Reasoning 推理
+                      </label>
+                      <button
+                        type="submit"
+                        style={{
+                          padding: '6px 14px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          background: '#2563eb',
+                          color: '#fff',
+                          fontSize: '12px',
+                          fontWeight: 500,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        确定添加
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {/* Models List Cards */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {currentProvider.models.map((m) => {
+                    const isActive = currentProvider.id === activeProviderId && m.id === activeModelId;
+                    return (
+                      <div
+                        key={m.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '10px 12px',
+                          borderRadius: '8px',
+                          border: isActive ? '1.5px solid #6366f1' : '1px solid #e2e8f0',
+                          background: isActive ? '#f5f3ff' : '#ffffff',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, fontSize: '13px' }}>
+                            <span>{m.name}</span>
+                            <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 400, background: '#f1f5f9', padding: '1px 6px', borderRadius: '4px' }}>
+                              {m.id}
+                            </span>
+                            {m.supportsReasoning && (
+                              <span style={{ display: 'flex', alignItems: 'center', gap: '2px', fontSize: '10px', background: '#dbeafe', color: '#1e40af', padding: '1px 5px', borderRadius: '4px' }}>
+                                <Brain size={10} /> 推理
+                              </span>
+                            )}
+                          </div>
+                          {m.description && (
+                            <span style={{ fontSize: '11px', color: '#64748b' }}>{m.description}</span>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {isActive ? (
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 500, color: '#6366f1' }}>
+                              <Check size={14} /> 当前激活
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => selectActiveModel(currentProvider.id, m.id)}
+                              style={{
+                                padding: '4px 10px',
+                                borderRadius: '6px',
+                                border: '1px solid #cbd5e1',
+                                background: '#fff',
+                                fontSize: '12px',
+                                cursor: 'pointer',
+                                color: '#334155'
+                              }}
+                            >
+                              设为当前
+                            </button>
+                          )}
+
+                          <button
+                            onClick={() => removeModelFromProvider(currentProvider.id, m.id)}
+                            title="删除模型"
+                            style={{
+                              padding: '4px 6px',
+                              borderRadius: '6px',
+                              border: 'none',
+                              background: 'transparent',
+                              color: '#94a3b8',
+                              cursor: 'pointer'
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
+                            onMouseLeave={(e) => (e.currentTarget.style.color = '#94a3b8')}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </>
           )}
