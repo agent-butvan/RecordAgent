@@ -6,6 +6,7 @@ import { Card } from '../common/Card';
 import { Toggle } from '../common/Toggle';
 import { Select } from '../common/Select';
 import { Badge } from '../common/Badge';
+import { ModelCard } from './ModelCard';
 import {
   ArrowLeft,
   User,
@@ -24,14 +25,6 @@ import {
   GitBranch,
   FolderArchive,
   Plus,
-  Trash2,
-  Brain,
-  Zap,
-  Eye,
-  EyeOff,
-  CheckCircle2,
-  AlertCircle,
-  RefreshCw,
   Inbox
 } from 'lucide-react';
 import styles from './ModelSettingsPage.module.css';
@@ -93,7 +86,6 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack }) 
   const [formName, setFormName] = useState('');
   const [formDesc, setFormDesc] = useState('');
   const [formReasoning, setFormReasoning] = useState(false);
-  const [showApiKeyMask, setShowApiKeyMask] = useState<Record<string, boolean>>({});
 
   const [testResults, setTestResults] = useState<Record<string, { success: boolean; message: string }>>({});
   const [testingMap, setTestingMap] = useState<Record<string, boolean>>({});
@@ -147,10 +139,6 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack }) 
     const res = await testConnectionByUrl(modelItem.baseUrl, modelItem.apiKey, modelItem.providerType);
     setTestResults((prev) => ({ ...prev, [key]: res }));
     setTestingMap((prev) => ({ ...prev, [key]: false }));
-  };
-
-  const toggleMask = (key: string) => {
-    setShowApiKeyMask((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   return (
@@ -484,124 +472,24 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack }) 
               </div>
             ) : (
               /* REAL MODEL LIST CARDS FROM config.json */
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 {allModels.map((item) => {
                   const key = `${item.providerId}-${item.id}`;
                   const isActive = (item.providerId === activeProviderId || item.providerType === activeProviderId) && item.id === activeModelId;
-                  const isMasked = !showApiKeyMask[key];
                   const testRes = testResults[key];
                   const isTesting = !!testingMap[key];
 
                   return (
-                    <Card
+                    <ModelCard
                       key={key}
-                      variant={isActive ? 'bordered' : 'default'}
-                      style={{
-                        borderColor: isActive ? '#2563eb' : '#e2e8f0',
-                        backgroundColor: isActive ? '#f8fafc' : '#ffffff'
-                      }}
-                    >
-                      {/* Top Header Row */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <Badge variant="primary">
-                            {(VENDOR_DISPLAY_NAMES[item.providerType] || item.providerName || 'VENDOR').toUpperCase()}
-                          </Badge>
-
-                          <span style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>
-                            {item.name}
-                          </span>
-
-                          <span style={{ fontSize: '12px', color: '#64748b', background: '#f1f5f9', padding: '2px 8px', borderRadius: '4px' }}>
-                            {item.id}
-                          </span>
-
-                          {item.supportsReasoning && (
-                            <Badge variant="purple" icon={<Brain size={11} />}>推理</Badge>
-                          )}
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          {isActive ? (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '13px', fontWeight: 700, color: '#2563eb' }}>
-                              <CheckCircle2 size={16} /> 当前激活
-                            </span>
-                          ) : (
-                            <Button size="sm" variant="outline" onClick={() => selectActiveModel(item.providerId, item.id)}>
-                              设为当前
-                            </Button>
-                          )}
-
-                          <button
-                            onClick={() => deleteModelItem(item.providerId, item.id)}
-                            title="删除模型"
-                            style={{
-                              padding: '5px 8px',
-                              borderRadius: '6px',
-                              border: 'none',
-                              background: 'transparent',
-                              color: '#94a3b8',
-                              cursor: 'pointer'
-                            }}
-                            onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
-                            onMouseLeave={(e) => (e.currentTarget.style.color = '#94a3b8')}
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </div>
-                      </div>
-
-                      {item.description && (
-                        <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '8px' }}>
-                          {item.description}
-                        </div>
-                      )}
-
-                      {/* Details Row */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '12px', color: '#475569', background: '#f8fafc', padding: '8px 12px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                        {item.providerType !== 'ollama' ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <strong>API Key:</strong>
-                            <code>
-                              {item.apiKey
-                                ? isMasked
-                                  ? `${item.apiKey.substring(0, 4)}...${item.apiKey.substring(Math.max(0, item.apiKey.length - 4))}`
-                                  : item.apiKey
-                                : '未填写'}
-                            </code>
-                            <button
-                              onClick={() => toggleMask(key)}
-                              style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0 }}
-                            >
-                              {isMasked ? <Eye size={13} /> : <EyeOff size={13} />}
-                            </button>
-                          </div>
-                        ) : (
-                          <div style={{ fontSize: '12px', color: '#64748b' }}>
-                            Ollama 本地开放服务
-                          </div>
-                        )}
-
-                        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => handleTestItem(item)}
-                            disabled={isTesting}
-                            icon={isTesting ? <RefreshCw size={11} className="animate-spin" /> : <Zap size={11} />}
-                          >
-                            测试连接
-                          </Button>
-
-                          {testRes && (
-                            <span style={{ fontSize: '11px', color: testRes.success ? '#047857' : '#b91c1c', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                              {testRes.success ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
-                              {testRes.message}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </Card>
+                      item={item}
+                      isActive={isActive}
+                      onSelect={() => selectActiveModel(item.providerId, item.id)}
+                      onDelete={() => deleteModelItem(item.providerId, item.id)}
+                      onTest={() => handleTestItem(item)}
+                      isTesting={isTesting}
+                      testResult={testRes}
+                    />
                   );
                 })}
               </div>
