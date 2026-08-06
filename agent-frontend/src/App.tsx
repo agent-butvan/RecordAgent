@@ -12,13 +12,14 @@ import {
   createSessionApi,
   deleteSessionApi,
 } from './services/api';
-import type { ChatSession, ChatMessage } from './types/chat';
+import type { ChatSession, ChatMessage, Project } from './types/chat';
 
 export const MainLayout: React.FC<{
   onOpenSettings: () => void;
   isSettingsOpen: boolean;
   setIsSettingsOpen: (open: boolean) => void;
 }> = ({ isSettingsOpen, setIsSettingsOpen }) => {
+  const [projects, setProjects] = useState<Project[]>([]);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string>('');
 
@@ -35,7 +36,8 @@ export const MainLayout: React.FC<{
   const activeSession = sessions.find((s) => s.id === activeSessionId);
   const activeMessages = activeSession?.messages || [];
 
-  const handleNewChat = () => {
+  // 新建普通独立会话
+  const handleNewGeneralChat = () => {
     const newSessionId = String(Date.now());
     const newSession: ChatSession = {
       id: newSessionId,
@@ -47,6 +49,39 @@ export const MainLayout: React.FC<{
     setSessions((prev) => [newSession, ...prev]);
     setActiveSessionId(newSessionId);
     createSessionApi(newSession);
+  };
+
+  // 新建指定项目绑定的会话
+  const handleNewProjectChat = (projectId: string) => {
+    const newSessionId = String(Date.now());
+    const targetProject = projects.find((p) => p.id === projectId);
+    const titleName = targetProject ? `${targetProject.name} 会话` : '项目会话';
+
+    const newSession: ChatSession = {
+      id: newSessionId,
+      title: titleName,
+      projectId,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      messages: [],
+    };
+    setSessions((prev) => [newSession, ...prev]);
+    setActiveSessionId(newSessionId);
+    createSessionApi(newSession);
+  };
+
+  // 导入本地项目
+  const handleImportProject = (name: string, path: string) => {
+    const newProjectId = String(Date.now());
+    const newProject: Project = {
+      id: newProjectId,
+      name,
+      path,
+      createdAt: Date.now(),
+    };
+    setProjects((prev) => [...prev, newProject]);
+    // 导入后自动为此项目创建一个初始化会话
+    handleNewProjectChat(newProjectId);
   };
 
   const handleDeleteSession = (id: string, e: React.MouseEvent) => {
@@ -61,12 +96,11 @@ export const MainLayout: React.FC<{
     deleteSessionApi(id);
   };
 
-
   const handleSendMessage = (prompt: string) => {
     let currentSessionId = activeSessionId;
     let targetSession = sessions.find((s) => s.id === currentSessionId);
 
-    // 若无任何激活会话，自动新建
+    // 若无任何激活会话，自动新建普通会话
     if (!targetSession) {
       currentSessionId = String(Date.now());
       const newSession: ChatSession = {
@@ -177,10 +211,13 @@ export const MainLayout: React.FC<{
       ) : (
         <>
           <Sidebar
+            projects={projects}
             sessions={sessions}
             activeSessionId={activeSessionId}
             onSelectSession={setActiveSessionId}
-            onNewChat={handleNewChat}
+            onNewGeneralChat={handleNewGeneralChat}
+            onNewProjectChat={handleNewProjectChat}
+            onImportProject={handleImportProject}
             onDeleteSession={handleDeleteSession}
             onOpenSettings={() => setIsSettingsOpen(true)}
           />
@@ -194,6 +231,7 @@ export const MainLayout: React.FC<{
     </div>
   );
 };
+
 
 export const App: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);

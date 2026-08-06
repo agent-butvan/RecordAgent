@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
 import { ModelSelector } from '../model/ModelSelector';
-import { useModel } from '../../context/ModelContext';
 import type { ChatMessage } from '../../types/chat';
 import { Card } from '../common/Card';
-import { Badge } from '../common/Badge';
 import {
   Plus,
   ArrowUp,
@@ -19,7 +17,6 @@ import {
   Laptop,
   GitBranch,
   Timer,
-  Sparkles
 } from 'lucide-react';
 import styles from './ChatWorkspace.module.css';
 
@@ -34,11 +31,8 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   onSendMessage,
   onOpenSettings,
 }) => {
-  const { getActiveModel, getActiveProvider } = useModel();
-  const activeModel = getActiveModel();
-  const activeProvider = getActiveProvider();
-
   const [inputPrompt, setInputPrompt] = useState('');
+
 
   const handleSend = () => {
     if (!inputPrompt.trim()) return;
@@ -60,20 +54,9 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
 
   return (
     <div className={styles.workspace}>
-      {/* Top Bar showing current AI Model Badge & Plus Tag matching Screenshot 1 */}
-      <div className={styles.topBar}>
-        <Badge variant="purple" icon={<Sparkles size={12} />} onClick={onOpenSettings} title="获取 Plus 共享更高级额">
-          获取 Plus
-        </Badge>
-
-        <div className={styles.currentModelBadge} onClick={onOpenSettings} title="点击配置/切换模型">
-          <Cpu size={13} style={{ color: '#2563eb' }} />
-          <span>{activeProvider && activeModel ? `${activeProvider.name} (${activeModel.name})` : '未配置模型'}</span>
-        </div>
-      </div>
-
       {/* Hero Empty State OR Chat Messages */}
       {messages.length === 0 ? (
+
         <div className={styles.centerHero}>
           <Cloud className={styles.cloudIcon} />
           <h1 className={styles.heroTitle}>要在 <span style={{ textDecoration: 'underline', textUnderlineOffset: '6px' }}>ButvanAgent</span> 内开发什么？</h1>

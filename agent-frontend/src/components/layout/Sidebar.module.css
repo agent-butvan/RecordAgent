@@ -14,94 +14,40 @@
   display: flex;
   flex-direction: column;
   height: calc(100% - 48px);
+  gap: 12px;
+  overflow-y: auto;
 }
 
-.trafficLights {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 4px 6px 12px;
+.newChatHeader {
+  padding: 2px 0;
 }
 
-.dot {
-  width: 11px;
-  height: 11px;
-  border-radius: var(--radius-full);
-}
-
-.red { background-color: #FF5F56; }
-.yellow { background-color: #FFBD2E; }
-.green { background-color: #27C93F; }
-
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 4px 6px 10px;
-}
-
-.headerTitle {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-primary);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  letter-spacing: -0.2px;
-}
-
-.headerIcons {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.iconBtn {
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  padding: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-sm);
-  transition: all var(--transition-fast);
-  cursor: pointer;
-}
-
-.iconBtn:hover {
-  background-color: var(--bg-sidebar-hover);
-  color: var(--text-primary);
-}
-
-.quickNavGroup {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-bottom: 12px;
-}
-
-.navItem {
+.newChatBtn {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 8px;
+  padding: 8px 12px;
   border-radius: var(--radius-sm);
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: var(--text-primary);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   width: 100%;
-  text-align: left;
   transition: all var(--transition-fast);
 }
 
-.navItem:hover {
-  background-color: var(--bg-sidebar-hover);
-  color: var(--text-primary);
+.newChatBtn:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  background-color: #f8fafc;
+}
+
+.sectionGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .groupHeader {
@@ -109,7 +55,6 @@
   align-items: center;
   justify-content: space-between;
   padding: 4px 6px;
-  margin-bottom: 4px;
 }
 
 .groupTitle {
@@ -117,12 +62,6 @@
   font-weight: 700;
   color: #64748b;
   letter-spacing: 0.5px;
-}
-
-.groupActions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
 }
 
 .iconBtnSmall {
@@ -142,68 +81,103 @@
   color: var(--text-primary);
 }
 
-.projectCard {
+.emptyStateContainer {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  border: 1px dashed #cbd5e1;
+  border-radius: var(--radius-sm);
+  background-color: rgba(255, 255, 255, 0.4);
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
 }
 
-.projectFolderHead {
+.importLinkBtn {
+  margin-top: 4px;
+  background: transparent;
+  border: none;
+  color: #2563eb;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.projectList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.projectItemContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.projectHead {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
   padding: 6px 8px;
   border-radius: var(--radius-sm);
   background-color: rgba(255, 255, 255, 0.7);
-  border: 1px solid #cbd5e1;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-primary);
+  border: 1px solid #e2e8f0;
+}
+
+.projectHeadLeft {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  overflow: hidden;
   cursor: pointer;
 }
 
 .projectName {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.sessionList {
-  flex: 1;
+.projectSubSessions {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  overflow-y: auto;
-  padding-left: 8px;
-  padding-right: 2px;
+  padding-left: 12px;
+}
+
+.subEmpty {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 4px 8px;
+}
+
+.sessionList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .emptySessionState {
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 20px 12px;
+  padding: 12px;
   text-align: center;
   color: var(--text-muted);
-}
-
-.emptySessionState span {
   font-size: 12px;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.emptySessionState p {
-  font-size: 10px;
-  margin-top: 2px;
-  opacity: 0.8;
 }
 
 .sessionItem {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 6px;
   padding: 6px 8px;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -254,6 +228,106 @@
   color: var(--text-primary);
   font-weight: 600;
   border-color: #cbd5e1;
+}
+
+/* 模态框 Modal */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modalContent {
+  width: 420px;
+  background-color: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modalHeader h3 {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.modalCloseBtn {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.modalBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.inputLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.textInput {
+  padding: 8px 10px;
+  border-radius: 4px;
+  border: 1px solid #cbd5e1;
+  font-size: 13px;
+  outline: none;
+}
+
+.textInput:focus {
+  border-color: #2563eb;
+}
+
+.modalActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.cancelBtn {
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.submitBtn {
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: none;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .footer {
@@ -319,6 +393,3 @@
   border-color: #2563eb;
   background-color: #f8fafc;
 }
-
-
-
