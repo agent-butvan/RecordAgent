@@ -1,212 +1,88 @@
-# ButvanAgent 自定义工具系统（Tooling System）设计与接入教程
+# AgentScope Java 原生自定义工具系统设计与接入教程
 
 ## 1. 这份文档解决什么问题
 
-在现有的 `ButvanAgent` 后端实现中，`HarnessAgent` 默认自动加载了 AgentScope 自带的基础内置工具。虽然这些工具能满足简单测试，但在实际构建面向程序员和 AI 深度使用者的桌面级 Agent 时，存在以下不足：
+为了给 `ButvanAgent` 打造强大且标准的本地桌面操控能力，我们需要在后端定义一套高质量的工具集（例如：Shell 命令行执行、高效文件读取、文件精准编辑、Glob 文件匹配与 Grep 正则搜索）。
 
-1. **缺乏统一可扩展的工具规范**：想要为 Agent 增加自定义本地能力（如特定的构建脚本、特定格式的编辑工具、特定知识库查询等）时，缺乏一套简单、解耦且类型安全的工具契约。
-2. **工具运行控制力不足**：内置工具对于控制字符解包、超时处理、Posix 权限配置、分页截断、正则匹配异常等细节缺乏精细掌控。
-3. **无法灵活替换与扩展**：工具与框架深度绑定，难以单独测试或针对不同安全级别进行策略拦截。
+**核心原则**：
+1. **完全基于 AgentScope 官方原生 Tool 机制**：使用 AgentScope 标准的 `io.agentscope.core.tool.Tool` 注解、`io.agentscope.core.tool.ToolParam` 参数注解，以及 `Toolkit` 工具容器。
+2. **复用 mewcode-java 优秀的核心实现逻辑**：吸收 `mewcode-java` 项目在 ProcessBuilder 交互、POSIX 权限、分页防乱码、精准 Target-Replacement 文本替换及 NIO FileVisitor 检索上的优良设计。
 
-本教程的目标是参考 `mewcode-java` 优质的工具架构，在 `ButvanAgent` 的 `agent-backend/server-agents` 模块中构建一套**低耦合、高可扩展的自定义工具系统**（包含 `BashTool`、`ReadFileTool`、`WriteFileTool`、`EditFileTool`、`GlobTool`、`GrepTool` 等系统级核心工具），并完成与 AgentScope 引擎的无缝适配桥接。
+这份教程旨在一步步指导你手动编写并装配基于 AgentScope 官方原生规范的自定义工具体系。
 
 ---
 
-## 2. 先看清完整架构
+## 2. AgentScope 官方 Tool 核心原理
+
+在 AgentScope Java 框架中，工具系统的运作主要由以下三大组件驱动：
 
 ```text
-               ┌────────────────────────────────────────────────────────┐
-               │                  AgentScope 智能体引擎                  │
-               │                   (HarnessAgent / Model)               │
-               └───────────────────────────┬────────────────────────────┘
-                                           │  自动桥接/调用
-                                           ▼
-               ┌────────────────────────────────────────────────────────┐
-               │                ToolRegistry (工具注册中心)              │
-               └───────────┬───────────────────────────────┬────────────┘
-                           │ 注册并统一管理                 │ 转换与适配
-                           ▼                               ▼
-       ┌──────────────────────────────┐        ┌─────────────────────────┐
-       │     Tool 接口与数据模型      │        │   AgentScope Toolkit    │
-       │ (Tool/ToolResult/Category)   │        │     (OpenAPI Schema)    │
-       └───────────────┬──────────────┘        └─────────────────────────┘
-                       │ 核心工具实现类 (Impl)
-        ┌──────────────┼──────────────┬──────────────┬──────────────┐
-        ▼              ▼              ▼              ▼              ▼
-    BashTool     ReadFileTool   WriteFileTool  EditFileTool   GlobTool/GrepTool
- (ProcessBuilder) (Offset/Limit)  (Posix/Dir)   (Diff/Match)   (Visitor/Regex)
+┌────────────────────────────────────────────────────────────────────────┐
+│                        io.agentscope.core.tool                         │
+├────────────────────────────────┬───────────────────────────────────────┤
+│           组件 / 注解           │                 作用                   │
+├────────────────────────────────┼───────────────────────────────────────┤
+│ @Tool                          │ 标注在类的方法上，声明该方法为一个 Agent 可调用的工具   │
+│ @ToolParam                     │ 标注在方法的参数上，提供 LLM 识别的参数名与功能描述    │
+│ Toolkit                        │ 工具注册与管理容器，负责生成 JSON Schema 并派发调用     │
+└────────────────────────────────┴───────────────────────────────────────┘
 ```
 
-**分层职责解耦**：
-- **契约层 (`Tool`)**：定义统一的工具名称、描述、JSON Schema 入参和 `execute()` 运行入口。
-- **模型层 (`ToolResult`)**：统一封装工具执行结果（成功/失败状态、输出内容、异常原因、Diff 差异）。
-- **注册与桥接层 (`ToolRegistry`)**：全局注册与索引工具，并将 `Tool` 转换为 AgentScope 引擎可识别的函数声明。
-- **工具实现层 (`impl.*`)**：具体操作 Shell、文件系统、正则表达式搜索的核心逻辑。
-
----
-
-## 3. 核心设计与数据模型
-
-核心代码分布在 `butvan.agent.agents.tool` 包下：
-
-| 类/接口名 | 职责 |
-| --- | --- |
-| `Tool` | 工具统一接口，声明名称、描述、分类、参数 Schema 与 `execute` 方法。 |
-| `ToolResult` | 工具执行结果 record，携带 `success` 标识、`output` 文本、`error` 信息与修改 `diff`。 |
-| `ToolCategory` | 工具分类枚举（`READ` / `WRITE` / `COMMAND` / `SYSTEM`）。 |
-| `ToolRegistry` | 自定义工具注册中心，负责注册管理与适配桥接到 AgentScope 引擎。 |
-| `impl.BashTool` | 终端命令工具，基于 `ProcessBuilder`，支持超时控制与 Shell 执行。 |
-| `impl.ReadFileTool` | 文件读取工具，支持按行号范围读取、分页截断与防二进制乱码检测。 |
-| `impl.WriteFileTool` | 文件创建/写入工具，支持自动建目录与写文件。 |
-| `impl.EditFileTool` | 文件替换工具，基于精确 Target 替换与修改差异生成。 |
-| `impl.GlobTool` | 通配符文件查找工具，使用 NIO `FileVisitor` 递归检索。 |
-| `impl.GrepTool` | 文本正则搜索工具，支持多文件检索与匹配截断。 |
-
----
-
-## 4. 第一步：定义统一工具契约接口 `Tool.java`
-
-在 `agent-backend/server-agents/src/main/java/butvan/agent/agents/tool/` 目录下创建 `Tool.java`。
-
-```java
-package butvan.agent.agents.tool;
-
-import java.util.Map;
-
-/**
- * ButvanAgent 工具统一标准接口。
- * 所有供 Agent 调用的本地能力或自定义工具均须实现此接口。
- */
-public interface Tool {
-
-    /**
-     * 获取工具的唯一名称（例如 "bash"、"read_file" 等）。
-     */
-    String name();
-
-    /**
-     * 获取工具的功能描述（提供给大模型理解的 Prompt 描述）。
-     */
-    String description();
-
-    /**
-     * 获取工具的分类（只读、写文件或系统命令）。
-     */
-    ToolCategory category();
-
-    /**
-     * 获取工具入参的 JSON Schema 参数定义 Map。
-     */
-    Map<String, Object> schema();
-
-    /**
-     * 执行具体工具逻辑。
-     *
-     * @param args 大模型传入的工具参数 Map
-     * @return 工具执行结果 {@link ToolResult}
-     */
-    ToolResult execute(Map<String, Object> args);
-
-    /**
-     * 是否延迟响应结果（默认 false）。
-     */
-    default boolean shouldDefer() {
-        return false;
-    }
-}
+**工作流**：
+```text
+创建标注 @Tool 方法的 Java 工具类 
+    ↓
+注册到 AgentScope Toolkit: toolkit.registerTool(new MyTool())
+    ↓
+装配给 HarnessAgent: HarnessAgent.builder().toolkit(toolkit).build()
+    ↓
+AgentScope 自动提取方法签名并转化为 JSON Schema，大模型通过函数调用 (Function Calling) 触发该方法
 ```
 
 ---
 
-## 5. 第二步：定义分类枚举与执行结果 `ToolResult.java`
+## 3. 包结构与目录规划
 
-### 5.1 创建分类枚举 `ToolCategory.java`
+在后端 `agent-backend/server-agents` 模块的 `src/main/java/butvan/agent/agents/` 路径下规划工具包结构：
 
-```java
-package butvan.agent.agents.tool;
-
-/**
- * 工具分类枚举。
- */
-public enum ToolCategory {
-    READ,
-    WRITE,
-    COMMAND,
-    SYSTEM
-}
-```
-
-### 5.2 创建结果模型 `ToolResult.java`
-
-```java
-package butvan.agent.agents.tool;
-
-/**
- * 工具执行统一结果模型。
- *
- * @param success 是否成功执行
- * @param output  工具输出正文（如标准输出、文件内容等）
- * @param error   异常报错信息（无报错时为 null）
- * @param diff    代码/文本修改差异（可选）
- */
-public record ToolResult(
-        boolean success,
-        String output,
-        String error,
-        String diff
-) {
-    /**
-     * 快捷创建成功执行结果。
-     */
-    public static ToolResult success(String output) {
-        return new ToolResult(true, output, null, null);
-    }
-
-    /**
-     * 快捷创建带 Diff 的成功执行结果。
-     */
-    public static ToolResult success(String output, String diff) {
-        return new ToolResult(true, output, null, diff);
-    }
-
-    /**
-     * 快捷创建失败执行结果。
-     */
-    public static ToolResult error(String errorMessage) {
-        return new ToolResult(false, null, errorMessage, null);
-    }
-}
+```text
+butvan.agent.agents.tool/
+├── ToolRegistry.java            // 工具注册与 Toolkit 统一管理类
+└── impl/                        // 基于 AgentScope 原生 @Tool 的核心工具类实现
+    ├── BashTool.java            // 终端 Shell 命令工具
+    ├── ReadFileTool.java        // 高效文件读取工具 (支持分页/行号)
+    ├── WriteFileTool.java       // 文件全量写入/创建工具
+    ├── EditFileTool.java        // 文件精准局部替换/编辑工具
+    ├── GlobTool.java            // 通配符文件查找工具
+    └── GrepTool.java            // 正则表达式文本搜索工具
 ```
 
 ---
 
-## 6. 第三步：实现系统级核心工具集 (`impl.*`)
+## 4. 第一步：编写 Bash 终端工具 (`BashTool.java`)
 
-在 `butvan.agent.agents.tool.impl/` 包下实现以下工具：
+在 `butvan.agent.agents.tool.impl` 包下创建 `BashTool.java`。
 
-### 6.1 `BashTool.java`（终端命令工具）
+使用 AgentScope 的 `@Tool` 标注方法，使用 `@ToolParam` 标注 `command` 参数：
 
 ```java
 package butvan.agent.agents.tool.impl;
 
-import butvan.agent.agents.tool.Tool;
-import butvan.agent.agents.tool.ToolCategory;
-import butvan.agent.agents.tool.ToolResult;
+import io.agentscope.core.tool.Tool;
+import io.agentscope.core.tool.ToolParam;
 
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Bash 终端命令执行工具。
+ * 原生 AgentScope 终端命令执行工具。
  */
-public class BashTool implements Tool {
+public class BashTool {
 
-    private String workDir;
+    private final String workDir;
 
     public BashTool() {
         this.workDir = System.getProperty("user.dir");
@@ -216,37 +92,12 @@ public class BashTool implements Tool {
         this.workDir = workDir != null ? workDir : System.getProperty("user.dir");
     }
 
-    @Override
-    public String name() {
-        return "bash";
-    }
-
-    @Override
-    public String description() {
-        return "Execute a shell command and return stdout/stderr. Do not use for cat, head, or echo; use ReadFile/WriteFile instead.";
-    }
-
-    @Override
-    public ToolCategory category() {
-        return ToolCategory.COMMAND;
-    }
-
-    @Override
-    public Map<String, Object> schema() {
-        return Map.of(
-                "type", "object",
-                "properties", Map.of(
-                        "command", Map.of("type", "string", "description", "The exact shell command to execute")
-                ),
-                "required", List.of("command")
-        );
-    }
-
-    @Override
-    public ToolResult execute(Map<String, Object> args) {
-        String command = (String) args.get("command");
+    @Tool(description = "Execute a shell command in current environment and return stdout/stderr. Do not use cat or echo; use read_file or write_file instead.")
+    public String execute(
+            @ToolParam(name = "command", description = "The exact shell command to execute") String command
+    ) {
         if (command == null || command.isBlank()) {
-            return ToolResult.error("Command parameter cannot be empty.");
+            return "Error: Command parameter cannot be empty.";
         }
 
         try {
@@ -267,307 +118,214 @@ public class BashTool implements Tool {
             boolean finished = process.waitFor(120, TimeUnit.SECONDS);
             if (!finished) {
                 process.destroyForcibly();
-                return ToolResult.error("Command execution timed out (120s limit).");
+                return "Error: Command execution timed out (120s limit).";
             }
 
             int exitCode = process.exitValue();
             if (exitCode != 0) {
-                return ToolResult.error("Command failed with exit code " + exitCode + "\nOutput:\n" + output);
+                return "Error (exit code " + exitCode + "):\n" + output;
             }
 
-            return ToolResult.success(output.toString());
+            return output.toString();
         } catch (Exception e) {
-            return ToolResult.error("Execution failed: " + e.getMessage());
+            return "Error: Failed to execute bash command: " + e.getMessage();
         }
     }
 }
 ```
 
-### 6.2 `ReadFileTool.java`（文件读取工具）
+---
+
+## 5. 第二步：编写文件读取工具 (`ReadFileTool.java`)
+
+在 `butvan.agent.agents.tool.impl` 包下创建 `ReadFileTool.java`：
 
 ```java
 package butvan.agent.agents.tool.impl;
 
-import butvan.agent.agents.tool.Tool;
-import butvan.agent.agents.tool.ToolCategory;
-import butvan.agent.agents.tool.ToolResult;
+import io.agentscope.core.tool.Tool;
+import io.agentscope.core.tool.ToolParam;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
-import java.util.Map;
 
 /**
- * 文件高效读取工具。
+ * 原生 AgentScope 文件高效读取工具。
  */
-public class ReadFileTool implements Tool {
+public class ReadFileTool {
 
-    @Override
-    public String name() {
-        return "read_file";
-    }
-
-    @Override
-    public String description() {
-        return "Read contents of a file with line numbers and line range support.";
-    }
-
-    @Override
-    public ToolCategory category() {
-        return ToolCategory.READ;
-    }
-
-    @Override
-    public Map<String, Object> schema() {
-        return Map.of(
-                "type", "object",
-                "properties", Map.of(
-                        "path", Map.of("type", "string", "description", "Absolute or relative path to the file"),
-                        "offset", Map.of("type", "integer", "description", "Line offset to start reading (1-indexed)"),
-                        "limit", Map.of("type", "integer", "description", "Maximum lines to read")
-                ),
-                "required", List.of("path")
-        );
-    }
-
-    @Override
-    public ToolResult execute(Map<String, Object> args) {
-        String pathStr = (String) args.get("path");
-        if (pathStr == null || pathStr.isBlank()) {
-            return ToolResult.error("Path parameter is required.");
+    @Tool(description = "Read file contents with line numbers and optional line offset and limit.")
+    public String readFile(
+            @ToolParam(name = "path", description = "Absolute or relative path to the target file") String path,
+            @ToolParam(name = "offset", description = "Line offset to start reading from (1-indexed, default 1)") Integer offset,
+            @ToolParam(name = "limit", description = "Maximum lines to read (default 500)") Integer limit
+    ) {
+        if (path == null || path.isBlank()) {
+            return "Error: Path parameter is required.";
         }
 
         try {
-            Path path = Paths.get(pathStr);
-            if (!Files.exists(path)) {
-                return ToolResult.error("File not found: " + pathStr);
+            Path filePath = Paths.get(path);
+            if (!Files.exists(filePath)) {
+                return "Error: File not found at path " + path;
             }
 
-            List<String> lines = Files.readAllLines(path);
-            int offset = args.get("offset") instanceof Number n ? n.intValue() : 1;
-            int limit = args.get("limit") instanceof Number n ? n.intValue() : 500;
-
-            int start = Math.max(1, offset) - 1;
-            int end = Math.min(lines.size(), start + limit);
+            List<String> lines = Files.readAllLines(filePath);
+            int startOffset = (offset != null && offset > 0) ? offset - 1 : 0;
+            int maxLimit = (limit != null && limit > 0) ? limit : 500;
+            int end = Math.min(lines.size(), startOffset + maxLimit);
 
             StringBuilder result = new StringBuilder();
-            for (int i = start; i < end; i++) {
+            for (int i = startOffset; i < end; i++) {
                 result.append(String.format("%4d | %s\n", i + 1, lines.get(i)));
             }
 
-            return ToolResult.success(result.toString());
+            return result.toString();
         } catch (Exception e) {
-            return ToolResult.error("Failed to read file: " + e.getMessage());
+            return "Error reading file: " + e.getMessage();
         }
     }
 }
 ```
 
-### 6.3 `WriteFileTool.java`（文件创建与全量覆盖工具）
+---
+
+## 6. 第三步：编写文件覆盖写入工具 (`WriteFileTool.java`)
+
+在 `butvan.agent.agents.tool.impl` 包下创建 `WriteFileTool.java`：
 
 ```java
 package butvan.agent.agents.tool.impl;
 
-import butvan.agent.agents.tool.Tool;
-import butvan.agent.agents.tool.ToolCategory;
-import butvan.agent.agents.tool.ToolResult;
+import io.agentscope.core.tool.Tool;
+import io.agentscope.core.tool.ToolParam;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.List;
-import java.util.Map;
 
 /**
- * 文件创建与覆盖写入工具。
+ * 原生 AgentScope 文件写入工具。
  */
-public class WriteFileTool implements Tool {
+public class WriteFileTool {
 
-    @Override
-    public String name() {
-        return "write_file";
-    }
-
-    @Override
-    public String description() {
-        return "Write text content to a file, creating parent directories automatically.";
-    }
-
-    @Override
-    public ToolCategory category() {
-        return ToolCategory.WRITE;
-    }
-
-    @Override
-    public Map<String, Object> schema() {
-        return Map.of(
-                "type", "object",
-                "properties", Map.of(
-                        "path", Map.of("type", "string", "description", "Target file path"),
-                        "content", Map.of("type", "string", "description", "Content to write into the file")
-                ),
-                "required", List.of("path", "content")
-        );
-    }
-
-    @Override
-    public ToolResult execute(Map<String, Object> args) {
-        String pathStr = (String) args.get("path");
-        String content = (String) args.get("content");
-
-        if (pathStr == null || content == null) {
-            return ToolResult.error("Parameters 'path' and 'content' are required.");
+    @Tool(description = "Write full text content to a file, automatically creating parent directories if needed.")
+    public String writeFile(
+            @ToolParam(name = "path", description = "Target file path to write to") String path,
+            @ToolParam(name = "content", description = "Complete content text to write") String content
+    ) {
+        if (path == null || content == null) {
+            return "Error: Parameters 'path' and 'content' are required.";
         }
 
         try {
-            Path path = Paths.get(pathStr);
-            if (path.getParent() != null) {
-                Files.createDirectories(path.getParent());
+            Path filePath = Paths.get(path);
+            if (filePath.getParent() != null) {
+                Files.createDirectories(filePath.getParent());
             }
 
-            Files.writeString(path, content, StandardCharsets.UTF_8);
-            return ToolResult.success("Successfully wrote " + content.getBytes(StandardCharsets.UTF_8).length + " bytes to " + pathStr);
+            Files.writeString(filePath, content, StandardCharsets.UTF_8);
+            return "Success: Wrote " + content.getBytes(StandardCharsets.UTF_8).length + " bytes to " + path;
         } catch (Exception e) {
-            return ToolResult.error("Failed to write file: " + e.getMessage());
+            return "Error writing file: " + e.getMessage();
         }
     }
 }
 ```
 
-### 6.4 `EditFileTool.java`（精确替换文件工具）
+---
+
+## 7. 第四步：编写文件精准编辑工具 (`EditFileTool.java`)
+
+在 `butvan.agent.agents.tool.impl` 包下创建 `EditFileTool.java`：
 
 ```java
 package butvan.agent.agents.tool.impl;
 
-import butvan.agent.agents.tool.Tool;
-import butvan.agent.agents.tool.ToolCategory;
-import butvan.agent.agents.tool.ToolResult;
+import io.agentscope.core.tool.Tool;
+import io.agentscope.core.tool.ToolParam;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.List;
-import java.util.Map;
 
 /**
- * 文件局部精准替换工具。
+ * 原生 AgentScope 精准局部文本替换编辑工具。
  */
-public class EditFileTool implements Tool {
+public class EditFileTool {
 
-    @Override
-    public String name() {
-        return "edit_file";
-    }
-
-    @Override
-    public String description() {
-        return "Replace target text in a file with new content.";
-    }
-
-    @Override
-    public ToolCategory category() {
-        return ToolCategory.WRITE;
-    }
-
-    @Override
-    public Map<String, Object> schema() {
-        return Map.of(
-                "type", "object",
-                "properties", Map.of(
-                        "path", Map.of("type", "string", "description", "File path to edit"),
-                        "target", Map.of("type", "string", "description", "Exact content to be replaced"),
-                        "replacement", Map.of("type", "string", "description", "Replacement text")
-                ),
-                "required", List.of("path", "target", "replacement")
-        );
-    }
-
-    @Override
-    public ToolResult execute(Map<String, Object> args) {
-        String pathStr = (String) args.get("path");
-        String target = (String) args.get("target");
-        String replacement = (String) args.get("replacement");
+    @Tool(description = "Replace specific target text block with replacement text in a target file.")
+    public String editFile(
+            @ToolParam(name = "path", description = "Target file path to edit") String path,
+            @ToolParam(name = "target", description = "Exact original text block to be replaced") String target,
+            @ToolParam(name = "replacement", description = "New text content to insert") String replacement
+    ) {
+        if (path == null || target == null || replacement == null) {
+            return "Error: 'path', 'target' and 'replacement' parameters are required.";
+        }
 
         try {
-            Path path = Paths.get(pathStr);
-            String original = Files.readString(path, StandardCharsets.UTF_8);
+            Path filePath = Paths.get(path);
+            String original = Files.readString(filePath, StandardCharsets.UTF_8);
 
             if (!original.contains(target)) {
-                return ToolResult.error("Target text not found in file " + pathStr);
+                return "Error: Target text not found in " + path;
             }
 
             String updated = original.replace(target, replacement);
-            Files.writeString(path, updated, StandardCharsets.UTF_8);
+            Files.writeString(filePath, updated, StandardCharsets.UTF_8);
 
-            return ToolResult.success("Successfully replaced target text in " + pathStr);
+            return "Success: Replaced target text in " + path;
         } catch (Exception e) {
-            return ToolResult.error("Edit file failed: " + e.getMessage());
+            return "Error editing file: " + e.getMessage();
         }
     }
 }
 ```
 
-### 6.5 `GlobTool.java`（通配符文件检索工具）
+---
+
+## 8. 第五步：编写匹配与搜索工具 (`GlobTool.java` & `GrepTool.java`)
+
+### 8.1 `GlobTool.java`
 
 ```java
 package butvan.agent.agents.tool.impl;
 
-import butvan.agent.agents.tool.Tool;
-import butvan.agent.agents.tool.ToolCategory;
-import butvan.agent.agents.tool.ToolResult;
+import io.agentscope.core.tool.Tool;
+import io.agentscope.core.tool.ToolParam;
 
 import java.io.IOException;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 /**
- * 文件 Glob 模式匹配检索工具。
+ * 原生 AgentScope Glob 文件路径通配符搜索工具。
  */
-public class GlobTool implements Tool {
+public class GlobTool {
 
-    @Override
-    public String name() {
-        return "glob_files";
-    }
+    @Tool(description = "Find file paths matching a glob pattern (e.g. '**/*.java').")
+    public String globFiles(
+            @ToolParam(name = "pattern", description = "Glob pattern string") String pattern,
+            @ToolParam(name = "dir", description = "Base directory to search from (optional)") String dir
+    ) {
+        if (pattern == null || pattern.isBlank()) {
+            return "Error: Pattern parameter is required.";
+        }
 
-    @Override
-    public String description() {
-        return "Find files matching a glob pattern (e.g. '**/*.java').";
-    }
-
-    @Override
-    public ToolCategory category() {
-        return ToolCategory.READ;
-    }
-
-    @Override
-    public Map<String, Object> schema() {
-        return Map.of(
-                "type", "object",
-                "properties", Map.of(
-                        "pattern", Map.of("type", "string", "description", "Glob pattern to match files"),
-                        "dir", Map.of("type", "string", "description", "Directory to search from")
-                ),
-                "required", List.of("pattern")
-        );
-    }
-
-    @Override
-    public ToolResult execute(Map<String, Object> args) {
-        String pattern = (String) args.get("pattern");
-        String dirStr = (String) args.getOrDefault("dir", System.getProperty("user.dir"));
-
-        Path rootDir = Paths.get(dirStr);
-        PathMatcher matcher = FileSystems.getDefault().getPathMatcher("glob:" + pattern);
-        List<String> matchedFiles = new ArrayList<>();
+        String baseDir = (dir != null && !dir.isBlank()) ? dir : System.getProperty("user.dir");
+        Path rootDir = Paths.get(baseDir);
 
         try {
+            PathMatcher matcher = FileSystems.getDefault().getPathMatcher("glob:" + pattern);
+            List<String> matchedFiles = new ArrayList<>();
+
             Files.walkFileTree(rootDir, new SimpleFileVisitor<Path>() {
                 @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
@@ -578,90 +336,65 @@ public class GlobTool implements Tool {
                 }
             });
 
-            return ToolResult.success(String.join("\n", matchedFiles));
+            return String.join("\n", matchedFiles);
         } catch (IOException e) {
-            return ToolResult.error("Glob search failed: " + e.getMessage());
+            return "Error searching glob files: " + e.getMessage();
         }
     }
 }
 ```
 
-### 6.6 `GrepTool.java`（正则文本搜索工具）
+### 8.2 `GrepTool.java`
 
 ```java
 package butvan.agent.agents.tool.impl;
 
-import butvan.agent.agents.tool.Tool;
-import butvan.agent.agents.tool.ToolCategory;
-import butvan.agent.agents.tool.ToolResult;
+import io.agentscope.core.tool.Tool;
+import io.agentscope.core.tool.ToolParam;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
- * 文件文本正则表达式匹配搜索工具。
+ * 原生 AgentScope 文本正则搜索工具。
  */
-public class GrepTool implements Tool {
+public class GrepTool {
 
-    @Override
-    public String name() {
-        return "grep_files";
-    }
-
-    @Override
-    public String description() {
-        return "Search text content in files using regular expressions.";
-    }
-
-    @Override
-    public ToolCategory category() {
-        return ToolCategory.READ;
-    }
-
-    @Override
-    public Map<String, Object> schema() {
-        return Map.of(
-                "type", "object",
-                "properties", Map.of(
-                        "query", Map.of("type", "string", "description", "Regex query string"),
-                        "path", Map.of("type", "string", "description", "File or directory path to search")
-                ),
-                "required", List.of("query", "path")
-        );
-    }
-
-    @Override
-    public ToolResult execute(Map<String, Object> args) {
-        String query = (String) args.get("query");
-        String pathStr = (String) args.get("path");
+    @Tool(description = "Search text content across files using regular expressions.")
+    public String grepFiles(
+            @ToolParam(name = "query", description = "Regular expression query") String query,
+            @ToolParam(name = "path", description = "File or directory path to search in") String path
+    ) {
+        if (query == null || path == null) {
+            return "Error: Parameters 'query' and 'path' are required.";
+        }
 
         try {
             Pattern regex = Pattern.compile(query);
-            Path searchPath = Paths.get(pathStr);
+            Path searchPath = Paths.get(path);
             List<String> results = new ArrayList<>();
 
             if (Files.isRegularFile(searchPath)) {
-                searchSingleFile(searchPath, regex, results);
+                searchFileContent(searchPath, regex, results);
             } else if (Files.isDirectory(searchPath)) {
                 try (Stream<Path> stream = Files.walk(searchPath)) {
-                    stream.filter(Files::isRegularFile).forEach(file -> searchSingleFile(file, regex, results));
+                    stream.filter(Files::isRegularFile).forEach(file -> searchFileContent(file, regex, results));
                 }
             }
 
-            return ToolResult.success(String.join("\n", results));
+            return String.join("\n", results);
         } catch (Exception e) {
-            return ToolResult.error("Grep failed: " + e.getMessage());
+            return "Error running grep: " + e.getMessage();
         }
     }
 
-    private void searchSingleFile(Path file, Pattern pattern, List<String> results) {
+    private void searchFileContent(Path file, Pattern pattern, List<String> results) {
         try {
             List<String> lines = Files.readAllLines(file);
             for (int i = 0; i < lines.size(); i++) {
@@ -671,7 +404,7 @@ public class GrepTool implements Tool {
                 }
             }
         } catch (Exception ignored) {
-            // 忽略读取非文本二进制文件的报错
+            // 忽略读取二进制非文本文件的报错
         }
     }
 }
@@ -679,70 +412,52 @@ public class GrepTool implements Tool {
 
 ---
 
-## 7. 第四步：创建工具注册中心 `ToolRegistry.java`
+## 9. 第六步：编写 `ToolRegistry` 并装配至 AgentScope `Toolkit`
 
-在 `butvan.agent.agents.tool/` 目录下创建 `ToolRegistry.java`，管理所有的工具实例。
+创建 `butvan.agent.agents.tool.ToolRegistry`：
 
 ```java
 package butvan.agent.agents.tool;
 
 import butvan.agent.agents.tool.impl.*;
+import io.agentscope.core.tool.Toolkit;
 import org.springframework.stereotype.Component;
 
-import java.util.Collection;
-import java.util.LinkedHashMap;
-import java.util.Map;
-
 /**
- * 自定义工具注册中心。
+ * 工具管理与 AgentScope Toolkit 统一注册中心。
  */
 @Component
 public class ToolRegistry {
 
-    private final Map<String, Tool> registry = new LinkedHashMap<>();
+    private final Toolkit toolkit;
 
     public ToolRegistry() {
-        // 自动注册默认的核心系统工具
-        register(new BashTool());
-        register(new ReadFileTool());
-        register(new WriteFileTool());
-        register(new EditFileTool());
-        register(new GlobTool());
-        register(new GrepTool());
+        this.toolkit = new Toolkit();
+        
+        // 向 AgentScope Toolkit 注册所有的原生 @Tool 工具类组件
+        this.toolkit.registerTool(new BashTool());
+        this.toolkit.registerTool(new ReadFileTool());
+        this.toolkit.registerTool(new WriteFileTool());
+        this.toolkit.registerTool(new EditFileTool());
+        this.toolkit.registerTool(new GlobTool());
+        this.toolkit.registerTool(new GrepTool());
     }
 
     /**
-     * 注册新的自定义 Tool
+     * 获取配置好的 AgentScope Toolkit 容器
      */
-    public void register(Tool tool) {
-        if (tool != null && tool.name() != null) {
-            registry.put(tool.name(), tool);
-        }
-    }
-
-    /**
-     * 根据名称查找 Tool
-     */
-    public Tool getTool(String name) {
-        return registry.get(name);
-    }
-
-    /**
-     * 获取所有已注册 Tool 集合
-     */
-    public Collection<Tool> getAllTools() {
-        return registry.values();
+    public Toolkit getToolkit() {
+        return this.toolkit;
     }
 }
 ```
 
----
+### 在 `AgentService.java` 中注入与装配
 
-## 8. 第五步：在 `AgentService` 中完成装配接入
-
-在 [`AgentService.java`](file:///Users/butvan/Butvan_Projets/my_code/ButvanAgent/agent-backend/server-agents/src/main/java/butvan/agent/agents/agent/AgentService.java) 中引入 `ToolRegistry` 依赖，并将注册的自定义工具自动装配至 `HarnessAgent`：
+更新 [`AgentService.java`](file:///Users/butvan/Butvan_Projets/my_code/ButvanAgent/agent-backend/server-agents/src/main/java/butvan/agent/agents/agent/AgentService.java)：
 
 ```java
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AgentService {
@@ -751,43 +466,43 @@ public class AgentService {
     private final ToolRegistry toolRegistry; // 注入工具注册中心
 
     private HarnessAgent createHarnessAgent(Model model) {
-        HarnessAgent.Builder builder = HarnessAgent.builder()
+        return HarnessAgent.builder()
                 .name("butvan-agent")
-                .sysPrompt("你是一个强大的桌面级智能助手。拥有执行 Shell 指令与读写本地文件的能力。")
+                .sysPrompt("你是一个强大的桌面智能助手，善于使用 Bash 和文件工具定位与修改代码问题。")
                 .model(model)
+                .toolkit(toolRegistry.getToolkit()) // 注入全局注册的 AgentScope Toolkit
                 .workspace(Paths.get(".agentscope/workspace"))
                 .compaction(CompactionConfig.builder()
                         .triggerMessages(30)
                         .keepMessages(10)
-                        .build());
-
-        // 此处可将 toolRegistry.getAllTools() 装配给 Agent 引擎
-
-        return builder.build();
+                        .build())
+                .build();
     }
 }
 ```
 
 ---
 
-## 9. 建议的实施步骤与验证顺序
+## 10. 建议的实施顺序与验证方式
 
-| 步骤 | 操作目标 | 文件位置 | 校验与验证方式 |
+| 次序 | 手动编写的代码内容 | 位置 | 成功验证标志 |
 | --- | --- | --- | --- |
-| 1 | 定义接口与数据模型 | `Tool.java`, `ToolResult.java`, `ToolCategory.java` | `mvn clean compile` 编译无错。 |
-| 2 | 创建核心工具类实现 | `impl/BashTool.java` ~ `impl/GrepTool.java` | 编写 JUnit 测试单元验证工具本地功能。 |
-| 3 | 创建 `ToolRegistry` 注册中心 | `ToolRegistry.java` | 容器启动时成功打印已注册工具列表。 |
-| 4 | 整合装配至 `AgentService` | `AgentService.java` | 运行 SSE 接口请求，验证日志打印自定义 Tool 加载。 |
+| 1 | 编写 `BashTool.java` | `tool/impl/BashTool.java` | `@Tool` 方法编译通过，参数全带 `@ToolParam`。 |
+| 2 | 编写 `ReadFileTool.java` & `WriteFileTool.java` | `tool/impl/` | 校验路径及 Line range 参数处理。 |
+| 3 | 编写 `EditFileTool.java` | `tool/impl/` | 校验 target 替换。 |
+| 4 | 编写 `GlobTool.java` & `GrepTool.java` | `tool/impl/` | 校验 Java FileVisitor 与正则逻辑。 |
+| 5 | 创建 `ToolRegistry.java` | `tool/ToolRegistry.java` | `new Toolkit()` 并成功调用 `registerTool(...)`。 |
+| 6 | 在 `AgentService` 注入 `ToolRegistry` | `agent/AgentService.java` | 启动后端应用，查看控制台日志输出了相关 Tool 的注册信息。 |
 
 ---
 
-## 10. 完成后的代码职责表
+## 11. 最终代码职责表
 
-| 文件/模块 | 职责与作用 |
-| --- | --- |
-| `Tool` | 工具基础契约接口，解耦具体框架与引擎。 |
-| `ToolResult` | 工具运行输出的结构化载体。 |
-| `ToolRegistry` | 统一维护工具实例的生命周期与查找注册。 |
-| `impl.BashTool` | 负责安全、可控的 ProcessBuilder 命令行调用。 |
-| `impl.ReadFileTool` / `impl.WriteFileTool` / `impl.EditFileTool` | 负责高效、准确的文件读取、写入与局部修改。 |
-| `impl.GlobTool` / `impl.GrepTool` | 负责高效的代码查找与正则匹配。 |
+| 类名 | 归属规范 | 职责与作用 |
+| --- | --- | --- |
+| `BashTool` | AgentScope `@Tool` | 基于 `ProcessBuilder` 执行安全 Shell 指令。 |
+| `ReadFileTool` | AgentScope `@Tool` | 分页、行号化读取文本文件。 |
+| `WriteFileTool` | AgentScope `@Tool` | 自动补全目录并写全量文件。 |
+| `EditFileTool` | AgentScope `@Tool` | 精准替换文件局部内容。 |
+| `GlobTool` / `GrepTool` | AgentScope `@Tool` | 高效的 Glob 检索与文本正则搜寻。 |
+| `ToolRegistry` | AgentScope `Toolkit` | 管理工具组件，生成 JSON Schema 传递给 `HarnessAgent`。 |
