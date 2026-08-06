@@ -118,7 +118,7 @@ export async function streamAgentChat(
   params: { sessionId: string; context: string },
   onChunk: (text: string) => void,
   onComplete?: () => void,
-  onError?: (err: any) => void
+  onError?: (error: Error) => void
 ): Promise<void> {
   try {
     const response = await fetch(`${API_BASE_URL}/agent/chat/stream`, {
@@ -141,29 +141,121 @@ export async function streamAgentChat(
     const decoder = new TextDecoder('utf-8');
     let buffer = '';
 
+    let streamFinished = false;
+
+    const dispatchSseEvent = (eventBlock: string) => {
+      let eventName = 'message';
+      const dataLines: string[] = [];
+
+      for (const rawLine of eventBlock.split(/\r?\n/)) {
+        if (rawLine.startsWith('event:')) {
+          eventName = rawLine.substring(6).trim();
+        } else if (rawLine.startsWith('data:')) {
+          dataLines.push(rawLine.substring(5).trimStart());
+        }
+      }
+
+      const data = dataLines.join('\n');
+      if (eventName === 'text' || eventName === 'message') {
+        if (data) onChunk(data);
+      } else if (eventName === 'error') {
+        streamFinished = true;
+        onError?.(new Error(data || 'Agent 流式处理失败'));
+      } else if (eventName === 'done') {
+        streamFinished = true;
+        onComplete?.();
+      }
+    };
+
     while (true) {
       const { done, value } = await reader.read();
       if (done) {
-        if (onComplete) onComplete();
+        if (buffer.trim()) dispatchSseEvent(buffer);
+        if (!streamFinished) onComplete?.();
         break;
       }
 
       buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || ''; // 保留未完整的行
+      const eventBlocks = buffer.split(/\r?\n\r?\n/);
+      buffer = eventBlocks.pop() || ''; // 保留尚未接收完整的 SSE 事件。
 
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (trimmed.startsWith('data:')) {
-          const dataText = trimmed.substring(5).trim();
-          if (dataText) {
-            onChunk(dataText);
-          }
-        }
+      for (const eventBlock of eventBlocks) {
+        if (eventBlock.trim()) dispatchSseEvent(eventBlock);
       }
     }
-  } catch (err: any) {
-    console.error('SSE 流数据解析失败:', err);
-    if (onError) onError(err);
+  } catch (error: unknown) {
+    console.error('SSE 流数据解析失败:', error);
+    onError?.(error instanceof Error ? error : new Error('SSE 流数据解析失败'));
   }
 }
+
+/**
+ * 获取后端会话列表
+ */
+export async function fetchSessions(): Promise<any[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/agent/sessions`);
+    if (!res.ok) return [];
+    const json: ApiResponse<any[]> = await res.json();
+    return json.data || [];
+  } catch (err) {
+    console.error('获取后端会话列表失败（后端接口可能未启动或未实现）:', err);
+    return [];
+  }
+}
+
+/**
+ * 创建新会话
+ */
+export async function createSessionApi(session: any): Promise<{ success: boolean; data?: any }> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/agent/sessions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(session),
+    });
+    if (!res.ok) return { success: false };
+    const json: ApiResponse<any> = await res.json();
+    return { success: res.ok && json.code === 200, data: json.data };
+  } catch (err) {
+    console.error('创建会话 API 调用失败:', err);
+    return { success: false };
+  }
+}
+
+/**
+ * 删除会话
+ */
+export async function deleteSessionApi(sessionId: string): Promise<{ success: boolean }> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/agent/sessions/${sessionId}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) return { success: false };
+    const json: ApiResponse<any> = await res.json();
+    return { success: res.ok && json.code === 200 };
+  } catch (err) {
+    console.error('删除会话 API 调用失败:', err);
+    return { success: false };
+  }
+}
+
+/**
+ * 更新会话
+ */
+export async function updateSessionApi(sessionId: string, sessionData: any): Promise<{ success: boolean }> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/agent/sessions/${sessionId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(sessionData),
+    });
+    if (!res.ok) return { success: false };
+    const json: ApiResponse<any> = await res.json();
+    return { success: res.ok && json.code === 200 };
+  } catch (err) {
+    console.error('更新会话 API 调用失败:', err);
+    return { success: false };
+  }
+}
+

@@ -4,37 +4,33 @@ import { Sidebar } from './components/layout/Sidebar';
 import { ChatWorkspace } from './components/chat/ChatWorkspace';
 import { ModelSettingsPage } from './components/model/ModelSettingsPage';
 import { ModelInitPage } from './components/model/ModelInitPage';
-import { fetchModelConfig, fetchSupportedVendors, streamAgentChat } from './services/api';
+import {
+  fetchModelConfig,
+  fetchSupportedVendors,
+  streamAgentChat,
+  fetchSessions,
+  createSessionApi,
+  deleteSessionApi,
+} from './services/api';
 import type { ChatSession, ChatMessage } from './types/chat';
-
-const SESSIONS_STORAGE_KEY = 'butvan_agent_sessions_v1';
 
 export const MainLayout: React.FC<{
   onOpenSettings: () => void;
   isSettingsOpen: boolean;
   setIsSettingsOpen: (open: boolean) => void;
 }> = ({ isSettingsOpen, setIsSettingsOpen }) => {
-  const [sessions, setSessions] = useState<ChatSession[]>(() => {
-    const saved = localStorage.getItem(SESSIONS_STORAGE_KEY);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch (e) {
-        console.error('读取保存的会话列表失败', e);
-      }
-    }
-    return [];
-  });
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string>('');
 
-  const [activeSessionId, setActiveSessionId] = useState<string>(() => {
-    return sessions[0]?.id || '';
-  });
-
-  // 变动时持久化保存会话列表
+  // 初始化从后端 API 获取会话列表数据
   useEffect(() => {
-    localStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(sessions));
-  }, [sessions]);
+    fetchSessions().then((data) => {
+      if (Array.isArray(data) && data.length > 0) {
+        setSessions(data);
+        setActiveSessionId(data[0].id);
+      }
+    });
+  }, []);
 
   const activeSession = sessions.find((s) => s.id === activeSessionId);
   const activeMessages = activeSession?.messages || [];
@@ -50,6 +46,7 @@ export const MainLayout: React.FC<{
     };
     setSessions((prev) => [newSession, ...prev]);
     setActiveSessionId(newSessionId);
+    createSessionApi(newSession);
   };
 
   const handleDeleteSession = (id: string, e: React.MouseEvent) => {
@@ -61,7 +58,9 @@ export const MainLayout: React.FC<{
       }
       return updated;
     });
+    deleteSessionApi(id);
   };
+
 
   const handleSendMessage = (prompt: string) => {
     let currentSessionId = activeSessionId;
