@@ -14,34 +14,8 @@
   display: flex;
   flex-direction: column;
   height: calc(100% - 48px);
-  gap: 12px;
+  gap: 16px;
   overflow-y: auto;
-}
-
-.newChatHeader {
-  padding: 2px 0;
-}
-
-.newChatBtn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
-  background-color: #ffffff;
-  border: 1px solid #cbd5e1;
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  width: 100%;
-  transition: all var(--transition-fast);
-}
-
-.newChatBtn:hover {
-  border-color: #2563eb;
-  color: #2563eb;
-  background-color: #f8fafc;
 }
 
 .sectionGroup {
@@ -57,23 +31,42 @@
   padding: 4px 6px;
 }
 
+.groupTitleClickable {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
 .groupTitle {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.1px;
+}
+
+.arrowIcon {
   color: #64748b;
-  letter-spacing: 0.5px;
+  opacity: 0.7;
+}
+
+.groupActions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 
 .iconBtnSmall {
   background: transparent;
   border: none;
   color: #64748b;
-  padding: 2px;
+  padding: 3px;
   border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  transition: all var(--transition-fast);
 }
 
 .iconBtnSmall:hover {
@@ -81,34 +74,28 @@
   color: var(--text-primary);
 }
 
-.emptyStateContainer {
+.sectionContent {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 12px;
-  border: 1px dashed #cbd5e1;
-  border-radius: var(--radius-sm);
-  background-color: rgba(255, 255, 255, 0.4);
-  font-size: 11px;
-  color: var(--text-muted);
+  gap: 4px;
+}
+
+.emptyLinkRow {
+  padding: 4px 8px;
+  font-size: 12px;
+  color: #2563eb;
+  font-weight: 500;
   cursor: pointer;
 }
 
-.importLinkBtn {
-  margin-top: 4px;
-  background: transparent;
-  border: none;
-  color: #2563eb;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
+.emptyLinkRow:hover {
+  text-decoration: underline;
 }
 
 .projectList {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .projectItemContainer {
@@ -121,7 +108,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 8px;
+  padding: 5px 8px;
   border-radius: var(--radius-sm);
   background-color: rgba(255, 255, 255, 0.7);
   border: 1px solid #e2e8f0;
@@ -149,29 +136,13 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding-left: 12px;
-}
-
-.subEmpty {
-  font-size: 11px;
-  color: var(--text-muted);
-  padding: 4px 8px;
+  padding-left: 10px;
 }
 
 .sessionList {
   display: flex;
   flex-direction: column;
   gap: 2px;
-}
-
-.emptySessionState {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 12px;
-  text-align: center;
-  color: var(--text-muted);
-  font-size: 12px;
 }
 
 .sessionItem {

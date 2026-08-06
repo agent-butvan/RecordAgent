@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { ModelSelector } from '../model/ModelSelector';
 import type { ChatMessage } from '../../types/chat';
 import { Card } from '../common/Card';
@@ -33,7 +34,6 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
 }) => {
   const [inputPrompt, setInputPrompt] = useState('');
 
-
   const handleSend = () => {
     if (!inputPrompt.trim()) return;
     const prompt = inputPrompt.trim();
@@ -56,7 +56,6 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     <div className={styles.workspace}>
       {/* Hero Empty State OR Chat Messages */}
       {messages.length === 0 ? (
-
         <div className={styles.centerHero}>
           <Cloud className={styles.cloudIcon} />
           <h1 className={styles.heroTitle}>要在 <span style={{ textDecoration: 'underline', textUnderlineOffset: '6px' }}>ButvanAgent</span> 内开发什么？</h1>
@@ -125,8 +124,12 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
                       <strong>思考过程:</strong> {msg.reasoning}
                     </div>
                   )}
-                  <div style={{ fontSize: '14px', lineHeight: 1.6 }}>
-                    {msg.content || <span style={{ opacity: 0.5 }}>正在思考并生成回答...</span>}
+                  <div className={styles.markdownBody}>
+                    {msg.content ? (
+                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    ) : (
+                      <span style={{ opacity: 0.5 }}>正在思考并生成回答...</span>
+                    )}
                   </div>
                 </div>
               )}
@@ -134,6 +137,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
           ))}
         </div>
       )}
+
 
       {/* Bottom Floating Input Area matching Screenshot 1 */}
       <div className={styles.bottomContainer}>

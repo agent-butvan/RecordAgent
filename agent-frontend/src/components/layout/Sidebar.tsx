@@ -9,8 +9,7 @@ import {
   MessageSquare,
   ChevronRight,
   ChevronDown,
-  X,
-  FolderOpen
+  X
 } from 'lucide-react';
 import type { ChatSession, Project } from '../../types/chat';
 import { UserPopover } from '../common/UserPopover';
@@ -40,7 +39,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenSettings,
 }) => {
   const [isUserPopoverOpen, setIsUserPopoverOpen] = useState(false);
+
+  // 区分项目与最近组的展开/收起折叠状态
+  const [isProjectsSectionExpanded, setIsProjectsSectionExpanded] = useState(true);
+  const [isRecentSectionExpanded, setIsRecentSectionExpanded] = useState(true);
   const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({});
+
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importPath, setImportPath] = useState('');
   const [importName, setImportName] = useState('');
@@ -68,18 +72,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <aside className={styles.sidebar}>
       <div className={styles.topContainer}>
-        {/* 新建普通会话按钮 */}
-        <div className={styles.newChatHeader}>
-          <button className={styles.newChatBtn} onClick={onNewGeneralChat} title="新建普通会话">
-            <SquarePen size={15} />
-            <span>新对话</span>
-          </button>
-        </div>
-
         {/* 1. 项目大类 */}
         <div className={styles.sectionGroup}>
           <div className={styles.groupHeader}>
-            <span className={styles.groupTitle}>项目</span>
+            <div
+              className={styles.groupTitleClickable}
+              onClick={() => setIsProjectsSectionExpanded(!isProjectsSectionExpanded)}
+            >
+              <span className={styles.groupTitle}>项目</span>
+              {isProjectsSectionExpanded ? (
+                <ChevronDown size={14} className={styles.arrowIcon} />
+              ) : (
+                <ChevronRight size={14} className={styles.arrowIcon} />
+              )}
+            </div>
             <button
               className={styles.iconBtnSmall}
               title="导入本地项目"
@@ -89,107 +95,122 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           </div>
 
-          {projects.length === 0 ? (
-            <div className={styles.emptyStateContainer} onClick={() => setIsImportModalOpen(true)}>
-              <FolderOpen size={18} style={{ opacity: 0.5, marginBottom: '4px' }} />
-              <span>暂无导入的项目</span>
-              <button className={styles.importLinkBtn}>+ 点击导入项目</button>
-            </div>
-          ) : (
-            <div className={styles.projectList}>
-              {projects.map((project) => {
-                const isExpanded = expandedProjects[project.id] ?? true;
-                const projectSessions = sessions.filter((s) => s.projectId === project.id);
+          {isProjectsSectionExpanded && (
+            <div className={styles.sectionContent}>
+              {projects.length === 0 ? (
+                <div className={styles.emptyLinkRow} onClick={() => setIsImportModalOpen(true)}>
+                  <span>+ 点击导入项目</span>
+                </div>
+              ) : (
+                <div className={styles.projectList}>
+                  {projects.map((project) => {
+                    const isExpanded = expandedProjects[project.id] ?? true;
+                    const projectSessions = sessions.filter((s) => s.projectId === project.id);
 
-                return (
-                  <div key={project.id} className={styles.projectItemContainer}>
-                    <div className={styles.projectHead}>
-                      <div className={styles.projectHeadLeft} onClick={() => toggleProject(project.id)}>
-                        {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                        <Folder size={14} style={{ color: '#2563eb', marginLeft: '4px' }} />
-                        <span className={styles.projectName} title={project.path}>{project.name}</span>
-                      </div>
-                      <button
-                        className={styles.iconBtnSmall}
-                        title="在此项目下新建会话"
-                        onClick={() => onNewProjectChat(project.id)}
-                      >
-                        <Plus size={13} />
-                      </button>
-                    </div>
+                    return (
+                      <div key={project.id} className={styles.projectItemContainer}>
+                        <div className={styles.projectHead}>
+                          <div className={styles.projectHeadLeft} onClick={() => toggleProject(project.id)}>
+                            {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                            <Folder size={13} style={{ color: '#2563eb', marginLeft: '2px' }} />
+                            <span className={styles.projectName} title={project.path}>{project.name}</span>
+                          </div>
+                          <button
+                            className={styles.iconBtnSmall}
+                            title="在此项目下新建会话"
+                            onClick={() => onNewProjectChat(project.id)}
+                          >
+                            <Plus size={13} />
+                          </button>
+                        </div>
 
-                    {isExpanded && (
-                      <div className={styles.projectSubSessions}>
-                        {projectSessions.length === 0 ? (
-                          <div className={styles.subEmpty}>暂无项目对话</div>
-                        ) : (
-                          projectSessions.map((session) => {
-                            const isActive = session.id === activeSessionId;
-                            return (
-                              <div
-                                key={session.id}
-                                className={`${styles.sessionItem} ${isActive ? styles.sessionActive : ''}`}
-                                onClick={() => onSelectSession(session.id)}
-                              >
-                                <span className={styles.sessionTitle} title={session.title}>
-                                  {session.title || '新对话'}
-                                </span>
-                                <button
-                                  className={styles.deleteBtn}
-                                  title="删除会话"
-                                  onClick={(e) => onDeleteSession(session.id, e)}
+                        {isExpanded && (
+                          <div className={styles.projectSubSessions}>
+                            {projectSessions.map((session) => {
+                              const isActive = session.id === activeSessionId;
+                              return (
+                                <div
+                                  key={session.id}
+                                  className={`${styles.sessionItem} ${isActive ? styles.sessionActive : ''}`}
+                                  onClick={() => onSelectSession(session.id)}
                                 >
-                                  <Trash2 size={12} />
-                                </button>
-                              </div>
-                            );
-                          })
+                                  <span className={styles.sessionTitle} title={session.title}>
+                                    {session.title || '新对话'}
+                                  </span>
+                                  <button
+                                    className={styles.deleteBtn}
+                                    title="删除会话"
+                                    onClick={(e) => onDeleteSession(session.id, e)}
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
                         )}
                       </div>
-                    )}
-                  </div>
-                );
-              })}
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        {/* 2. 最近 / 普通会话 */}
+        {/* 2. 最近 / 普通会话大类 */}
         <div className={styles.sectionGroup}>
           <div className={styles.groupHeader}>
-            <span className={styles.groupTitle}>最近</span>
+            <div
+              className={styles.groupTitleClickable}
+              onClick={() => setIsRecentSectionExpanded(!isRecentSectionExpanded)}
+            >
+              <span className={styles.groupTitle}>最近</span>
+              {isRecentSectionExpanded ? (
+                <ChevronDown size={14} className={styles.arrowIcon} />
+              ) : (
+                <ChevronRight size={14} className={styles.arrowIcon} />
+              )}
+            </div>
+            <div className={styles.groupActions}>
+              <button
+                className={styles.iconBtnSmall}
+                title="新建普通对话"
+                onClick={onNewGeneralChat}
+              >
+                <SquarePen size={14} />
+              </button>
+            </div>
           </div>
 
-          <div className={styles.sessionList}>
-            {generalSessions.length === 0 ? (
-              <div className={styles.emptySessionState}>
-                <span>暂无最近普通对话</span>
-              </div>
-            ) : (
-              generalSessions.map((session) => {
-                const isActive = session.id === activeSessionId;
-                return (
-                  <div
-                    key={session.id}
-                    className={`${styles.sessionItem} ${isActive ? styles.sessionActive : ''}`}
-                    onClick={() => onSelectSession(session.id)}
-                  >
-                    <MessageSquare size={13} style={{ opacity: 0.6, flexShrink: 0 }} />
-                    <span className={styles.sessionTitle} title={session.title}>
-                      {session.title || '新对话'}
-                    </span>
-                    <button
-                      className={styles.deleteBtn}
-                      title="删除会话"
-                      onClick={(e) => onDeleteSession(session.id, e)}
+          {isRecentSectionExpanded && (
+            <div className={styles.sectionContent}>
+              <div className={styles.sessionList}>
+                {generalSessions.map((session) => {
+                  const isActive = session.id === activeSessionId;
+                  return (
+                    <div
+                      key={session.id}
+                      className={`${styles.sessionItem} ${isActive ? styles.sessionActive : ''}`}
+                      onClick={() => onSelectSession(session.id)}
                     >
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
-                );
-              })
-            )}
-          </div>
+                      <MessageSquare size={13} style={{ opacity: 0.6, flexShrink: 0 }} />
+                      <span className={styles.sessionTitle} title={session.title}>
+                        {session.title || '新对话'}
+                      </span>
+                      <button
+                        className={styles.deleteBtn}
+                        title="删除会话"
+                        onClick={(e) => onDeleteSession(session.id, e)}
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
