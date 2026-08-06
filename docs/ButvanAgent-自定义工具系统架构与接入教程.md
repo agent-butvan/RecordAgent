@@ -63,7 +63,7 @@ butvan.agent.agents.tool/
 
 在 `butvan.agent.agents.tool.impl` 包下创建 `BashTool.java`。
 
-使用 AgentScope 的 `@Tool` 标注方法，使用 `@ToolParam` 标注 `command` 参数：
+使用 AgentScope 的 `@Tool` 标注方法，使用 `@ToolParam` 标注 `command` 参数，并**加入防止 ProcessBuilder 死锁与交互等待的防卡死逻辑**：
 
 ```java
 package butvan.agent.agents.tool.impl;
@@ -75,10 +75,11 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 原生 AgentScope 终端命令执行工具。
+ * 原生 AgentScope 终端命令执行工具（防卡死版）。
  */
 public class BashTool {
 
@@ -92,9 +93,9 @@ public class BashTool {
         this.workDir = workDir != null ? workDir : System.getProperty("user.dir");
     }
 
-    @Tool(description = "Execute a shell command in current environment and return stdout/stderr. Do not use cat or echo; use read_file or write_file instead.")
+    @Tool(name = "custom_bash", description = "用于在 Shell 环境中执行终端命令，可查看系统硬件、电池状态、内存、磁盘空间及代码任务等。")
     public String execute(
-            @ToolParam(name = "command", description = "The exact shell command to execute") String command
+            @ToolParam(name = "command", description = "要执行的终端 Shell 指令") String command
     ) {
         if (command == null || command.isBlank()) {
             return "Error: Command parameter cannot be empty.";
@@ -106,33 +107,43 @@ public class BashTool {
             processBuilder.redirectErrorStream(true);
 
             Process process = processBuilder.start();
-            StringBuilder output = new StringBuilder();
+            
+            // 防卡死关键 1：主动关闭 stdin 标准输入流，防止子进程因交互性命令卡死等待用户输入
+            process.getOutputStream().close();
 
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    output.append(line).append("\n");
-                }
-            }
+            // 防卡死关键 2：异步线程读取标准输出流，防止缓冲区满导致父子线程死锁
+            CompletableFuture<String> outputFuture = CompletableFuture.supplyAsync(() -> {
+                StringBuilder output = new StringBuilder();
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        output.append(line).append("\n");
+                    }
+                } catch (Exception ignored) {}
+                return output.toString();
+            });
 
-            boolean finished = process.waitFor(120, TimeUnit.SECONDS);
+            // 防卡死关键 3：设置 15 秒合理超时限制（避免长卡 120 秒）
+            boolean finished = process.waitFor(15, TimeUnit.SECONDS);
             if (!finished) {
                 process.destroyForcibly();
-                return "Error: Command execution timed out (120s limit).";
+                return "Error: Command execution timed out (15s limit).";
             }
 
+            String result = outputFuture.get(3, TimeUnit.SECONDS);
             int exitCode = process.exitValue();
             if (exitCode != 0) {
-                return "Error (exit code " + exitCode + "):\n" + output;
+                return "Error (exit code " + exitCode + "):\n" + result;
             }
 
-            return output.toString();
+            return result.isBlank() ? "Command executed successfully with no output." : result;
         } catch (Exception e) {
             return "Error: Failed to execute bash command: " + e.getMessage();
         }
     }
 }
 ```
+
 
 ---
 
