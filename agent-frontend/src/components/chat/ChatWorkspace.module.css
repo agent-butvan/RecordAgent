@@ -8,56 +8,6 @@
   overflow: hidden;
 }
 
-.topBar {
-  height: 52px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 20px;
-  z-index: 10;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.currentModelBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background-color: #f8fafc;
-  border: 1px solid #cbd5e1;
-  color: #1d4ed8;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 4px 12px;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  box-shadow: none;
-}
-
-.currentModelBadge:hover {
-  background-color: #eff6ff;
-  border-color: #2563eb;
-}
-
-.statusTag {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background-color: #f0fdf4;
-  border: 1px solid #bbf7d0;
-  color: #166534;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 4px 10px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.statusTag:hover {
-  background-color: #dcfce7;
-}
-
 .centerHero {
   flex: 1;
   display: flex;
@@ -196,84 +146,16 @@
   gap: 8px;
 }
 
-.noticeBar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background-color: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: var(--radius-md);
-  padding: 6px 12px;
-  box-shadow: none;
-}
-
-.noticeText {
-  font-size: 12px;
-  color: var(--text-secondary);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 500;
-}
-
-.upgradeBtn {
-  background-color: #0f172a;
-  color: #FFFFFF;
-  border: none;
-  border-radius: var(--radius-sm);
-  padding: 4px 10px;
-  font-size: 12px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  transition: all var(--transition-fast);
-}
-
-.upgradeBtn:hover {
-  background-color: #1e293b;
-}
-
-.inputBoxContainer {
-  display: flex;
-  flex-direction: column;
-  background-color: #f1f5f9;
-  border: 1px solid #cbd5e1;
-  border-radius: var(--radius-lg);
-  padding: 4px;
-  gap: 2px;
-}
-
-.attachedPillsBar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 4px 10px;
-}
-
-.pillItem {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-
-.pillItem:hover {
-  color: var(--text-primary);
-}
-
 .inputBox {
   background-color: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: var(--radius-md);
+  border: 1px solid #cbd5e1;
+  border-radius: var(--radius-lg);
   padding: 12px 14px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   transition: all var(--transition-fast);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
 }
 
 .inputBox:focus-within {
@@ -326,48 +208,10 @@
   color: var(--text-primary);
 }
 
-.toolTextBtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: transparent;
-  border: 1px solid #e2e8f0;
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 500;
-  padding: 3px 8px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.toolTextBtn:hover {
-  background-color: #f8fafc;
-  color: var(--text-primary);
-  border-color: #cbd5e1;
-}
-
 .toolbarRight {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.presetDropdown {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  color: var(--text-secondary);
-  font-weight: 500;
-  padding: 3px 8px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-
-.presetDropdown:hover {
-  background-color: #f1f5f9;
-  color: var(--text-primary);
 }
 
 .sendCircleBtn {
@@ -380,6 +224,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
   transition: all var(--transition-fast);
 }
 
@@ -471,7 +316,3 @@
   background-color: #f1f5f9;
   font-weight: 600;
 }
-
-
-
-

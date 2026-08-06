@@ -6,18 +6,12 @@ import { Card } from '../common/Card';
 import {
   Plus,
   ArrowUp,
-  Folder,
-  Mic,
   Compass,
   Wrench,
   RotateCcw,
   Bug,
   Cloud,
   Cpu,
-  Sliders,
-  Laptop,
-  GitBranch,
-  Timer,
 } from 'lucide-react';
 import styles from './ChatWorkspace.module.css';
 
@@ -138,64 +132,35 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
         </div>
       )}
 
-
-      {/* Bottom Floating Input Area matching Screenshot 1 */}
+      {/* Bottom Floating Input Area */}
       <div className={styles.bottomContainer}>
-        {/* Input Box Capsule Container with attached Top Tag Bar */}
-        <div className={styles.inputBoxContainer}>
-          <div className={styles.attachedPillsBar}>
-            <div className={styles.pillItem}>
-              <Folder size={13} style={{ color: '#64748b' }} />
-              <span>ButvanAgent</span>
-            </div>
-            <div className={styles.pillItem}>
-              <Laptop size={13} style={{ color: '#64748b' }} />
-              <span>本地</span>
-            </div>
-            <div className={styles.pillItem}>
-              <GitBranch size={13} style={{ color: '#64748b' }} />
-              <span>develop</span>
-            </div>
-          </div>
+        <div className={styles.inputBox}>
+          <textarea
+            className={styles.textarea}
+            placeholder="随心输入"
+            value={inputPrompt}
+            onChange={(e) => setInputPrompt(e.target.value)}
+            onKeyDown={handleKeyDown}
+          />
 
-          <div className={styles.inputBox}>
-            <textarea
-              className={styles.textarea}
-              placeholder="随心输入"
-              value={inputPrompt}
-              onChange={(e) => setInputPrompt(e.target.value)}
-              onKeyDown={handleKeyDown}
-            />
+          <div className={styles.inputToolbar}>
+            <div className={styles.toolbarLeft}>
+              <button className={styles.toolIconBtn} title="添加附件/文件关联">
+                <Plus size={16} />
+              </button>
+            </div>
 
-            <div className={styles.inputToolbar}>
-              <div className={styles.toolbarLeft}>
-                <button className={styles.toolIconBtn} title="添加文件/图片">
-                  <Plus size={16} />
-                </button>
-                <button className={styles.toolTextBtn} title="审批与自动运行设置">
-                  <Timer size={14} />
-                  请求批准
-                </button>
-              </div>
-
-              <div className={styles.toolbarRight}>
-                <div className={styles.presetDropdown} onClick={onOpenSettings} title="自定义轻度配置">
-                  <span>自定义 轻度</span>
-                  <Sliders size={12} />
-                </div>
-                <ModelSelector onOpenSettings={onOpenSettings} />
-                <button className={styles.toolIconBtn} title="语音输入">
-                  <Mic size={15} />
-                </button>
-                <button
-                  className={`${styles.sendCircleBtn} ${
-                    inputPrompt.trim() ? styles.sendCircleBtnActive : ''
-                  }`}
-                  onClick={handleSend}
-                >
-                  <ArrowUp size={16} />
-                </button>
-              </div>
+            <div className={styles.toolbarRight}>
+              <ModelSelector onOpenSettings={onOpenSettings} />
+              <button
+                className={`${styles.sendCircleBtn} ${
+                  inputPrompt.trim() ? styles.sendCircleBtnActive : ''
+                }`}
+                onClick={handleSend}
+                title="发送消息 (Enter)"
+              >
+                <ArrowUp size={16} />
+              </button>
             </div>
           </div>
         </div>

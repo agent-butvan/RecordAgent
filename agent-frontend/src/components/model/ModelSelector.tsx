@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useModel } from '../../context/ModelContext';
-import { ChevronDown, Settings, Brain, Check } from 'lucide-react';
+import { ChevronDown, Settings, Check } from 'lucide-react';
 import styles from './ModelSelector.module.css';
 
 interface ModelSelectorProps {
@@ -16,6 +16,8 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ onOpenSettings }) 
   const activeModel = getActiveModel();
   const allModels = getAllModels();
 
+  type ModelItemType = ReturnType<typeof getAllModels>[number];
+
   // Close dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -27,94 +29,91 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ onOpenSettings }) 
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // 按 Vendor 厂商对模型进行分类分组
+  const groupedModels = useMemo(() => {
+    const groups: Record<string, { vendorName: string; models: ModelItemType[] }> = {};
+
+
+    allModels.forEach((model) => {
+      const vendorKey = model.providerType || model.providerId || 'other';
+      const vendorName = (model.providerName || vendorKey).toUpperCase();
+
+      if (!groups[vendorKey]) {
+        groups[vendorKey] = {
+          vendorName,
+          models: [],
+        };
+      }
+      groups[vendorKey].models.push(model);
+    });
+
+    return Object.values(groups);
+  }, [allModels]);
+
   const handleSelectModel = (providerId: string, modelId: string) => {
     selectActiveModel(providerId, modelId);
     setIsOpen(false);
   };
 
-  const getProviderClass = (type: string) => {
-    switch (type) {
-      case 'gemini': return styles.gemini;
-      case 'deepseek': return styles.deepseek;
-      case 'openai': return styles.openai;
-      case 'anthropic': return styles.anthropic;
-      case 'ollama': return styles.ollama;
-      case 'qwen': return styles.qwen;
-      default: return styles.gemini;
-    }
-  };
-
   return (
     <div className={styles.container} ref={dropdownRef}>
+      {/* 当前选中的模型触发按钮 */}
       <button 
         className={styles.selectorBtn} 
         onClick={() => setIsOpen(!isOpen)}
-        title="切换当前 Agent 使用的 AI 大模型"
+        title="点击选择模型"
       >
-        <span className={`${styles.providerBadge} ${getProviderClass(activeProvider?.type || 'gemini')}`}>
-          {activeProvider ? (activeProvider.name || activeProvider.type.toUpperCase()) : '未配置'}
+        <span className={styles.activeVendorLabel}>
+          {activeProvider ? (activeProvider.name || activeProvider.type.toUpperCase()) : '模型'}
         </span>
-        <span>{activeModel?.name || '选择模型'}</span>
-        {activeModel?.supportsReasoning && (
-          <span className={styles.reasoningBadge}>
-            <Brain size={10} /> 推理
-          </span>
-        )}
-        <ChevronDown size={14} style={{ opacity: 0.7, transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 150ms' }} />
+        <span className={styles.activeModelName}>{activeModel?.name || '选择模型'}</span>
+        <ChevronDown size={13} style={{ opacity: 0.7, transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 150ms' }} />
       </button>
 
+      {/* 点击配置按钮 */}
       <button 
         className={styles.configBtn}
         onClick={onOpenSettings}
         title="模型厂商与 API Key 配置"
       >
-        <Settings size={15} />
+        <Settings size={14} />
       </button>
 
+      {/* 向上弹出的极简模型选择下拉菜单 */}
       {isOpen && (
         <div className={styles.dropdown}>
           {allModels.length === 0 ? (
             <button
-              className={styles.modelOption}
+              className={styles.emptyOption}
               onClick={() => {
                 setIsOpen(false);
                 onOpenSettings();
               }}
-              style={{ color: '#6366f1', fontWeight: 500, justifyContent: 'center', padding: '12px' }}
             >
               暂未配置任何模型，点击去设置
             </button>
           ) : (
-            allModels.map((model) => {
-              const isSelected = (model.providerId === activeProviderId || model.providerType === activeProviderId) && model.id === activeModelId;
-              return (
-                <button
-                  key={`${model.providerId}-${model.id}`}
-                  className={`${styles.modelOption} ${isSelected ? styles.modelOptionActive : ''}`}
-                  onClick={() => handleSelectModel(model.providerId, model.id)}
-                >
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 500 }}>
-                      <span className={`${styles.providerBadge} ${getProviderClass(model.providerType)}`} style={{ fontSize: '10px', padding: '1px 4px' }}>
-                        {model.providerName || model.providerType.toUpperCase()}
-                      </span>
-                      <span>{model.name}</span>
-                      {model.supportsReasoning && (
-                        <span className={styles.reasoningBadge} style={{ fontSize: '9px' }}>
-                          <Brain size={9} /> 推理
-                        </span>
-                      )}
-                    </div>
-                    {model.description && (
-                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                        {model.description}
-                      </span>
-                    )}
-                  </div>
-                  {isSelected && <Check size={14} style={{ color: '#818cf8', flexShrink: 0 }} />}
-                </button>
-              );
-            })
+            groupedModels.map((group) => (
+              <div key={group.vendorName} className={styles.vendorGroup}>
+                <div className={styles.vendorHeader}>{group.vendorName}</div>
+                {group.models.map((model) => {
+                  const isSelected =
+                    (model.providerId === activeProviderId || model.providerType === activeProviderId) &&
+                    model.id === activeModelId;
+
+                  return (
+                    <button
+                      key={`${model.providerId}-${model.id}`}
+                      className={`${styles.modelOption} ${isSelected ? styles.modelOptionActive : ''}`}
+                      onClick={() => handleSelectModel(model.providerId, model.id)}
+                    >
+                      <span className={styles.modelOptionName}>{model.name}</span>
+                      {isSelected && <Check size={14} className={styles.checkIcon} />}
+                    </button>
+                  );
+                })}
+              </div>
+            ))
           )}
         </div>
       )}

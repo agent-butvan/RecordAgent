@@ -1,7 +1,7 @@
 .container {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   position: relative;
 }
 
@@ -9,68 +9,108 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  background-color: var(--bg-surface);
+  background-color: #ffffff;
   border: 1px solid #cbd5e1;
   border-radius: var(--radius-md);
-  padding: 6px 12px;
+  padding: 5px 10px;
   color: var(--text-primary);
   font-size: 13px;
   font-weight: 500;
-  box-shadow: none;
+  cursor: pointer;
   transition: all var(--transition-fast);
 }
 
 .selectorBtn:hover {
-  background-color: var(--bg-surface-hover);
+  background-color: #f8fafc;
   border-color: #2563eb;
 }
 
-.providerBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 6px;
+.activeVendorLabel {
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  background: var(--bg-sidebar);
-  border-radius: var(--radius-sm);
+  color: #2563eb;
+  background-color: #eff6ff;
+  padding: 1px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.3px;
+}
+
+.activeModelName {
+  font-size: 13px;
+  font-weight: 500;
   color: var(--text-primary);
 }
 
-.reasoningBadge {
-  display: inline-flex;
+.configBtn {
+  display: flex;
   align-items: center;
-  gap: 3px;
-  background: #0f172a;
-  color: #FFFFFF;
-  font-size: 10px;
-  padding: 2px 6px;
-  border-radius: var(--radius-sm);
-  font-weight: 600;
-}
-
-.dropdown {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  width: 320px;
-  background-color: var(--bg-surface);
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: #ffffff;
   border: 1px solid #cbd5e1;
   border-radius: var(--radius-md);
-  box-shadow: none;
-  padding: 8px 0;
-  z-index: 100;
-  animation: fadeIn 150ms ease;
+  color: #64748b;
+  cursor: pointer;
+  transition: all var(--transition-fast);
 }
 
-.groupTitle {
-  font-size: 11px;
+.configBtn:hover {
+  background: #f8fafc;
+  border-color: #2563eb;
+  color: var(--text-primary);
+}
+
+/* 向上弹出的极简下拉卡片 */
+.dropdown {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  top: auto;
+  right: 0;
+  left: auto;
+  width: 260px;
+  max-height: 280px;
+  overflow-y: auto;
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+  padding: 6px 0;
+  z-index: 1000;
+  animation: slideUp 150ms ease;
+}
+
+.emptyOption {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 12px;
+  background: transparent;
+  border: none;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.vendorGroup {
+  display: flex;
+  flex-direction: column;
+}
+
+.vendorGroup:not(:last-child) {
+  border-bottom: 1px solid #f1f5f9;
+  margin-bottom: 4px;
+  padding-bottom: 4px;
+}
+
+.vendorHeader {
+  font-size: 10px;
   font-weight: 700;
-  color: var(--text-muted);
-  padding: 8px 12px 4px;
-  text-transform: uppercase;
+  color: #94a3b8;
+  padding: 6px 12px 2px;
   letter-spacing: 0.6px;
 }
 
@@ -79,53 +119,46 @@
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  padding: 10px 14px;
+  padding: 8px 12px;
   background: transparent;
   border: none;
   color: var(--text-primary);
   text-align: left;
   font-size: 13px;
+  cursor: pointer;
   transition: background var(--transition-fast);
 }
 
 .modelOption:hover {
-  background-color: var(--bg-surface-hover);
+  background-color: #f8fafc;
 }
 
 .modelOptionActive {
-  background-color: var(--bg-sidebar);
-  color: var(--text-primary);
+  background-color: #eff6ff;
+  color: #2563eb;
   font-weight: 600;
 }
 
-.configBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  background: var(--bg-surface);
-  border: 1px solid #cbd5e1;
-  border-radius: var(--radius-md);
-  color: var(--text-secondary);
-  box-shadow: none;
-  transition: all var(--transition-fast);
+.modelOptionName {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
 }
 
-.configBtn:hover {
-  background: var(--bg-surface-hover);
-  border-color: #2563eb;
-  color: var(--text-primary);
+.checkIcon {
+  color: #2563eb;
+  flex-shrink: 0;
+  margin-left: 8px;
 }
 
-@keyframes fadeIn {
+@keyframes slideUp {
   from {
     opacity: 0;
-    transform: translateY(-2px);
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
   }
 }
-
