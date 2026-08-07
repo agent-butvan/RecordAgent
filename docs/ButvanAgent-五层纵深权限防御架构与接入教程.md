@@ -8,6 +8,7 @@
 1. **纵深防御 (Defense in Depth)**：叠加 5 道互补的防线，上一层拦截失败时下一层兜底，确保单个防线失效不会导致系统崩溃。
 2. **硬防线与软策略结合**：危险命令与路径沙箱为**硬防线**（任何模式与白名单均无法绕过）；规则匹配与模式决策为**软策略**（可根据场景灵活调整）。
 3. **闭环学习机制 (HITL)**：人在回路审批时提供“始终允许”选项，自动记录并持久化本地规则，形成越用越智能且安全基线不降低的**权限学习循环**。
+4. **AgentScope 原生平滑集成**：将五层防线加载的规则真实转换为 AgentScope 原生的 `PermissionRule`，注入到 `PermissionContextState` 容器中。
 
 本教程指导你在后端构建一套完整的五层纵深权限防御体系，并优雅地接入 AgentScope Java 的工具调度链路中。
 
@@ -49,7 +50,7 @@
 ┌─────────────────────────────────────────────────────────┐
 │ [第 5 层] HITL 人在回路审批 (Human-in-the-Loop)         │
 │ 前端弹窗询问 (y/n/a)；用户选择“始终允许”自动持久化本地规则│
-└─────────────────────────────────────────────────────────┘
+└────────────────────────────┴────────────────────────────┘
 ```
 
 ---
@@ -63,7 +64,8 @@ butvan.agent.agents.security/
 ├── PermissionMode.java          // 权限模式枚举与分类决策矩阵
 ├── PermissionRule.java          // YAML 规则项模型与 Glob 匹配器
 ├── PermissionResult.java        // 校验决策结果记录类
-└── PermissionChecker.java       // 五层纵深权限检查核心引擎
+├── PermissionChecker.java       // 五层纵深权限检查核心引擎
+└── AgentSecurity.java           // 与 AgentScope PermissionContext 的适配中心
 ```
 
 ---
@@ -198,11 +200,9 @@ public record PermissionRule(
         if (globPattern == null || input == null) {
             return false;
         }
-        // 将特殊的正则元字符进行转义，将 * 替换为 .*，? 替换为 .
         String regex = "^" + Pattern.quote(globPattern)
                 .replace("*", "\\E.*\\Q")
                 .replace("?", "\\E.\\Q") + "$";
-        // 清理空转义
         regex = regex.replace("\\Q\\E", "");
 
         try {
@@ -278,7 +278,7 @@ public record PermissionResult(
 
 ## 7. 第四步：编写五层纵深权限检查核心引擎 (`PermissionChecker.java`)
 
-在 `butvan.agent.agents.security` 包下创建 `PermissionChecker.java`：
+在 `butvan.agent.agents.security` 包下创建 `PermissionChecker.java`，注意添加 `getFileRules()`Getter 方法以供安全适配中心注入规则：
 
 ```java
 package butvan.agent.agents.security;
@@ -295,15 +295,6 @@ import java.util.regex.Pattern;
 
 /**
  * 五层纵深权限检查核心引擎（PermissionChecker）。
- * <p>
- * 在 Agent 每次调用敏感工具前执行五层顺序拦截判断：
- * <ol>
- *   <li><b>Layer 1: 危险命令硬拦截</b> —— 正则匹配如 rm -rf / 等高危 Shell 命令（不可覆盖）。</li>
- *   <li><b>Layer 2: 路径沙箱保护</b> —— 解析绝对路径与 Symlink，阻止读取项目外文件或修改保护路径（不可覆盖）。</li>
- *   <li><b>Layer 3: 三层 YAML 规则匹配</b> —— 加载用户级、项目级、本地级配置文件，支持 DENY 跨层硬合并。</li>
- *   <li><b>Layer 4: 权限模式矩阵决策</b> —— 根据当前 {@link PermissionMode} 决定默认策略。</li>
- *   <li><b>Layer 5: HITL 人在回路</b> —— 挂起并在前端提示用户确认，支持“始终允许”自动持久化到本地规则。</li>
- * </ol>
  */
 public class PermissionChecker {
 
@@ -340,12 +331,6 @@ public class PermissionChecker {
     /** 运行时“始终允许 (Always Allow)”记录集 */
     private final Set<String> allowAlwaysRules = new HashSet<>();
 
-    /**
-     * 构造权限检查器。
-     *
-     * @param mode        初始运行权限模式
-     * @param projectRoot 当前项目根路径
-     */
     public PermissionChecker(PermissionMode mode, Path projectRoot) {
         this.mode = mode != null ? mode : PermissionMode.DEFAULT;
         this.projectRoot = projectRoot != null ? projectRoot.toAbsolutePath().normalize() : Paths.get(".").toAbsolutePath().normalize();
@@ -356,22 +341,25 @@ public class PermissionChecker {
     public void setMode(PermissionMode mode) { this.mode = mode; }
 
     /**
-     * 核心公开方法：对某次工具调用参数执行五层纵深拦截检查。
+     * 获取从三层 YAML 配置文件解析出的只读规则列表，供 AgentSecurity 注入 AgentScope 使用。
      *
-     * @param toolName 工具名称（如 Bash, ReadFile, WriteFile 等）
-     * @param args     LLM 传入的参数 Map
-     * @return 最终的校验决策结果 {@link PermissionResult}
+     * @return 不可变规则列表
+     */
+    public List<PermissionRule> getFileRules() {
+        return Collections.unmodifiableList(fileRules);
+    }
+
+    /**
+     * 核心公开方法：对某次工具调用参数执行五层纵深拦截检查。
      */
     public PermissionResult check(String toolName, Map<String, Object> args) {
         String content = extractContent(toolName, args);
 
-        // === Layer 1: 危险命令硬拦截 (Bash 工具) ===
+        // === Layer 1: 危险命令硬拦截 ===
         if ("Bash".equalsIgnoreCase(toolName) && content != null) {
-            // 1a. 安全命令速放
             if (isSafeCommand(content)) {
                 return PermissionResult.allow();
             }
-            // 1b. 高危正则匹配硬拒绝
             for (Pattern pattern : DANGEROUS_PATTERNS) {
                 if (pattern.matcher(content).find()) {
                     return PermissionResult.deny("[第1层防线] 检测到严重高危命令: " + content);
@@ -379,25 +367,21 @@ public class PermissionChecker {
             }
         }
 
-        // === Layer 2: 路径沙箱保护 (文件类工具) ===
+        // === Layer 2: 路径沙箱保护 ===
         if (content != null && isFileTool(toolName)) {
-            // 2a. 写入敏感配置文件保护
             if (isWriteTool(toolName) && isProtectedPath(content)) {
                 return PermissionResult.deny("[第2层防线] 禁止写入系统受保护的敏感文件: " + content);
             }
-            // 2b. 路径越界沙箱检查
             if (!isWithinSandbox(content) && mode != PermissionMode.BYPASS) {
                 return PermissionResult.deny("[第2层防线] 操作路径超出了项目许可沙箱范围: " + content);
             }
         }
 
-        // === Layer 3: 三层 YAML 规则匹配（从后向前，DENY 优先） ===
+        // === Layer 3: 三层 YAML 规则匹配 ===
         if (content != null) {
-            // 3a. 会话内“始终允许”命中
             if (allowAlwaysRules.contains(toolName + ":" + content)) {
                 return PermissionResult.allow();
             }
-            // 3b. 校验 YAML 规则集
             for (int i = fileRules.size() - 1; i >= 0; i--) {
                 PermissionRule rule = fileRules.get(i);
                 if (rule.matches(toolName, content)) {
@@ -421,12 +405,6 @@ public class PermissionChecker {
         };
     }
 
-    /**
-     * 当用户在 HITL 弹窗中选择“始终允许”时，将规则追加到本地 permissions.local.yaml 集中。
-     *
-     * @param toolName 工具名称
-     * @param pattern  匹配模式
-     */
     public void appendLocalRule(String toolName, String pattern) {
         allowAlwaysRules.add(toolName + ":" + pattern);
         if (projectRoot == null) return;
@@ -435,8 +413,6 @@ public class PermissionChecker {
         try {
             Files.createDirectories(localYaml.getParent());
             List<Map<String, String>> entries = new ArrayList<>();
-            
-            // 读取原有规则列表并追加新规则
             if (Files.exists(localYaml)) {
                 Yaml yaml = new Yaml();
                 Object loaded = yaml.load(Files.readString(localYaml));
@@ -451,25 +427,19 @@ public class PermissionChecker {
                     }
                 }
             }
-
             entries.add(Map.of("rule", toolName + "(" + pattern + ")", "effect", "allow"));
             Yaml yaml = new Yaml();
             Files.writeString(localYaml, yaml.dump(entries));
         } catch (IOException ignored) {}
     }
 
-    // ── 内部私有辅助逻辑 ──────────────────────────────────────────────────
-
     private List<PermissionRule> loadRules() {
         List<PermissionRule> rules = new ArrayList<>();
-        // 1. 加载全局 ~/.butvan/permissions.yaml
         Path home = Paths.get(System.getProperty("user.home"));
         rules.addAll(loadRulesFile(home.resolve(".butvan").resolve("permissions.yaml")));
 
-        // 2. 加载项目级 {projectRoot}/.butvan/permissions.yaml
         if (projectRoot != null) {
             rules.addAll(loadRulesFile(projectRoot.resolve(".butvan").resolve("permissions.yaml")));
-            // 3. 加载本地覆盖 {projectRoot}/.butvan/permissions.local.yaml
             rules.addAll(loadRulesFile(projectRoot.resolve(".butvan").resolve("permissions.local.yaml")));
         }
         return rules;
@@ -519,7 +489,6 @@ public class PermissionChecker {
     private boolean isWithinSandbox(String pathStr) {
         try {
             Path p = Paths.get(pathStr).toAbsolutePath().normalize();
-            // 解析软链接防止 symlink 逃逸
             if (Files.exists(p)) {
                 p = p.toRealPath();
             } else if (p.getParent() != null && Files.exists(p.getParent())) {
@@ -571,25 +540,134 @@ public class PermissionChecker {
 
 ---
 
-## 8. 第五步：在 `AgentService.java` 中接入权限校验
+## 8. 第五步：编写 AgentScope 安全适配中心 (`AgentSecurity.java`)
 
-更新 `AgentService.java`，在触发工具前执行权限校验，被拒绝时产生 `isError: true` 错误结果，确保大模型可以自适应调整策略：
+在 `butvan.agent.agents.security` 包下修改 `AgentSecurity.java`，实现将 `PermissionChecker` 加载的动态规则与防线真正转换为 AgentScope 原生的 `PermissionRule` 并注入 `PermissionContextState`：
+
+```java
+package butvan.agent.agents.security;
+
+import io.agentscope.core.permission.PermissionBehavior;
+import io.agentscope.core.permission.PermissionContextState;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 智能体安全与 AgentScope PermissionContext 适配中心。
+ * <p>
+ * 负责将五层纵深权限检查引擎（{@link PermissionChecker}）加载的三层 YAML 规则
+ * 及硬拦截规则真正转换为 AgentScope 原生 {@link io.agentscope.core.permission.PermissionRule} 并注入框架。
+ */
+@Slf4j
+@Component
+public class AgentSecurity {
+
+    /**
+     * 构建并返回真正集成了五层防御规则的 AgentScope 原生 PermissionContextState。
+     *
+     * @param checker 五层纵深权限检查引擎
+     * @return 注入完规则的 PermissionContextState 实例
+     */
+    public PermissionContextState createPermissionContext(PermissionChecker checker) {
+        PermissionContextState.Builder builder = PermissionContextState.builder();
+
+        if (checker == null) {
+            return builder.build();
+        }
+
+        // 1. 将第 1 层高危命令硬拦截规则注册到 AgentScope 原生上下文
+        builder.addDenyRule("Bash", new io.agentscope.core.permission.PermissionRule(
+                "Bash", "rm -rf*", PermissionBehavior.DENY, "Layer1-DangerousHardDeny"
+        ));
+
+        // 2. 将 PermissionChecker 从 YAML 加载的三层规则转化为 AgentScope 原生规则
+        List<PermissionRule> rules = checker.getFileRules();
+        for (PermissionRule rule : rules) {
+            PermissionBehavior behavior = switch (rule.effect()) {
+                case ALLOW -> PermissionBehavior.ALLOW;
+                case DENY -> PermissionBehavior.DENY;
+                case ASK -> PermissionBehavior.ASK;
+            };
+
+            io.agentscope.core.permission.PermissionRule agentScopeRule =
+                    new io.agentscope.core.permission.PermissionRule(
+                            rule.toolName(),
+                            rule.pattern(),
+                            behavior,
+                            "Layer3-YamlRule"
+                    );
+
+            if (behavior == PermissionBehavior.DENY) {
+                builder.addDenyRule(rule.toolName(), agentScopeRule);
+                log.info("[AgentSecurity] 成功向 AgentScope 注入 Deny 规则: {}({})", rule.toolName(), rule.pattern());
+            } else if (behavior == PermissionBehavior.ALLOW) {
+                builder.addAllowRule(rule.toolName(), agentScopeRule);
+                log.info("[AgentSecurity] 成功向 AgentScope 注入 Allow 规则: {}({})", rule.toolName(), rule.pattern());
+            }
+        }
+
+        return builder.build();
+    }
+
+    /**
+     * 运行时对带有具体参数 Map 的工具调用执行五层防线动态判定（如校验绝对路径/Symlink 是否超出沙箱）。
+     *
+     * @param checker  五层权限检查引擎
+     * @param toolName 工具名称
+     * @param args     工具传入的实际参数 Map
+     * @return AgentScope 原生 PermissionBehavior
+     */
+    public PermissionBehavior evaluatePermission(PermissionChecker checker, String toolName, Map<String, Object> args) {
+        if (checker == null) {
+            return PermissionBehavior.ALLOW;
+        }
+
+        PermissionResult result = checker.check(toolName, args);
+
+        return switch (result.decision()) {
+            case ALLOW -> PermissionBehavior.ALLOW;
+            case DENY -> {
+                log.warn("[AgentSecurity] 动态沙箱/正则防线拦截工具调用: {} -> {}", toolName, result.reason());
+                yield PermissionBehavior.DENY;
+            }
+            case ASK -> {
+                log.info("[AgentSecurity] 触发 HITL 审批: {} -> {}", toolName, result.reason());
+                yield PermissionBehavior.ASK;
+            }
+        };
+    }
+}
+```
+
+---
+
+## 9. 第六步：在 `AgentService.java` 中接入权限校验
+
+更新 `AgentService.java`，将 `permissionChecker` 正确传递给 `agentSecurity.createPermissionContext(...)`：
 
 ```java
 package butvan.agent.agents.agent;
 
+import butvan.agent.agents.security.AgentSecurity;
 import butvan.agent.agents.security.PermissionChecker;
 import butvan.agent.agents.security.PermissionMode;
-import butvan.agent.agents.security.PermissionResult;
+import io.agentscope.harness.agent.HarnessAgent;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Paths;
-import java.util.Map;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class AgentService {
+
+    private final ToolRegistry toolRegistry;
+    private final AgentSecurity agentSecurity;
 
     private final PermissionChecker permissionChecker = new PermissionChecker(
             PermissionMode.DEFAULT,
@@ -597,61 +675,52 @@ public class AgentService {
     );
 
     /**
-     * 在发起工具调用前执行纵深权限校验。
-     *
-     * @param toolName 工具名称
-     * @param args     参数 Map
-     * @return 若通过或用户同意返回 true；被拦截返回 false（产生 errorResult 传给大模型）
+     * 创建当前模型对应的 HarnessAgent，并装配集成了五层纵深规则的 PermissionContext。
      */
-    public boolean authorizeToolCall(String toolName, Map<String, Object> args) {
-        PermissionResult result = permissionChecker.check(toolName, args);
+    private HarnessAgent createHarnessAgent(Model model) {
+        String modelName = model.getModelName() != null ? model.getModelName() : "unknown-model";
+        String workDir = System.getProperty("user.dir");
+        String sysPrompt = PromptBuilder.buildDefaultSystemPrompt(modelName, workDir);
 
-        switch (result.decision()) {
-            case ALLOW -> {
-                log.info("[Permission] 工具调用审批放行: {} -> {}", toolName, result.reason());
-                return true;
-            }
-            case DENY -> {
-                log.warn("[Permission] 工具调用被安全拒绝: {} -> {}", toolName, result.reason());
-                return false;
-            }
-            case ASK -> {
-                log.info("[Permission] 触发第5层 HITL 人在回路审批: {}", result.reason());
-                // 此处与前端 Tauri/SSE 协同，弹窗向用户请求确认 (y/n/a)
-                // 若用户选择 (a) 始终允许，调用 permissionChecker.appendLocalRule(toolName, pattern);
-                return handleUserHitlApproval(toolName, args);
-            }
-        }
-        return false;
-    }
-
-    private boolean handleUserHitlApproval(String toolName, Map<String, Object> args) {
-        // 模拟用户在前端点击同意
-        return true;
+        return HarnessAgent.builder()
+                .name("butvan_agent")
+                .sysPrompt(sysPrompt)
+                .model(model)
+                .toolkit(toolRegistry.getToolkit())
+                // 重点：将包含了三层 YAML 规则与硬拦截的 permissionChecker 传递给 AgentSecurity 构建原生上下文
+                .permissionContext(agentSecurity.createPermissionContext(permissionChecker))
+                .workspace(Paths.get(".agentscope/workspace"))
+                .compaction(CompactionConfig.builder()
+                        .triggerMessages(30)
+                        .keepMessages(10)
+                        .build())
+                .build();
     }
 }
 ```
 
 ---
 
-## 9. 建议的实施顺序与验证方式
+## 10. 建议的实施顺序与验证方式
 
 | 次序 | 手动编写的代码内容 | 位置 | 成功验证标志 |
 | --- | --- | --- | --- |
 | 1 | 编写 `PermissionMode.java` | `security/PermissionMode.java` | 模式枚举与分类 `decide` 方法编译通过。 |
 | 2 | 编写 `PermissionRule.java` | `security/PermissionRule.java` | Glob 正则转换匹配方法编译通过。 |
 | 3 | 编写 `PermissionResult.java` | `security/PermissionResult.java` | 静态构建工厂方法编译通过。 |
-| 4 | 编写 `PermissionChecker.java` | `security/PermissionChecker.java` | 五层纵深检查 `check` 方法编译通过。 |
-| 5 | 在 `AgentService.java` 中接入 | `agent/AgentService.java` | 传入 `rm -rf /` 测试触发 DENY；传入 `ReadFile` 触发 ALLOW。 |
+| 4 | 编写 `PermissionChecker.java` | `security/PermissionChecker.java` | 包含 `getFileRules()` 导出接口，五层纵深检查 `check` 方法编译通过。 |
+| 5 | 编写 `AgentSecurity.java` | `security/AgentSecurity.java` | 包含 `createPermissionContext(checker)`，可将 `checker` 规则真实转化为 AgentScope `PermissionRule`。 |
+| 6 | 在 `AgentService.java` 中接入 | `agent/AgentService.java` | 启动后端，查看控制台日志输出 `[AgentSecurity] 成功向 AgentScope 注入 Allow/Deny 规则`。 |
 
 ---
 
-## 10. 最终代码职责表
+## 11. 最终代码职责表
 
 | 类名 | 归属规范 | 职责与作用 |
 | --- | --- | --- |
 | `PermissionMode` | 安全决策矩阵 | 定义 4 种信任模式及不同工具分类下的默认决策逻辑。 |
 | `PermissionRule` | 规则表达式模型 | 转换与执行 `ToolName(pattern)` 的 Simple Glob 表达式匹配。 |
 | `PermissionResult` | 校验结果载体 | 封装包含 ALLOW / DENY / ASK 决策及防线拦截说明的响应对象。 |
-| `PermissionChecker` | 纵深防御引擎 | 顺序调度 5 层拦截管道（黑名单、沙箱、规则、模式、HITL）。 |
-| `AgentService` | 业务调度服务 | 在工具调用前触发权限校验，并将拒接结果作为错误报告回传给 LLM。 |
+| `PermissionChecker` | 纵深防御引擎 | 顺序调度 5 层拦截管道（黑名单、沙箱、规则、模式、HITL），并解析 3 层 YAML。 |
+| `AgentSecurity` | AgentScope 适配中心 | 将 `PermissionChecker` 加载的动态与硬拦截规则真正转化为 AgentScope 原生 `PermissionRule` 并注入 `PermissionContextState`。 |
+| `AgentService` | 业务调度服务 | 在生成 `HarnessAgent` 时调用 `agentSecurity.createPermissionContext(permissionChecker)` 完成装配。 |
