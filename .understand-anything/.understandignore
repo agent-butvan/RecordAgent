@@ -1,0 +1,11 @@
+# .understandignore — patterns for files/dirs to exclude from analysis
+# Syntax: same as .gitignore (globs, # comments, ! negation, trailing / for dirs)
+# Built-in defaults already exclude dependency, build, VCS, media, and lock files.
+
+# Runtime state and local IDE metadata should not shape the architecture graph.
+agent-backend/.agentscope/workspace/
+.idea/
+.vscode/
+
+# Uncomment if you want to exclude tests from a future full analysis.
+# **/src/test/

@@ -34,41 +34,9 @@ public class LocalConfigService {
      * 构造函数：初始化 JSON 序列化工具并指定本地配置文件路径
      */
     public LocalConfigService() {
-        this.objectMapper = new ObjectMapper()
-                .enable(SerializationFeature.INDENT_OUTPUT)
-                .configure(com.fasterxml.jackson.core.JsonParser.Feature.ALLOW_UNESCAPED_CONTROL_CHARS, true);
+        this.objectMapper = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
         String userHome = System.getProperty("user.home");
         this.configPath = Paths.get(userHome, ".butvan-agent", "config.json");
-    }
-
-    private String cleanString(String str) {
-        if (str == null) return "";
-        return str.trim().replaceAll("[\\r\\n]", "");
-    }
-
-    private void cleanModelConfigData(ModelConfigData data) {
-        if (data == null) return;
-        data.setVendor(cleanString(data.getVendor()));
-        data.setName(cleanString(data.getName()));
-        data.setApiKey(cleanString(data.getApiKey()));
-        data.setActiveVendor(cleanString(data.getActiveVendor()));
-        data.setActiveModel(cleanString(data.getActiveModel()));
-        if (data.getProviders() != null) {
-            for (ProviderConfigData provider : data.getProviders()) {
-                provider.setId(cleanString(provider.getId()));
-                provider.setName(cleanString(provider.getName()));
-                provider.setType(cleanString(provider.getType()));
-                provider.setApiKey(cleanString(provider.getApiKey()));
-                if (provider.getModels() != null) {
-                    for (ModelItemData model : provider.getModels()) {
-                        model.setId(cleanString(model.getId()));
-                        model.setName(cleanString(model.getName()));
-                        model.setModelName(cleanString(model.getModelName()));
-                        model.setProviderId(cleanString(model.getProviderId()));
-                    }
-                }
-            }
-        }
     }
 
     /**
@@ -190,16 +158,12 @@ public class LocalConfigService {
             String targetName = (name != null && !name.isBlank()) ? name : activeModel;
             String targetApiKey = apiKey != null ? apiKey : "";
 
-            targetVendor = targetVendor != null ? targetVendor.trim().replaceAll("[\\r\\n]", "") : "";
-            targetName = targetName != null ? targetName.trim().replaceAll("[\\r\\n]", "") : "";
-            targetApiKey = targetApiKey != null ? targetApiKey.trim().replaceAll("[\\r\\n]", "") : "";
-
             // 若在 providers 中找到了匹配的 vendor，且当前 apiKey 为空，提取 provider 级别的 apiKey
-            if (targetApiKey.isBlank() && providers != null && !targetVendor.isBlank()) {
+            if ((targetApiKey == null || targetApiKey.isBlank()) && providers != null && targetVendor != null) {
                 for (ProviderConfigData p : providers) {
                     if (targetVendor.equalsIgnoreCase(p.getId()) || targetVendor.equalsIgnoreCase(p.getType())) {
                         if (p.getApiKey() != null && !p.getApiKey().isBlank()) {
-                            targetApiKey = p.getApiKey().trim().replaceAll("[\\r\\n]", "");
+                            targetApiKey = p.getApiKey();
                             break;
                         }
                     }
@@ -217,9 +181,9 @@ public class LocalConfigService {
          */
         public static ModelConfigData fromSelector(ModelSelector selector) {
             return new ModelConfigData(
-                    selector != null && selector.vendor() != null ? selector.vendor().trim().replaceAll("[\\r\\n]", "") : "",
-                    selector != null && selector.name() != null ? selector.name().trim().replaceAll("[\\r\\n]", "") : "",
-                    selector != null && selector.apiKey() != null ? selector.apiKey().trim().replaceAll("[\\r\\n]", "") : "",
+                    selector != null ? selector.vendor() : "",
+                    selector != null ? selector.name() : "",
+                    selector != null ? selector.apiKey() : "",
                     selector != null && selector.temperature() != null ? selector.temperature() : 0.7,
                     selector != null && selector.stream() != null ? selector.stream() : true
             );
@@ -229,7 +193,7 @@ public class LocalConfigService {
     /**
      * 加载本地配置：
      * 优先读取 ~/.butvan-agent/config.json；
-     * 若文件不存在或读取失败，则处理后返回有效配置
+     * 若文件不存在或读取失败，则自动创建含有空字段属性的模板 ~/.butvan-agent/config.json 写出
      *
      * @return 当前生效的 ModelSelector
      */
@@ -248,19 +212,16 @@ public class LocalConfigService {
         if (configFile.exists() && configFile.isFile()) {
             try {
                 ModelConfigData data = objectMapper.readValue(configFile, ModelConfigData.class);
-                cleanModelConfigData(data);
                 log.info("成功从本地文件读取多厂商模型配置: {}", configPath);
                 return data;
             } catch (Exception e) {
-                log.error("读取本地模型配置文件失败 [{}]", configPath, e);
+                log.error("读取本地模型配置文件失败 [{}]，将自动初始化为空配置模板并写出", configPath, e);
             }
         }
 
-        // 仅当配置文件不存在时，自动创建并持久化空配置模板；若解析异常则只在内存中返回模板，不破坏已有文件
+        // 文件不存在或读取异常：自动创建配置模板
         ModelConfigData emptyData = new ModelConfigData("", "", "", 0.7, true);
-        if (!configFile.exists()) {
-            saveFullConfigData(emptyData);
-        }
+        saveFullConfigData(emptyData);
         return emptyData;
     }
 
@@ -276,8 +237,6 @@ public class LocalConfigService {
             if (parentDir != null && !parentDir.exists()) {
                 parentDir.mkdirs();
             }
-
-            cleanModelConfigData(fullData);
 
             if (fullData.getVendor() == null || fullData.getVendor().isBlank()) {
                 fullData.setVendor(fullData.getActiveVendor());

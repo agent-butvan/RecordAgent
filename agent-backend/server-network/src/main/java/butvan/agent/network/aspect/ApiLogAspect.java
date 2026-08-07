@@ -1,6 +1,10 @@
 package butvan.agent.network.aspect;
 
+import butvan.agent.agents.agent.AgentUserCall;
+import butvan.agent.agents.config.LocalConfigService;
 import butvan.agent.network.annotation.ApiLog;
+import butvan.agent.network.common.Result;
+import butvan.agent.network.dto.SetModel;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -14,6 +18,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.stream.Collectors;
 
 /**
  * 后端 REST API 规范化请求与响应日志打印切面
@@ -56,17 +61,19 @@ public class ApiLogAspect {
         String remoteAddr = request != null ? request.getRemoteAddr() : "UNKNOWN";
         String className = joinPoint.getTarget().getClass().getSimpleName();
         String methodName = method.getName();
-        Object[] args = joinPoint.getArgs();
+        String argumentsSummary = Arrays.stream(joinPoint.getArgs())
+                .map(this::summarizeValue)
+                .collect(Collectors.joining(", ", "[", "]"));
 
         log.info("[API-LOG] >>> START | Description: [{}] | Method: [{} {}] | Client: [{}] | Handler: [{}.{}] | Args: {}",
-                description, httpMethod, requestUri, remoteAddr, className, methodName, Arrays.toString(args));
+                description, httpMethod, requestUri, remoteAddr, className, methodName, argumentsSummary);
 
         Object result;
         try {
             result = joinPoint.proceed();
             long timeTaken = System.currentTimeMillis() - startTime;
             log.info("[API-LOG] <<< END   | Description: [{}] | Method: [{} {}] | Status: [SUCCESS] | Cost: [{} ms] | Result: {}",
-                    description, httpMethod, requestUri, timeTaken, result);
+                    description, httpMethod, requestUri, timeTaken, summarizeValue(result));
             return result;
         } catch (Throwable e) {
             long timeTaken = System.currentTimeMillis() - startTime;
@@ -74,5 +81,37 @@ public class ApiLogAspect {
                     description, httpMethod, requestUri, timeTaken, e.getMessage(), e);
             throw e;
         }
+    }
+
+    /**
+     * 生成可用于接口日志的脱敏摘要，避免将用户输入、API Key 和完整配置写入日志。
+     *
+     * @param value 待记录对象
+     * @return 安全摘要
+     */
+    private String summarizeValue(Object value) {
+        if (value == null) {
+            return "null";
+        }
+        if (value instanceof AgentUserCall agentUserCall) {
+            int contextLength = agentUserCall.context() == null ? 0 : agentUserCall.context().length();
+            return "AgentUserCall{sessionId='%s', contextLength=%d}"
+                    .formatted(agentUserCall.sessionId(), contextLength);
+        }
+        if (value instanceof SetModel setModel) {
+            return "SetModel{vendor='%s', modelName='%s', apiKey='***'}"
+                    .formatted(setModel.vendor(), setModel.modelName());
+        }
+        if (value instanceof LocalConfigService.ModelConfigData modelConfigData) {
+            int providerCount = modelConfigData.getProviders() == null ? 0 : modelConfigData.getProviders().size();
+            return "ModelConfigData{activeVendor='%s', activeModel='%s', providerCount=%d, apiKey='***'}"
+                    .formatted(modelConfigData.getActiveVendor(), modelConfigData.getActiveModel(), providerCount);
+        }
+        if (value instanceof Result<?> result) {
+            String dataType = result.getData() == null ? "null" : result.getData().getClass().getSimpleName();
+            return "Result{code=%s, message='%s', dataType='%s'}"
+                    .formatted(result.getCode(), result.getMessage(), dataType);
+        }
+        return value.getClass().getSimpleName();
     }
 }

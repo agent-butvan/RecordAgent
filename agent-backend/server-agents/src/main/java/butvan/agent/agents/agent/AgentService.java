@@ -1,7 +1,15 @@
 package butvan.agent.agents.agent;
 
 import butvan.agent.agents.model.ModelHolder;
+import butvan.agent.agents.prompts.PromptBuilder;
+import butvan.agent.agents.security.AgentSecurity;
+import butvan.agent.agents.security.PermissionChecker;
+import butvan.agent.agents.security.PermissionMode;
+import butvan.agent.agents.security.PermissionResult;
+import butvan.agent.agents.session.AgentStreamSession;
+import butvan.agent.agents.tool.ToolRegistry;
 import io.agentscope.core.agent.RuntimeContext;
+import io.agentscope.core.event.*;
 import io.agentscope.core.message.UserMessage;
 import io.agentscope.core.model.Model;
 import io.agentscope.harness.agent.HarnessAgent;
@@ -9,10 +17,9 @@ import io.agentscope.harness.agent.memory.compaction.CompactionConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.io.IOException;
 import java.nio.file.Paths;
+import java.util.Map;
 
 /**
  * Agent 核心服务类
@@ -27,130 +34,167 @@ public class AgentService {
      * 模型持有者组件，动态提供当前激活的 Model 实例
      */
     private final ModelHolder modelHolder;
+    private final ToolRegistry toolRegistry;
+    private final AgentSecurity agentSecurity;
+
+    private final PermissionChecker permissionChecker = new PermissionChecker(
+            PermissionMode.DEFAULT,
+            Paths.get(".").toAbsolutePath().normalize()
+    );
+
+    private boolean handleUserHitlApproval(String toolName, Map<String, Object> args) {
+        // 模拟用户在前端点击同意
+        return true;
+    }
 
     /**
-     * 运行 HarnessAgent 并通过 SseEmitter 推送流式响应
+     * 创建 Agent 流式会话，并在虚拟线程中启动 AgentScope 事件生产。
      *
-     * @param agentUserCall 用户发起的对话请求
-     * @return SseEmitter
+     * @param request 用户对话请求
+     * @return 可由网络层消费的流式会话
      */
-    public SseEmitter streamAgent(AgentUserCall agentUserCall) {
-        SseEmitter emitter = new SseEmitter(0L); // 永超时
+    public AgentStreamSession streamAgent(AgentUserCall request) {
+        // 为每次 HTTP 对话请求创建独立队列，不能复用其他用户的队列。
+        AgentStreamSession session = new AgentStreamSession();
 
+        // 立即启动虚拟线程，Controller 无需等待模型生成完成。
+        Thread producer = Thread.startVirtualThread(() -> produceEvents(request, session));
+        session.bindProducer(producer);
+        return session;
+    }
+
+    /**
+     * 消费 AgentScope 细粒度事件流，并转换为项目标准事件写入队列。
+     *
+     * @param request 用户对话请求
+     * @param session 当前流式会话
+     */
+    private void produceEvents(AgentUserCall request, AgentStreamSession session) {
         if (!modelHolder.isInitialized()) {
-            log.warn("当前模型尚未完成初始化配置，无法启动 Agent 对话");
-            try {
-                emitter.send(SseEmitter.event().name("error").data("当前模型尚未完成初始化配置，请先在界面设置 API 密钥。"));
-                emitter.complete();
-            } catch (IOException e) {
-                emitter.completeWithError(e);
-            }
-            return emitter;
+            putEvent(session, new AgentStreamEvent.Failed("请先完成模型配置。"));
+            return;
         }
 
-        Model model = modelHolder.getModel();
+        String input = request != null && request.context() != null ? request.context() : "";
 
-        // 1. 根据 AgentScope 规范构造 HarnessAgent
-        HarnessAgent harnessAgent = HarnessAgent.builder()
-                .name("butvan-agent")
-                .sysPrompt("你是一个全能智能助手，请简洁、清晰地解答用户的各种技术与日常问题。")
+        RuntimeContext context = createRuntimeContext(request);
+        boolean terminalEventSent = false;
+
+        try (HarnessAgent agent = createHarnessAgent(modelHolder.getModel())) {
+            for (AgentEvent event : agent.streamEvents(new UserMessage(input), context).toIterable()) {
+                if (session.isCancelled()) {
+                    return;
+                }
+
+                AgentStreamEvent mappedEvent = mapEvent(event);
+                if (mappedEvent == null) {
+                    continue;
+                }
+
+                if (!putEvent(session, mappedEvent)) {
+                    return;
+                }
+
+                if (mappedEvent.isTerminal()) {
+                    terminalEventSent = true;
+                    return;
+                }
+            }
+            if (!terminalEventSent && !session.isCancelled()) {
+                putEvent(session, new AgentStreamEvent.Completed());
+            }
+        } catch (Exception exception) {
+            if (session.isCancelled() || Thread.currentThread().isInterrupted()) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+            log.error("Agent 流处理失败: sessionId={}", context.getSessionId(), exception);
+            putEvent(session, new AgentStreamEvent.Failed("Agent 处理失败，请稍后重试。"));
+        }
+    }
+
+    /**
+     * 将 AgentScope 原始事件转换为应用流事件。
+     *
+     * @param event AgentScope 原始事件
+     * @return 应用流事件；不需要向前端输出的事件返回 {@code null}
+     */
+    private AgentStreamEvent mapEvent(AgentEvent event) {
+        if (event instanceof TextBlockDeltaEvent textEvent) {
+            // 文本增量只追加到聊天正文，不与内部控制事件混淆。
+            return new AgentStreamEvent.TextDelta(textEvent.getDelta());
+        }
+        if (event instanceof AgentEndEvent) {
+            // 生命周期结束
+            return new AgentStreamEvent.Completed();
+        }
+        if (event instanceof ToolCallStartEvent) {
+            log.info("---工具事件开始：{}---",((ToolCallStartEvent) event).getToolCallName());
+        }
+        if (event instanceof ToolResultTextDeltaEvent) {
+            log.info("---工具调用结果：{}---",((ToolResultTextDeltaEvent) event).getDelta());
+        }
+
+        return null;
+    }
+
+    /**
+     * 根据请求创建隔离 AgentScope 会话记忆的运行上下文。
+     *
+     * @param request 用户对话请求
+     * @return 运行上下文
+     */
+    private RuntimeContext createRuntimeContext(AgentUserCall request) {
+        String sessionId = request != null && request.sessionId() != null && !request.sessionId().isBlank()
+                ? request.sessionId() : "default_session";
+
+        return RuntimeContext.builder()
+                .sessionId(sessionId)
+                .userId("butvan")
+                .build();
+    }
+
+    /**
+     * 创建当前模型对应的 HarnessAgent。
+     *
+     * @param model 当前激活模型
+     * @return HarnessAgent 实例
+     */
+    private HarnessAgent createHarnessAgent(Model model) {
+
+        String modelName = model.getModelName() != null ? model.getModelName() : "unknown-model";
+        String workDir = System.getProperty("user.dir");
+        String sysPrompt = PromptBuilder.buildDefaultSystemPrompt(modelName, workDir);
+
+        return HarnessAgent.builder()
+                .name("butvan_agent")
+                .sysPrompt(sysPrompt)
                 .model(model)
+                .toolkit(toolRegistry.getToolkit())
+                .permissionContext(agentSecurity.createPermissionContext())
                 .workspace(Paths.get(".agentscope/workspace"))
                 .compaction(CompactionConfig.builder()
                         .triggerMessages(30)
                         .keepMessages(10)
                         .build())
                 .build();
-
-        // 2. 构建 RuntimeContext 上下文
-        RuntimeContext ctx = RuntimeContext.builder()
-                .sessionId(agentUserCall != null && agentUserCall.sessionId() != null ? agentUserCall.sessionId() : "default_session")
-                .userId("butvan")
-                .build();
-
-        String contextText = agentUserCall != null && agentUserCall.context() != null ? agentUserCall.context() : "";
-
-        // 3. 订阅事件流并精准提取增量文本推送到 SSE 节点
-        harnessAgent.streamEvents(new UserMessage(contextText), ctx)
-                .doOnNext(event -> {
-                    try {
-                        String data = extractContent(event);
-                        if (data != null && !data.isEmpty()) {
-                            emitter.send(SseEmitter.event().data(data));
-                        }
-                    } catch (Exception e) {
-                        log.error("推送 SSE 增量事件失败", e);
-                        emitter.completeWithError(e);
-                    }
-                })
-                .doOnError(error -> {
-                    log.error("HarnessAgent 发生异常", error);
-                    try {
-                        emitter.send(SseEmitter.event().name("error").data("处理异常: " + error.getMessage()));
-                    } catch (IOException ignored) {
-                    }
-                    emitter.completeWithError(error);
-                })
-                .doOnComplete(() -> {
-                    log.info("HarnessAgent 对话流事件处理完成");
-                    emitter.complete();
-                })
-                .subscribe();
-
-        return emitter;
     }
 
     /**
-     * 提炼 AgentScope 事件增量文本内容，自动过滤控制类事件
+     * 向队列写入事件，并正确保留线程中断信号。
      *
-     * @param event 事件对象
-     * @return 纯文本（非文本增量事件返回 null 忽略）
+     * @param session 流式会话
+     * @param event   待发送事件
+     * @return 写入成功时返回 {@code true}
      */
-    private String extractContent(Object event) {
-        if (event == null) return null;
-        if (event instanceof String str) return str;
-
-        String className = event.getClass().getSimpleName();
-
-        // 过滤忽略 AgentScope 控制类与描述类事件
-        if (className.contains("StartEvent") ||
-            className.contains("EndEvent") ||
-            className.contains("ResultEvent") ||
-            className.contains("CallEvent")) {
-
-            // 唯独 TextBlockDeltaEvent 包含文本增量片段，需深入提取
-            if (!className.equals("TextBlockDeltaEvent")) {
-                return null;
-            }
-        }
-
+    private boolean putEvent(AgentStreamSession session, AgentStreamEvent event) {
         try {
-            var methods = event.getClass().getMethods();
-            // 优先提取增量文本属性：text(), getText(), delta(), getDelta()
-            for (var m : methods) {
-                if (m.getParameterCount() == 0 &&
-                   (m.getName().equals("text") || m.getName().equals("getText") ||
-                    m.getName().equals("delta") || m.getName().equals("getDelta") ||
-                    m.getName().equals("getTextContent"))) {
-                    Object val = m.invoke(event);
-                    if (val != null && !val.toString().isEmpty()) {
-                        return val.toString();
-                    }
-                }
-            }
-
-            // 若嵌套有 Message 对象，递归解包
-            for (var m : methods) {
-                if (m.getParameterCount() == 0 && (m.getName().equals("getMsg") || m.getName().equals("message"))) {
-                    Object msgObj = m.invoke(event);
-                    if (msgObj != null) {
-                        return extractContent(msgObj);
-                    }
-                }
-            }
-        } catch (Exception ignored) {
+            session.queue().put(event);
+            return true;
+        } catch (InterruptedException exception) {
+            // 保留停止信号，调用方据此停止生产。
+            Thread.currentThread().interrupt();
+            return false;
         }
-
-        return null;
     }
 }

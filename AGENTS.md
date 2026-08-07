@@ -1,58 +1,99 @@
-# DOX framework
+# ButvanAgent 工程协作规范（DOX）
 
-- DOX is highly performant AGENTS.md hierarchy installed here
-- Agent must follow DOX instructions across any edits
+本文件是仓库根目录的工程契约，适用于整个 `ButvanAgent` 项目。所有新增、修改、移动或删除文件的工作，均必须遵守本文件及目标目录下更近层级的 `AGENTS.md`。
 
-## Core Contract
+## 一、DOX 文档治理
 
-- AGENTS.md files are binding work contracts for their subtrees
-- Work products, source materials, instructions, records, assets, and durable docs must stay understandable from the nearest applicable AGENTS.md plus every parent AGENTS.md above it
+- `AGENTS.md` 是其所在目录树的强制性工作契约，不是参考建议。
+- 修改任何文件前，必须从仓库根目录开始，逐级读取目标路径上的全部 `AGENTS.md`；距离目标文件最近的规则优先，但不得削弱本文件的 DOX 要求。
+- 每次会话中都必须重新读取适用的 `AGENTS.md`，不得依赖历史记忆。
+- 发生影响职责边界、目录结构、接口契约、工作流、输入输出、权限、持久化位置或用户体验的变更后，必须执行 DOX 复核。
+- 若变更影响本文件所属的全局规则，必须同步更新本文件；若新增子目录规范，必须在对应目录创建中文 `AGENTS.md`，并维护父级的子级索引。
+- 小型、纯实现细节的修复可以不修改 `AGENTS.md`，但仍必须确认现有约束未被破坏。
 
-## Read Before Editing
+## 二、项目定位与目录职责
 
-1. Read the root AGENTS.md
-2. Identify every file or folder you expect to touch
-3. Walk from the repository root to each target path
-4. Read every AGENTS.md found along each route
-5. If a parent AGENTS.md lists a child AGENTS.md whose scope contains the path, read that child and continue from there
-6. Use the nearest AGENTS.md as the local contract and parent docs for repo-wide rules
-7. If docs conflict, the closer doc controls local work details, but no child doc may weaken DOX
+本项目是基于 `React + Tauri` 桌面端、`Spring Boot + AgentScope Java` 后端的智能体应用。目录必须按职责稳定划分，禁止把临时代码、构建产物、运行态数据或跨层实现混入业务源码。
 
-Do not rely on memory. Re-read the applicable DOX chain in the current session before editing.
+| 目录 | 职责与约束 |
+| --- | --- |
+| `agent-frontend/` | React、TypeScript、Vite 与 Tauri 桌面端代码；仅放置前端构建、展示和桌面壳层相关内容。 |
+| `agent-frontend/src/components/` | 可复用视图组件；按业务域建立目录，例如 `chat/`、`model/`、`layout/`、`common/`。 |
+| `agent-frontend/src/services/` | HTTP、SSE、存储与第三方调用等基础设施适配；不得承载页面状态或 JSX。 |
+| `agent-frontend/src/context/` | 跨页面共享状态与领域上下文；不得把一次性局部状态提升到此处。 |
+| `agent-frontend/src/types/` | 前端领域类型、接口和 DTO 定义；禁止放置运行逻辑。 |
+| `agent-frontend/src-tauri/` | Tauri/Rust 桌面端能力；系统权限与原生能力必须最小化授权。 |
+| `agent-backend/server-network/` | Spring Boot 启动、Controller、DTO、API 通用能力、AOP 与网络适配层。 |
+| `agent-backend/server-agents/` | AgentScope、模型工厂、智能体编排、工作区与配置领域逻辑。 |
+| `agent-backend/*/src/main/resources/` | 仅保存不含密钥的默认配置和资源；真实用户配置不得硬编码于 yml。 |
+| `.agentscope/` | AgentScope 运行态工作区；不得手工提交会话、日志、缓存或临时任务数据。 |
+| `docs/`（新增时） | 架构、接口、决策记录和操作文档；文档应使用中文，专业术语可保留英文。 |
 
-## Update After Editing
+### 目录与文件管理
 
-Every meaningful change requires a DOX pass before the task is done.
+- 新增代码前先确认归属目录；不确定归属时优先建立清晰的业务域目录，而不是继续堆积在根目录或 `components/` 顶层。
+- 禁止新增无职责说明的 `utils`、`common`、`helper` 大杂烩目录；通用能力必须按明确领域命名。
+- 禁止提交 `node_modules`、`dist`、`target`、IDE 配置、日志、缓存、运行会话、真实密钥和用户本地配置。
+- 一个文件只承担一个清晰职责；页面编排、可复用组件、请求服务、领域类型和样式不得无边界混写。
+- 重命名、移动或删除文件后，必须同步更新所有导入、文档、测试和相关 `AGENTS.md` 索引。
 
-Update the closest owning AGENTS.md when a change affects:
+## 三、后端工程规范
 
-- purpose, scope, ownership, or responsibilities
-- durable structure, contracts, workflows, or operating rules
-- required inputs, outputs, permissions, constraints, side effects, or artifacts
-- user preferences about behavior, communication, process, organization, or quality
-- AGENTS.md creation, deletion, move, rename, or index contents
+### 分层与接口
 
-Update parent docs when parent-level structure, ownership, workflow, or child index changes. Update child docs when parent changes alter local rules. Remove stale or contradictory text immediately. Small edits that do not change behavior or contracts may leave docs unchanged, but the DOX pass still must happen.
+- `Controller` 只负责协议适配、参数接收、响应包装和鉴权边界；不得编写 Agent 编排、模型创建、文件操作或复杂业务逻辑。
+- 业务逻辑放入 `Service` 或明确的领域组件；模型供应商适配集中在 `ModelFactory` 或其专属实现中，禁止散落条件判断。
+- 请求/响应对象使用独立 DTO；禁止把持久化对象、AgentScope 第三方对象或内部领域对象直接暴露给 API。
+- 所有 REST Controller 方法必须标注 `@ApiLog("接口作用描述")`，由 `ApiLogAspect` 输出包含 Description、参数、客户端 IP、状态和毫秒级 Cost 的 `[API-LOG] START/END/ERROR` 日志。
+- 新增 API 必须同步明确 HTTP 方法、URL、请求字段、响应结构、异常语义和权限要求；对前端有影响时同步更新前端类型与服务层。
 
-## Hierarchy
+### 代码质量与安全
 
-- Root AGENTS.md is the DOX rail: project-wide instructions, global preferences, durable workflow rules, and the top-level Child DOX Index
-- Child AGENTS.md files own domain-specific instructions and their own Child DOX Index
-- Each parent explains what its direct children cover and what stays owned by the parent
-- The closer a doc is to the work, the more specific and practical it must be
+- 后端使用 Lombok 消除样板代码；类、公共方法、关键字段和复杂分支必须保留规范、准确的中文 Javadoc 或注释。
+- 类名使用 PascalCase，方法与变量使用 camelCase，常量使用全大写蛇形命名；包名全小写并遵循业务域分层。
+- 禁止捕获异常后静默忽略；必须记录有上下文的日志，或转换为可识别的业务异常。
+- 禁止在日志、异常响应、配置文件和代码中输出 API Key、Token、密码或完整敏感请求体。
+- 用户模型配置统一持久化在 `~/.butvan-agent/config.json`，不得把用户密钥或个性化配置写入 `application.yml`、`application-vendor.yml` 或源码。
+- AgentScope 工作区、工具权限、文件与网络访问必须按最小权限设计；任何可能执行本机操作的能力都应具备明确的审批、范围和错误反馈。
 
-## Local Contracts
+## 四、前端工程与 UI 组件规范
 
-- **后端 REST API 日志打印契约**：所有后端 Controller REST API 接口方法必须标注 `@ApiLog("接口作用描述")` 自定义注解，触发 `ApiLogAspect` AOP 切面进行包含接口功能描述（Description）、请求参数、客户端 IP、处理状态及毫秒级耗时（Cost）的规范化日志输出。
-- **前端模型配置引导契约**：未检测到模型配置时，必须使用全屏居中的独立配置页面（`ModelInitPage`），设计视觉风格须保持全屏纯白、椭圆双按钮（取消 / 继续）与极简排版，禁止使用浮层遮罩弹窗。
+### 组件复用与封装
 
-## User Preferences
+- 本项目以**自定义 UI 组件**为唯一设计与实现基线；未经明确批准，不引入通用 UI 组件库来替代现有视觉体系。
+- 一旦某类交互或展示元素被确定为产品组件，例如输出框、消息气泡、输入框、按钮、选择器、空状态、加载态、错误提示或设置卡片，必须抽离为职责单一的统一组件；禁止在多个页面复制 JSX、内联样式或交互逻辑。
+- 可复用基础组件放在 `agent-frontend/src/components/common/`；领域复用组件放在对应域目录，例如 `components/chat/`。页面只负责数据编排和布局，不重复实现基础组件细节。
+- 组件应提供清晰的 TypeScript `Props` 类型、受控状态边界、可访问性语义和必要的事件回调；禁止通过 `any` 逃避领域类型设计。
+- 同一组件的尺寸、间距、圆角、状态颜色、禁用态、加载态和错误态必须一致；新增变体优先通过受控 `variant`、`size`、`state` 等属性扩展，而不是复制一份组件。
+- 组件对应样式使用 CSS Modules，与组件同目录同名保存；禁止在业务页面持续扩张大段内联样式。仅一次性的动态数值可使用内联样式。
+- 引入或调整组件时，必须检查已有组件能否复用；若发现重复实现，应在本次改动中合并或记录明确的后续重构任务。
 
-- **持久化配置**：当用户配置模型信息时，所有配置文件托管在本地 `~/.butvan-agent/config.json` 中，解耦硬编码 yml 依赖。
-- **代码与注释规范**：后端代码全量使用 Lombok 注解，并附带规范且详尽的中文 Javadoc 与注释。
-- **接口日志输出**：后端每个 API 接口的调用必须通过 `@ApiLog` 注解触发规范化的日志输出打印（形如 `[API-LOG] START/END/ERROR` 并附带 Description 说明）。
+### 前端分层与状态
 
-## Child DOX Index
+- 页面组件负责路由或页面级编排；领域组件负责具体业务交互；`services` 负责 API/SSE 调用；`types` 负责模型定义；不得跨层反向依赖。
+- 所有后端 API 调用必须集中在 `services`，统一处理响应结构、超时、错误映射与类型；组件内不得散落重复 `fetch` 实现。
+- 跨页面且需要持久化或同步的状态使用 Context 或专用状态模块；仅限单组件使用的状态保留在组件内部。
+- API 基础地址、功能开关和环境差异必须通过配置集中管理，禁止在多个组件硬编码。
+- 未检测到模型配置时，必须展示全屏居中的独立 `ModelInitPage`：纯白背景、椭圆形“取消 / 继续”按钮、极简排版；禁止改为遮罩弹窗。
+- 所有用户可见文案、错误信息和空状态应使用清晰中文；技术名词、模型名和协议名可保留英文。
 
-- No child AGENTS.md files are needed for the current repository structure.
-- Root-owned files: `README.md`, `LICENSE`, `banner.jpg`, `video-thumbnail.jpg`, and root-level project documentation.
+## 五、验证、评审与交付
+
+- 修改前先检查工作区状态，保留并避免覆盖用户已有改动。
+- 修改后至少执行与改动最贴近的格式化、类型检查、单元测试、构建或静态检查；若因环境或权限无法执行，必须说明原因和未验证范围。
+- 不修复与当前任务无关的问题；发现阻断性问题时，应单独说明，不得隐式扩大改动范围。
+- 提交结果必须说明：修改了什么、为何修改、验证结果、遗留风险以及需要用户决策的事项。
+- 不得自行创建分支、提交、推送、发布或写入外部系统，除非用户明确要求。
+
+## 六、子级 DOX 索引
+
+- 当前仓库尚未建立子级 `AGENTS.md`。
+- 根目录负责项目级工程规范、目录边界、架构契约与根文档。
+- 当 `agent-frontend/` 或 `agent-backend/` 出现独立且稳定的局部规则时，应分别建立中文 `AGENTS.md`，并在本节登记其职责范围。
+
+## 行为准则
+- 回复尽量简短。一个简单问题配一个直接回答，不要分段加标题。
+- 做任务之前先说一句你要做什么，别一声不吭就开始。
+- 做完之后一两句话总结。改了什么，接下来该做什么。
+- 探索性问题（"这个怎么办？""你觉得呢？"）回 2-3 句建议，不要直接动手。
+- 不确定的时候先问，不要猜。
