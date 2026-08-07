@@ -5,7 +5,6 @@ import butvan.agent.agents.prompts.PromptBuilder;
 import butvan.agent.agents.security.AgentSecurity;
 import butvan.agent.agents.security.PermissionChecker;
 import butvan.agent.agents.security.PermissionMode;
-import butvan.agent.agents.security.PermissionResult;
 import butvan.agent.agents.session.AgentStreamSession;
 import butvan.agent.agents.tool.ToolRegistry;
 import io.agentscope.core.agent.RuntimeContext;
@@ -19,7 +18,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Paths;
-import java.util.Map;
 
 /**
  * Agent 核心服务类
@@ -41,11 +39,6 @@ public class AgentService {
             PermissionMode.DEFAULT,
             Paths.get(".").toAbsolutePath().normalize()
     );
-
-    private boolean handleUserHitlApproval(String toolName, Map<String, Object> args) {
-        // 模拟用户在前端点击同意
-        return true;
-    }
 
     /**
      * 创建 Agent 流式会话，并在虚拟线程中启动 AgentScope 事件生产。
@@ -81,25 +74,40 @@ public class AgentService {
         boolean terminalEventSent = false;
 
         try (HarnessAgent agent = createHarnessAgent(modelHolder.getModel())) {
-            for (AgentEvent event : agent.streamEvents(new UserMessage(input), context).toIterable()) {
-                if (session.isCancelled()) {
-                    return;
+            String currentInput = input;
+            while (!session.isCancelled() && !terminalEventSent) {
+                boolean hasEventsThisTurn = false;
+
+                for (AgentEvent event : agent.streamEvents(new UserMessage(currentInput), context).toIterable()) {
+                    hasEventsThisTurn = true;
+                    if (session.isCancelled()) {
+                        return;
+                    }
+
+                    AgentStreamEvent mappedEvent = mapEvent(event);
+                    if (mappedEvent == null) {
+                        continue;
+                    }
+
+                    if (!putEvent(session, mappedEvent)) {
+                        return;
+                    }
+
+                    if (mappedEvent.isTerminal()) {
+                        terminalEventSent = true;
+                        break;
+                    }
                 }
 
-                AgentStreamEvent mappedEvent = mapEvent(event);
-                if (mappedEvent == null) {
-                    continue;
-                }
+                // 首轮过后清空输入，后续由上下文中的工具调用结果驱动下一轮推理
+                currentInput = "";
 
-                if (!putEvent(session, mappedEvent)) {
-                    return;
-                }
-
-                if (mappedEvent.isTerminal()) {
-                    terminalEventSent = true;
-                    return;
+                // 若本轮未产生新事件或已触发终止事件，结束多轮循环
+                if (!hasEventsThisTurn || terminalEventSent) {
+                    break;
                 }
             }
+
             if (!terminalEventSent && !session.isCancelled()) {
                 putEvent(session, new AgentStreamEvent.Completed());
             }
@@ -171,7 +179,7 @@ public class AgentService {
                 .sysPrompt(sysPrompt)
                 .model(model)
                 .toolkit(toolRegistry.getToolkit())
-                .permissionContext(agentSecurity.createPermissionContext())
+                .permissionContext(agentSecurity.createPermissionContext(permissionChecker))
                 .workspace(Paths.get(".agentscope/workspace"))
                 .compaction(CompactionConfig.builder()
                         .triggerMessages(30)
