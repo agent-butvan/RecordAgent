@@ -293,13 +293,13 @@ public class AgentSecurity {
         for (PermissionRule rule : rules) {
             if (rule.behavior() == PermissionBehavior.DENY) {
                 builder.addDenyRule(rule.toolName(), rule);
-                log.info("[AgentSecurity] 成功向 AgentScope 注入 Deny 规则: {}({})", rule.toolName(), rule.pattern());
+                log.info("[AgentSecurity] 成功向 AgentScope 注入 Deny 规则: {}({})", rule.toolName(), rule.ruleContent());
             } else if (rule.behavior() == PermissionBehavior.ALLOW) {
                 builder.addAllowRule(rule.toolName(), rule);
-                log.info("[AgentSecurity] 成功向 AgentScope 注入 Allow 规则: {}({})", rule.toolName(), rule.pattern());
+                log.info("[AgentSecurity] 成功向 AgentScope 注入 Allow 规则: {}({})", rule.toolName(), rule.ruleContent());
             } else if (rule.behavior() == PermissionBehavior.ASK) {
                 builder.addAskRule(rule.toolName(), rule);
-                log.info("[AgentSecurity] 成功向 AgentScope 注入 Ask 规则: {}({})", rule.toolName(), rule.pattern());
+                log.info("[AgentSecurity] 成功向 AgentScope 注入 Ask 规则: {}({})", rule.toolName(), rule.ruleContent());
             }
         }
 
