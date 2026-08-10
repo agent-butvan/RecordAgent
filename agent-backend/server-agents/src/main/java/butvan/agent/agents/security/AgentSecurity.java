@@ -34,12 +34,14 @@ public class AgentSecurity {
 
         // 1. 设置全局模式基线 (BYPASS / ACCEPT_EDITS / EXPLORE / DONT_ASK / DEFAULT)
         builder.mode(checker.getMode());
+        log.info("[AgentSecurity] 正在为 AgentScope 构建 PermissionContextState，当前权限模式: [{}]", checker.getMode());
 
         // 2. 当处于 BYPASS 模式时，注册全局通配 Allow 规则，保障所有合法工具调用不被误拦截
         if (checker.getMode() == PermissionMode.BYPASS) {
             builder.addAllowRule("*", new PermissionRule(
                     "*", ".*", PermissionBehavior.ALLOW, "Layer0-BypassMode"
             ));
+            log.info("[AgentSecurity] BYPASS 模式生效，已向 AgentScope 挂载全局通配 Allow 规则");
             return builder.build();
         }
 
