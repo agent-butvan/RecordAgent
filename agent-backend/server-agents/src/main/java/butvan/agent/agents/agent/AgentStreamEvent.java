@@ -1,13 +1,23 @@
 package butvan.agent.agents.agent;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Agent 对话流在业务层和网络层之间传递的标准事件。
  *
  * <p>业务层只负责产生此事件，Controller 再将其转换为 SSE，避免 AgentScope 与 Spring Web
  * 相互耦合。</p>
  */
-public sealed interface AgentStreamEvent permits AgentStreamEvent.TextDelta,
-        AgentStreamEvent.Completed, AgentStreamEvent.Failed {
+public sealed interface AgentStreamEvent permits
+        AgentStreamEvent.Completed,
+        AgentStreamEvent.Failed,
+        AgentStreamEvent.TextDelta,
+        AgentStreamEvent.ToolCall,
+        AgentStreamEvent.ToolResult
+{
+
+    Logger log = LoggerFactory.getLogger(AgentStreamEvent.class);
 
     /**
      * 事件名称
@@ -84,6 +94,41 @@ public sealed interface AgentStreamEvent permits AgentStreamEvent.TextDelta,
         @Override
         public boolean isTerminal() {
             return true;
+        }
+    }
+
+    /**
+     * 工具调用发起事件
+     * @param toolName
+     */
+    record ToolCall(String toolName) implements AgentStreamEvent{
+
+        @Override
+        public String eventName() {
+            return "tool_call";
+        }
+
+        @Override
+        public Object payload() {
+            log.info("发起工具调用，工具名称：[ {} ]",toolName);
+            return toolName;
+        }
+    }
+
+    /**
+     * 工具调用结果
+     * @param delta
+     */
+    record ToolResult(String delta) implements AgentStreamEvent {
+
+        @Override
+        public String eventName() {
+            return "tool_result";
+        }
+
+        @Override
+        public Object payload() {
+            return delta;
         }
     }
 }

@@ -31,7 +31,18 @@ public class AgentSecurity {
             return builder.build();
         }
 
+        // 当处于 BYPASS 模式时，注册全局放行规则，避免未匹配工具误触发 ASK
+        if (checker.getMode() == PermissionMode.BYPASS) {
+            builder.addAllowRule("*", new io.agentscope.core.permission.PermissionRule(
+                    "*", "*", PermissionBehavior.ALLOW, "Layer0-BypassMode"
+            ));
+            return builder.build();
+        }
+
         // 1. 将第 1 层高危命令硬拦截规则注册到 AgentScope 原生上下文
+        builder.addDenyRule("execute", new io.agentscope.core.permission.PermissionRule(
+                "execute", "rm -rf*", PermissionBehavior.DENY, "Layer1-DangerousHardDeny"
+        ));
         builder.addDenyRule("Bash", new io.agentscope.core.permission.PermissionRule(
                 "Bash", "rm -rf*", PermissionBehavior.DENY, "Layer1-DangerousHardDeny"
         ));

@@ -9,6 +9,7 @@ import butvan.agent.agents.session.AgentStreamSession;
 import butvan.agent.agents.tool.ToolRegistry;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.*;
+import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.UserMessage;
 import io.agentscope.core.model.Model;
 import io.agentscope.harness.agent.HarnessAgent;
@@ -18,6 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Paths;
+import java.util.List;
 
 /**
  * Agent 核心服务类
@@ -36,7 +38,7 @@ public class AgentService {
     private final AgentSecurity agentSecurity;
 
     private final PermissionChecker permissionChecker = new PermissionChecker(
-            PermissionMode.DEFAULT,
+            PermissionMode.BYPASS,
             Paths.get(".").toAbsolutePath().normalize()
     );
 
@@ -69,41 +71,20 @@ public class AgentService {
         }
 
         String input = request != null && request.context() != null ? request.context() : "";
-
         RuntimeContext context = createRuntimeContext(request);
         boolean terminalEventSent = false;
 
         try (HarnessAgent agent = createHarnessAgent(modelHolder.getModel())) {
-            String currentInput = input;
-            while (!session.isCancelled() && !terminalEventSent) {
-                boolean hasEventsThisTurn = false;
 
-                for (AgentEvent event : agent.streamEvents(new UserMessage(currentInput), context).toIterable()) {
-                    hasEventsThisTurn = true;
-                    if (session.isCancelled()) {
-                        return;
-                    }
+            UserMessage message = new UserMessage(input);
 
-                    AgentStreamEvent mappedEvent = mapEvent(event);
-                    if (mappedEvent == null) {
-                        continue;
-                    }
-
-                    if (!putEvent(session, mappedEvent)) {
-                        return;
-                    }
-
-                    if (mappedEvent.isTerminal()) {
-                        terminalEventSent = true;
-                        break;
-                    }
-                }
-
-                // 首轮过后清空输入，后续由上下文中的工具调用结果驱动下一轮推理
-                currentInput = "";
-
-                // 若本轮未产生新事件或已触发终止事件，结束多轮循环
-                if (!hasEventsThisTurn || terminalEventSent) {
+            for (AgentEvent event : agent.streamEvents(message, context).toIterable()) {
+                if (session.isCancelled()) return;
+                AgentStreamEvent mappedEvent = mapEvent(event);
+                if (mappedEvent == null) continue;
+                if (!putEvent(session, mappedEvent)) return;
+                if (mappedEvent.isTerminal()) {
+                    terminalEventSent = true;
                     break;
                 }
             }
@@ -111,6 +92,7 @@ public class AgentService {
             if (!terminalEventSent && !session.isCancelled()) {
                 putEvent(session, new AgentStreamEvent.Completed());
             }
+
         } catch (Exception exception) {
             if (session.isCancelled() || Thread.currentThread().isInterrupted()) {
                 Thread.currentThread().interrupt();
@@ -136,11 +118,11 @@ public class AgentService {
             // 生命周期结束
             return new AgentStreamEvent.Completed();
         }
-        if (event instanceof ToolCallStartEvent) {
-            log.info("---工具事件开始：{}---",((ToolCallStartEvent) event).getToolCallName());
+        if (event instanceof ToolCallStartEvent toolCallStartEvent) {
+            return new AgentStreamEvent.ToolCall(toolCallStartEvent.getToolCallName());
         }
-        if (event instanceof ToolResultTextDeltaEvent) {
-            log.info("---工具调用结果：{}---",((ToolResultTextDeltaEvent) event).getDelta());
+        if (event instanceof ToolResultTextDeltaEvent toolResultTextDeltaEvent) {
+            return new AgentStreamEvent.ToolResult(toolResultTextDeltaEvent.getDelta());
         }
 
         return null;
