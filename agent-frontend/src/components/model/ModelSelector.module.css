@@ -27,6 +27,10 @@
   font-size: 13px;
   font-weight: 500;
   color: #18181b;
+  max-width: 140px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .modelSubDetail {
@@ -39,6 +43,7 @@
 .chevronIcon {
   color: #71717a;
   margin-left: 2px;
+  flex-shrink: 0;
 }
 
 /* 图 3 所示的级联弹出菜单容器 */
@@ -54,11 +59,11 @@
 
 /* 左侧主设置卡片 */
 .primaryPanel {
-  width: 220px;
+  width: 200px;
   background-color: #ffffff;
   border: 1px solid #e4e4e7;
   border-radius: 14px;
-  padding: 8px;
+  padding: 6px;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
 }
 
@@ -83,6 +88,8 @@
 
 .menuItemLabel {
   font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .menuItemRight {
@@ -91,6 +98,14 @@
   gap: 4px;
   color: #71717a;
   font-size: 12px;
+  overflow: hidden;
+}
+
+.menuItemRightName {
+  max-width: 90px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .divider {

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useModel } from '../../context/ModelContext';
-import { ChevronDown, ChevronRight, ChevronUp, Check } from 'lucide-react';
+import { ChevronDown, ChevronRight, Check } from 'lucide-react';
 import styles from './ModelSelector.module.css';
 
 interface ModelSelectorProps {
@@ -62,24 +62,9 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ onOpenSettings }) 
             >
               <span className={styles.menuItemLabel}>模型</span>
               <span className={styles.menuItemRight}>
-                <span>{displayModelName}</span>
+                <span className={styles.menuItemRightName}>{displayModelName}</span>
                 <ChevronRight size={14} />
               </span>
-            </button>
-
-            <div className={styles.divider} />
-
-            <button
-              className={styles.advancedItem}
-              onMouseEnter={() => setShowSubMenu(false)}
-              onClick={() => {
-                setIsOpen(false);
-                setShowSubMenu(false);
-                onOpenSettings();
-              }}
-            >
-              <span>高级</span>
-              <ChevronUp size={14} />
             </button>
           </div>
 
