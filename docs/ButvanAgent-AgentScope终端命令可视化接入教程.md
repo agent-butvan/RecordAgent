@@ -10,7 +10,8 @@
 **重构与接入核心目标**：
 1. **对接 AgentScope 2.0 事件流**：AgentScope 2.0 中通过 `ToolCallStartEvent` 启动工具、`ToolCallDeltaEvent`（流式推送参数增量 `getDelta()`）拼接命令行参数、`ToolResultTextDeltaEvent` 提取终端输出内容。
 2. **标准化 SSE 传输 Payload**：将 `tool_call` 与 `tool_result` SSE 事件升级为携带结构化 JSON 数据（包含工具名、命令行、执行状态、日志输出）的事件流。
-3. **实现极致终端卡片（CommandCard）**：前端新增极具科技感、纯黑客 Terminal 风格的命令控制台卡片，支持实时显示命令行、状态指示灯（执行中/完成/错误）以及可展开/折叠的终端输出面板。
+3. **统一事件映射内聚设计**：将所有 AgentScope 事件到应用业务事件的转换与状态缓冲区统一封装于 `mapEvent` 方法中，保持 `produceEvents` 主循环极简干净。
+4. **实现极致终端卡片（CommandCard）**：前端新增极具科技感、纯黑客 Terminal 风格的命令控制台卡片，支持实时显示命令行、状态指示灯（执行中/完成/错误）以及可展开/折叠的终端输出面板。
 
 ---
 
@@ -24,11 +25,10 @@
 ├──────────────────────────────────────────────────────────────────────────────────┤
 │ 1. HarnessAgent 触发工具调用                                                     │
 │     ↓                                                                            │
-│ 2. AgentScope 事件流:                                                             │
-│    - ToolCallStartEvent (开始, 获 toolCallId & toolCallName)                       │
-│    - ToolCallDeltaEvent (流式参数增量, 累加 command JSON)                         │
-│    - ToolCallEndEvent (参数生成完成, 触发 tool_call SSE)                          │
-│    - ToolResultTextDeltaEvent (输出增量, 触发 tool_result SSE)                     │
+│ 2. AgentScope 事件流由 AgentService.mapEvent() 统一处理:                           │
+│    - ToolCallDeltaEvent (流式参数增量, 写入缓冲区, 返回 null)                         │
+│    - ToolCallEndEvent (参数生成完成, 提取 command JSON, 映射为 ToolCall)             │
+│    - ToolResultTextDeltaEvent (输出增量, 映射为 ToolResult)                          │
 │     ↓                                                                            │
 │ 3. 通过 SSE 推送 JSON 数据到前端                                                  │
 │     ↓                                                                            │
@@ -66,7 +66,7 @@
 Backend: agent-backend/server-agents/src/main/java/butvan/agent/agents/
 ├── agent/
 │   ├── AgentStreamEvent.java      // [修改] 升级 ToolCall 与 ToolResult 数据记录结构
-│   └── AgentService.java          // [修改] 结合 ToolCallDeltaEvent 累加解析 command 入参
+│   └── AgentService.java          // [修改] 统一 mapEvent 事件映射与流式参数缓冲区处理
 │
 Frontend: agent-frontend/src/
 ├── types/
@@ -220,15 +220,17 @@ public sealed interface AgentStreamEvent permits
 
 ---
 
-## 5. 第二步：改造后端 `AgentService.java` 解析 AgentScope 流式 Event
+## 5. 第二步：改造后端 `AgentService.java` 统一封装 `mapEvent`
 
 ### 2.1 说明干什么的
 
-AgentScope 2.0 使用 `ToolCallDeltaEvent` 流式传输工具参数 JSON。我们通过在事件循环中维护一个按 `toolCallId` 缓冲参数的 Map，在 `ToolCallDeltaEvent` 中追加 `getDelta()` 增量，并在 `ToolCallEndEvent` 触发时解析 `command` 字段，抛出完整的 `ToolCall` 事件。
+把所有 AgentScope 事件解析与参数缓冲收集逻辑统一收聚在 `mapEvent` 方法中：
+1. `produceEvents` 主循环仅负责迭代事件并调用 `mapEvent`。
+2. `mapEvent` 统一处理 `ToolCallDeltaEvent` 参数收集、`ToolCallEndEvent` 命令构建以及 `ToolResultTextDeltaEvent`。
 
 ### 2.2 完整代码实现
 
-在 `agent-backend/server-agents/src/main/java/butvan/agent/agents/agent/AgentService.java` 中更新事件循环处理：
+在 `agent-backend/server-agents/src/main/java/butvan/agent/agents/agent/AgentService.java` 中替换代码：
 
 ```java
     /**
@@ -244,7 +246,7 @@ AgentScope 2.0 使用 `ToolCallDeltaEvent` 流式传输工具参数 JSON。我�
         RuntimeContext context = createRuntimeContext(request);
         boolean terminalEventSent = false;
 
-        // 用于按 toolCallId 收集 AgentScope 流式工具参数增量
+        // 用于在单个会话事件流中按 toolCallId 收集 AgentScope 参数增量
         Map<String, StringBuilder> toolArgsBuffer = new java.util.concurrent.ConcurrentHashMap<>();
 
         try (HarnessAgent agent = createHarnessAgent(modelHolder.getModel())) {
@@ -254,27 +256,8 @@ AgentScope 2.0 使用 `ToolCallDeltaEvent` 流式传输工具参数 JSON。我�
             for (AgentEvent event : agent.streamEvents(message, context).toIterable()) {
                 if (session.isCancelled()) return;
 
-                // 1. 处理工具参数流式增量 ToolCallDeltaEvent
-                if (event instanceof ToolCallDeltaEvent deltaEvent) {
-                    toolArgsBuffer.computeIfAbsent(deltaEvent.getToolCallId(), k -> new StringBuilder())
-                            .append(deltaEvent.getDelta() != null ? deltaEvent.getDelta() : "");
-                    continue;
-                }
-
-                // 2. 工具参数流结束 ToolCallEndEvent：提取并发送 ToolCall
-                if (event instanceof ToolCallEndEvent endEvent) {
-                    String toolCallId = endEvent.getToolCallId();
-                    String toolName = endEvent.getToolCallName();
-                    StringBuilder rawArgs = toolArgsBuffer.remove(toolCallId);
-                    String command = parseCommandFromArgs(rawArgs != null ? rawArgs.toString() : "");
-
-                    AgentStreamEvent toolCallEvent = new AgentStreamEvent.ToolCall(toolCallId, toolName, command);
-                    if (!putEvent(session, toolCallEvent)) return;
-                    continue;
-                }
-
-                // 3. 其他常规事件映射 (TextDelta, ToolResultTextDeltaEvent, AgentEndEvent)
-                AgentStreamEvent mappedEvent = mapEvent(event);
+                // 统一交给 mapEvent 方法进行封装与状态处理
+                AgentStreamEvent mappedEvent = mapEvent(event, toolArgsBuffer);
                 if (mappedEvent == null) continue;
                 if (!putEvent(session, mappedEvent)) return;
                 if (mappedEvent.isTerminal()) {
@@ -298,6 +281,49 @@ AgentScope 2.0 使用 `ToolCallDeltaEvent` 流式传输工具参数 JSON。我�
     }
 
     /**
+     * 统一将 AgentScope 原始事件转换为应用流事件。
+     *
+     * @param event          AgentScope 原始事件
+     * @param toolArgsBuffer 流式工具参数收集缓冲区
+     * @return 应用流事件；不需要向前端输出或内部累加的事件返回 {@code null}
+     */
+    private AgentStreamEvent mapEvent(AgentEvent event, Map<String, StringBuilder> toolArgsBuffer) {
+        if (event instanceof TextBlockDeltaEvent textEvent) {
+            return new AgentStreamEvent.TextDelta(textEvent.getDelta());
+        }
+        if (event instanceof AgentEndEvent) {
+            return new AgentStreamEvent.Completed();
+        }
+
+        // 1. 处理工具参数流式增量 ToolCallDeltaEvent (写入缓冲区，无需发前端)
+        if (event instanceof ToolCallDeltaEvent deltaEvent) {
+            toolArgsBuffer.computeIfAbsent(deltaEvent.getToolCallId(), k -> new StringBuilder())
+                    .append(deltaEvent.getDelta() != null ? deltaEvent.getDelta() : "");
+            return null;
+        }
+
+        // 2. 工具参数流结束 ToolCallEndEvent：提取 command 并组装 ToolCall
+        if (event instanceof ToolCallEndEvent endEvent) {
+            String toolCallId = endEvent.getToolCallId();
+            String toolName = endEvent.getToolCallName();
+            StringBuilder rawArgs = toolArgsBuffer.remove(toolCallId);
+            String command = parseCommandFromArgs(rawArgs != null ? rawArgs.toString() : "");
+            return new AgentStreamEvent.ToolCall(toolCallId, toolName, command);
+        }
+
+        // 3. 工具输出结果增量 ToolResultTextDeltaEvent
+        if (event instanceof ToolResultTextDeltaEvent toolResultTextDeltaEvent) {
+            return new AgentStreamEvent.ToolResult(
+                    toolResultTextDeltaEvent.getToolCallId(),
+                    toolResultTextDeltaEvent.getToolCallName(),
+                    toolResultTextDeltaEvent.getDelta()
+            );
+        }
+
+        return null;
+    }
+
+    /**
      * 从模型生成的 JSON 参数字符串中提取 command 字段值
      */
     private String parseCommandFromArgs(String rawJson) {
@@ -312,158 +338,25 @@ AgentScope 2.0 使用 `ToolCallDeltaEvent` 流式传输工具参数 JSON。我�
             return rawJson;
         }
     }
-
-    private AgentStreamEvent mapEvent(AgentEvent event) {
-        if (event instanceof TextBlockDeltaEvent textEvent) {
-            return new AgentStreamEvent.TextDelta(textEvent.getDelta());
-        }
-        if (event instanceof AgentEndEvent) {
-            return new AgentStreamEvent.Completed();
-        }
-        if (event instanceof ToolResultTextDeltaEvent toolResultTextDeltaEvent) {
-            return new AgentStreamEvent.ToolResult(
-                    toolResultTextDeltaEvent.getToolCallId(),
-                    toolResultTextDeltaEvent.getToolCallName(),
-                    toolResultTextDeltaEvent.getDelta()
-            );
-        }
-        return null;
-    }
 ```
 
 ---
 
 ## 6. 第三步：升级前端 `src/services/api.ts` 事件分发
 
-### 3.1 说明干什么的
-
-修改前端 `api.ts` 的 `streamAgentChat` 函数，增加 `toolCallId` 传输支持。
-
-### 3.2 完整代码实现
-
-在 `agent-frontend/src/services/api.ts` 中更新代码：
-
-```typescript
-export interface ToolCallPayload {
-  toolCallId?: string;
-  toolName: string;
-  command: string;
-}
-
-export interface ToolResultPayload {
-  toolCallId?: string;
-  toolName: string;
-  result: string;
-}
-
-/**
- * Agent 对话流式 SSE 交互函数
- */
-export async function streamAgentChat(
-  params: { sessionId: string; context: string },
-  onChunk: (text: string) => void,
-  onComplete?: () => void,
-  onError?: (error: Error) => void,
-  onToolCall?: (data: ToolCallPayload) => void,
-  onToolResult?: (data: ToolResultPayload) => void
-): Promise<void> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/agent/chat/stream`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(params),
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP 响应异常: Status ${response.status}`);
-    }
-
-    if (!response.body) {
-      throw new Error('ReadableStream 不可用');
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder('utf-8');
-    let buffer = '';
-    let streamFinished = false;
-
-    const dispatchSseEvent = (eventBlock: string) => {
-      let eventName = 'message';
-      const dataLines: string[] = [];
-
-      for (const rawLine of eventBlock.split(/\r?\n/)) {
-        if (rawLine.startsWith('event:')) {
-          eventName = rawLine.substring(6).trim();
-        } else if (rawLine.startsWith('data:')) {
-          dataLines.push(rawLine.substring(5).trimStart());
-        }
-      }
-
-      const dataStr = dataLines.join('\n');
-
-      if (eventName === 'text' || eventName === 'message') {
-        if (dataStr) onChunk(dataStr);
-      } else if (eventName === 'tool_call') {
-        try {
-          const payload: ToolCallPayload = JSON.parse(dataStr);
-          onToolCall?.(payload);
-        } catch {
-          onToolCall?.({ toolName: 'tool', command: dataStr });
-        }
-      } else if (eventName === 'tool_result') {
-        try {
-          const payload: ToolResultPayload = JSON.parse(dataStr);
-          onToolResult?.(payload);
-        } catch {
-          onToolResult?.({ toolName: 'tool', result: dataStr });
-        }
-      } else if (eventName === 'error') {
-        streamFinished = true;
-        onError?.(new Error(dataStr || 'Agent 流式处理失败'));
-      } else if (eventName === 'done') {
-        streamFinished = true;
-        onComplete?.();
-      }
-    };
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) {
-        if (buffer.trim()) dispatchSseEvent(buffer);
-        if (!streamFinished) onComplete?.();
-        break;
-      }
-
-      buffer += decoder.decode(value, { stream: true });
-      const eventBlocks = buffer.split(/\r?\n\r?\n/);
-      buffer = eventBlocks.pop() || '';
-
-      for (const eventBlock of eventBlocks) {
-        if (eventBlock.trim()) dispatchSseEvent(eventBlock);
-      }
-    }
-  } catch (error: unknown) {
-    console.error('SSE 流数据解析失败:', error);
-    onError?.(error instanceof Error ? error : new Error('SSE 流数据解析失败'));
-  }
-}
-```
+与先前步骤一致，详见代码实现。
 
 ---
 
 ## 7. 第四步：前端终端控制台组件 `CommandCard`
 
-与先前设计一致：
-1. **新建组件样式**：`agent-frontend/src/components/chat/CommandCard.module.css`
-2. **新建组件实现**：`agent-frontend/src/components/chat/CommandCard.tsx`
+与先前步骤一致，详见 `CommandCard.tsx` 和 `CommandCard.module.css`。
 
 ---
 
 ## 8. 第五步：在 `App.tsx` 中挂载终端卡片渲染
 
-按 `toolCallId` 将 `toolCall` 附加到对话消息中，当收到 `toolResult` 时更新对应 ID 卡片状态。
+与先前步骤一致，详见 App 集成代码。
 
 ---
 
@@ -472,7 +365,7 @@ export async function streamAgentChat(
 | 次序 | 修改内容 | 对应文件路径 | 成功验证标志 |
 | --- | --- | --- | --- |
 | 1 | 升级后端事件结构 | `AgentStreamEvent.java` | `ToolCall` 和 `ToolResult` 包含 `toolCallId` 字段。 |
-| 2 | 解析 AgentScope 事件流 | `AgentService.java` | 利用 `ToolCallDeltaEvent` 收集参数，在 `ToolCallEndEvent` 完美打印 `$ command`。 |
+| 2 | 统一封装 `mapEvent` | `AgentService.java` | `produceEvents` 主循环干净清晰，`mapEvent` 完成参数收集与解析。 |
 | 3 | 前端 SSE 协议解析 | `src/services/api.ts` | 浏览器 Console 精准收到带有 `command` 的 `tool_call` 数据。 |
 | 4 | 编写 Terminal 卡片组件 | `src/components/chat/CommandCard.tsx` | 渲染 macOS Terminal 风格容器。 |
 | 5 | 集成到 UI 消息面板 | `src/App.tsx` | 提问“查看系统电池”时，界面实时展示 Terminal 指令卡片！ |
