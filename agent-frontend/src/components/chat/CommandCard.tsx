@@ -15,8 +15,8 @@ export const CommandCard: React.FC<CommandCardProps> = ({
   status,
   output,
 }) => {
-  // 默认展开以符合截图中的展现效果
-  const [isExpanded, setIsExpanded] = useState<boolean>(true);
+  // 默认收起折叠，用户点击时手动展开
+  const [isExpanded, setIsExpanded] = useState<boolean>(false);
 
   const displayCommand = command || '准备执行终端命令...';
   const isRunning = status === 'running';
