@@ -87,7 +87,8 @@ public final class PromptsSections {
               - 写入文件优先用 WriteFile 而非 echo >；
               - 匹配与搜索优先用 Glob / Grep 工具。
             - 多个独立的工具调用应在同一轮集中并行发出，不要串行多次往返。
-            - 仅在需要系统交互或无专用工具替代时使用 Bash 命令。""";
+            - 仅在需要系统交互或无专用工具替代时使用 Bash 命令。
+            - 结果总结要求：每次工具（Tool）执行完毕获得结果后，你必须基于工具返回的实际输出进行简明分析与总结，并向用户提供最终回复，严禁在工具完成后直接停止或返回空响应。""";
 
     public static PromptSection usingToolsSection() {
         return new PromptSection("UsingTools", 40, USING_TOOLS_CONTENT);
@@ -111,7 +112,9 @@ public final class PromptsSections {
             # 输出效率
             - 在发起工具调用之前，用一句话向用户说明你即将进行的操作（不要无声地直接调工具）。
             - 避免输出冗长的内心思考过程，直接呈现决策与关键进展。
+            - 必须进行结果总结：每次工具调用结束后，必须根据工具输出内容解答或汇报用户，严禁直接发送空回复。
             - 轮次结束总结：任务完成时仅用 1-2 句话总结“改了什么”以及“下一步建议”，不多说废话。""";
+
 
     public static PromptSection outputEfficiencySection() {
         return new PromptSection("OutputEfficiency", 60, OUTPUT_EFFICIENCY_CONTENT);
