@@ -207,15 +207,17 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
         </div>
       ) : (
         <div className={styles.messagesArea}>
-          {messages.map((msg) => (
-            <div key={msg.id} className={styles.messageRow}>
-              {msg.role === 'user' ? (
-                <div className={styles.userMessage}>{msg.content}</div>
-              ) : (
-                <AssistantMessageItem msg={msg} />
-              )}
-            </div>
-          ))}
+          <div className={styles.messagesInner}>
+            {messages.map((msg) => (
+              <div key={msg.id} className={styles.messageRow}>
+                {msg.role === 'user' ? (
+                  <div className={styles.userMessage}>{msg.content}</div>
+                ) : (
+                  <AssistantMessageItem msg={msg} />
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

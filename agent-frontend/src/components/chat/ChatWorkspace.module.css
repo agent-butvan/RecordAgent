@@ -81,7 +81,13 @@
 .messagesArea {
   flex: 1;
   overflow-y: auto;
-  padding: 24px 16%;
+  padding: 24px 20px;
+}
+
+.messagesInner {
+  width: 100%;
+  max-width: 840px;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 20px;
