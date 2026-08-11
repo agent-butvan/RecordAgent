@@ -103,14 +103,15 @@
 .userMessage {
   align-self: flex-end;
   max-width: 78%;
-  background-color: #f8fafc;
-  border: 1px solid #cbd5e1;
-  border-radius: var(--radius-md);
-  padding: 10px 16px;
-  color: var(--text-primary);
+  background-color: #f3f4f6;
+  border: none;
+  border-radius: 18px;
+  padding: 10px 18px;
+  color: #18181b;
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.5;
   box-shadow: none;
+  word-break: break-word;
 }
 
 .assistantMessage {
@@ -218,14 +219,32 @@
 .toolbarRight {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
+}
+
+.micBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: none;
+  color: #18181b;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: background-color 0.15s ease;
+}
+
+.micBtn:hover {
+  background-color: #f4f4f5;
 }
 
 .sendCircleBtn {
-  width: 30px;
-  height: 30px;
-  border-radius: var(--radius-sm);
-  background-color: #cbd5e1;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: #9ca3af;
   border: none;
   color: #ffffff;
   display: flex;
@@ -236,11 +255,11 @@
 }
 
 .sendCircleBtnActive {
-  background-color: #2563eb;
+  background-color: #18181b;
 }
 
 .sendCircleBtnActive:hover {
-  background-color: #1d4ed8;
+  background-color: #27272a;
 }
 
 /* Markdown 排版美化样式 */

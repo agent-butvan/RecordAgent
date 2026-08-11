@@ -8,110 +8,121 @@
 .selectorBtn {
   display: flex;
   align-items: center;
-  gap: 8px;
-  background-color: #ffffff;
-  border: 1px solid #cbd5e1;
-  border-radius: var(--radius-md);
-  padding: 5px 10px;
-  color: var(--text-primary);
+  gap: 6px;
+  background-color: #f4f4f5;
+  border: 1px solid #e4e4e7;
+  border-radius: 18px;
+  padding: 5px 12px;
+  color: #18181b;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: background-color 0.15s ease;
 }
 
 .selectorBtn:hover {
-  background-color: #f8fafc;
-  border-color: #2563eb;
+  background-color: #e4e4e7;
 }
 
-.activeVendorLabel {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  color: #2563eb;
-  background-color: #eff6ff;
-  padding: 1px 6px;
-  border-radius: 4px;
-  letter-spacing: 0.3px;
-}
-
-.activeModelName {
+.modelMainName {
   font-size: 13px;
   font-weight: 500;
-  color: var(--text-primary);
+  color: #18181b;
 }
 
-.configBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  background: #ffffff;
-  border: 1px solid #cbd5e1;
-  border-radius: var(--radius-md);
-  color: #64748b;
-  cursor: pointer;
-  transition: all var(--transition-fast);
+.modelSubDetail {
+  font-size: 13px;
+  font-weight: 400;
+  color: #71717a;
+  margin-left: 2px;
 }
 
-.configBtn:hover {
-  background: #f8fafc;
-  border-color: #2563eb;
-  color: var(--text-primary);
+.chevronIcon {
+  color: #71717a;
+  margin-left: 2px;
 }
 
-/* 向上弹出的极简下拉卡片 */
-.dropdown {
+/* 图 3 所示的级联弹出菜单容器 */
+.cascadingPopover {
   position: absolute;
   bottom: calc(100% + 8px);
-  top: auto;
   right: 0;
-  left: auto;
-  width: 260px;
-  max-height: 280px;
-  overflow-y: auto;
-  background-color: #ffffff;
-  border: 1px solid #cbd5e1;
-  border-radius: var(--radius-lg);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
-  padding: 6px 0;
+  display: flex;
+  gap: 8px;
   z-index: 1000;
-  animation: slideUp 150ms ease;
+  animation: fadeIn 150ms ease;
 }
 
-.emptyOption {
+/* 左侧主设置卡片 */
+.primaryPanel {
+  width: 220px;
+  background-color: #ffffff;
+  border: 1px solid #e4e4e7;
+  border-radius: 14px;
+  padding: 8px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.menuItem {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   width: 100%;
-  padding: 12px;
+  padding: 8px 10px;
   background: transparent;
   border: none;
-  color: #2563eb;
-  font-size: 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #18181b;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.menuItem:hover, .menuItemActive {
+  background-color: #f4f4f5;
+}
+
+.menuItemLabel {
   font-weight: 500;
+}
+
+.menuItemRight {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #71717a;
+  font-size: 12px;
+}
+
+.divider {
+  height: 1px;
+  background-color: #f4f4f5;
+  margin: 6px 0;
+}
+
+.advancedItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 6px 10px;
+  background: transparent;
+  border: none;
+  font-size: 12px;
+  color: #71717a;
   cursor: pointer;
 }
 
-.vendorGroup {
-  display: flex;
-  flex-direction: column;
-}
-
-.vendorGroup:not(:last-child) {
-  border-bottom: 1px solid #f1f5f9;
-  margin-bottom: 4px;
-  padding-bottom: 4px;
-}
-
-.vendorHeader {
-  font-size: 10px;
-  font-weight: 700;
-  color: #94a3b8;
-  padding: 6px 12px 2px;
-  letter-spacing: 0.6px;
+/* 右侧子选项列表面板 */
+.secondaryPanel {
+  width: 200px;
+  background-color: #ffffff;
+  border: 1px solid #e4e4e7;
+  border-radius: 14px;
+  padding: 8px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+  max-height: 240px;
+  overflow-y: auto;
 }
 
 .modelOption {
@@ -119,40 +130,26 @@
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  padding: 8px 12px;
+  padding: 8px 10px;
   background: transparent;
   border: none;
-  color: var(--text-primary);
-  text-align: left;
+  border-radius: 8px;
   font-size: 13px;
+  color: #18181b;
+  text-align: left;
   cursor: pointer;
-  transition: background var(--transition-fast);
+  transition: background-color 0.15s ease;
 }
 
 .modelOption:hover {
-  background-color: #f8fafc;
-}
-
-.modelOptionActive {
-  background-color: #eff6ff;
-  color: #2563eb;
-  font-weight: 600;
-}
-
-.modelOptionName {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex: 1;
+  background-color: #f4f4f5;
 }
 
 .checkIcon {
-  color: #2563eb;
-  flex-shrink: 0;
-  margin-left: 8px;
+  color: #18181b;
 }
 
-@keyframes slideUp {
+@keyframes fadeIn {
   from {
     opacity: 0;
     transform: translateY(4px);

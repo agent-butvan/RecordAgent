@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useModel } from '../../context/ModelContext';
-import { ChevronDown, Settings, Check } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronUp, Check } from 'lucide-react';
 import styles from './ModelSelector.module.css';
 
 interface ModelSelectorProps {
@@ -8,17 +8,16 @@ interface ModelSelectorProps {
 }
 
 export const ModelSelector: React.FC<ModelSelectorProps> = ({ onOpenSettings }) => {
-  const { activeProviderId, activeModelId, selectActiveModel, getActiveModel, getActiveProvider, getAllModels } = useModel();
+  const { activeModelId, selectActiveModel, getActiveModel, getAllModels } = useModel();
   const [isOpen, setIsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'model' | 'reasoning'>('model');
+  const [reasoningLevel, setReasoningLevel] = useState<string>('轻度');
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const activeProvider = getActiveProvider();
   const activeModel = getActiveModel();
   const allModels = getAllModels();
 
-  type ModelItemType = ReturnType<typeof getAllModels>[number];
-
-  // Close dropdown on outside click
+  // 点击外部收起
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -29,92 +28,102 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ onOpenSettings }) 
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // 按 Vendor 厂商对模型进行分类分组
-  const groupedModels = useMemo(() => {
-    const groups: Record<string, { vendorName: string; models: ModelItemType[] }> = {};
-
-
-    allModels.forEach((model) => {
-      const vendorKey = model.providerType || model.providerId || 'other';
-      const vendorName = (model.providerName || vendorKey).toUpperCase();
-
-      if (!groups[vendorKey]) {
-        groups[vendorKey] = {
-          vendorName,
-          models: [],
-        };
-      }
-      groups[vendorKey].models.push(model);
-    });
-
-    return Object.values(groups);
-  }, [allModels]);
-
   const handleSelectModel = (providerId: string, modelId: string) => {
     selectActiveModel(providerId, modelId);
-    setIsOpen(false);
   };
+
+  const handleSelectReasoning = (level: string) => {
+    setReasoningLevel(level);
+  };
+
+  const displayModelName = activeModel?.name || '5.6 Terra';
 
   return (
     <div className={styles.container} ref={dropdownRef}>
-      {/* 当前选中的模型触发按钮 */}
-      <button 
-        className={styles.selectorBtn} 
+      {/* 图 2: 极简胶囊展示按钮 */}
+      <button
+        className={styles.selectorBtn}
         onClick={() => setIsOpen(!isOpen)}
-        title="点击选择模型"
+        title="模型与推理强度配置"
       >
-        <span className={styles.activeVendorLabel}>
-          {activeProvider ? (activeProvider.name || activeProvider.type.toUpperCase()) : '模型'}
-        </span>
-        <span className={styles.activeModelName}>{activeModel?.name || '选择模型'}</span>
-        <ChevronDown size={13} style={{ opacity: 0.7, transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 150ms' }} />
+        <span className={styles.modelMainName}>{displayModelName}</span>
+        <span className={styles.modelSubDetail}>{reasoningLevel}</span>
+        <ChevronDown size={14} className={styles.chevronIcon} />
       </button>
 
-      {/* 点击配置按钮 */}
-      <button 
-        className={styles.configBtn}
-        onClick={onOpenSettings}
-        title="模型厂商与 API Key 配置"
-      >
-        <Settings size={14} />
-      </button>
-
-      {/* 向上弹出的极简模型选择下拉菜单 */}
+      {/* 图 3: 级联弹出菜单 */}
       {isOpen && (
-        <div className={styles.dropdown}>
-          {allModels.length === 0 ? (
+        <div className={styles.cascadingPopover}>
+          {/* 左侧主设置项 */}
+          <div className={styles.primaryPanel}>
             <button
-              className={styles.emptyOption}
-              onClick={() => {
-                setIsOpen(false);
-                onOpenSettings();
-              }}
+              className={`${styles.menuItem} ${activeTab === 'model' ? styles.menuItemActive : ''}`}
+              onClick={() => setActiveTab('model')}
             >
-              暂未配置任何模型，点击去设置
+              <span className={styles.menuItemLabel}>模型</span>
+              <span className={styles.menuItemRight}>
+                <span>{displayModelName}</span>
+                <ChevronRight size={14} />
+              </span>
             </button>
-          ) : (
-            groupedModels.map((group) => (
-              <div key={group.vendorName} className={styles.vendorGroup}>
-                <div className={styles.vendorHeader}>{group.vendorName}</div>
-                {group.models.map((model) => {
-                  const isSelected =
-                    (model.providerId === activeProviderId || model.providerType === activeProviderId) &&
-                    model.id === activeModelId;
 
+            <button
+              className={`${styles.menuItem} ${activeTab === 'reasoning' ? styles.menuItemActive : ''}`}
+              onClick={() => setActiveTab('reasoning')}
+            >
+              <span className={styles.menuItemLabel}>推理强度</span>
+              <span className={styles.menuItemRight}>
+                <span>{reasoningLevel}</span>
+                <ChevronRight size={14} />
+              </span>
+            </button>
+
+            <div className={styles.divider} />
+
+            <button className={styles.advancedItem} onClick={onOpenSettings}>
+              <span>高级</span>
+              <ChevronUp size={14} />
+            </button>
+          </div>
+
+          {/* 右侧二级字列表 */}
+          <div className={styles.secondaryPanel}>
+            {activeTab === 'model' ? (
+              allModels.length === 0 ? (
+                <button className={styles.modelOption} onClick={onOpenSettings}>
+                  去配置模型...
+                </button>
+              ) : (
+                allModels.map((model) => {
+                  const isSelected = model.id === activeModelId;
                   return (
                     <button
                       key={`${model.providerId}-${model.id}`}
-                      className={`${styles.modelOption} ${isSelected ? styles.modelOptionActive : ''}`}
+                      className={styles.modelOption}
                       onClick={() => handleSelectModel(model.providerId, model.id)}
                     >
-                      <span className={styles.modelOptionName}>{model.name}</span>
+                      <span>{model.name}</span>
                       {isSelected && <Check size={14} className={styles.checkIcon} />}
                     </button>
                   );
-                })}
-              </div>
-            ))
-          )}
+                })
+              )
+            ) : (
+              ['轻度', '中度', '深度', '关闭'].map((level) => {
+                const isSelected = level === reasoningLevel;
+                return (
+                  <button
+                    key={level}
+                    className={styles.modelOption}
+                    onClick={() => handleSelectReasoning(level)}
+                  >
+                    <span>{level}</span>
+                    {isSelected && <Check size={14} className={styles.checkIcon} />}
+                  </button>
+                );
+              })
+            )}
+          </div>
         </div>
       )}
     </div>

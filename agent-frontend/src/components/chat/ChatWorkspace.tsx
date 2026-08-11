@@ -18,6 +18,7 @@ import {
   ThumbsUp,
   ThumbsDown,
   Maximize2,
+  Mic,
 } from 'lucide-react';
 import styles from './ChatWorkspace.module.css';
 
@@ -221,8 +222,6 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
         </div>
       )}
 
-
-
       {/* Bottom Floating Input Area */}
       <div className={styles.bottomContainer}>
         <div className={styles.inputBox}>
@@ -243,6 +242,9 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
 
             <div className={styles.toolbarRight}>
               <ModelSelector onOpenSettings={onOpenSettings} />
+              <button className={styles.micBtn} title="语音输入">
+                <Mic size={18} />
+              </button>
               <button
                 className={`${styles.sendCircleBtn} ${
                   inputPrompt.trim() ? styles.sendCircleBtnActive : ''
@@ -259,3 +261,4 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     </div>
   );
 };
+export default ChatWorkspace;
