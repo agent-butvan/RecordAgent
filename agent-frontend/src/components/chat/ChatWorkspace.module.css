@@ -316,3 +316,53 @@
   background-color: #f1f5f9;
   font-weight: 600;
 }
+
+/* 过程与耗时 Header */
+.processHeader {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: #6b7280;
+  cursor: pointer;
+  user-select: none;
+  margin-bottom: 4px;
+  transition: color 0.15s ease;
+}
+
+.processHeader:hover {
+  color: #374151;
+}
+
+.processDivider {
+  width: 100%;
+  height: 1px;
+  background-color: #f1f5f9;
+  margin-bottom: 12px;
+}
+
+/* 消息底部动作工具栏 */
+.messageActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+  padding-top: 4px;
+}
+
+.actionBtn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #9ca3af;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease;
+}
+
+.actionBtn:hover {
+  color: #4b5563;
+}
+

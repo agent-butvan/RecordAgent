@@ -122,13 +122,15 @@ export const MainLayout: React.FC<{
       createdAt: Date.now(),
     };
 
-    const assistantMsgId = String(Date.now() + 1);
+    const startTime = Date.now();
+    const assistantMsgId = String(startTime + 1);
     const assistantMsg: ChatMessage = {
       id: assistantMsgId,
       role: 'assistant',
       modelName: 'ButvanAgent',
       content: '',
-      createdAt: Date.now(),
+      createdAt: startTime,
+      startTime: startTime,
     };
 
     // 追加消息并自动将新会话首句设为 Title
@@ -178,6 +180,23 @@ export const MainLayout: React.FC<{
       },
       () => {
         console.log('Session 流式对话完成:', currentSessionId);
+        setSessions((prev) =>
+          prev.map((s) => {
+            if (s.id === currentSessionId) {
+              return {
+                ...s,
+                messages: s.messages.map((msg) => {
+                  if (msg.id === assistantMsgId) {
+                    const elapsed = Math.max(1, Math.floor((Date.now() - (msg.startTime || msg.createdAt)) / 1000));
+                    return { ...msg, elapsedTime: elapsed };
+                  }
+                  return msg;
+                }),
+              };
+            }
+            return s;
+          })
+        );
       },
       (err) => {
         console.error('Session 流式对话异常:', err);

@@ -13,6 +13,8 @@ export interface ChatMessage {
   reasoning?: string;
   modelName?: string;
   createdAt: number;
+  startTime?: number;
+  elapsedTime?: number;
   tools?: ToolExecution[];
 }
 

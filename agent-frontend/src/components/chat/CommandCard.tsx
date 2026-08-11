@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Terminal, ChevronDown, ChevronRight, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ChevronDown, ChevronRight, Check } from 'lucide-react';
 import styles from './CommandCard.module.css';
 
 export interface CommandCardProps {
@@ -15,66 +15,59 @@ export const CommandCard: React.FC<CommandCardProps> = ({
   status,
   output,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(true);
+  // 默认展开以符合截图中的展现效果
+  const [isExpanded, setIsExpanded] = useState<boolean>(true);
+
+  const displayCommand = command || '准备执行终端命令...';
+  const isRunning = status === 'running';
 
   return (
-    <div className={styles.cardContainer}>
-      <div className={styles.header}>
-        <div className={styles.windowButtons}>
-          <span className={`${styles.dot} ${styles.dotRed}`} />
-          <span className={`${styles.dot} ${styles.dotYellow}`} />
-          <span className={`${styles.dot} ${styles.dotGreen}`} />
-        </div>
-        <div className={styles.title}>
-          <Terminal size={14} />
-          <span>{toolName || 'Terminal Exec'}</span>
-        </div>
-        <div className={`${styles.statusTag} ${styles[status]}`}>
-          {status === 'running' && (
-            <>
-              <Loader2 size={12} className={styles.spinner} />
-              <span>执行中...</span>
-            </>
-          )}
-          {status === 'completed' && (
-            <>
-              <CheckCircle2 size={12} />
-              <span>完成</span>
-            </>
-          )}
-          {status === 'failed' && (
-            <>
-              <AlertCircle size={12} />
-              <span>失败</span>
-            </>
-          )}
-        </div>
-      </div>
-
-      <div className={styles.body}>
-        <div className={styles.commandLine}>
-          <span className={styles.prompt}>$</span>
-          <span className={styles.commandText}>{command || '准备执行终端命令...'}</span>
-        </div>
-
-        {output && (
+    <div className={styles.commandContainer}>
+      {/* 极简 Header 行 */}
+      <div
+        className={styles.commandHeader}
+        onClick={() => !isRunning && setIsExpanded(!isExpanded)}
+      >
+        <span className={styles.terminalIcon}>&gt;_</span>
+        
+        {isRunning ? (
+          <span className={`${styles.commandTitle} ${styles.runningTitle}`}>
+            正在运行 {displayCommand}
+          </span>
+        ) : (
           <>
-            <button
-              className={styles.toggleBtn}
-              onClick={() => setIsExpanded(!isExpanded)}
-            >
-              {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-              <span>{isExpanded ? '收起控制台输出' : '查看控制台输出'}</span>
-            </button>
-
-            {isExpanded && (
-              <pre className={styles.outputArea}>
-                <code>{output}</code>
-              </pre>
+            <span className={styles.commandTitle}>
+              {isExpanded ? (toolName === 'execute' ? '运行了命令' : `运行了 ${toolName}`) : `已运行 ${displayCommand}`}
+            </span>
+            {isExpanded ? (
+              <ChevronDown size={14} className={styles.arrowIcon} />
+            ) : (
+              <ChevronRight size={14} className={styles.arrowIcon} />
             )}
           </>
         )}
       </div>
+
+      {/* 展开后的极简浅灰代码卡片 */}
+      {isExpanded && !isRunning && (
+        <div className={styles.codeCard}>
+          <div className={styles.commandText}>
+            <span className={styles.promptSymbol}>$</span>
+            {displayCommand}
+          </div>
+
+          {output && (
+            <pre className={styles.outputArea}>
+              <code>{output}</code>
+            </pre>
+          )}
+
+          <div className={styles.cardFooter}>
+            <Check size={13} style={{ color: '#6b7280' }} />
+            <span className={styles.successText}>成功</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
