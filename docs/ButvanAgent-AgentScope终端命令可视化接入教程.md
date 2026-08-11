@@ -8,7 +8,7 @@
 3. **缺少交互式 Terminal UI 组件**：前端没有专门为终端指令设计的展示容器。
 
 **重构与接入核心目标**：
-1. **对接 AgentScope 2.0 事件流**：从 AgentScope 的 `ToolCallStartEvent` 中提取具体的工具调用参数（如 `command`），并在 `ToolResultTextDeltaEvent` / `ToolResultEvent` 中捕获终端输出内容。
+1. **对接 AgentScope 2.0 事件流**：AgentScope 2.0 中通过 `ToolCallStartEvent` 启动工具、`ToolCallDeltaEvent`（流式推送参数增量 `getDelta()`）拼接命令行参数、`ToolResultTextDeltaEvent` 提取终端输出内容。
 2. **标准化 SSE 传输 Payload**：将 `tool_call` 与 `tool_result` SSE 事件升级为携带结构化 JSON 数据（包含工具名、命令行、执行状态、日志输出）的事件流。
 3. **实现极致终端卡片（CommandCard）**：前端新增极具科技感、纯黑客 Terminal 风格的命令控制台卡片，支持实时显示命令行、状态指示灯（执行中/完成/错误）以及可展开/折叠的终端输出面板。
 
@@ -22,17 +22,17 @@
 ┌──────────────────────────────────────────────────────────────────────────────────┐
 │                            AgentScope 终端命令可视化流式链路                      │
 ├──────────────────────────────────────────────────────────────────────────────────┤
-│ 1. HarnessAgent 执行 Shell 指令 (如 custom_bash)                                  │
+│ 1. HarnessAgent 触发工具调用                                                     │
 │     ↓                                                                            │
-│ 2. 触发 AgentScope 事件: ToolCallStartEvent (包含 toolCallName & 入参 json)        │
+│ 2. AgentScope 事件流:                                                             │
+│    - ToolCallStartEvent (开始, 获 toolCallId & toolCallName)                       │
+│    - ToolCallDeltaEvent (流式参数增量, 累加 command JSON)                         │
+│    - ToolCallEndEvent (参数生成完成, 触发 tool_call SSE)                          │
+│    - ToolResultTextDeltaEvent (输出增量, 触发 tool_result SSE)                     │
 │     ↓                                                                            │
-│ 3. AgentService.mapEvent() 解析出 command 命令行, 包装为 AgentStreamEvent.ToolCall│
+│ 3. 通过 SSE 推送 JSON 数据到前端                                                  │
 │     ↓                                                                            │
-│ 4. 通过 SSE 推送 event: tool_call 到前端                                          │
-│     ↓                                                                            │
-│ 5. 工具执行完毕触发 ToolResultEvent, AgentService 转换为 tool_result 推送 SSE      │
-│     ↓                                                                            │
-│ 6. 前端 api.ts 接收事件 -> App.tsx 更新消息列表 -> CommandCard 渲染终端控制台      │
+│ 4. 前端 api.ts 接收事件 -> App.tsx 更新消息列表 -> CommandCard 渲染终端控制台      │
 └──────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -41,6 +41,7 @@
 - **`tool_call` 事件**：
   ```json
   {
+    "toolCallId": "call_123",
     "toolName": "custom_bash",
     "command": "pmset -g batt"
   }
@@ -49,6 +50,7 @@
 - **`tool_result` 事件**：
   ```json
   {
+    "toolCallId": "call_123",
     "toolName": "custom_bash",
     "result": "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=12345) 98%; discharging..."
   }
@@ -64,7 +66,7 @@
 Backend: agent-backend/server-agents/src/main/java/butvan/agent/agents/
 ├── agent/
 │   ├── AgentStreamEvent.java      // [修改] 升级 ToolCall 与 ToolResult 数据记录结构
-│   └── AgentService.java          // [修改] 捕获 ToolCallStartEvent 中的入参 command
+│   └── AgentService.java          // [修改] 结合 ToolCallDeltaEvent 累加解析 command 入参
 │
 Frontend: agent-frontend/src/
 ├── types/
@@ -83,7 +85,7 @@ Frontend: agent-frontend/src/
 
 ### 1.1 说明干什么的
 
-修改 `AgentStreamEvent.java`，为 `ToolCall` 事件记录增加 `command` 字段（保存具体执行的命令），为 `ToolResult` 增加 `result` 字段，并将其序列化为包含工具名的 Map 对象，方便控制层导出为标准 JSON 格式推送给前端。
+修改 `AgentStreamEvent.java`，为 `ToolCall` 事件记录增加 `toolCallId` 和 `command` 字段，为 `ToolResult` 增加 `toolCallId` 和 `result` 字段。
 
 ### 1.2 完整代码实现
 
@@ -173,12 +175,9 @@ public sealed interface AgentStreamEvent permits
     }
 
     /**
-     * 工具调用发起事件（包含工具名称及具体的命令行指令）
-     *
-     * @param toolName 工具名称
-     * @param command  调用的具体指令或参数
+     * 工具调用发起事件（包含 callId、工具名称及具体的命令行指令）
      */
-    record ToolCall(String toolName, String command) implements AgentStreamEvent {
+    record ToolCall(String toolCallId, String toolName, String command) implements AgentStreamEvent {
 
         @Override
         public String eventName() {
@@ -187,8 +186,9 @@ public sealed interface AgentStreamEvent permits
 
         @Override
         public Object payload() {
-            log.info("发起工具调用，工具: [{}], 指令: [{}]", toolName, command);
+            log.info("发起工具调用 callId: [{}], 工具: [{}], 指令: [{}]", toolCallId, toolName, command);
             return Map.of(
+                    "toolCallId", toolCallId != null ? toolCallId : "",
                     "toolName", toolName != null ? toolName : "",
                     "command", command != null ? command : ""
             );
@@ -197,11 +197,8 @@ public sealed interface AgentStreamEvent permits
 
     /**
      * 工具调用结果事件
-     *
-     * @param toolName 工具名称
-     * @param result   输出结果内容
      */
-    record ToolResult(String toolName, String result) implements AgentStreamEvent {
+    record ToolResult(String toolCallId, String toolName, String result) implements AgentStreamEvent {
 
         @Override
         public String eventName() {
@@ -210,8 +207,9 @@ public sealed interface AgentStreamEvent permits
 
         @Override
         public Object payload() {
-            log.info("工具 [{}] 调用完成，输出字节数: [{}]", toolName, result != null ? result.length() : 0);
+            log.info("工具 callId: [{}] [{}] 调用完成，输出字节数: [{}]", toolCallId, toolName, result != null ? result.length() : 0);
             return Map.of(
+                    "toolCallId", toolCallId != null ? toolCallId : "",
                     "toolName", toolName != null ? toolName : "",
                     "result", result != null ? result : ""
             );
@@ -222,25 +220,99 @@ public sealed interface AgentStreamEvent permits
 
 ---
 
-## 5. 第二步：改造后端 `AgentService.java` 解析命令入参
+## 5. 第二步：改造后端 `AgentService.java` 解析 AgentScope 流式 Event
 
 ### 2.1 说明干什么的
 
-修改 `AgentService.java` 中的 `mapEvent` 方法：
-1. 当捕获到 AgentScope 的 `ToolCallStartEvent` 时，通过其 `getCallArgs()` 提取 JSON 参数中的 `command`。
-2. 当捕获到 `ToolResultEvent` 或 `ToolResultTextDeltaEvent` 时，将其输出包裹为带有工具名的 `AgentStreamEvent.ToolResult`。
+AgentScope 2.0 使用 `ToolCallDeltaEvent` 流式传输工具参数 JSON。我们通过在事件循环中维护一个按 `toolCallId` 缓冲参数的 Map，在 `ToolCallDeltaEvent` 中追加 `getDelta()` 增量，并在 `ToolCallEndEvent` 触发时解析 `command` 字段，抛出完整的 `ToolCall` 事件。
 
 ### 2.2 完整代码实现
 
-在 `agent-backend/server-agents/src/main/java/butvan/agent/agents/agent/AgentService.java` 中替换 `mapEvent` 方法：
+在 `agent-backend/server-agents/src/main/java/butvan/agent/agents/agent/AgentService.java` 中更新事件循环处理：
 
 ```java
     /**
-     * 将 AgentScope 原始事件转换为应用流事件。
-     *
-     * @param event AgentScope 原始事件
-     * @return 应用流事件；不需要向前端输出的事件返回 {@code null}
+     * 消费 AgentScope 细粒度事件流，并转换为项目标准事件写入队列。
      */
+    private void produceEvents(AgentUserCall request, AgentStreamSession session) {
+        if (!modelHolder.isInitialized()) {
+            putEvent(session, new AgentStreamEvent.Failed("请先完成模型配置。"));
+            return;
+        }
+
+        String input = request != null && request.context() != null ? request.context() : "";
+        RuntimeContext context = createRuntimeContext(request);
+        boolean terminalEventSent = false;
+
+        // 用于按 toolCallId 收集 AgentScope 流式工具参数增量
+        Map<String, StringBuilder> toolArgsBuffer = new java.util.concurrent.ConcurrentHashMap<>();
+
+        try (HarnessAgent agent = createHarnessAgent(modelHolder.getModel())) {
+
+            UserMessage message = new UserMessage(input);
+
+            for (AgentEvent event : agent.streamEvents(message, context).toIterable()) {
+                if (session.isCancelled()) return;
+
+                // 1. 处理工具参数流式增量 ToolCallDeltaEvent
+                if (event instanceof ToolCallDeltaEvent deltaEvent) {
+                    toolArgsBuffer.computeIfAbsent(deltaEvent.getToolCallId(), k -> new StringBuilder())
+                            .append(deltaEvent.getDelta() != null ? deltaEvent.getDelta() : "");
+                    continue;
+                }
+
+                // 2. 工具参数流结束 ToolCallEndEvent：提取并发送 ToolCall
+                if (event instanceof ToolCallEndEvent endEvent) {
+                    String toolCallId = endEvent.getToolCallId();
+                    String toolName = endEvent.getToolCallName();
+                    StringBuilder rawArgs = toolArgsBuffer.remove(toolCallId);
+                    String command = parseCommandFromArgs(rawArgs != null ? rawArgs.toString() : "");
+
+                    AgentStreamEvent toolCallEvent = new AgentStreamEvent.ToolCall(toolCallId, toolName, command);
+                    if (!putEvent(session, toolCallEvent)) return;
+                    continue;
+                }
+
+                // 3. 其他常规事件映射 (TextDelta, ToolResultTextDeltaEvent, AgentEndEvent)
+                AgentStreamEvent mappedEvent = mapEvent(event);
+                if (mappedEvent == null) continue;
+                if (!putEvent(session, mappedEvent)) return;
+                if (mappedEvent.isTerminal()) {
+                    terminalEventSent = true;
+                    break;
+                }
+            }
+
+            if (!terminalEventSent && !session.isCancelled()) {
+                putEvent(session, new AgentStreamEvent.Completed());
+            }
+
+        } catch (Exception exception) {
+            if (session.isCancelled() || Thread.currentThread().isInterrupted()) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+            log.error("Agent 流处理失败: sessionId={}", context.getSessionId(), exception);
+            putEvent(session, new AgentStreamEvent.Failed("Agent 处理失败，请稍后重试。"));
+        }
+    }
+
+    /**
+     * 从模型生成的 JSON 参数字符串中提取 command 字段值
+     */
+    private String parseCommandFromArgs(String rawJson) {
+        if (rawJson == null || rawJson.isBlank()) return "";
+        try {
+            com.fasterxml.jackson.databind.JsonNode node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(rawJson);
+            if (node.has("command")) {
+                return node.get("command").asText();
+            }
+            return rawJson;
+        } catch (Exception e) {
+            return rawJson;
+        }
+    }
+
     private AgentStreamEvent mapEvent(AgentEvent event) {
         if (event instanceof TextBlockDeltaEvent textEvent) {
             return new AgentStreamEvent.TextDelta(textEvent.getDelta());
@@ -248,33 +320,13 @@ public sealed interface AgentStreamEvent permits
         if (event instanceof AgentEndEvent) {
             return new AgentStreamEvent.Completed();
         }
-
-        // 捕获工具发起事件并解析 command 参数
-        if (event instanceof ToolCallStartEvent toolCallStartEvent) {
-            String toolName = toolCallStartEvent.getToolCallName();
-            String command = "";
-            
-            // 尝试从 AgentScope ToolCallStartEvent 中提取参数字段
-            if (toolCallStartEvent.getCallArgs() != null) {
-                Object cmdObj = toolCallStartEvent.getCallArgs().get("command");
-                if (cmdObj != null) {
-                    command = cmdObj.toString();
-                } else {
-                    command = toolCallStartEvent.getCallArgs().toString();
-                }
-            }
-            
-            return new AgentStreamEvent.ToolCall(toolName, command);
-        }
-
-        // 捕获工具输出结果事件
         if (event instanceof ToolResultTextDeltaEvent toolResultTextDeltaEvent) {
             return new AgentStreamEvent.ToolResult(
+                    toolResultTextDeltaEvent.getToolCallId(),
                     toolResultTextDeltaEvent.getToolCallName(),
                     toolResultTextDeltaEvent.getDelta()
             );
         }
-
         return null;
     }
 ```
@@ -285,19 +337,21 @@ public sealed interface AgentStreamEvent permits
 
 ### 3.1 说明干什么的
 
-修改前端 `api.ts` 的 `streamAgentChat` 函数，让其支持回调 `onToolCall` 和 `onToolResult`，并在接收到对应 SSE 事件时解析 JSON 内容。
+修改前端 `api.ts` 的 `streamAgentChat` 函数，增加 `toolCallId` 传输支持。
 
 ### 3.2 完整代码实现
 
-在 `agent-frontend/src/services/api.ts` 中替换 `streamAgentChat` 的实现：
+在 `agent-frontend/src/services/api.ts` 中更新代码：
 
 ```typescript
 export interface ToolCallPayload {
+  toolCallId?: string;
   toolName: string;
   command: string;
 }
 
 export interface ToolResultPayload {
+  toolCallId?: string;
   toolName: string;
   result: string;
 }
@@ -399,268 +453,17 @@ export async function streamAgentChat(
 
 ---
 
-## 7. 第四步：新建前端终端控制台组件 `CommandCard`
+## 7. 第四步：前端终端控制台组件 `CommandCard`
 
-### 4.1 说明干什么的
-
-创建专用的终端卡片 UI 组件，具有以下特点：
-- **Terminal Header**：带有标准的 macOS 三色控制点（红黄绿）和 `bash` 提示。
-- **Command Line**：动态渲染带高亮的 `$ bash command` 指令。
-- **Status Indicator**：状态包括 `running`（脉冲转圈动画）、`completed`（绿色打勾）、`failed`（红色交叉）。
-- **Terminal Output**：折叠面板，点击可展开查看实时输出的控制台控制文本。
-
-### 4.2 完整代码实现与 CSS
-
+与先前设计一致：
 1. **新建组件样式**：`agent-frontend/src/components/chat/CommandCard.module.css`
-
-```css
-.cardContainer {
-  background-color: #0d1117;
-  border: 1px solid #30363d;
-  border-radius: 8px;
-  margin: 10px 0;
-  overflow: hidden;
-  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-  max-width: 100%;
-}
-
-.header {
-  background-color: #161b22;
-  padding: 8px 12px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid #21262d;
-  user-select: none;
-}
-
-.windowButtons {
-  display: flex;
-  gap: 6px;
-}
-
-.dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-
-.dotRed { background-color: #ff5f56; }
-.dotYellow { background-color: #ffbd2e; }
-.dotGreen { background-color: #27c93f; }
-
-.title {
-  color: #8b949e;
-  font-size: 12px;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.statusTag {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 12px;
-}
-
-.running {
-  background-color: rgba(56, 139, 253, 0.15);
-  color: #58a6ff;
-  border: 1px solid rgba(56, 139, 253, 0.3);
-}
-
-.completed {
-  background-color: rgba(46, 160, 67, 0.15);
-  color: #3fb950;
-  border: 1px solid rgba(46, 160, 67, 0.3);
-}
-
-.body {
-  padding: 12px;
-  color: #c9d1d9;
-  font-size: 13px;
-}
-
-.commandLine {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  word-break: break-all;
-}
-
-.prompt {
-  color: #2f81f7;
-  font-weight: bold;
-}
-
-.commandText {
-  color: #79c0ff;
-  font-weight: 600;
-}
-
-.toggleBtn {
-  margin-top: 8px;
-  background: none;
-  border: none;
-  color: #8b949e;
-  font-size: 11px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 0;
-}
-
-.toggleBtn:hover {
-  color: #c9d1d9;
-}
-
-.outputArea {
-  margin-top: 8px;
-  background-color: #010409;
-  border: 1px solid #21262d;
-  border-radius: 6px;
-  padding: 10px;
-  max-height: 240px;
-  overflow-y: auto;
-  font-size: 12px;
-  line-height: 1.4;
-  color: #7d8590;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-```
-
 2. **新建组件实现**：`agent-frontend/src/components/chat/CommandCard.tsx`
-
-```tsx
-import React, { useState } from 'react';
-import { Terminal, ChevronDown, ChevronRight, Loader2, CheckCircle2 } from 'lucide-react';
-import styles from './CommandCard.module.css';
-
-export interface CommandCardProps {
-  toolName: string;
-  command: string;
-  status: 'running' | 'completed' | 'failed';
-  output?: string;
-}
-
-export const CommandCard: React.FC<CommandCardProps> = ({
-  toolName,
-  command,
-  status,
-  output,
-}) => {
-  const [isExpanded, setIsExpanded] = useState(true);
-
-  return (
-    <div className={styles.cardContainer}>
-      <div className={styles.header}>
-        <div className={styles.windowButtons}>
-          <span className={`${styles.dot} ${styles.dotRed}`} />
-          <span className={`${styles.dot} ${styles.dotYellow}`} />
-          <span className={`${styles.dot} ${styles.dotGreen}`} />
-        </div>
-        <div className={styles.title}>
-          <Terminal size={14} />
-          <span>{toolName || 'Terminal Exec'}</span>
-        </div>
-        <div className={`${styles.statusTag} ${styles[status]}`}>
-          {status === 'running' && (
-            <>
-              <Loader2 size={12} className="animate-spin" />
-              <span>执行中...</span>
-            </>
-          )}
-          {status === 'completed' && (
-            <>
-              <CheckCircle2 size={12} />
-              <span>完成</span>
-            </>
-          )}
-        </div>
-      </div>
-
-      <div className={styles.body}>
-        <div className={styles.commandLine}>
-          <span className={styles.prompt}>$</span>
-          <span className={styles.commandText}>{command || '执行本地命令...'}</span>
-        </div>
-
-        {output && (
-          <>
-            <button
-              className={styles.toggleBtn}
-              onClick={() => setIsExpanded(!isExpanded)}
-            >
-              {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-              <span>{isExpanded ? '收起控制台输出' : '查看控制台输出'}</span>
-            </button>
-
-            {isExpanded && (
-              <pre className={styles.outputArea}>
-                <code>{output}</code>
-              </pre>
-            )}
-          </>
-        )}
-      </div>
-    </div>
-  );
-};
-```
 
 ---
 
 ## 8. 第五步：在 `App.tsx` 中挂载终端卡片渲染
 
-### 5.1 说明干什么的
-
-修改 `App.tsx` 的消息处理逻辑，当触发 `onToolCall` 时向当前 Agent 消息中压入一个 Tool 命令节点，当触发 `onToolResult` 时更对应 Tool 命令节点的状态与日志。
-
-### 5.2 完整代码集成片段
-
-在 `agent-frontend/src/App.tsx` 的消息流处理处进行更新：
-
-```tsx
-// 1. 定义扩展消息项接口
-interface ToolExecution {
-  id: string;
-  toolName: string;
-  command: string;
-  status: 'running' | 'completed' | 'failed';
-  output?: string;
-}
-
-// 2. 在 App 对话调用流中传入 onToolCall 与 onToolResult
-await streamAgentChat(
-  { sessionId, context: inputPrompt },
-  (textDelta) => {
-    // 正常文本渲染逻辑
-    setMessages((prev) => updateLastAssistantMessageText(prev, textDelta));
-  },
-  () => {
-    setIsLoading(false);
-  },
-  (error) => {
-    console.error('Chat error:', error);
-    setIsLoading(false);
-  },
-  (toolCall) => {
-    // 捕获到工具调用，向当前消息附加命令卡片数据
-    setMessages((prev) => appendToolCallToLastMessage(prev, toolCall));
-  },
-  (toolResult) => {
-    // 捕获到工具输出，更新命令卡片状态为 completed 并写入 output
-    setMessages((prev) => updateToolResultInLastMessage(prev, toolResult));
-  }
-);
-```
+按 `toolCallId` 将 `toolCall` 附加到对话消息中，当收到 `toolResult` 时更新对应 ID 卡片状态。
 
 ---
 
@@ -668,19 +471,8 @@ await streamAgentChat(
 
 | 次序 | 修改内容 | 对应文件路径 | 成功验证标志 |
 | --- | --- | --- | --- |
-| 1 | 升级后端事件结构 | `AgentStreamEvent.java` | `ToolCall` 和 `ToolResult` 支持携带 Map 格式 payload。 |
-| 2 | 解析 AgentScope 入参 | `AgentService.java` | 控制台日志打印出 `发起工具调用，工具: [custom_bash], 指令: [pmset -g batt]`。 |
-| 3 | 前端 SSE 协议解析 | `src/services/api.ts` | 浏览器 Console 能够精准收到 `tool_call` JSON 对象。 |
-| 4 | 编写 Terminal 卡片组件 | `src/components/chat/CommandCard.tsx` | 独创 Terminal macOS 风格控制台样式呈现。 |
-| 5 | 集成到 UI 消息面板 | `src/App.tsx` | 提问“查看系统电池”时，前台跳出极具视觉冲击力的 `$ bash pmset -g batt` 卡片并实时显示结果！ |
-
----
-
-## 10. 最终代码职责表
-
-| 模块/文件 | 归属 | 核心职责 |
-| --- | --- | --- |
-| `AgentStreamEvent.java` | 后端 | 定义带命令行与日志 Payload 的 SSE 传输标准。 |
-| `AgentService.java` | 后端 | 拦截 AgentScope `ToolCallStartEvent` 提取参数，抛出标准事件。 |
-| `api.ts` | 前端 | SSE 细粒度解析器，分派 `text` / `tool_call` / `tool_result` 给 UI。 |
-| `CommandCard.tsx` | 前端 | macOS Terminal 极简黑客风格卡片，展示状态动画与交互式控制台输出。 |
+| 1 | 升级后端事件结构 | `AgentStreamEvent.java` | `ToolCall` 和 `ToolResult` 包含 `toolCallId` 字段。 |
+| 2 | 解析 AgentScope 事件流 | `AgentService.java` | 利用 `ToolCallDeltaEvent` 收集参数，在 `ToolCallEndEvent` 完美打印 `$ command`。 |
+| 3 | 前端 SSE 协议解析 | `src/services/api.ts` | 浏览器 Console 精准收到带有 `command` 的 `tool_call` 数据。 |
+| 4 | 编写 Terminal 卡片组件 | `src/components/chat/CommandCard.tsx` | 渲染 macOS Terminal 风格容器。 |
+| 5 | 集成到 UI 消息面板 | `src/App.tsx` | 提问“查看系统电池”时，界面实时展示 Terminal 指令卡片！ |
