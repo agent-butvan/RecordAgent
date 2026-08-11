@@ -200,6 +200,78 @@ export const MainLayout: React.FC<{
             return s;
           })
         );
+      },
+      (toolCallPayload) => {
+        setSessions((prev) =>
+          prev.map((s) => {
+            if (s.id === currentSessionId) {
+              return {
+                ...s,
+                messages: s.messages.map((msg) => {
+                  if (msg.id === assistantMsgId) {
+                    const tools = msg.tools ? [...msg.tools] : [];
+                    const targetId = toolCallPayload.toolCallId || 'tool_' + Date.now();
+                    const existingIndex = tools.findIndex((t) => t.toolCallId === targetId);
+
+                    if (existingIndex >= 0) {
+                      tools[existingIndex] = {
+                        ...tools[existingIndex],
+                        toolName: toolCallPayload.toolName || tools[existingIndex].toolName,
+                        command: toolCallPayload.command || tools[existingIndex].command,
+                      };
+                    } else {
+                      tools.push({
+                        toolCallId: targetId,
+                        toolName: toolCallPayload.toolName || 'custom_bash',
+                        command: toolCallPayload.command || '',
+                        status: 'running',
+                      });
+                    }
+                    return { ...msg, tools };
+                  }
+                  return msg;
+                }),
+              };
+            }
+            return s;
+          })
+        );
+      },
+      (toolResultPayload) => {
+        setSessions((prev) =>
+          prev.map((s) => {
+            if (s.id === currentSessionId) {
+              return {
+                ...s,
+                messages: s.messages.map((msg) => {
+                  if (msg.id === assistantMsgId) {
+                    const tools = msg.tools ? [...msg.tools] : [];
+                    const targetId = toolResultPayload.toolCallId;
+
+                    let targetIndex = -1;
+                    if (targetId) {
+                      targetIndex = tools.findIndex((t) => t.toolCallId === targetId);
+                    }
+                    if (targetIndex === -1) {
+                      targetIndex = tools.findLastIndex((t) => t.status === 'running');
+                    }
+
+                    if (targetIndex >= 0) {
+                      tools[targetIndex] = {
+                        ...tools[targetIndex],
+                        output: (tools[targetIndex].output || '') + (toolResultPayload.result || ''),
+                        status: 'completed',
+                      };
+                    }
+                    return { ...msg, tools };
+                  }
+                  return msg;
+                }),
+              };
+            }
+            return s;
+          })
+        );
       }
     );
   };

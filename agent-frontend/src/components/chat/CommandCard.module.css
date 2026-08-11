@@ -1,0 +1,147 @@
+.cardContainer {
+  background-color: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  margin: 10px 0;
+  overflow: hidden;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, Monaco, monospace;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  max-width: 100%;
+}
+
+.header {
+  background-color: #161b22;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #21262d;
+  user-select: none;
+}
+
+.windowButtons {
+  display: flex;
+  gap: 6px;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dotRed {
+  background-color: #ff5f56;
+}
+.dotYellow {
+  background-color: #ffbd2e;
+}
+.dotGreen {
+  background-color: #27c93f;
+}
+
+.title {
+  color: #8b949e;
+  font-size: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.statusTag {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.running {
+  background-color: rgba(56, 139, 253, 0.15);
+  color: #58a6ff;
+  border: 1px solid rgba(56, 139, 253, 0.3);
+}
+
+.completed {
+  background-color: rgba(46, 160, 67, 0.15);
+  color: #3fb950;
+  border: 1px solid rgba(46, 160, 67, 0.3);
+}
+
+.failed {
+  background-color: rgba(248, 81, 73, 0.15);
+  color: #f85149;
+  border: 1px solid rgba(248, 81, 73, 0.3);
+}
+
+.body {
+  padding: 12px;
+  color: #c9d1d9;
+  font-size: 13px;
+}
+
+.commandLine {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  word-break: break-all;
+}
+
+.prompt {
+  color: #2f81f7;
+  font-weight: bold;
+}
+
+.commandText {
+  color: #79c0ff;
+  font-weight: 600;
+}
+
+.toggleBtn {
+  margin-top: 8px;
+  background: none;
+  border: none;
+  color: #8b949e;
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+}
+
+.toggleBtn:hover {
+  color: #c9d1d9;
+}
+
+.outputArea {
+  margin-top: 8px;
+  background-color: #010409;
+  border: 1px solid #21262d;
+  border-radius: 6px;
+  padding: 10px;
+  max-height: 240px;
+  overflow-y: auto;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #7d8590;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin-bottom: 0;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}

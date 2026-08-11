@@ -110,6 +110,18 @@ export async function saveModelConfig(params: {
   }
 }
 
+export interface ToolCallPayload {
+  toolCallId?: string;
+  toolName?: string;
+  command?: string;
+}
+
+export interface ToolResultPayload {
+  toolCallId?: string;
+  toolName?: string;
+  result?: string;
+}
+
 /**
  * Agent 对话流式 SSE 交互函数
  * 利用 fetch + ReadableStream 实时解析后端推流
@@ -118,7 +130,9 @@ export async function streamAgentChat(
   params: { sessionId: string; context: string },
   onChunk: (text: string) => void,
   onComplete?: () => void,
-  onError?: (error: Error) => void
+  onError?: (error: Error) => void,
+  onToolCall?: (payload: ToolCallPayload) => void,
+  onToolResult?: (payload: ToolResultPayload) => void
 ): Promise<void> {
   try {
     const response = await fetch(`${API_BASE_URL}/agent/chat/stream`, {
@@ -155,12 +169,26 @@ export async function streamAgentChat(
         }
       }
 
-      const data = dataLines.join('\n');
+      const dataStr = dataLines.join('\n');
       if (eventName === 'text' || eventName === 'message') {
-        if (data) onChunk(data);
+        if (dataStr) onChunk(dataStr);
+      } else if (eventName === 'tool_call') {
+        try {
+          const payload: ToolCallPayload = JSON.parse(dataStr);
+          onToolCall?.(payload);
+        } catch {
+          onToolCall?.({ toolName: 'tool', command: dataStr });
+        }
+      } else if (eventName === 'tool_result') {
+        try {
+          const payload: ToolResultPayload = JSON.parse(dataStr);
+          onToolResult?.(payload);
+        } catch {
+          onToolResult?.({ toolName: 'tool', result: dataStr });
+        }
       } else if (eventName === 'error') {
         streamFinished = true;
-        onError?.(new Error(data || 'Agent 流式处理失败'));
+        onError?.(new Error(dataStr || 'Agent 流式处理失败'));
       } else if (eventName === 'done') {
         streamFinished = true;
         onComplete?.();

@@ -1,3 +1,11 @@
+export interface ToolExecution {
+  toolCallId: string;
+  toolName: string;
+  command: string;
+  status: 'running' | 'completed' | 'failed';
+  output?: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -5,6 +13,7 @@ export interface ChatMessage {
   reasoning?: string;
   modelName?: string;
   createdAt: number;
+  tools?: ToolExecution[];
 }
 
 export interface Project {

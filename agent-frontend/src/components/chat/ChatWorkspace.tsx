@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import { ModelSelector } from '../model/ModelSelector';
 import type { ChatMessage } from '../../types/chat';
 import { Card } from '../common/Card';
+import { CommandCard } from './CommandCard';
 import {
   Plus,
   ArrowUp,
@@ -118,11 +119,29 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
                       <strong>思考过程:</strong> {msg.reasoning}
                     </div>
                   )}
+
+                  {/* 终端工具调用卡片列表 */}
+                  {msg.tools && msg.tools.length > 0 && (
+                    <div style={{ margin: '8px 0' }}>
+                      {msg.tools.map((tool) => (
+                        <CommandCard
+                          key={tool.toolCallId || tool.command || Math.random().toString()}
+                          toolName={tool.toolName}
+                          command={tool.command}
+                          status={tool.status}
+                          output={tool.output}
+                        />
+                      ))}
+                    </div>
+                  )}
+
                   <div className={styles.markdownBody}>
                     {msg.content ? (
                       <ReactMarkdown>{msg.content}</ReactMarkdown>
                     ) : (
-                      <span style={{ opacity: 0.5 }}>正在思考并生成回答...</span>
+                      (!msg.tools || msg.tools.length === 0) && (
+                        <span style={{ opacity: 0.5 }}>正在思考并生成回答...</span>
+                      )
                     )}
                   </div>
                 </div>
@@ -131,6 +150,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
           ))}
         </div>
       )}
+
 
       {/* Bottom Floating Input Area */}
       <div className={styles.bottomContainer}>
