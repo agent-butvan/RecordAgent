@@ -3,6 +3,8 @@ package butvan.agent.agents.agent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Map;
+
 /**
  * Agent 对话流在业务层和网络层之间传递的标准事件。
  *
@@ -99,9 +101,11 @@ public sealed interface AgentStreamEvent permits
 
     /**
      * 工具调用发起事件
+     * @param toolCallId
      * @param toolName
+     * @param command
      */
-    record ToolCall(String toolName) implements AgentStreamEvent{
+    record ToolCall(String toolCallId,String toolName, String command ) implements AgentStreamEvent{
 
         @Override
         public String eventName() {
@@ -110,16 +114,22 @@ public sealed interface AgentStreamEvent permits
 
         @Override
         public Object payload() {
-            log.info("发起工具调用，工具名称：[ {} ]",toolName);
-            return toolName;
+            log.info("发起工具调用 callId: [{}], 工具: [{}], 指令: [{}]", toolCallId, toolName, command);
+            return Map.of(
+                    "toolCallId", toolCallId != null ? toolCallId : "",
+                    "toolName", toolName != null ? toolName : "",
+                    "command", command != null ? command : ""
+            );
         }
     }
 
     /**
      * 工具调用结果
-     * @param delta
+     * @param toolCallId
+     * @param toolName
+     * @param result
      */
-    record ToolResult(String delta) implements AgentStreamEvent {
+    record ToolResult(String toolCallId, String toolName, String result) implements AgentStreamEvent {
 
         @Override
         public String eventName() {
@@ -128,7 +138,12 @@ public sealed interface AgentStreamEvent permits
 
         @Override
         public Object payload() {
-            return delta;
+            log.info("工具 callId: [{}] [{}] 调用完成，输出字节数: [{}]", toolCallId, toolName, result != null ? result.length() : 0);
+            return Map.of(
+                    "toolCallId", toolCallId != null ? toolCallId : "",
+                    "toolName", toolName != null ? toolName : "",
+                    "result", result != null ? result : ""
+            );
         }
     }
 }
