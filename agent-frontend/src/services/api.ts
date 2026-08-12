@@ -133,7 +133,7 @@ export interface ToolResultPayload {
  * 利用 fetch + ReadableStream 实时解析后端推流
  */
 export async function streamAgentChat(
-  params: { sessionId: string; content: string },
+  params: { sessionId: string; content: string; context?: string },
   onChunk: (text: string) => void,
   onComplete?: () => void,
   onError?: (error: Error) => void,
@@ -141,12 +141,17 @@ export async function streamAgentChat(
   onToolResult?: (payload: ToolResultPayload) => void
 ): Promise<void> {
   try {
+    const payloadContent = params.content || params.context || '';
     const response = await fetch(`${API_BASE_URL}/agent/chat/stream`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(params),
+      body: JSON.stringify({
+        sessionId: params.sessionId,
+        context: payloadContent,
+        content: payloadContent,
+      }),
     });
 
     if (!response.ok) {
