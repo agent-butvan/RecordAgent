@@ -9,10 +9,12 @@ import {
   fetchSupportedVendors,
   streamAgentChat,
   fetchSessions,
+  fetchSessionDetail,
   createSessionApi,
+  updateSessionTitleApi,
   deleteSessionApi,
 } from './services/api';
-import type { ChatSession, ChatMessage, Project } from './types/chat';
+import type { ChatSession, ChatMessage, Project, SessionSummaryDto } from './types/chat';
 
 export const MainLayout: React.FC<{
   onOpenSettings: () => void;
@@ -23,54 +25,124 @@ export const MainLayout: React.FC<{
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string>('');
 
-  // 初始化从后端 API 获取会话列表数据
+  // 1. 初始化从后端 API 获取会话列表数据
   useEffect(() => {
-    fetchSessions().then((data) => {
+    fetchSessions().then(async (data: SessionSummaryDto[]) => {
       if (Array.isArray(data) && data.length > 0) {
-        setSessions(data);
-        setActiveSessionId(data[0].id);
+        const initialSessions: ChatSession[] = data.map((dto) => ({
+          id: dto.id,
+          kind: dto.kind,
+          title: dto.title,
+          lastMessagePreview: dto.lastMessagePreview,
+          createdAt: new Date(dto.createdAt).getTime() || Date.now(),
+          updatedAt: new Date(dto.updatedAt).getTime() || Date.now(),
+          messages: [],
+          isLoaded: false,
+        }));
+        setSessions(initialSessions);
+        setActiveSessionId(initialSessions[0].id);
+      } else {
+        // 若无会话，由后端 API 创建一个初始化会话
+        const res = await createSessionApi({ kind: 'GENERAL', title: '新对话' });
+        if (res.success && res.data) {
+          const created: ChatSession = {
+            id: res.data.id,
+            kind: res.data.kind,
+            title: res.data.title,
+            lastMessagePreview: res.data.lastMessagePreview,
+            createdAt: new Date(res.data.createdAt).getTime() || Date.now(),
+            updatedAt: new Date(res.data.updatedAt).getTime() || Date.now(),
+            messages: [],
+            isLoaded: true,
+          };
+          setSessions([created]);
+          setActiveSessionId(created.id);
+        }
       }
     });
   }, []);
 
+  // 2. 切换当前激活会话时，若消息未加载，从后端 fetchSessionDetail 获取完整聊天记录
+  useEffect(() => {
+    if (!activeSessionId) return;
+
+    const currentSession = sessions.find((s) => s.id === activeSessionId);
+    if (currentSession && !currentSession.isLoaded) {
+      fetchSessionDetail(activeSessionId).then((detail) => {
+        if (detail) {
+          const loadedMessages: ChatMessage[] = detail.messages.map((m) => ({
+            id: m.id,
+            turnId: m.turnId,
+            role: m.role.toLowerCase() === 'user' ? 'user' : 'assistant',
+            content: m.content,
+            createdAt: new Date(m.createdAt).getTime() || Date.now(),
+            status: m.status,
+          }));
+
+          setSessions((prev) =>
+            prev.map((s) =>
+              s.id === activeSessionId
+                ? {
+                    ...s,
+                    title: detail.summary.title,
+                    lastMessagePreview: detail.summary.lastMessagePreview,
+                    messages: loadedMessages,
+                    isLoaded: true,
+                  }
+                : s
+            )
+          );
+        }
+      });
+    }
+  }, [activeSessionId, sessions]);
+
   const activeSession = sessions.find((s) => s.id === activeSessionId);
   const activeMessages = activeSession?.messages || [];
 
-  // 新建普通独立会话
-  const handleNewGeneralChat = () => {
-    const newSessionId = String(Date.now());
-    const newSession: ChatSession = {
-      id: newSessionId,
-      title: '新对话',
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      messages: [],
-    };
-    setSessions((prev) => [newSession, ...prev]);
-    setActiveSessionId(newSessionId);
-    createSessionApi(newSession);
+  // 3. 新建普通独立会话（UUID 由后端统一生成）
+  const handleNewGeneralChat = async () => {
+    const res = await createSessionApi({ kind: 'GENERAL', title: '新对话' });
+    if (res.success && res.data) {
+      const newSession: ChatSession = {
+        id: res.data.id,
+        kind: res.data.kind,
+        title: res.data.title,
+        lastMessagePreview: res.data.lastMessagePreview,
+        createdAt: new Date(res.data.createdAt).getTime() || Date.now(),
+        updatedAt: new Date(res.data.updatedAt).getTime() || Date.now(),
+        messages: [],
+        isLoaded: true,
+      };
+      setSessions((prev) => [newSession, ...prev]);
+      setActiveSessionId(newSession.id);
+    }
   };
 
-  // 新建指定项目绑定的会话
-  const handleNewProjectChat = (projectId: string) => {
-    const newSessionId = String(Date.now());
+  // 4. 新建项目绑定会话（项目绑定目前采用 GENERAL 会话挂载）
+  const handleNewProjectChat = async (projectId: string) => {
     const targetProject = projects.find((p) => p.id === projectId);
     const titleName = targetProject ? `${targetProject.name} 会话` : '项目会话';
 
-    const newSession: ChatSession = {
-      id: newSessionId,
-      title: titleName,
-      projectId,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      messages: [],
-    };
-    setSessions((prev) => [newSession, ...prev]);
-    setActiveSessionId(newSessionId);
-    createSessionApi(newSession);
+    const res = await createSessionApi({ kind: 'GENERAL', title: titleName });
+    if (res.success && res.data) {
+      const newSession: ChatSession = {
+        id: res.data.id,
+        kind: res.data.kind,
+        title: res.data.title,
+        lastMessagePreview: res.data.lastMessagePreview,
+        projectId,
+        createdAt: new Date(res.data.createdAt).getTime() || Date.now(),
+        updatedAt: new Date(res.data.updatedAt).getTime() || Date.now(),
+        messages: [],
+        isLoaded: true,
+      };
+      setSessions((prev) => [newSession, ...prev]);
+      setActiveSessionId(newSession.id);
+    }
   };
 
-  // 导入本地项目
+  // 5. 导入本地项目
   const handleImportProject = (name: string, path: string) => {
     const newProjectId = String(Date.now());
     const newProject: Project = {
@@ -80,39 +152,58 @@ export const MainLayout: React.FC<{
       createdAt: Date.now(),
     };
     setProjects((prev) => [...prev, newProject]);
-    // 导入后自动为此项目创建一个初始化会话
     handleNewProjectChat(newProjectId);
   };
 
-  const handleDeleteSession = (id: string, e: React.MouseEvent) => {
+  // 6. 删除会话
+  const handleDeleteSession = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setSessions((prev) => {
-      const updated = prev.filter((s) => s.id !== id);
-      if (activeSessionId === id) {
-        setActiveSessionId(updated[0]?.id || '');
-      }
-      return updated;
-    });
-    deleteSessionApi(id);
+    const res = await deleteSessionApi(id);
+    if (res.success) {
+      setSessions((prev) => {
+        const updated = prev.filter((s) => s.id !== id);
+        if (activeSessionId === id) {
+          const nextId = updated[0]?.id || '';
+          setActiveSessionId(nextId);
+        }
+        return updated;
+      });
+    }
   };
 
-  const handleSendMessage = (prompt: string) => {
+  // 7. 修改会话标题
+  const handleUpdateSessionTitle = async (id: string, newTitle: string) => {
+    setSessions((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, title: newTitle } : s))
+    );
+    await updateSessionTitleApi(id, newTitle);
+  };
+
+  // 8. 发送消息发起 SSE 流
+  const handleSendMessage = async (prompt: string) => {
     let currentSessionId = activeSessionId;
     let targetSession = sessions.find((s) => s.id === currentSessionId);
 
-    // 若无任何激活会话，自动新建普通会话
+    // 若无激活会话，首先调用后端生成新会话 ID
     if (!targetSession) {
-      currentSessionId = String(Date.now());
-      const newSession: ChatSession = {
-        id: currentSessionId,
-        title: prompt.length > 18 ? prompt.substring(0, 18) + '...' : prompt,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        messages: [],
-      };
-      setSessions((prev) => [newSession, ...prev]);
-      setActiveSessionId(currentSessionId);
-      targetSession = newSession;
+      const res = await createSessionApi({ kind: 'GENERAL', title: prompt.substring(0, 18) });
+      if (res.success && res.data) {
+        currentSessionId = res.data.id;
+        targetSession = {
+          id: res.data.id,
+          kind: res.data.kind,
+          title: res.data.title,
+          lastMessagePreview: res.data.lastMessagePreview,
+          createdAt: new Date(res.data.createdAt).getTime() || Date.now(),
+          updatedAt: new Date(res.data.updatedAt).getTime() || Date.now(),
+          messages: [],
+          isLoaded: true,
+        };
+        setSessions((prev) => [targetSession!, ...prev]);
+        setActiveSessionId(currentSessionId);
+      } else {
+        return;
+      }
     }
 
     const userMsg: ChatMessage = {
@@ -133,20 +224,12 @@ export const MainLayout: React.FC<{
       startTime: startTime,
     };
 
-    // 追加消息并自动将新会话首句设为 Title
+    // 本地即时追加 UI 消息
     setSessions((prev) =>
       prev.map((s) => {
         if (s.id === currentSessionId) {
-          const isFirstMessage = s.messages.length === 0;
-          const newTitle = isFirstMessage
-            ? prompt.length > 18
-              ? prompt.substring(0, 18) + '...'
-              : prompt
-            : s.title;
-
           return {
             ...s,
-            title: newTitle,
             updatedAt: Date.now(),
             messages: [...s.messages, userMsg, assistantMsg],
           };
@@ -155,11 +238,11 @@ export const MainLayout: React.FC<{
       })
     );
 
-    // 发起 SSE 流式调用
+    // 发起 SSE 流式调用，发送 content 字段
     streamAgentChat(
       {
         sessionId: currentSessionId,
-        context: prompt,
+        content: prompt,
       },
       (chunkText) => {
         setSessions((prev) =>
@@ -179,7 +262,7 @@ export const MainLayout: React.FC<{
         );
       },
       () => {
-        console.log('Session 流式对话完成:', currentSessionId);
+        // 流式对话完成后同步耗时并重新刷新后端的最新详情
         setSessions((prev) =>
           prev.map((s) => {
             if (s.id === currentSessionId) {
@@ -187,7 +270,10 @@ export const MainLayout: React.FC<{
                 ...s,
                 messages: s.messages.map((msg) => {
                   if (msg.id === assistantMsgId) {
-                    const elapsed = Math.max(1, Math.floor((Date.now() - (msg.startTime || msg.createdAt)) / 1000));
+                    const elapsed = Math.max(
+                      1,
+                      Math.floor((Date.now() - (msg.startTime || msg.createdAt)) / 1000)
+                    );
                     return { ...msg, elapsedTime: elapsed };
                   }
                   return msg;
@@ -197,6 +283,23 @@ export const MainLayout: React.FC<{
             return s;
           })
         );
+
+        // 从后端重新同步最新的消息和摘要（包含更新的目录册 title / preview）
+        fetchSessionDetail(currentSessionId).then((detail) => {
+          if (detail) {
+            setSessions((prev) =>
+              prev.map((s) =>
+                s.id === currentSessionId
+                  ? {
+                      ...s,
+                      title: detail.summary.title,
+                      lastMessagePreview: detail.summary.lastMessagePreview,
+                    }
+                  : s
+              )
+            );
+          }
+        });
       },
       (err) => {
         console.error('Session 流式对话异常:', err);
@@ -210,7 +313,7 @@ export const MainLayout: React.FC<{
                     ? {
                         ...msg,
                         content:
-                          '连接 Agent 对话服务失败或发生错误，请检查后端网络与 API Key 配置。',
+                          '连接 Agent 对话服务失败或发生错误，请检查后端服务状态与 API Key 配置。',
                       }
                     : msg
                 ),
@@ -310,6 +413,7 @@ export const MainLayout: React.FC<{
             onNewProjectChat={handleNewProjectChat}
             onImportProject={handleImportProject}
             onDeleteSession={handleDeleteSession}
+            onUpdateSessionTitle={handleUpdateSessionTitle}
             onOpenSettings={() => setIsSettingsOpen(true)}
           />
           <ChatWorkspace

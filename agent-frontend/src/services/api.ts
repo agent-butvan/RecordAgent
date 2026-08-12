@@ -1,3 +1,9 @@
+import type {
+  SessionSummaryDto,
+  SessionDetailDto,
+  SessionKind,
+} from '../types/chat';
+
 export interface ModelConfig {
   vendor: string;
   name: string;
@@ -127,7 +133,7 @@ export interface ToolResultPayload {
  * 利用 fetch + ReadableStream 实时解析后端推流
  */
 export async function streamAgentChat(
-  params: { sessionId: string; context: string },
+  params: { sessionId: string; content: string },
   onChunk: (text: string) => void,
   onComplete?: () => void,
   onError?: (error: Error) => void,
@@ -218,72 +224,103 @@ export async function streamAgentChat(
 }
 
 /**
- * 获取后端会话列表
+ * 获取后端会话摘要列表
  */
-export async function fetchSessions(): Promise<any[]> {
+export async function fetchSessions(): Promise<SessionSummaryDto[]> {
   try {
     const res = await fetch(`${API_BASE_URL}/agent/sessions`);
     if (!res.ok) return [];
-    const json: ApiResponse<any[]> = await res.json();
-    return json.data || [];
+    const json: ApiResponse<SessionSummaryDto[]> = await res.json();
+    return json.code === 200 && Array.isArray(json.data) ? json.data : [];
   } catch (err) {
-    console.error('获取后端会话列表失败（后端接口可能未启动或未实现）:', err);
+    console.error('获取后端会话列表失败:', err);
     return [];
   }
 }
 
 /**
- * 创建新会话
+ * 获取会话详情（包含完整消息记录列表）
  */
-export async function createSessionApi(session: any): Promise<{ success: boolean; data?: any }> {
+export async function fetchSessionDetail(sessionId: string): Promise<SessionDetailDto | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/agent/sessions/${sessionId}`);
+    if (!res.ok) return null;
+    const json: ApiResponse<SessionDetailDto> = await res.json();
+    return json.code === 200 ? json.data : null;
+  } catch (err) {
+    console.error('获取会话详情失败:', err);
+    return null;
+  }
+}
+
+/**
+ * 创建新会话（ID 由后端生成 UUID）
+ */
+export async function createSessionApi(params?: {
+  kind?: SessionKind;
+  title?: string;
+}): Promise<{ success: boolean; data?: SessionSummaryDto; message?: string }> {
   try {
     const res = await fetch(`${API_BASE_URL}/agent/sessions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(session),
+      body: JSON.stringify({
+        kind: params?.kind || 'GENERAL',
+        title: params?.title || '新对话',
+      }),
     });
-    if (!res.ok) return { success: false };
-    const json: ApiResponse<any> = await res.json();
-    return { success: res.ok && json.code === 200, data: json.data };
-  } catch (err) {
+    const json: ApiResponse<SessionSummaryDto> = await res.json();
+    if (res.ok && json.code === 200) {
+      return { success: true, data: json.data };
+    }
+    return { success: false, message: json.message || '创建会话失败' };
+  } catch (err: any) {
     console.error('创建会话 API 调用失败:', err);
-    return { success: false };
+    return { success: false, message: err?.message || '网络连接失败' };
   }
 }
 
 /**
- * 删除会话
+ * 修改会话标题 (PATCH /agent/sessions/{sessionId})
  */
-export async function deleteSessionApi(sessionId: string): Promise<{ success: boolean }> {
+export async function updateSessionTitleApi(
+  sessionId: string,
+  title: string
+): Promise<{ success: boolean; data?: SessionSummaryDto; message?: string }> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/agent/sessions/${sessionId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title }),
+    });
+    const json: ApiResponse<SessionSummaryDto> = await res.json();
+    if (res.ok && json.code === 200) {
+      return { success: true, data: json.data };
+    }
+    return { success: false, message: json.message || '更新标题失败' };
+  } catch (err: any) {
+    console.error('更新会话标题 API 调用失败:', err);
+    return { success: false, message: err?.message || '网络连接失败' };
+  }
+}
+
+/**
+ * 删除会话 (DELETE /agent/sessions/{sessionId})
+ */
+export async function deleteSessionApi(sessionId: string): Promise<{ success: boolean; message?: string }> {
   try {
     const res = await fetch(`${API_BASE_URL}/agent/sessions/${sessionId}`, {
       method: 'DELETE',
     });
-    if (!res.ok) return { success: false };
-    const json: ApiResponse<any> = await res.json();
-    return { success: res.ok && json.code === 200 };
-  } catch (err) {
+    const json: ApiResponse<void> = await res.json();
+    if (res.ok && json.code === 200) {
+      return { success: true };
+    }
+    return { success: false, message: json.message || '删除会话失败' };
+  } catch (err: any) {
     console.error('删除会话 API 调用失败:', err);
-    return { success: false };
+    return { success: false, message: err?.message || '网络连接失败' };
   }
 }
 
-/**
- * 更新会话
- */
-export async function updateSessionApi(sessionId: string, sessionData: any): Promise<{ success: boolean }> {
-  try {
-    const res = await fetch(`${API_BASE_URL}/agent/sessions/${sessionId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(sessionData),
-    });
-    if (!res.ok) return { success: false };
-    const json: ApiResponse<any> = await res.json();
-    return { success: res.ok && json.code === 200 };
-  } catch (err) {
-    console.error('更新会话 API 调用失败:', err);
-    return { success: false };
-  }
-}
 

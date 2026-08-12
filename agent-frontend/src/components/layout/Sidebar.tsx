@@ -24,6 +24,7 @@ interface SidebarProps {
   onNewProjectChat: (projectId: string) => void;
   onImportProject: (name: string, path: string) => void;
   onDeleteSession: (id: string, e: React.MouseEvent) => void;
+  onUpdateSessionTitle?: (id: string, newTitle: string) => void;
   onOpenSettings: () => void;
 }
 
@@ -36,9 +37,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onNewProjectChat,
   onImportProject,
   onDeleteSession,
+  onUpdateSessionTitle,
   onOpenSettings,
 }) => {
   const [isUserPopoverOpen, setIsUserPopoverOpen] = useState(false);
+
+  // 双击修改会话标题状态
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
 
   // 区分项目与最近组的展开/收起折叠状态
   const [isProjectsSectionExpanded, setIsProjectsSectionExpanded] = useState(true);
@@ -188,16 +194,63 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div className={styles.sessionList}>
                 {generalSessions.map((session) => {
                   const isActive = session.id === activeSessionId;
+                  const isEditing = editingSessionId === session.id;
+
                   return (
                     <div
                       key={session.id}
                       className={`${styles.sessionItem} ${isActive ? styles.sessionActive : ''}`}
-                      onClick={() => onSelectSession(session.id)}
+                      onClick={() => !isEditing && onSelectSession(session.id)}
                     >
                       <MessageSquare size={13} style={{ opacity: 0.6, flexShrink: 0 }} />
-                      <span className={styles.sessionTitle} title={session.title}>
-                        {session.title || '新对话'}
-                      </span>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          className={styles.sessionTitleInput || styles.textInput}
+                          style={{
+                            height: '24px',
+                            fontSize: '12px',
+                            padding: '0 6px',
+                            width: '100%',
+                            background: '#ffffff',
+                            border: '1px solid #3b82f6',
+                            borderRadius: '4px',
+                          }}
+                          value={editingTitle}
+                          onChange={(e) => setEditingTitle(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.stopPropagation();
+                              if (editingTitle.trim() && onUpdateSessionTitle) {
+                                onUpdateSessionTitle(session.id, editingTitle.trim());
+                              }
+                              setEditingSessionId(null);
+                            } else if (e.key === 'Escape') {
+                              setEditingSessionId(null);
+                            }
+                          }}
+                          onBlur={() => {
+                            if (editingTitle.trim() && onUpdateSessionTitle && editingTitle !== session.title) {
+                              onUpdateSessionTitle(session.id, editingTitle.trim());
+                            }
+                            setEditingSessionId(null);
+                          }}
+                          autoFocus
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      ) : (
+                        <span
+                          className={styles.sessionTitle}
+                          title={`${session.title || '新对话'}（双击修改标题）`}
+                          onDoubleClick={(e) => {
+                            e.stopPropagation();
+                            setEditingSessionId(session.id);
+                            setEditingTitle(session.title || '');
+                          }}
+                        >
+                          {session.title || '新对话'}
+                        </span>
+                      )}
                       <button
                         className={styles.deleteBtn}
                         title="删除会话"
