@@ -84,6 +84,8 @@ public class AgentService {
     /** 将 AgentScope 事件逐条转换为项目 SSE 事件，并在终态保存完整 assistant 消息。 */
     private void produceEvents(AgentUserCall request, AgentStreamSession streamSession) {
         StringBuilder assistantContent = new StringBuilder();
+        // 本轮完整的thinking文本
+        StringBuilder assistantThinking = new StringBuilder();
 
         /**
          * key 是 AgentScope 事件中的 toolCallId， value 是该工具当前累计的完整状态
@@ -118,7 +120,7 @@ public class AgentService {
             for (AgentEvent event : agent.streamEvents(new UserMessage(input), context).toIterable()) {
                 if (streamSession.isCancelled()) {
                     // 取消时保留已输出文本，状态明确标记为 CANCELLED。
-                    finishAssistantMessage(request.sessionId(), turnId, assistantContent,
+                    finishAssistantMessage(request.sessionId(), turnId, assistantContent, assistantThinking,
                             TranscriptMessageDto.MessageStatus.CANCELLED, startedAt, toolExecutions);
                     return;
                 }
@@ -127,15 +129,18 @@ public class AgentService {
                 if (mappedEvent instanceof AgentStreamEvent.TextDelta textDelta) {
                     assistantContent.append(textDelta.content());
                 }
+                if (mappedEvent instanceof AgentStreamEvent.ThinkingDelta thinkingDelta) {
+                    assistantThinking.append(thinkingDelta.content());
+                }
                 collectToolExecution(mappedEvent, toolExecutions);
 
                 if (mappedEvent != null && !putEvent(streamSession, mappedEvent)) {
-                    finishAssistantMessage(request.sessionId(), turnId, assistantContent,
+                    finishAssistantMessage(request.sessionId(), turnId, assistantContent, assistantThinking,
                             TranscriptMessageDto.MessageStatus.CANCELLED, startedAt, toolExecutions);
                     return;
                 }
                 if (mappedEvent != null && mappedEvent.isTerminal()) {
-                    finishAssistantMessage(request.sessionId(), turnId, assistantContent,
+                    finishAssistantMessage(request.sessionId(), turnId, assistantContent, assistantThinking,
                             mappedEvent instanceof AgentStreamEvent.Failed
                                     ? TranscriptMessageDto.MessageStatus.FAILED
                                     : TranscriptMessageDto.MessageStatus.COMPLETED, startedAt, toolExecutions);
@@ -144,14 +149,14 @@ public class AgentService {
             }
 
             // AgentEvent 流自然结束但未产生 AgentEndEvent 时，仍要给前端和消息记录一个完成状态。
-            finishAssistantMessage(request.sessionId(), turnId, assistantContent,
+            finishAssistantMessage(request.sessionId(), turnId, assistantContent, assistantThinking,
                     TranscriptMessageDto.MessageStatus.COMPLETED, startedAt, toolExecutions);
             putEvent(streamSession, new AgentStreamEvent.Completed());
         } catch (Exception exception) {
             if (streamSession.isCancelled() || Thread.currentThread().isInterrupted()) {
                 Thread.currentThread().interrupt();
                 if (turnId != null) {
-                    finishAssistantMessage(request.sessionId(), turnId, assistantContent,
+                    finishAssistantMessage(request.sessionId(), turnId, assistantContent, assistantThinking,
                             TranscriptMessageDto.MessageStatus.CANCELLED, startedAt, toolExecutions);
                 }
                 return;
@@ -159,7 +164,7 @@ public class AgentService {
             String sessionId = request == null ? null : request.sessionId();
             log.error("Agent 流处理失败: sessionId={}", sessionId, exception);
             if (turnId != null) {
-                finishAssistantMessage(sessionId, turnId, assistantContent,
+                finishAssistantMessage(sessionId, turnId, assistantContent, assistantThinking,
                         TranscriptMessageDto.MessageStatus.FAILED, startedAt, toolExecutions);
             }
             putEvent(streamSession, new AgentStreamEvent.Failed(
@@ -297,11 +302,13 @@ public class AgentService {
             String sessionId,
             String turnId,
             StringBuilder assistantContent,
+            StringBuilder assistantThinking,
             TranscriptMessageDto.MessageStatus status,
             Instant statedAt,
             Map<String, TranscriptMessageDto.ToolExecutionDto> toolExecutions
     ) {
         String content = assistantContent.toString();
+        String thiking = assistantThinking.toString();
 
         // 防止系统时钟微笑回拨产生负数
         long durationMills = Math.max(0, Duration.between(statedAt, Instant.now()).toMillis());
@@ -310,6 +317,7 @@ public class AgentService {
                 sessionId,
                 turnId,
                 content,
+                thiking,
                 status,
                 durationMills,
                 finalizeToolExecution(toolExecutions, status)

@@ -12,12 +12,14 @@ public record TranscriptMessageDto(
         Instant createdAt,
         MessageStatus status,
         Long durationMillis,
-        List<ToolExecutionDto> tools
+        List<ToolExecutionDto> tools,
+        String thinking
 ) {
 
     public TranscriptMessageDto {
         content = content == null ? "" : content;
         tools = tools == null ? List.of() : List.copyOf(tools);
+        thinking = (thinking == null || thinking.isBlank()) ? null : thinking;
     }
 
     /** 消息角色。工具详情后续可扩展为单独事件，不和普通消息混用。 */

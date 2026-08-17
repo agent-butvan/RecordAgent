@@ -76,7 +76,8 @@ public class TranscriptService {
                 Instant.now(),
                 TranscriptMessageDto.MessageStatus.COMPLETED,
                 null,
-                List.of()
+                List.of(),
+                null // 用户消息没有思考过程
         ));
 
         return turnId;
@@ -89,6 +90,7 @@ public class TranscriptService {
             String sessionId,
             String turnId,
             String content,
+            String thinking,
             TranscriptMessageDto.MessageStatus status,
             Long durationMillis,
             List<TranscriptMessageDto.ToolExecutionDto> tools
@@ -101,7 +103,8 @@ public class TranscriptService {
                 Instant.now(),
                 status,
                 durationMillis,
-                tools
+                tools,
+                thinking
         ));
     }
 
