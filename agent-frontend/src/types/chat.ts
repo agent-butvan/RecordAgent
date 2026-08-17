@@ -59,6 +59,7 @@ export interface TranscriptMessageDto {
   status: MessageStatus;
   durationMillis?: number | null;
   tools?: TranscriptToolExecutionDto[];
+  thinking?: string | null;
 }
 
 export interface SessionDetailDto {

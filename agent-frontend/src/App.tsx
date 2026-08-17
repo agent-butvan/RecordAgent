@@ -24,6 +24,7 @@ function mapTranscriptToChatMessage(dto: TranscriptMessageDto): ChatMessage {
     role: isUser ? 'user' : 'assistant',
     modelName: isUser ? undefined : 'ButvanAgent',
     content: dto.content || '',
+    reasoning: dto.thinking || undefined,
     createdAt: new Date(dto.createdAt).getTime() || Date.now(),
     status: dto.status,
     elapsedTime:
