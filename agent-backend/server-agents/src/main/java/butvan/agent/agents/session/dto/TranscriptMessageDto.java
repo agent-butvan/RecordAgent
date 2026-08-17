@@ -1,6 +1,7 @@
 package butvan.agent.agents.session.dto;
 
 import java.time.Instant;
+import java.util.List;
 
 /** 用户界面能够稳定展示的一条完整消息。 */
 public record TranscriptMessageDto(
@@ -9,8 +10,16 @@ public record TranscriptMessageDto(
         MessageRole role,
         String content,
         Instant createdAt,
-        MessageStatus status
+        MessageStatus status,
+        Long durationMillis,
+        List<ToolExecutionDto> tools
 ) {
+
+    public TranscriptMessageDto {
+        content = content == null ? "" : content;
+        tools = tools == null ? List.of() : List.copyOf(tools);
+    }
+
     /** 消息角色。工具详情后续可扩展为单独事件，不和普通消息混用。 */
     public enum MessageRole {
         USER,
@@ -23,4 +32,28 @@ public record TranscriptMessageDto(
         FAILED,
         CANCELLED
     }
+
+
+    public record ToolExecutionDto(
+            String toolCallId,
+            String toolName,
+            String command,
+            String output,
+            ToolStatus status
+    ) {
+        public ToolExecutionDto {
+            toolCallId = toolCallId == null ? "" : toolCallId;
+            toolName = toolName == null ? "" : toolName;
+            command = command == null ? "" : command;
+            output = output == null ? "" : output;
+        }
+    }
+
+    public enum ToolStatus {
+        RUNNING,
+        COMPLETED,
+        FAILED,
+        CANCELLED
+    }
+
 }

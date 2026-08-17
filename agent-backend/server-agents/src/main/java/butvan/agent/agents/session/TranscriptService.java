@@ -74,7 +74,9 @@ public class TranscriptService {
                 TranscriptMessageDto.MessageRole.USER,
                 content,
                 Instant.now(),
-                TranscriptMessageDto.MessageStatus.COMPLETED
+                TranscriptMessageDto.MessageStatus.COMPLETED,
+                null,
+                List.of()
         ));
 
         return turnId;
@@ -87,7 +89,9 @@ public class TranscriptService {
             String sessionId,
             String turnId,
             String content,
-            TranscriptMessageDto.MessageStatus status
+            TranscriptMessageDto.MessageStatus status,
+            Long durationMillis,
+            List<TranscriptMessageDto.ToolExecutionDto> tools
     ) {
         append(sessionId, new TranscriptMessageDto(
                 UUID.randomUUID().toString(),
@@ -95,7 +99,9 @@ public class TranscriptService {
                 TranscriptMessageDto.MessageRole.ASSISTANT,
                 content == null ? "" : content,
                 Instant.now(),
-                status
+                status,
+                durationMillis,
+                tools
         ));
     }
 

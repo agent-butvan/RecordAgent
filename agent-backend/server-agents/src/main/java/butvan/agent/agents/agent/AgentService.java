@@ -32,6 +32,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Paths;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
@@ -86,7 +90,16 @@ public class AgentService {
     /** 将 AgentScope 事件逐条转换为项目 SSE 事件，并在终态保存完整 assistant 消息。 */
     private void produceEvents(AgentUserCall request, AgentStreamSession streamSession) {
         StringBuilder assistantContent = new StringBuilder();
+
+        /**
+         * key 是 AgentScope 事件中的 toolCallId， value 是该工具当前累计的完整状态
+         * LinkedHashMap 保留工具调用发生的先后顺序，便于历史界面俺原顺序展示
+         */
+        Map<String, TranscriptMessageDto.ToolExecutionDto> toolExecutions = new LinkedHashMap<>();
+
         String turnId = null;
+        // 本轮耗时，从开始处理请求起计算
+        Instant startedAt = Instant.now();
 
         try {
             if (request == null) {
@@ -112,7 +125,7 @@ public class AgentService {
                 if (streamSession.isCancelled()) {
                     // 取消时保留已输出文本，状态明确标记为 CANCELLED。
                     finishAssistantMessage(request.sessionId(), turnId, assistantContent,
-                            TranscriptMessageDto.MessageStatus.CANCELLED);
+                            TranscriptMessageDto.MessageStatus.CANCELLED, startedAt, toolExecutions);
                     return;
                 }
 
@@ -120,30 +133,32 @@ public class AgentService {
                 if (mappedEvent instanceof AgentStreamEvent.TextDelta textDelta) {
                     assistantContent.append(textDelta.content());
                 }
+                collectToolExecution(mappedEvent, toolExecutions);
+
                 if (mappedEvent != null && !putEvent(streamSession, mappedEvent)) {
                     finishAssistantMessage(request.sessionId(), turnId, assistantContent,
-                            TranscriptMessageDto.MessageStatus.CANCELLED);
+                            TranscriptMessageDto.MessageStatus.CANCELLED, startedAt, toolExecutions);
                     return;
                 }
                 if (mappedEvent != null && mappedEvent.isTerminal()) {
                     finishAssistantMessage(request.sessionId(), turnId, assistantContent,
                             mappedEvent instanceof AgentStreamEvent.Failed
                                     ? TranscriptMessageDto.MessageStatus.FAILED
-                                    : TranscriptMessageDto.MessageStatus.COMPLETED);
+                                    : TranscriptMessageDto.MessageStatus.COMPLETED, startedAt, toolExecutions);
                     return;
                 }
             }
 
             // AgentEvent 流自然结束但未产生 AgentEndEvent 时，仍要给前端和消息记录一个完成状态。
             finishAssistantMessage(request.sessionId(), turnId, assistantContent,
-                    TranscriptMessageDto.MessageStatus.COMPLETED);
+                    TranscriptMessageDto.MessageStatus.COMPLETED, startedAt, toolExecutions);
             putEvent(streamSession, new AgentStreamEvent.Completed());
         } catch (Exception exception) {
             if (streamSession.isCancelled() || Thread.currentThread().isInterrupted()) {
                 Thread.currentThread().interrupt();
                 if (turnId != null) {
                     finishAssistantMessage(request.sessionId(), turnId, assistantContent,
-                            TranscriptMessageDto.MessageStatus.CANCELLED);
+                            TranscriptMessageDto.MessageStatus.CANCELLED, startedAt, toolExecutions);
                 }
                 return;
             }
@@ -151,12 +166,72 @@ public class AgentService {
             log.error("Agent 流处理失败: sessionId={}", sessionId, exception);
             if (turnId != null) {
                 finishAssistantMessage(sessionId, turnId, assistantContent,
-                        TranscriptMessageDto.MessageStatus.FAILED);
+                        TranscriptMessageDto.MessageStatus.FAILED, startedAt, toolExecutions);
             }
             putEvent(streamSession, new AgentStreamEvent.Failed(
                     exception instanceof IllegalArgumentException ? exception.getMessage() : "Agent 处理失败，请稍后重试。"
             ));
         }
+    }
+
+    /**
+     * 汇总实时工具事件
+     * @param event
+     * @param toolExecutions
+     */
+    private void collectToolExecution(
+            AgentStreamEvent event,
+            Map<String, TranscriptMessageDto.ToolExecutionDto> toolExecutions
+    ) {
+        if (event instanceof AgentStreamEvent.ToolCall toolCall) {
+
+            toolExecutions.compute(toolCall.toolCallId(), (k, previous) -> new TranscriptMessageDto.ToolExecutionDto(
+                    toolCall.toolCallId(),
+                    toolCall.toolName(),
+                    toolCall.command().isBlank() && previous != null ? previous.command() : toolCall.command(),
+                    previous == null ? "" : previous.output(),
+                    TranscriptMessageDto.ToolStatus.RUNNING
+            ));
+            return;
+        }
+
+        if (event instanceof AgentStreamEvent.ToolResult toolResult) {
+
+            toolExecutions.compute(toolResult.toolCallId(), (k, previous) -> new TranscriptMessageDto.ToolExecutionDto(
+                    toolResult.toolCallId(),
+                    toolResult.toolName(),
+                    previous == null ? "" : previous.command(),
+                    (previous == null ? "" : previous.output()) + toolResult.result(),
+                    TranscriptMessageDto.ToolStatus.COMPLETED
+            ));
+        }
+    }
+
+    /**
+     * 将尚未收到结果的 RUNNING 工具转换为最终状态
+     * @param toolExecutions
+     * @param messageStatus
+     * @return
+     */
+    private List<TranscriptMessageDto.ToolExecutionDto> finalizeToolExecution(
+            Map<String, TranscriptMessageDto.ToolExecutionDto> toolExecutions,
+            TranscriptMessageDto.MessageStatus messageStatus
+    ) {
+        TranscriptMessageDto.ToolStatus fallbackStatus = switch (messageStatus) {
+            case COMPLETED, FAILED -> TranscriptMessageDto.ToolStatus.FAILED;
+            case CANCELLED -> TranscriptMessageDto.ToolStatus.CANCELLED;
+        };
+
+        return toolExecutions.values().stream()
+                .map(tool -> tool.status() == TranscriptMessageDto.ToolStatus.RUNNING
+                ? new TranscriptMessageDto.ToolExecutionDto(
+                        tool.toolCallId(),
+                        tool.toolName(),
+                        tool.command(),
+                        tool.output(),
+                        fallbackStatus
+                ) : tool)
+                .toList();
     }
 
     /** 只在此处构造 RuntimeContext，保证所有 Agent 调用都使用同一个用户身份规则。 */
@@ -228,10 +303,25 @@ public class AgentService {
             String sessionId,
             String turnId,
             StringBuilder assistantContent,
-            TranscriptMessageDto.MessageStatus status
+            TranscriptMessageDto.MessageStatus status,
+            Instant statedAt,
+            Map<String, TranscriptMessageDto.ToolExecutionDto> toolExecutions
     ) {
         String content = assistantContent.toString();
-        transcriptService.appendAssistantMessage(sessionId, turnId, content, status);
+
+        // 防止系统时钟微笑回拨产生负数
+        long durationMills = Math.max(0, Duration.between(statedAt, Instant.now()).toMillis());
+
+        transcriptService.appendAssistantMessage(
+                sessionId,
+                turnId,
+                content,
+                status,
+                durationMills,
+                finalizeToolExecution(toolExecutions, status)
+        );
+
+        // 侧边栏预览仍只使用最终正文，不把工具输出混入会话标题和预览
         sessionCatalogService.touch(sessionId, content);
     }
 
