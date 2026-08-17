@@ -5,7 +5,7 @@ import styles from './CommandCard.module.css';
 export interface CommandCardProps {
   toolName: string;
   command: string;
-  status: 'running' | 'completed' | 'failed';
+  status: 'running' | 'completed' | 'failed' | 'cancelled';
   output?: string;
 }
 
@@ -63,8 +63,16 @@ export const CommandCard: React.FC<CommandCardProps> = ({
           )}
 
           <div className={styles.cardFooter}>
-            <Check size={13} style={{ color: '#6b7280' }} />
-            <span className={styles.successText}>成功</span>
+            {status === 'failed' ? (
+              <span style={{ color: '#ef4444' }}>失败</span>
+            ) : status === 'cancelled' ? (
+              <span style={{ color: '#9ca3af' }}>已取消</span>
+            ) : (
+              <>
+                <Check size={13} style={{ color: '#6b7280' }} />
+                <span className={styles.successText}>成功</span>
+              </>
+            )}
           </div>
         </div>
       )}

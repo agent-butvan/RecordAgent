@@ -33,7 +33,11 @@ const AssistantMessageItem: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
 
   const hasTools = Boolean(msg.tools && msg.tools.length > 0);
   const isGenerating = !msg.content && hasTools && Boolean(msg.tools?.some((t) => t.status === 'running'));
-  const elapsedSec = msg.elapsedTime || (msg.createdAt ? Math.max(1, Math.floor((Date.now() - msg.createdAt) / 1000)) : 1);
+  const elapsedSec = msg.elapsedTime !== undefined
+    ? msg.elapsedTime
+    : (isGenerating && (msg.startTime || msg.createdAt)
+      ? Math.max(1, Math.floor((Date.now() - (msg.startTime || msg.createdAt)) / 1000))
+      : undefined);
 
   const handleCopy = () => {
     if (msg.content) {
@@ -54,10 +58,10 @@ const AssistantMessageItem: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
           onClick={() => setIsProcessExpanded(!isProcessExpanded)}
         >
           {isGenerating ? (
-            <span>已处理 {elapsedSec}秒</span>
+            <span>已处理 {elapsedSec ?? 1}秒</span>
           ) : (
             <>
-              <span>耗时 {elapsedSec}秒</span>
+              <span>{elapsedSec !== undefined ? `耗时 ${elapsedSec}秒` : '执行过程'}</span>
               {isProcessExpanded ? (
                 <ChevronDown size={14} style={{ color: '#9ca3af' }} />
               ) : (

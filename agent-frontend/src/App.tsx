@@ -14,7 +14,38 @@ import {
   updateSessionTitleApi,
   deleteSessionApi,
 } from './services/api';
-import type { ChatSession, ChatMessage, Project, SessionSummaryDto } from './types/chat';
+import type { ChatSession, ChatMessage, Project, SessionSummaryDto, TranscriptMessageDto } from './types/chat';
+
+function mapTranscriptToChatMessage(dto: TranscriptMessageDto): ChatMessage {
+  const isUser = dto.role?.toUpperCase() === 'USER';
+  return {
+    id: dto.id,
+    turnId: dto.turnId,
+    role: isUser ? 'user' : 'assistant',
+    modelName: isUser ? undefined : 'ButvanAgent',
+    content: dto.content || '',
+    createdAt: new Date(dto.createdAt).getTime() || Date.now(),
+    status: dto.status,
+    elapsedTime:
+      dto.durationMillis != null
+        ? Math.max(1, Math.round(dto.durationMillis / 1000))
+        : undefined,
+    tools:
+      dto.tools && dto.tools.length > 0
+        ? dto.tools.map((t) => ({
+            toolCallId: t.toolCallId,
+            toolName: t.toolName,
+            command: t.command,
+            output: t.output,
+            status: (t.status ? t.status.toLowerCase() : 'completed') as
+              | 'running'
+              | 'completed'
+              | 'failed'
+              | 'cancelled',
+          }))
+        : undefined,
+  };
+}
 
 export const MainLayout: React.FC<{
   onOpenSettings: () => void;
@@ -70,14 +101,7 @@ export const MainLayout: React.FC<{
     if (currentSession && !currentSession.isLoaded) {
       fetchSessionDetail(activeSessionId).then((detail) => {
         if (detail) {
-          const loadedMessages: ChatMessage[] = detail.messages.map((m) => ({
-            id: m.id,
-            turnId: m.turnId,
-            role: m.role.toLowerCase() === 'user' ? 'user' : 'assistant',
-            content: m.content,
-            createdAt: new Date(m.createdAt).getTime() || Date.now(),
-            status: m.status,
-          }));
+          const loadedMessages: ChatMessage[] = detail.messages.map(mapTranscriptToChatMessage);
 
           setSessions((prev) =>
             prev.map((s) =>
@@ -284,9 +308,10 @@ export const MainLayout: React.FC<{
           })
         );
 
-        // 从后端重新同步最新的消息和摘要（包含更新的目录册 title / preview）
+        // 从后端重新同步最新的消息和摘要（包含更新的目录册 title / preview 及后端持久化的完整消息）
         fetchSessionDetail(currentSessionId).then((detail) => {
           if (detail) {
+            const loadedMessages: ChatMessage[] = detail.messages.map(mapTranscriptToChatMessage);
             setSessions((prev) =>
               prev.map((s) =>
                 s.id === currentSessionId
@@ -294,6 +319,7 @@ export const MainLayout: React.FC<{
                       ...s,
                       title: detail.summary.title,
                       lastMessagePreview: detail.summary.lastMessagePreview,
+                      messages: loadedMessages,
                     }
                   : s
               )

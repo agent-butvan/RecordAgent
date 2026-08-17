@@ -7,7 +7,7 @@ export interface ToolExecution {
   toolCallId: string;
   toolName: string;
   command: string;
-  status: 'running' | 'completed' | 'failed';
+  status: 'running' | 'completed' | 'failed' | 'cancelled';
   output?: string;
 }
 
@@ -42,6 +42,14 @@ export interface SessionSummaryDto {
   status: SessionStatus;
 }
 
+export interface TranscriptToolExecutionDto {
+  toolCallId: string;
+  toolName: string;
+  command: string;
+  output: string;
+  status: 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+}
+
 export interface TranscriptMessageDto {
   id: string;
   turnId: string;
@@ -49,6 +57,8 @@ export interface TranscriptMessageDto {
   content: string;
   createdAt: string;
   status: MessageStatus;
+  durationMillis?: number | null;
+  tools?: TranscriptToolExecutionDto[];
 }
 
 export interface SessionDetailDto {
@@ -67,5 +77,4 @@ export interface ChatSession {
   messages: ChatMessage[];
   isLoaded?: boolean; // 消息记录是否已从后端详情接口中全量加载
 }
-
 
