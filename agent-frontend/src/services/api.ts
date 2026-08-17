@@ -138,7 +138,8 @@ export async function streamAgentChat(
   onComplete?: () => void,
   onError?: (error: Error) => void,
   onToolCall?: (payload: ToolCallPayload) => void,
-  onToolResult?: (payload: ToolResultPayload) => void
+  onToolResult?: (payload: ToolResultPayload) => void,
+  onThinking?: (thinkingText: string) => void
 ): Promise<void> {
   try {
     const payloadContent = params.content || params.context || '';
@@ -183,6 +184,8 @@ export async function streamAgentChat(
       const dataStr = dataLines.join('\n');
       if (eventName === 'text' || eventName === 'message') {
         if (dataStr) onChunk(dataStr);
+      } else if (eventName === 'thinking') {
+        if (dataStr) onThinking?.(dataStr);
       } else if (eventName === 'tool_call') {
         try {
           const payload: ToolCallPayload = JSON.parse(dataStr);

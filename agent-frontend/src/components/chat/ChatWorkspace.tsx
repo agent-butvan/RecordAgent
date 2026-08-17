@@ -32,7 +32,9 @@ const AssistantMessageItem: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
   const [isProcessExpanded, setIsProcessExpanded] = useState(true);
 
   const hasTools = Boolean(msg.tools && msg.tools.length > 0);
-  const isGenerating = !msg.content && hasTools && Boolean(msg.tools?.some((t) => t.status === 'running'));
+  const hasReasoning = Boolean(msg.reasoning && msg.reasoning.trim().length > 0);
+  const hasProcess = hasTools || hasReasoning;
+  const isGenerating = !msg.content || Boolean(msg.tools?.some((t) => t.status === 'running'));
   const elapsedSec = msg.elapsedTime !== undefined
     ? msg.elapsedTime
     : (isGenerating && (msg.startTime || msg.createdAt)
@@ -48,7 +50,7 @@ const AssistantMessageItem: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
   return (
     <div className={styles.assistantMessage}>
       {/* 过程耗时 / 思考中 Header */}
-      {!msg.content && !hasTools ? (
+      {!msg.content && !hasProcess ? (
         <div className={styles.processHeader} style={{ color: '#9ca3af', cursor: 'default' }}>
           <span>正在思考...</span>
         </div>
@@ -78,9 +80,10 @@ const AssistantMessageItem: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
       {/* 折叠区：思考过程与终端工具命令 */}
       {isProcessExpanded && (
         <>
-          {msg.reasoning && (
+          {hasReasoning && (
             <div className={styles.reasoningBox}>
-              <strong>思考过程:</strong> {msg.reasoning}
+              <div className={styles.reasoningTitle}>思考过程</div>
+              <div className={styles.reasoningContent}>{msg.reasoning}</div>
             </div>
           )}
 
@@ -105,7 +108,7 @@ const AssistantMessageItem: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
         {msg.content ? (
           <ReactMarkdown>{msg.content}</ReactMarkdown>
         ) : (
-          !hasTools && <span style={{ opacity: 0.5 }}>正在思考并生成回答...</span>
+          !hasProcess && <span style={{ opacity: 0.5 }}>正在思考并生成回答...</span>
         )}
       </div>
 

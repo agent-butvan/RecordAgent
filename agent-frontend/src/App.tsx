@@ -420,6 +420,23 @@ export const MainLayout: React.FC<{
             return s;
           })
         );
+      },
+      (thinkingChunk) => {
+        setSessions((prev) =>
+          prev.map((s) => {
+            if (s.id === currentSessionId) {
+              return {
+                ...s,
+                messages: s.messages.map((msg) =>
+                  msg.id === assistantMsgId
+                    ? { ...msg, reasoning: (msg.reasoning || '') + thinkingChunk }
+                    : msg
+                ),
+              };
+            }
+            return s;
+          })
+        );
       }
     );
   };
