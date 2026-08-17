@@ -131,33 +131,148 @@
   color: var(--text-primary);
 }
 
-.reasoningBox {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-left: 3px solid #64748b;
-  padding: 8px 12px;
-  font-size: 13px;
-  color: var(--text-secondary);
-  line-height: 1.6;
-  border-radius: var(--radius-sm);
-  box-shadow: none;
-  margin-bottom: 8px;
+/* Think 思考过程容器（参考图2、图3设计） */
+.thinkSection {
+  margin: 2px 0 10px 0;
+  font-family: var(--font-sans);
+  max-width: 100%;
 }
 
-.reasoningTitle {
-  font-size: 12px;
-  font-weight: 600;
-  color: #64748b;
-  margin-bottom: 4px;
+/* 折叠状态（图2）：单行预览 */
+.thinkCollapsedRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 3px 0;
+  font-size: 13.5px;
+  color: #6b7280;
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s ease;
 }
 
-.reasoningContent {
-  font-size: 12px;
-  color: #475569;
-  white-space: pre-wrap;
+.thinkCollapsedRow:hover {
+  color: #374151;
+}
+
+.thinkIcon {
+  flex-shrink: 0;
+  color: #6b7280;
+  transition: color 0.15s ease;
+}
+
+.thinkCollapsedRow:hover .thinkIcon {
+  color: #374151;
+}
+
+.thinkLabel {
+  font-weight: 500;
+  color: #4b5563;
+  flex-shrink: 0;
+  font-size: 13.5px;
+}
+
+.thinkDot {
+  color: #9ca3af;
+  flex-shrink: 0;
+  margin: 0 1px;
+}
+
+.thinkPreview {
+  color: #6b7280;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13.5px;
+}
+
+/* 展开状态（图3） */
+.thinkExpandedContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 100%;
+}
+
+.thinkExpandedHeader {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #4b5563;
+  cursor: pointer;
+  user-select: none;
+  padding: 2px 0;
+  transition: color 0.15s ease;
+  width: fit-content;
+}
+
+.thinkExpandedHeader:hover {
+  color: #111827;
+}
+
+.thinkChevron {
+  color: #6b7280;
+  transition: color 0.15s ease;
+}
+
+.thinkExpandedHeader:hover .thinkChevron {
+  color: #111827;
+}
+
+.thinkExpandedContent {
+  color: #52525b;
+  font-size: 13.5px;
+  line-height: 1.7;
+  padding-left: 2px;
   word-break: break-word;
-  max-height: 280px;
-  overflow-y: auto;
+}
+
+.thinkExpandedContent p {
+  margin: 0 0 10px 0;
+}
+
+.thinkExpandedContent p:last-child {
+  margin-bottom: 0;
+}
+
+.thinkExpandedContent code {
+  font-family: var(--font-mono, monospace);
+  font-size: 12.5px;
+  background-color: #f4f4f5;
+  border: 1px solid #e4e4e7;
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: #27272a;
+}
+
+.thinkExpandedContent pre {
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+  padding: 10px 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.thinkExpandedContent pre code {
+  background-color: transparent;
+  border: none;
+  padding: 0;
+  color: inherit;
+}
+
+.thinkExpandedContent ol,
+.thinkExpandedContent ul {
+  margin: 6px 0 10px 0;
+  padding-left: 20px;
+}
+
+.thinkExpandedContent li {
+  margin-bottom: 4px;
 }
 
 .bottomContainer {

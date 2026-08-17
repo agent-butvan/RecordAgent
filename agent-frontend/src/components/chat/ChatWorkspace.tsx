@@ -19,6 +19,7 @@ import {
   ThumbsDown,
   Maximize2,
   Mic,
+  Atom,
 } from 'lucide-react';
 import styles from './ChatWorkspace.module.css';
 
@@ -29,11 +30,11 @@ interface ChatWorkspaceProps {
 }
 
 const AssistantMessageItem: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
-  const [isProcessExpanded, setIsProcessExpanded] = useState(true);
+  const [isReasoningExpanded, setIsReasoningExpanded] = useState<boolean>(!msg.content);
+  const [isProcessExpanded, setIsProcessExpanded] = useState<boolean>(true);
 
   const hasTools = Boolean(msg.tools && msg.tools.length > 0);
   const hasReasoning = Boolean(msg.reasoning && msg.reasoning.trim().length > 0);
-  const hasProcess = hasTools || hasReasoning;
   const isGenerating = !msg.content || Boolean(msg.tools?.some((t) => t.status === 'running'));
   const elapsedSec = msg.elapsedTime !== undefined
     ? msg.elapsedTime
@@ -47,14 +48,23 @@ const AssistantMessageItem: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
     }
   };
 
+  const getReasoningPreview = (text?: string): string => {
+    if (!text) return '';
+    const clean = text.trim().replace(/[\r\n]+/g, ' ');
+    return clean.length > 130 ? clean.slice(0, 130) + '...' : clean;
+  };
+
   return (
     <div className={styles.assistantMessage}>
-      {/* 过程耗时 / 思考中 Header */}
-      {!msg.content && !hasProcess ? (
+      {/* 1. 正在思考中（未收到 reasoning、tools 及正文） */}
+      {!msg.content && !hasReasoning && !hasTools && (
         <div className={styles.processHeader} style={{ color: '#9ca3af', cursor: 'default' }}>
           <span>正在思考...</span>
         </div>
-      ) : (
+      )}
+
+      {/* 2. 耗时 Header（当有工具调用或已完成时展示） */}
+      {(hasTools || (elapsedSec !== undefined && !isGenerating)) && (
         <div
           className={styles.processHeader}
           onClick={() => setIsProcessExpanded(!isProcessExpanded)}
@@ -74,41 +84,59 @@ const AssistantMessageItem: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
         </div>
       )}
 
-      {/* 细分割线 */}
-      <div className={styles.processDivider} />
-
-      {/* 折叠区：思考过程与终端工具命令 */}
-      {isProcessExpanded && (
-        <>
-          {hasReasoning && (
-            <div className={styles.reasoningBox}>
-              <div className={styles.reasoningTitle}>思考过程</div>
-              <div className={styles.reasoningContent}>{msg.reasoning}</div>
+      {/* 3. 独立且优雅的 Think 思考过程（参考图2、图3设计） */}
+      {hasReasoning && (
+        <div className={styles.thinkSection}>
+          {!isReasoningExpanded ? (
+            <div
+              className={styles.thinkCollapsedRow}
+              onClick={() => setIsReasoningExpanded(true)}
+              title="点击展开思考过程"
+            >
+              <Atom size={15} className={styles.thinkIcon} />
+              <span className={styles.thinkLabel}>Think</span>
+              <span className={styles.thinkDot}>·</span>
+              <span className={styles.thinkPreview}>{getReasoningPreview(msg.reasoning)}</span>
+            </div>
+          ) : (
+            <div className={styles.thinkExpandedContainer}>
+              <div
+                className={styles.thinkExpandedHeader}
+                onClick={() => setIsReasoningExpanded(false)}
+                title="点击收起思考过程"
+              >
+                <ChevronDown size={14} className={styles.thinkChevron} />
+                <span className={styles.thinkLabel}>Think</span>
+              </div>
+              <div className={styles.thinkExpandedContent}>
+                <ReactMarkdown>{msg.reasoning}</ReactMarkdown>
+              </div>
             </div>
           )}
-
-          {hasTools && (
-            <div style={{ margin: '4px 0 10px' }}>
-              {msg.tools!.map((tool) => (
-                <CommandCard
-                  key={tool.toolCallId || tool.command || Math.random().toString()}
-                  toolName={tool.toolName}
-                  command={tool.command}
-                  status={tool.status}
-                  output={tool.output}
-                />
-              ))}
-            </div>
-          )}
-        </>
+        </div>
       )}
 
-      {/* 最终回答正文 */}
+      {/* 4. 工具执行卡片（折叠区） */}
+      {hasTools && isProcessExpanded && (
+        <div style={{ margin: '4px 0 10px' }}>
+          {msg.tools!.map((tool) => (
+            <CommandCard
+              key={tool.toolCallId || tool.command || Math.random().toString()}
+              toolName={tool.toolName}
+              command={tool.command}
+              status={tool.status}
+              output={tool.output}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* 5. 最终回答正文 */}
       <div className={styles.markdownBody}>
         {msg.content ? (
           <ReactMarkdown>{msg.content}</ReactMarkdown>
         ) : (
-          !hasProcess && <span style={{ opacity: 0.5 }}>正在思考并生成回答...</span>
+          !hasReasoning && !hasTools && <span style={{ opacity: 0.5 }}>正在思考并生成回答...</span>
         )}
       </div>
 
