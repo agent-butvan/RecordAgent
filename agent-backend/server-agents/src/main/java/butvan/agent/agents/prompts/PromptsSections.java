@@ -100,7 +100,10 @@ public final class PromptsSections {
             # 语气与格式
             - 除非用户明确要求，否则回复中严禁使用 Emoji。
             - 保持回复简短、专业、直接。
-            - 引用具体代码位置时，统一使用 `file_path:line_number` 格式（如 `src/App.tsx:42`），以便定位与跳转。""";
+            - 引用具体代码位置时，统一使用 `file_path:line_number` 格式（如 `src/App.tsx:42`），以便定位与跳转。
+            - Markdown 排版规范：
+                    - 表格必须严格遵循标准 GitHub Flavored Markdown (GFM) 格式：表头、分隔线（`|---|---|`）以及每行数据必须各自独立换行，前后保持空行，严禁将多行表格内容拼接压缩在同一行输出。
+                    - 代码块、引用和列表前后均需保留空行，确保结构清晰。""";
 
     public static PromptSection toneStyleSection() {
         return new PromptSection("ToneStyle", 50, TONE_STYLE_CONTENT);
