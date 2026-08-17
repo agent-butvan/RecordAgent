@@ -33,17 +33,51 @@ interface ChatWorkspaceProps {
 /**
  * 容错清洗函数：修复模型输出中被压缩在同一行的 Markdown 表格
  */
-function normalizeMarkdown(text?: string): string {
-  if (!text) return '';
-  let normalized = text;
+function normalizeMarkdown(raw?: string): string {
+  if (!raw) return '';
 
-  // 1. 修复单行拼接的 Markdown 表格：识别 `| ... | | ... |`，将中间的 `| |` 拆分成换行 `|\n|`
-  normalized = normalized.replace(/\|\s*\|\s*(?=[^\n]*\|)/g, '|\n|');
+  const blocks = raw.split(/(```[\s\S]*?```)/g);
+  return blocks
+    .map((block, idx) => {
+      // 代码块内容原样保留
+      if (idx % 2 === 1) return block;
 
-  // 2. 确保 Markdown 表格与前后段落之间有空行分隔，以便 GFM 解析器正确将其识别为表格块
-  normalized = normalized.replace(/([^\n])\n(\|.*\|)\n/g, '$1\n\n$2\n');
+      // 1. 将单行连续的表格行 `| ... | | ... |` 拆分成独立行 `|\n|`
+      const res = block.replace(/\|\s*\|\s*(?=[^\n]*\|)/g, '|\n|');
 
-  return normalized;
+      const lines = res.split(/\r?\n/);
+      const output: string[] = [];
+      let inTable = false;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const trimmed = line.trim();
+        const isTableLine = trimmed.startsWith('|') && trimmed.endsWith('|');
+
+        if (isTableLine) {
+          if (!inTable) {
+            // 表格开始前，若前一行不是空行，插入空行保证 GFM 解析器识别
+            if (output.length > 0 && output[output.length - 1].trim() !== '') {
+              output.push('');
+            }
+            inTable = true;
+          }
+          output.push(trimmed);
+        } else {
+          if (inTable) {
+            // 表格结束后，若当前行不是空行，插入空行
+            if (trimmed !== '') {
+              output.push('');
+            }
+            inTable = false;
+          }
+          output.push(line);
+        }
+      }
+
+      return output.join('\n');
+    })
+    .join('');
 }
 
 const AssistantMessageItem: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
