@@ -14,13 +14,7 @@ import butvan.agent.agents.tool.ToolRegistry;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agentscope.core.agent.RuntimeContext;
-import io.agentscope.core.event.AgentEndEvent;
-import io.agentscope.core.event.AgentEvent;
-import io.agentscope.core.event.TextBlockDeltaEvent;
-import io.agentscope.core.event.ToolCallDeltaEvent;
-import io.agentscope.core.event.ToolCallEndEvent;
-import io.agentscope.core.event.ToolCallStartEvent;
-import io.agentscope.core.event.ToolResultTextDeltaEvent;
+import io.agentscope.core.event.*;
 import io.agentscope.core.message.UserMessage;
 import io.agentscope.core.model.Model;
 import io.agentscope.core.permission.PermissionMode;
@@ -330,6 +324,13 @@ public class AgentService {
         if (event instanceof TextBlockDeltaEvent textEvent) {
             return new AgentStreamEvent.TextDelta(textEvent.getDelta());
         }
+
+        if (event instanceof ThinkingBlockDeltaEvent thinkingBlockDeltaEvent) {
+            return new AgentStreamEvent.ThinkingDelta(
+                    thinkingBlockDeltaEvent.getDelta()
+            );
+        }
+
         if (event instanceof AgentEndEvent) {
             return new AgentStreamEvent.Completed();
         }

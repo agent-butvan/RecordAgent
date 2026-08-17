@@ -11,12 +11,7 @@ import java.util.Map;
  * <p>业务层只负责产生此事件，Controller 再将其转换为 SSE，避免 AgentScope 与 Spring Web
  * 相互耦合。</p>
  */
-public sealed interface AgentStreamEvent permits
-        AgentStreamEvent.Completed,
-        AgentStreamEvent.Failed,
-        AgentStreamEvent.TextDelta,
-        AgentStreamEvent.ToolCall,
-        AgentStreamEvent.ToolResult
+public sealed interface AgentStreamEvent permits AgentStreamEvent.Completed, AgentStreamEvent.Failed, AgentStreamEvent.TextDelta, AgentStreamEvent.ThinkingDelta, AgentStreamEvent.ToolCall, AgentStreamEvent.ToolResult
 {
 
     Logger log = LoggerFactory.getLogger(AgentStreamEvent.class);
@@ -53,6 +48,23 @@ public sealed interface AgentStreamEvent permits
         @Override
         public Object payload() {
             return content;
+        }
+    }
+
+    /**
+     * 模型返回 thinking 文本增量
+     * @param content
+     */
+    record ThinkingDelta(String content) implements AgentStreamEvent {
+
+        @Override
+        public String eventName() {
+            return "thinking";
+        }
+
+        @Override
+        public Object payload() {
+            return content == null ? "" : content;
         }
     }
 
