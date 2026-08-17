@@ -21,12 +21,29 @@ import {
   Mic,
   Atom,
 } from 'lucide-react';
+import remarkGfm from 'remark-gfm';
 import styles from './ChatWorkspace.module.css';
 
 interface ChatWorkspaceProps {
   messages: ChatMessage[];
   onSendMessage: (prompt: string) => void;
   onOpenSettings: () => void;
+}
+
+/**
+ * 容错清洗函数：修复模型输出中被压缩在同一行的 Markdown 表格
+ */
+function normalizeMarkdown(text?: string): string {
+  if (!text) return '';
+  let normalized = text;
+
+  // 1. 修复单行拼接的 Markdown 表格：识别 `| ... | | ... |`，将中间的 `| |` 拆分成换行 `|\n|`
+  normalized = normalized.replace(/\|\s*\|\s*(?=[^\n]*\|)/g, '|\n|');
+
+  // 2. 确保 Markdown 表格与前后段落之间有空行分隔，以便 GFM 解析器正确将其识别为表格块
+  normalized = normalized.replace(/([^\n])\n(\|.*\|)\n/g, '$1\n\n$2\n');
+
+  return normalized;
 }
 
 const AssistantMessageItem: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
@@ -109,7 +126,9 @@ const AssistantMessageItem: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
                 <span className={styles.thinkLabel}>Think</span>
               </div>
               <div className={styles.thinkExpandedContent}>
-                <ReactMarkdown>{msg.reasoning}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {normalizeMarkdown(msg.reasoning)}
+                </ReactMarkdown>
               </div>
             </div>
           )}
@@ -134,7 +153,9 @@ const AssistantMessageItem: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
       {/* 5. 最终回答正文 */}
       <div className={styles.markdownBody}>
         {msg.content ? (
-          <ReactMarkdown>{msg.content}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {normalizeMarkdown(msg.content)}
+          </ReactMarkdown>
         ) : (
           !hasReasoning && !hasTools && <span style={{ opacity: 0.5 }}>正在思考并生成回答...</span>
         )}

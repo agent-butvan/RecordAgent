@@ -459,19 +459,34 @@
 .markdownBody table {
   border-collapse: collapse;
   width: 100%;
-  margin: 10px 0;
+  margin: 12px 0;
+  font-size: 13px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  overflow: hidden;
 }
 
 .markdownBody th,
 .markdownBody td {
-  border: 1px solid #cbd5e1;
-  padding: 6px 10px;
+  border: 1px solid #e2e8f0;
+  padding: 8px 12px;
   text-align: left;
+  line-height: 1.5;
 }
 
 .markdownBody th {
-  background-color: #f1f5f9;
+  background-color: #f8fafc;
   font-weight: 600;
+  color: #334155;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.markdownBody tr:nth-child(even) td {
+  background-color: #fbfcfd;
+}
+
+.markdownBody tr:hover td {
+  background-color: #f1f5f9;
 }
 
 /* 过程与耗时 Header */
