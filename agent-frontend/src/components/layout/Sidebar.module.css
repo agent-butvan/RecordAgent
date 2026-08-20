@@ -201,64 +201,10 @@
   border-color: #cbd5e1;
 }
 
-/* 模态框 Modal */
-.modalOverlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background-color: rgba(0, 0, 0, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modalContent {
-  width: 420px;
-  background-color: #ffffff;
-  border-radius: 8px;
-  border: 1px solid #cbd5e1;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.modalHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.modalHeader h3 {
-  font-size: 15px;
-  font-weight: 700;
-  margin: 0;
-}
-
-.modalCloseBtn {
-  background: transparent;
-  border: none;
-  color: #64748b;
-  cursor: pointer;
-}
-
 .modalBody {
   display: flex;
   flex-direction: column;
   gap: 12px;
-}
-
-.inputLabel {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-secondary);
 }
 
 .textInput {

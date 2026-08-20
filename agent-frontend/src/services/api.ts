@@ -128,32 +128,74 @@ export interface ToolResultPayload {
   result?: string;
 }
 
+/** 后端要求用户确认时返回的单条高风险工具。 */
+export interface PermissionToolPayload {
+  toolCallId: string;
+  toolName: string;
+  input: Record<string, unknown>;
+  riskDescription: string;
+  index: number;
+  total: number;
+}
+
+export interface PermissionRequiredPayload {
+  approvalId: string;
+  tool: PermissionToolPayload;
+}
+
+export interface PermissionDecisionResponse {
+  readyToResume: boolean;
+  nextTool: PermissionToolPayload | null;
+}
+
+/** 提交一条工具授权决定；本批全部完成时响应会标记 readyToResume。 */
+export async function submitPermissionDecision(params: {
+  sessionId: string;
+  approvalId: string;
+  toolCallId: string;
+  approved: boolean;
+  rememberForSession: boolean;
+}): Promise<PermissionDecisionResponse> {
+  const response = await fetch(`${API_BASE_URL}/agent/chat/permission/decision`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!response.ok) {
+    throw new Error(`提交权限决定失败：HTTP ${response.status}`);
+  }
+  return response.json() as Promise<PermissionDecisionResponse>;
+}
+
 /**
  * Agent 对话流式 SSE 交互函数
  * 利用 fetch + ReadableStream 实时解析后端推流
  */
 export async function streamAgentChat(
-  params: { sessionId: string; content: string; context?: string },
+  params: { sessionId: string; content?: string; context?: string; approvalId?: string },
   onChunk: (text: string) => void,
   onComplete?: () => void,
   onError?: (error: Error) => void,
   onToolCall?: (payload: ToolCallPayload) => void,
   onToolResult?: (payload: ToolResultPayload) => void,
-  onThinking?: (thinkingText: string) => void
+  onThinking?: (thinkingText: string) => void,
+  onPermissionRequired?: (payload: PermissionRequiredPayload) => void
 ): Promise<void> {
   try {
     const payloadContent = params.content || params.context || '';
-    const response = await fetch(`${API_BASE_URL}/agent/chat/stream`, {
+    const isResume = Boolean(params.approvalId);
+    const response = await fetch(
+      `${API_BASE_URL}/agent/chat${isResume ? '/permission/resume' : '/stream'}`,
+      {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        sessionId: params.sessionId,
-        context: payloadContent,
-        content: payloadContent,
-      }),
-    });
+        body: JSON.stringify(isResume
+          ? { sessionId: params.sessionId, approvalId: params.approvalId }
+          : { sessionId: params.sessionId, context: payloadContent, content: payloadContent }),
+      }
+    );
 
     if (!response.ok) {
       throw new Error(`HTTP 响应异常: Status ${response.status}`);
@@ -199,6 +241,13 @@ export async function streamAgentChat(
           onToolResult?.(payload);
         } catch {
           onToolResult?.({ toolName: 'tool', result: dataStr });
+        }
+      } else if (eventName === 'permission_required') {
+        streamFinished = true;
+        try {
+          onPermissionRequired?.(JSON.parse(dataStr) as PermissionRequiredPayload);
+        } catch {
+          onError?.(new Error('权限确认事件格式错误'));
         }
       } else if (eventName === 'error') {
         streamFinished = true;
@@ -330,5 +379,4 @@ export async function deleteSessionApi(sessionId: string): Promise<{ success: bo
     return { success: false, message: err?.message || '网络连接失败' };
   }
 }
-
 

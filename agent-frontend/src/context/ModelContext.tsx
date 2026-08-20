@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import type { ModelProvider, ModelItem } from '../types/model';
 import { fetchFullModelConfig, saveFullModelConfig, saveModelConfig } from '../services/api';
 
@@ -60,37 +60,44 @@ export const ModelProviderContext: React.FC<{ children: React.ReactNode }> = ({ 
 
   const [temperature, setTemperature] = useState<number>(0.7);
   const [maxTokens, setMaxTokens] = useState<number>(4096);
+  // 标记是否已完成后端配置同步；同步完成前禁止向后端写回，避免用空 localStorage 覆盖 config.json
+  const hasSyncedFromBackend = useRef(false);
 
   // 挂载时严格同步 backend config.json 真实数据
   useEffect(() => {
     const syncFromBackend = async () => {
-      const fullConfig = await fetchFullModelConfig();
-      if (fullConfig) {
-        const actVendor = fullConfig.activeVendor || fullConfig.vendor || '';
-        const actModel = fullConfig.activeModel || fullConfig.name || '';
-        setActiveProviderId(actVendor);
-        setActiveModelId(actModel);
+      try {
+        const fullConfig = await fetchFullModelConfig();
+        if (fullConfig) {
+          const actVendor = fullConfig.activeVendor || fullConfig.vendor || '';
+          const actModel = fullConfig.activeModel || fullConfig.name || '';
+          setActiveProviderId(actVendor);
+          setActiveModelId(actModel);
 
-        if (Array.isArray(fullConfig.providers)) {
-          const loadedProviders: ModelProvider[] = fullConfig.providers.map((p: any) => ({
-            id: p.id || p.type || p.vendor || 'custom',
-            name: p.name || p.vendor || 'Custom Vendor',
-            type: p.type || p.vendor || 'custom',
-            baseUrl: p.baseUrl || '',
-            apiKey: p.apiKey || '',
-            isEnabled: p.isEnabled !== undefined ? p.isEnabled : true,
-            models: Array.isArray(p.models)
-              ? p.models.map((m: any) => ({
-                  id: m.id || m.modelName,
-                  name: m.name || m.modelName,
-                  providerId: p.id || p.type || 'custom',
-                  description: m.description || '',
-                  supportsReasoning: !!m.supportsReasoning,
-                }))
-              : [],
-          }));
-          setProviders(loadedProviders);
+          if (Array.isArray(fullConfig.providers)) {
+            const loadedProviders: ModelProvider[] = fullConfig.providers.map((p: any) => ({
+              id: p.id || p.type || p.vendor || 'custom',
+              name: p.name || p.vendor || 'Custom Vendor',
+              type: p.type || p.vendor || 'custom',
+              baseUrl: p.baseUrl || '',
+              apiKey: p.apiKey || '',
+              isEnabled: p.isEnabled !== undefined ? p.isEnabled : true,
+              models: Array.isArray(p.models)
+                ? p.models.map((m: any) => ({
+                    id: m.id || m.modelName,
+                    name: m.name || m.modelName,
+                    providerId: p.id || p.type || 'custom',
+                    description: m.description || '',
+                    supportsReasoning: !!m.supportsReasoning,
+                  }))
+                : [],
+            }));
+            setProviders(loadedProviders);
+          }
         }
+      } finally {
+        // 无论同步成功与否，同步尝试结束后才允许后续持久化写回
+        hasSyncedFromBackend.current = true;
       }
     };
     syncFromBackend();
@@ -101,6 +108,9 @@ export const ModelProviderContext: React.FC<{ children: React.ReactNode }> = ({ 
     localStorage.setItem(STORAGE_KEY_PROVIDERS, JSON.stringify(providers));
     localStorage.setItem(STORAGE_KEY_ACTIVE_PROVIDER, activeProviderId);
     localStorage.setItem(STORAGE_KEY_ACTIVE_MODEL, activeModelId);
+
+    // 挂载阶段先等待后端同步完成，避免用空/失步的 localStorage 覆盖本地 config.json
+    if (!hasSyncedFromBackend.current) return;
 
     const activeProvider = providers.find((p) => p.id === activeProviderId || p.type === activeProviderId);
     const activeApiKey = activeProvider?.apiKey || '';

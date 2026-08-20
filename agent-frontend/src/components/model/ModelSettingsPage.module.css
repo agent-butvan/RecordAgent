@@ -88,8 +88,8 @@
 }
 
 .navItemActive {
-  background-color: #e0e7ff;
-  color: #4338ca;
+  background-color: #eff6ff;
+  color: #1d4ed8;
   font-weight: 600;
 }
 
@@ -107,6 +107,102 @@
   margin-bottom: 24px;
 }
 
+.configSubtitle {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 4px;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.addForm {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.fullWidth {
+  width: 100%;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  border-radius: var(--radius-lg);
+  border: 1px dashed #cbd5e1;
+  background: #fafafa;
+  text-align: center;
+  margin: 20px 0;
+}
+
+.emptyIcon {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-lg);
+  background: #eff6ff;
+  color: #2563eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.emptyTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 6px;
+}
+
+.emptyDesc {
+  font-size: 13px;
+  color: #64748b;
+  max-width: 440px;
+  line-height: 1.5;
+  margin: 0 0 20px;
+}
+
+.emptyDesc code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  padding: 1px 5px;
+  color: #0f172a;
+}
+
+.modelList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@media (max-width: 720px) {
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .title {
   font-size: 20px;
   font-weight: 700;
@@ -118,7 +214,7 @@
   background: #f1f5f9;
   border: 1px solid #e2e8f0;
   padding: 6px 14px;
-  border-radius: 20px;
+  border-radius: var(--radius-md);
   font-size: 13px;
   font-weight: 500;
   color: #475569;
@@ -135,27 +231,6 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-}
-
-.label {
-  font-size: 13px;
-  font-weight: 600;
-  color: #334155;
-}
-
-.input {
-  width: 100%;
-  padding: 10px 14px;
-  border-radius: 8px;
-  border: 1px solid #cbd5e1;
-  font-size: 13px;
-  outline: none;
-  background: #ffffff;
-  transition: border-color 0.15s ease;
-}
-
-.input:focus {
-  border-color: #6366f1;
 }
 
 .inputWrapper {
@@ -300,6 +375,5 @@
 .segmentActive {
   background-color: #ffffff;
   color: #0f172a;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  box-shadow: none;
 }
-

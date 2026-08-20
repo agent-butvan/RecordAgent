@@ -13,7 +13,9 @@ import {
   createSessionApi,
   updateSessionTitleApi,
   deleteSessionApi,
+  submitPermissionDecision,
 } from './services/api';
+import type { PermissionToolPayload } from './services/api';
 import type { ChatSession, ChatMessage, Project, SessionSummaryDto, TranscriptMessageDto } from './types/chat';
 
 function mapTranscriptToChatMessage(dto: TranscriptMessageDto): ChatMessage {
@@ -49,13 +51,19 @@ function mapTranscriptToChatMessage(dto: TranscriptMessageDto): ChatMessage {
 }
 
 export const MainLayout: React.FC<{
-  onOpenSettings: () => void;
   isSettingsOpen: boolean;
   setIsSettingsOpen: (open: boolean) => void;
 }> = ({ isSettingsOpen, setIsSettingsOpen }) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string>('');
+  const [pendingPermission, setPendingPermission] = useState<{
+    sessionId: string;
+    assistantMessageId: string;
+    approvalId: string;
+    tool: PermissionToolPayload;
+  } | null>(null);
+  const [isPermissionSubmitting, setIsPermissionSubmitting] = useState(false);
 
   // 1. 初始化从后端 API 获取会话列表数据
   useEffect(() => {
@@ -183,6 +191,7 @@ export const MainLayout: React.FC<{
   // 6. 删除会话
   const handleDeleteSession = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!window.confirm('确定删除该会话吗？此操作不可撤销。')) return;
     const res = await deleteSessionApi(id);
     if (res.success) {
       setSessions((prev) => {
@@ -438,8 +447,99 @@ export const MainLayout: React.FC<{
             return s;
           })
         );
-      }
+      },
+      (permissionPayload) => {
+        setPendingPermission({
+          sessionId: currentSessionId,
+          assistantMessageId: assistantMsgId,
+          approvalId: permissionPayload.approvalId,
+          tool: permissionPayload.tool,
+        });
+      },
     );
+  };
+
+  /** 向当前 assistant 草稿追加恢复流产生的内容。 */
+  const updateAssistantMessage = (
+    sessionId: string,
+    messageId: string,
+    update: (message: ChatMessage) => ChatMessage,
+  ) => {
+    setSessions((prev) => prev.map((session) => session.id === sessionId
+      ? { ...session, messages: session.messages.map((message) =>
+        message.id === messageId ? update(message) : message) }
+      : session));
+  };
+
+  /** 前端逐条提交决定；最后一条完成后建立新的 SSE 连接恢复 Agent。 */
+  const handlePermissionDecision = async (approved: boolean, rememberForSession: boolean) => {
+    if (!pendingPermission || isPermissionSubmitting) return;
+    const current = pendingPermission;
+    setIsPermissionSubmitting(true);
+    try {
+      const result = await submitPermissionDecision({
+        sessionId: current.sessionId,
+        approvalId: current.approvalId,
+        toolCallId: current.tool.toolCallId,
+        approved,
+        rememberForSession,
+      });
+
+      if (!result.readyToResume && result.nextTool) {
+        setPendingPermission({ ...current, tool: result.nextTool });
+        return;
+      }
+
+      setPendingPermission(null);
+      await streamAgentChat(
+        { sessionId: current.sessionId, approvalId: current.approvalId },
+        (text) => updateAssistantMessage(current.sessionId, current.assistantMessageId,
+          (message) => ({ ...message, content: message.content + text })),
+        () => {
+          updateAssistantMessage(current.sessionId, current.assistantMessageId, (message) => ({
+            ...message,
+            elapsedTime: Math.max(1, Math.floor((Date.now() - (message.startTime || message.createdAt)) / 1000)),
+          }));
+          fetchSessionDetail(current.sessionId).then((detail) => {
+            if (!detail) return;
+            const messages = detail.messages.map(mapTranscriptToChatMessage);
+            setSessions((prev) => prev.map((session) => session.id === current.sessionId
+              ? { ...session, title: detail.summary.title, lastMessagePreview: detail.summary.lastMessagePreview, messages }
+              : session));
+          });
+        },
+        (error) => updateAssistantMessage(current.sessionId, current.assistantMessageId,
+          (message) => ({ ...message, content: message.content || `恢复任务失败：${error.message}` })),
+        (tool) => updateAssistantMessage(current.sessionId, current.assistantMessageId, (message) => ({
+          ...message,
+          tools: [...(message.tools || []), {
+            toolCallId: tool.toolCallId || `tool_${Date.now()}`,
+            toolName: tool.toolName || 'tool', command: tool.command || '', status: 'running',
+          }],
+        })),
+        (result) => updateAssistantMessage(current.sessionId, current.assistantMessageId, (message) => ({
+          ...message,
+          tools: (message.tools || []).map((tool) => tool.toolCallId === result.toolCallId
+            ? { ...tool, status: 'completed', output: (tool.output || '') + (result.result || '') }
+            : tool),
+        })),
+        (thinking) => updateAssistantMessage(current.sessionId, current.assistantMessageId,
+          (message) => ({ ...message, reasoning: (message.reasoning || '') + thinking })),
+        (permissionPayload) => setPendingPermission({
+          sessionId: current.sessionId,
+          assistantMessageId: current.assistantMessageId,
+          approvalId: permissionPayload.approvalId,
+          tool: permissionPayload.tool,
+        }),
+      );
+    } catch (error) {
+      updateAssistantMessage(current.sessionId, current.assistantMessageId, (message) => ({
+        ...message,
+        content: message.content || '提交权限决定失败，请重试。',
+      }));
+    } finally {
+      setIsPermissionSubmitting(false);
+    }
   };
 
   return (
@@ -464,6 +564,9 @@ export const MainLayout: React.FC<{
             messages={activeMessages}
             onSendMessage={handleSendMessage}
             onOpenSettings={() => setIsSettingsOpen(true)}
+            pendingPermission={pendingPermission}
+            isPermissionSubmitting={isPermissionSubmitting}
+            onPermissionDecision={handlePermissionDecision}
           />
         </>
       )}
@@ -513,18 +616,9 @@ export const App: React.FC = () => {
 
   if (loading) {
     return (
-      <div style={{
-        width: '100vw',
-        height: '100vh',
-        background: '#ffffff',
-        color: '#6b7280',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: '14px',
-        fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif'
-      }}>
-        正在加载...
+      <div className="bootScreen">
+        <div className="bootSpinner" aria-hidden="true" />
+        <span>正在加载...</span>
       </div>
     );
   }
@@ -547,7 +641,6 @@ export const App: React.FC = () => {
       <MainLayout
         isSettingsOpen={isSettingsOpen}
         setIsSettingsOpen={setIsSettingsOpen}
-        onOpenSettings={() => setIsSettingsOpen(true)}
       />
     </ModelProviderContext>
   );

@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { ModelSelector } from '../model/ModelSelector';
 import type { ChatMessage } from '../../types/chat';
 import { Card } from '../common/Card';
 import { CommandCard } from './CommandCard';
+import { PermissionRequestCard } from './PermissionRequestCard';
+import type { PermissionToolPayload } from '../../services/api';
 import {
   Plus,
   ArrowUp,
@@ -28,6 +30,9 @@ interface ChatWorkspaceProps {
   messages: ChatMessage[];
   onSendMessage: (prompt: string) => void;
   onOpenSettings: () => void;
+  pendingPermission?: { assistantMessageId: string; tool: PermissionToolPayload } | null;
+  isPermissionSubmitting?: boolean;
+  onPermissionDecision?: (approved: boolean, rememberForSession: boolean) => void;
 }
 
 /**
@@ -81,12 +86,12 @@ function normalizeMarkdown(raw?: string): string {
 }
 
 const AssistantMessageItem: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
-  const [isReasoningExpanded, setIsReasoningExpanded] = useState<boolean>(!msg.content);
-  const [isProcessExpanded, setIsProcessExpanded] = useState<boolean>(true);
+  const [isReasoningExpanded, setIsReasoningExpanded] = useState(true);
+  const [isProcessExpanded, setIsProcessExpanded] = useState(false);
 
   const hasTools = Boolean(msg.tools && msg.tools.length > 0);
   const hasReasoning = Boolean(msg.reasoning && msg.reasoning.trim().length > 0);
-  const isGenerating = !msg.content || Boolean(msg.tools?.some((t) => t.status === 'running'));
+  const isGenerating = msg.status === undefined && msg.elapsedTime === undefined;
   const elapsedSec = msg.elapsedTime !== undefined
     ? msg.elapsedTime
     : (isGenerating && (msg.startTime || msg.createdAt)
@@ -105,6 +110,13 @@ const AssistantMessageItem: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
     return clean.length > 130 ? clean.slice(0, 130) + '...' : clean;
   };
 
+  useEffect(() => {
+    if (!isGenerating) {
+      setIsReasoningExpanded(false);
+      setIsProcessExpanded(false);
+    }
+  }, [isGenerating]);
+
   return (
     <div className={styles.assistantMessage}>
       {/* 1. 正在思考中（未收到 reasoning、tools 及正文） */}
@@ -115,28 +127,18 @@ const AssistantMessageItem: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
       )}
 
       {/* 2. 耗时 Header（当有工具调用或已完成时展示） */}
-      {(hasTools || (elapsedSec !== undefined && !isGenerating)) && (
+      {(hasTools || hasReasoning || (elapsedSec !== undefined && !isGenerating)) && (
         <div
           className={styles.processHeader}
           onClick={() => setIsProcessExpanded(!isProcessExpanded)}
         >
-          {isGenerating ? (
-            <span>已处理 {elapsedSec ?? 1}秒</span>
-          ) : (
-            <>
-              <span>{elapsedSec !== undefined ? `耗时 ${elapsedSec}秒` : '执行过程'}</span>
-              {isProcessExpanded ? (
-                <ChevronDown size={14} style={{ color: '#9ca3af' }} />
-              ) : (
-                <ChevronRight size={14} style={{ color: '#9ca3af' }} />
-              )}
-            </>
-          )}
+          <span>{isGenerating ? '正在处理' : `已完成${elapsedSec !== undefined ? ` · 耗时 ${elapsedSec}秒` : ''}`}</span>
+          {isProcessExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </div>
       )}
 
       {/* 3. 独立且优雅的 Think 思考过程（参考图2、图3设计） */}
-      {hasReasoning && (
+      {hasReasoning && (isGenerating || isProcessExpanded) && (
         <div className={styles.thinkSection}>
           {!isReasoningExpanded ? (
             <div
@@ -171,7 +173,7 @@ const AssistantMessageItem: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
 
       {/* 4. 工具执行卡片（折叠区） */}
       {hasTools && isProcessExpanded && (
-        <div style={{ margin: '4px 0 10px' }}>
+        <div className={styles.toolsList}>
           {msg.tools!.map((tool) => (
             <CommandCard
               key={tool.toolCallId || tool.command || Math.random().toString()}
@@ -198,16 +200,16 @@ const AssistantMessageItem: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
       {/* 消息底部 4 个操作工具栏图标：复制、赞、踩、全屏/分享 */}
       {msg.content && (
         <div className={styles.messageActions}>
-          <button className={styles.actionBtn} title="复制内容" onClick={handleCopy}>
+          <button className={styles.actionBtn} title="复制内容" aria-label="复制内容" onClick={handleCopy}>
             <Copy size={14} />
           </button>
-          <button className={styles.actionBtn} title="赞">
+          <button className={styles.actionBtn} title="即将推出" aria-label="赞（即将推出）" disabled>
             <ThumbsUp size={14} />
           </button>
-          <button className={styles.actionBtn} title="踩">
+          <button className={styles.actionBtn} title="即将推出" aria-label="踩（即将推出）" disabled>
             <ThumbsDown size={14} />
           </button>
-          <button className={styles.actionBtn} title="全屏/扩展">
+          <button className={styles.actionBtn} title="即将推出" aria-label="全屏/扩展（即将推出）" disabled>
             <Maximize2 size={14} />
           </button>
         </div>
@@ -220,8 +222,18 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   messages,
   onSendMessage,
   onOpenSettings,
+  pendingPermission = null,
+  isPermissionSubmitting = false,
+  onPermissionDecision,
 }) => {
   const [inputPrompt, setInputPrompt] = useState('');
+  const messagesAreaRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const area = messagesAreaRef.current;
+    if (!area) return;
+    requestAnimationFrame(() => area.scrollTo({ top: area.scrollHeight, behavior: 'smooth' }));
+  }, [messages, pendingPermission]);
 
   const handleSend = () => {
     if (!inputPrompt.trim()) return;
@@ -297,7 +309,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
           </div>
         </div>
       ) : (
-        <div className={styles.messagesArea}>
+        <div ref={messagesAreaRef} className={styles.messagesArea}>
           <div className={styles.messagesInner}>
             {messages.map((msg) => (
               <div key={msg.id} className={styles.messageRow}>
@@ -312,7 +324,16 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
         </div>
       )}
 
-      {/* Bottom Floating Input Area */}
+      {/* 审批出现时完整替换输入区，避免 Agent 暂停时继续提交新问题。 */}
+      {pendingPermission && onPermissionDecision ? (
+        <div className={styles.permissionContainer}>
+          <PermissionRequestCard
+            tool={pendingPermission.tool}
+            isSubmitting={isPermissionSubmitting}
+            onDecision={onPermissionDecision}
+          />
+        </div>
+      ) : (
       <div className={styles.bottomContainer}>
         <div className={styles.inputBox}>
           <textarea
@@ -325,14 +346,14 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
 
           <div className={styles.inputToolbar}>
             <div className={styles.toolbarLeft}>
-              <button className={styles.toolIconBtn} title="添加附件/文件关联">
+              <button className={styles.toolIconBtn} title="添加附件（即将推出）" aria-label="添加附件（即将推出）" disabled>
                 <Plus size={16} />
               </button>
             </div>
 
             <div className={styles.toolbarRight}>
               <ModelSelector onOpenSettings={onOpenSettings} />
-              <button className={styles.micBtn} title="语音输入">
+              <button className={styles.micBtn} title="语音输入（即将推出）" aria-label="语音输入（即将推出）" disabled>
                 <Mic size={18} />
               </button>
               <button
@@ -341,6 +362,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
                 }`}
                 onClick={handleSend}
                 title="发送消息 (Enter)"
+                aria-label="发送消息"
               >
                 <ArrowUp size={16} />
               </button>
@@ -348,6 +370,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 };

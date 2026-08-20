@@ -29,6 +29,12 @@
             <version>${project.version}</version>
         </dependency>
 
+        <dependency>
+            <groupId>butvan.agent</groupId>
+            <artifactId>server-feishu</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
     </dependencies>
 
     <properties>

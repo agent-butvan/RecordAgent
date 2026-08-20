@@ -1,9 +1,13 @@
 package butvan.agent.agents.config;
 
 import butvan.agent.agents.model.ModelSelector;
+import com.fasterxml.jackson.annotation.JsonAnyGetter;
+import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import lombok.AccessLevel;
 import lombok.Data;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -11,6 +15,8 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * 本地模型配置持久化服务
@@ -135,6 +141,39 @@ public class LocalConfigService {
          */
         private java.util.List<ProviderConfigData> providers = new java.util.ArrayList<>();
 
+        /**
+         * 配置文件中的未知顶层节点（例如后续新增的 feishu 渠道配置）。
+         *
+         * <p>读取时原样收进此集合，保存时原样写回，避免模型配置保存覆盖时
+         * 把其他模块写入 config.json 的配置丢掉。</p>
+         */
+        @Getter(AccessLevel.NONE)
+        private Map<String, Object> extraFields = new LinkedHashMap<>();
+
+        /**
+         * 未知顶层节点读取入口。
+         *
+         * @return 额外顶层节点
+         */
+        @JsonAnyGetter
+        public Map<String, Object> getExtraFields() {
+            return extraFields != null ? extraFields : Map.of();
+        }
+
+        /**
+         * 未知顶层节点写入入口。
+         *
+         * @param key   顶层节点名
+         * @param value 节点内容
+         */
+        @JsonAnySetter
+        public void setExtraField(String key, Object value) {
+            if (extraFields == null) {
+                extraFields = new LinkedHashMap<>();
+            }
+            extraFields.put(key, value);
+        }
+
         public ModelConfigData() {
         }
 
@@ -238,11 +277,46 @@ public class LocalConfigService {
                 parentDir.mkdirs();
             }
 
-            if (fullData.getVendor() == null || fullData.getVendor().isBlank()) {
-                fullData.setVendor(fullData.getActiveVendor());
-            }
-            if (fullData.getName() == null || fullData.getName().isBlank()) {
-                fullData.setName(fullData.getActiveModel());
+            // 合并写入：避免空 payload（例如前端 localStorage 为空时的挂载写回）整体覆盖本地已有配置。
+            if (configFile.exists() && configFile.isFile()) {
+                ModelConfigData existing = null;
+                try {
+                    existing = objectMapper.readValue(configFile, ModelConfigData.class);
+                } catch (Exception readEx) {
+                    log.warn("合并写入前读取本地配置失败，按空配置处理: {}", configPath, readEx);
+                }
+
+                if (existing != null) {
+                    if (isBlank(fullData.getVendor())) {
+                        fullData.setVendor(existing.getVendor());
+                    }
+                    if (isBlank(fullData.getName())) {
+                        fullData.setName(existing.getName());
+                    }
+                    if (isBlank(fullData.getApiKey())) {
+                        fullData.setApiKey(existing.getApiKey());
+                    }
+                    if (isBlank(fullData.getActiveVendor())) {
+                        fullData.setActiveVendor(existing.getActiveVendor());
+                    }
+                    if (isBlank(fullData.getActiveModel())) {
+                        fullData.setActiveModel(existing.getActiveModel());
+                    }
+                    if (fullData.getTemperature() == null) {
+                        fullData.setTemperature(existing.getTemperature());
+                    }
+                    if (fullData.getStream() == null) {
+                        fullData.setStream(existing.getStream());
+                    }
+                    if ((fullData.getProviders() == null || fullData.getProviders().isEmpty())
+                            && existing.getProviders() != null && !existing.getProviders().isEmpty()) {
+                        log.warn("收到空 providers 写回，保留本地已有 {} 个模型配置，防止配置被清空",
+                                existing.getProviders().size());
+                        fullData.setProviders(existing.getProviders());
+                    }
+                    // 保留未知顶层节点（如 feishu 等渠道配置），避免被前端整包覆盖丢掉
+                    existing.getExtraFields().forEach(fullData::setExtraField);
+                }
             }
 
             objectMapper.writeValue(configFile, fullData);
@@ -250,6 +324,13 @@ public class LocalConfigService {
         } catch (IOException e) {
             log.error("保存全量模型配置到本地文件失败: {}", configPath, e);
         }
+    }
+
+    /**
+     * 判断字符串为空或全空白。
+     */
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     /**

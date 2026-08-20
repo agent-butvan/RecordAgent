@@ -10,17 +10,19 @@ export interface SelectOption {
 export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   options: SelectOption[];
   icon?: React.ReactNode;
+  fieldSize?: 'sm' | 'md';
 }
 
 export const Select: React.FC<SelectProps> = ({
   options,
   icon,
+  fieldSize = 'sm',
   className = '',
   ...props
 }) => {
   return (
     <div className={styles.selectWrapper}>
-      <select className={`${styles.select} ${className}`} {...props}>
+      <select className={`${styles.select} ${styles[fieldSize]} ${className}`} {...props}>
         {options.map((opt) => (
           <option key={opt.value} value={opt.value}>
             {opt.label}

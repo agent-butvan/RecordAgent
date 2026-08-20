@@ -25,6 +25,7 @@
 | `agent-frontend/src-tauri/` | Tauri/Rust 桌面端能力；系统权限与原生能力必须最小化授权。 |
 | `agent-backend/server-network/` | Spring Boot 启动、Controller、DTO、API 通用能力、AOP 与网络适配层。 |
 | `agent-backend/server-agents/` | AgentScope、模型工厂、智能体编排、工作区与配置领域逻辑。 |
+| `agent-backend/server-feishu/` | 飞书等即时通讯渠道集成：长连接事件接收、消息收发与渠道适配；仅依赖 `server-agents`，不承载 Agent 编排逻辑。 |
 | `agent-backend/*/src/main/resources/` | 仅保存不含密钥的默认配置和资源；真实用户配置不得硬编码于 yml。 |
 | `.agentscope/` | AgentScope 运行态工作区；不得手工提交会话、日志、缓存或临时任务数据。 |
 | `docs/`（新增时） | 架构、接口、决策记录和操作文档；文档应使用中文，专业术语可保留英文。 |
@@ -87,7 +88,7 @@
 
 ## 六、子级 DOX 索引
 
-- 当前仓库尚未建立子级 `AGENTS.md`。
+- 已建立子级 `AGENTS.md`：`agent-backend/server-feishu/`（渠道集成模块职责与配置约束）。
 - 根目录负责项目级工程规范、目录边界、架构契约与根文档。
 - 当 `agent-frontend/` 或 `agent-backend/` 出现独立且稳定的局部规则时，应分别建立中文 `AGENTS.md`，并在本节登记其职责范围。
 

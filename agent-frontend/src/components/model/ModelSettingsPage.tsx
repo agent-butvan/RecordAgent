@@ -5,6 +5,9 @@ import { Button } from '../common/Button';
 import { Card } from '../common/Card';
 import { Toggle } from '../common/Toggle';
 import { Select } from '../common/Select';
+import { FormField } from '../common/FormField';
+import { TextInput } from '../common/TextInput';
+import { Modal } from '../common/Modal';
 import { Badge } from '../common/Badge';
 import { ModelCard } from './ModelCard';
 import {
@@ -40,15 +43,6 @@ const VENDOR_DEFAULT_URLS: Record<string, string> = {
   dashscope: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
   anthropic: 'https://api.anthropic.com/v1',
   ollama: 'http://localhost:11434/v1',
-};
-
-const VENDOR_DISPLAY_NAMES: Record<string, string> = {
-  gemini: 'Google Gemini',
-  deepseek: 'DeepSeek',
-  openai: 'OpenAI',
-  dashscope: '通义千问 (DashScope)',
-  anthropic: 'Anthropic Claude',
-  ollama: 'Ollama (Local)',
 };
 
 export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack }) => {
@@ -374,45 +368,44 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack }) 
             <div className={styles.topHeader}>
               <div>
                 <h2 className={styles.title}>模型配置列表 (Model List)</h2>
-                <p style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                <p className={styles.configSubtitle}>
                   托管在本地 ~/.butvan-agent/config.json 的多厂商 AI 大模型配置
                 </p>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div className={styles.headerActions}>
                 <Badge variant="primary">已配置 {allModels.length} 个模型</Badge>
-                <Button variant="primary" icon={<Plus size={15} />} onClick={() => setShowAddForm(!showAddForm)}>
-                  {showAddForm ? '取消添加' : '新增配置模型'}
+                <Button variant="primary" icon={<Plus size={15} />} onClick={() => setShowAddForm(true)}>
+                  新增配置模型
                 </Button>
               </div>
             </div>
 
-            {/* Inline Add Model Form Card */}
-            {showAddForm && (
-              <form onSubmit={handleSaveModel} style={{ background: '#f8fafc', padding: '20px', borderRadius: '8px', marginBottom: '24px', border: '1px solid #cbd5e1' }}>
-                <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '16px', color: '#0f172a' }}>
-                  新增 AI 大模型配置
-                </h3>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                  <div>
-                    <label className={styles.label}>模型供应商</label>
-                    <select
-                      className={styles.input}
+            {/* 新增模型配置弹框 */}
+            <Modal
+              open={showAddForm}
+              title="新增 AI 大模型配置"
+              onClose={() => setShowAddForm(false)}
+            >
+              <form onSubmit={handleSaveModel} className={styles.addForm}>
+                <div className={styles.formGrid}>
+                  <FormField label="模型供应商" htmlFor="model-vendor" required>
+                    <Select
+                      id="model-vendor"
+                      fieldSize="md"
+                      className={styles.fullWidth}
                       value={formVendor}
                       onChange={(e) => handleVendorChange(e.target.value)}
-                    >
-                      {supportedVendors.map((v) => (
-                        <option key={v} value={v}>
-                          {VENDOR_DISPLAY_NAMES[v] || v.toUpperCase()} ({v})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className={styles.label}>模型名称</label>
-                    <input
-                      className={styles.input}
+                      options={supportedVendors.map((v) => ({
+                        label: v,
+                        value: v,
+                      }))}
+                    />
+                  </FormField>
+
+                  <FormField label="模型名称 / ID" htmlFor="model-name" required>
+                    <TextInput
+                      id="model-name"
                       value={formName}
                       onChange={(e) => {
                         setFormName(e.target.value);
@@ -421,49 +414,38 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack }) 
                       placeholder="例如 gemini-2.5-flash / deepseek-chat"
                       required
                     />
-                  </div>
+                  </FormField>
                 </div>
 
-                <div style={{ marginBottom: '20px' }}>
-                  <label className={styles.label}>API Key 密钥</label>
-                  <input
-                    className={styles.input}
+                <FormField label="API Key 密钥" htmlFor="model-api-key" required>
+                  <TextInput
+                    id="model-api-key"
                     type="password"
                     value={formApiKey}
                     onChange={(e) => setFormApiKey(e.target.value)}
-                    placeholder={formVendor === 'ollama' ? 'Ollama 本地无需 API Key (选填)' : 'sk-... / AIza...'}
-                    required={formVendor !== 'ollama'}
+                    placeholder="sk-... / AIza..."
+                    required
+                    autoComplete="off"
                   />
-                </div>
+                </FormField>
 
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                <div className={styles.formActions}>
                   <Button type="button" variant="outline" onClick={() => setShowAddForm(false)}>取消</Button>
                   <Button type="submit" variant="primary">保存配置模型</Button>
                 </div>
               </form>
-            )}
+            </Modal>
 
             {/* EMPTY STATE */}
             {allModels.length === 0 ? (
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '60px 20px',
-                borderRadius: '8px',
-                border: '2px dashed #e2e8f0',
-                background: '#fafafa',
-                textAlign: 'center',
-                margin: '20px 0'
-              }}>
-                <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#e0e7ff', color: '#4338ca', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
-                  <Inbox size={32} />
+              <div className={styles.emptyState}>
+                <div className={styles.emptyIcon}>
+                  <Inbox size={30} />
                 </div>
-                <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#1e293b', margin: '0 0 6px' }}>
+                <h3 className={styles.emptyTitle}>
                   暂未配置任何 AI 大模型
                 </h3>
-                <p style={{ fontSize: '13px', color: '#64748b', maxWidth: '440px', lineHeight: 1.5, margin: '0 0 20px' }}>
+                <p className={styles.emptyDesc}>
                   本地配置文件 <code>~/.butvan-agent/config.json</code> 当前无任何有效模型。请点击下方按钮添加您的第一个 Gemini、DeepSeek 或 OpenAI 模型。
                 </p>
                 <Button variant="primary" icon={<Plus size={16} />} onClick={() => setShowAddForm(true)}>
@@ -472,7 +454,7 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack }) 
               </div>
             ) : (
               /* REAL MODEL LIST CARDS FROM config.json */
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div className={styles.modelList}>
                 {allModels.map((item) => {
                   const key = `${item.providerId}-${item.id}`;
                   const isActive = (item.providerId === activeProviderId || item.providerType === activeProviderId) && item.id === activeModelId;

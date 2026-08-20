@@ -1,0 +1,7 @@
+# macOS
+.DS_Store
+
+# 本地工具状态与缓存（不提交）
+.codex/
+.dsh-plugins/
+.impeccable/critique/

@@ -11,7 +11,7 @@ import java.util.Map;
  * <p>业务层只负责产生此事件，Controller 再将其转换为 SSE，避免 AgentScope 与 Spring Web
  * 相互耦合。</p>
  */
-public sealed interface AgentStreamEvent permits AgentStreamEvent.Completed, AgentStreamEvent.Failed, AgentStreamEvent.TextDelta, AgentStreamEvent.ThinkingDelta, AgentStreamEvent.ToolCall, AgentStreamEvent.ToolResult
+public sealed interface AgentStreamEvent permits AgentStreamEvent.Completed, AgentStreamEvent.Failed, AgentStreamEvent.PermissionRequired, AgentStreamEvent.TextDelta, AgentStreamEvent.ThinkingDelta, AgentStreamEvent.ToolCall, AgentStreamEvent.ToolResult
 {
 
     Logger log = LoggerFactory.getLogger(AgentStreamEvent.class);
@@ -156,6 +156,26 @@ public sealed interface AgentStreamEvent permits AgentStreamEvent.Completed, Age
                     "toolName", toolName != null ? toolName : "",
                     "result", result != null ? result : ""
             );
+        }
+    }
+
+
+    record PermissionRequired(String approvalId, PermissionToolDto firstTool) implements AgentStreamEvent{
+
+        @Override
+        public String eventName() {
+            return "permission_required";
+        }
+
+        @Override
+        public Object payload() {
+            return Map.of("approvalId", approvalId, "tool", firstTool);
+        }
+
+        /** 结束当前 SSE；恢复会由前端建立新的 SSE 连接。 */
+        @Override
+        public boolean isTerminal() {
+            return true;
         }
     }
 }

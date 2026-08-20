@@ -1,8 +1,6 @@
 package butvan.agent.network.controller;
 
-import butvan.agent.agents.agent.AgentService;
-import butvan.agent.agents.agent.AgentStreamEvent;
-import butvan.agent.agents.agent.AgentUserCall;
+import butvan.agent.agents.agent.*;
 import butvan.agent.agents.session.AgentStreamSession;
 import butvan.agent.network.annotation.ApiLog;
 import lombok.RequiredArgsConstructor;
@@ -25,54 +23,69 @@ public class AgentController {
 
     private final AgentService agentService;
 
-    /**
-     * Agent 对话 SSE 流式接口
-     *
-     * @param request 用户提问请求体 (sessionId 与 context)
-     * @return SseEmitter 事件流
-     */
+    @ApiLog("提交单条工具权限确认")
+    @PostMapping("/permission/decision")
+    public PermissionDecisionResponse decidePermission(
+            @RequestBody PermissionDecisionRequest request
+    ) {
+        return agentService.decidePermission(request);
+    }
+
+    @ApiLog("恢复已确认的Agent对话SSE流")
+    @PostMapping(value = "/permission/resume", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter resumeChat(@RequestBody PermissionResumeRequest request) {
+        AgentStreamSession session = agentService.resumeAgent(
+                request.sessionId(), request.approvalId());
+        return createEmitter(session); // 将原 streamChat 中的 emitter/发送线程逻辑提取到此方法。
+    }
+
     @ApiLog("Agent对话SSE流式推流")
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamChat(@RequestBody AgentUserCall request) {
-        // 0L 表示由应用控制何时关闭，不让 Spring 因默认超时提前断开流。
-        SseEmitter emitter = new SseEmitter(0L);
-        // 此调用只创建队列和生产线程，会很快返回，不会阻塞 Controller 请求线程。
-        AgentStreamSession session = agentService.streamAgent(request);
+        // 初始对话流和确认后的恢复流共用同一套 SSE 发送/断开逻辑。
+        return createEmitter(agentService.streamAgent(request));
+    }
 
-        // 发送线程专门负责“从队列取事件 → 写入 HTTP 响应”。
+    /**
+     * 将 Agent 事件队列转发为 HTTP SSE，并统一处理客户端断开。
+     *
+     * @param session 已经启动生产者的 Agent 流会话
+     * @return 返回给前端的 SSE 响应
+     */
+    private SseEmitter createEmitter(AgentStreamSession session) {
+        // 0L 表示由应用控制何时关闭，避免 Spring 默认超时中断等待确认的流。
+        SseEmitter emitter = new SseEmitter(0L);
+
         Thread sender = Thread.startVirtualThread(() -> {
             try {
-                // 客户端仍连接且线程未被中断时，持续等待下一条业务事件。
                 while (!Thread.currentThread().isInterrupted()) {
-                    // take() 在队列为空时等待；不需要手写轮询或 sleep。
+                    // 队列为空时阻塞等待；不会占用 CPU 轮询。
                     AgentStreamEvent event = session.queue().take();
-                    // SSE 同时写入 event 名称和 data 内容，浏览器据此区分事件类型。
                     emitter.send(SseEmitter.event()
                             .name(event.eventName())
                             .data(event.payload()));
-                    // done/error 已经写出，跳出循环，finally 会做统一清理。
+
+                    // done、error、permission_required 都是当前 SSE 的终态事件。
                     if (event.isTerminal()) {
                         return;
                     }
                 }
             } catch (IOException | IllegalStateException exception) {
-                // 常见于用户关闭页面或网络断开；记录调试日志即可，不再向已断开的客户端发送错误。
+                // 前端关闭页面或网络断开时，SseEmitter 可能抛出这些异常。
                 log.debug("SSE 客户端已断开", exception);
             } catch (InterruptedException exception) {
-                // onCompletion 触发 interrupt 后会来到这里；必须恢复中断标记。
+                // onCompletion 会中断 sender；恢复中断标记以便 finally 正常释放资源。
                 Thread.currentThread().interrupt();
             } finally {
-                // 无论正常结束、异常还是断开，都通知生产者停止。
+                // 发送端结束后终止仍在等待模型或队列的生产者线程。
                 session.cancel();
-                // 关闭 HTTP SSE 响应，释放 Spring 侧资源。
                 emitter.complete();
             }
         });
 
         emitter.onCompletion(() -> {
-            // 浏览器主动关闭连接时，中断消费者线程。
+            // 浏览器主动断开时，同时停止 SSE 消费线程与 Agent 生产线程。
             sender.interrupt();
-            // 同时取消仍可能运行的 AgentScope 生产者线程。
             session.cancel();
         });
 

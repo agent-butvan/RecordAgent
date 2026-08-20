@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { Trash2, Sparkles, Check } from 'lucide-react';
+import React from 'react';
+import { Trash2, Check, Loader2 } from 'lucide-react';
+import { VendorIcon } from './VendorIcon';
 import styles from './ModelCard.module.css';
 
-export interface ModelItem {
+export interface ModelCardItem {
   providerId: string;
   providerType: string;
   providerName?: string;
@@ -12,10 +13,11 @@ export interface ModelItem {
   apiKey?: string;
   description?: string;
   supportsReasoning?: boolean;
+  contextWindow?: number;
 }
 
 interface ModelCardProps {
-  item: ModelItem;
+  item: ModelCardItem;
   isActive: boolean;
   onSelect: () => void;
   onDelete: () => void;
@@ -24,23 +26,27 @@ interface ModelCardProps {
   testResult?: { success: boolean; message: string };
 }
 
-const VENDOR_LOGOS: Record<string, string> = {
-  gemini: '/vendors/gemini.png',
-  deepseek: '/vendors/deepseek.png',
-  openai: '/vendors/openai.png',
-  dashscope: '/vendors/dashscope.png',
-  anthropic: '/vendors/anthropic.png',
-  ollama: '/vendors/ollama.png',
-};
-
 const VENDOR_DISPLAY_NAMES: Record<string, string> = {
   gemini: 'Google Gemini',
   deepseek: 'DeepSeek',
   openai: 'OpenAI',
-  dashscope: '通义千问 (DashScope)',
+  dashscope: '通义千问',
+  qwen: '通义千问',
   anthropic: 'Anthropic Claude',
   ollama: 'Ollama',
 };
+
+/** 将上下文窗口长度格式化为可读的 K/M 单位。 */
+function formatContextWindow(n?: number): string | null {
+  if (!n || n <= 0) return null;
+  if (n >= 1_000_000) {
+    return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+  }
+  if (n >= 1_000) {
+    return `${Math.round(n / 1_000)}K`;
+  }
+  return `${n}`;
+}
 
 export const ModelCard: React.FC<ModelCardProps> = ({
   item,
@@ -49,76 +55,79 @@ export const ModelCard: React.FC<ModelCardProps> = ({
   onDelete,
   onTest,
   isTesting = false,
-  testResult
+  testResult,
 }) => {
-  const [imgError, setImgError] = useState(false);
-
   const vendorKey = (item.providerType || item.providerId || '').toLowerCase();
-  const logoPath = VENDOR_LOGOS[vendorKey];
   const vendorName = VENDOR_DISPLAY_NAMES[vendorKey] || item.providerName || vendorKey.toUpperCase();
+  const contextLabel = formatContextWindow(item.contextWindow);
 
   return (
     <div className={`${styles.card} ${isActive ? styles.cardActive : ''}`}>
-      <div className={styles.leftSection}>
-        {/* 厂商图标 */}
-        <div className={styles.iconWrapper}>
-          {!imgError && logoPath ? (
-            <img
-              src={logoPath}
-              alt={vendorName}
-              className={styles.vendorImg}
-              onError={() => setImgError(true)}
-            />
-          ) : (
-            <div className={styles.vendorFallback}>
-              {vendorName ? vendorName.charAt(0).toUpperCase() : <Sparkles size={16} />}
-            </div>
-          )}
+      <div className={styles.main}>
+        <div className={styles.iconTile} aria-hidden="true">
+          <VendorIcon vendor={vendorKey} size={22} />
         </div>
 
-        {/* 厂商 + 模型名称 */}
-        <div className={styles.infoGroup}>
-          <span className={styles.vendorText}>{vendorName}</span>
-          <span className={styles.modelName}>{item.name}</span>
+        <div className={styles.info}>
+          <div className={styles.metaRow}>
+            <span className={styles.vendorName}>{vendorName}</span>
+            {item.supportsReasoning && (
+              <span className={styles.reasoningTag}>思考</span>
+            )}
+            {contextLabel && (
+              <span className={styles.contextTag}>{contextLabel} 上下文</span>
+            )}
+          </div>
+
+          <span className={styles.modelName} title={item.id}>{item.name}</span>
+
+          {item.baseUrl && (
+            <span className={styles.baseUrl} title={item.baseUrl}>{item.baseUrl}</span>
+          )}
+
+          {item.description && (
+            <span className={styles.desc}>{item.description}</span>
+          )}
         </div>
       </div>
 
-      {/* 右侧极其平实的激活与操作栏 */}
-      <div className={styles.rightSection}>
+      <div className={styles.actions}>
         {testResult && (
-          <span
-            style={{
-              fontSize: '11px',
-              color: testResult.success ? '#059669' : '#dc2626',
-              marginRight: '4px'
-            }}
-          >
+          <span className={`${styles.testStatus} ${testResult.success ? styles.testOk : styles.testFail}`}>
             {testResult.success ? '连接正常' : '连接失败'}
           </span>
         )}
 
-        <button className={styles.testBtn} onClick={onTest} disabled={isTesting}>
-          {isTesting ? '测试中...' : '测试连接'}
-        </button>
-
-        {isActive ? (
-          <span className={styles.activeTag}>
-            <Check size={12} style={{ display: 'inline', marginRight: '4px' }} />
-            当前激活
-          </span>
-        ) : (
-          <button className={styles.selectBtn} onClick={onSelect}>
-            设为当前
+        <div className={styles.actionRow}>
+          <button
+            className={styles.testBtn}
+            onClick={onTest}
+            disabled={isTesting}
+          >
+            {isTesting && <Loader2 size={13} className={styles.spin} />}
+            {isTesting ? '测试中...' : '测试连接'}
           </button>
-        )}
 
-        <button
-          className={styles.deleteBtn}
-          onClick={onDelete}
-          title="删除模型"
-        >
-          <Trash2 size={14} />
-        </button>
+          {isActive ? (
+            <span className={styles.activeTag}>
+              <Check size={12} />
+              当前激活
+            </span>
+          ) : (
+            <button className={styles.selectBtn} onClick={onSelect}>
+              设为当前
+            </button>
+          )}
+
+          <button
+            className={styles.deleteBtn}
+            onClick={onDelete}
+            title="删除模型"
+            aria-label={`删除模型 ${item.name}`}
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
       </div>
     </div>
   );

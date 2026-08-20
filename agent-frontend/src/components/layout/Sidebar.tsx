@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   SquarePen,
   Trash2,
@@ -9,10 +9,12 @@ import {
   MessageSquare,
   ChevronRight,
   ChevronDown,
-  X
 } from 'lucide-react';
 import type { ChatSession, Project } from '../../types/chat';
 import { UserPopover } from '../common/UserPopover';
+import { FormField } from '../common/FormField';
+import { TextInput } from '../common/TextInput';
+import { Modal } from '../common/Modal';
 import styles from './Sidebar.module.css';
 
 interface SidebarProps {
@@ -55,6 +57,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [importPath, setImportPath] = useState('');
   const [importName, setImportName] = useState('');
 
+  // Esc 关闭弹窗与用户菜单
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsImportModalOpen(false);
+        setIsUserPopoverOpen(false);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
   // 区分普通会话与关联具体项目的会话
   const generalSessions = sessions.filter((s) => !s.projectId);
 
@@ -95,6 +109,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <button
               className={styles.iconBtnSmall}
               title="导入本地项目"
+              aria-label="导入本地项目"
               onClick={() => setIsImportModalOpen(true)}
             >
               <FolderPlus size={14} />
@@ -124,6 +139,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           <button
                             className={styles.iconBtnSmall}
                             title="在此项目下新建会话"
+                            aria-label="在此项目下新建会话"
                             onClick={() => onNewProjectChat(project.id)}
                           >
                             <Plus size={13} />
@@ -146,6 +162,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                   <button
                                     className={styles.deleteBtn}
                                     title="删除会话"
+                                    aria-label="删除会话"
                                     onClick={(e) => onDeleteSession(session.id, e)}
                                   >
                                     <Trash2 size={12} />
@@ -182,6 +199,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 className={styles.iconBtnSmall}
                 title="新建普通对话"
+                aria-label="新建普通对话"
                 onClick={onNewGeneralChat}
               >
                 <SquarePen size={14} />
@@ -254,6 +272,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <button
                         className={styles.deleteBtn}
                         title="删除会话"
+                        aria-label="删除会话"
                         onClick={(e) => onDeleteSession(session.id, e)}
                       >
                         <Trash2 size={12} />
@@ -268,56 +287,46 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* 导入项目 UI 弹窗 */}
-      {isImportModalOpen && (
-        <div className={styles.modalOverlay} onClick={() => setIsImportModalOpen(false)}>
-          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.modalHeader}>
-              <h3>导入本地项目</h3>
-              <button className={styles.modalCloseBtn} onClick={() => setIsImportModalOpen(false)}>
-                <X size={16} />
-              </button>
-            </div>
-            <form onSubmit={handleConfirmImport} className={styles.modalBody}>
-              <label className={styles.inputLabel}>
-                项目路径 (支持绝对路径)
-                <input
-                  type="text"
-                  className={styles.textInput}
-                  placeholder="/Users/username/Projects/my_project"
-                  value={importPath}
-                  onChange={(e) => setImportPath(e.target.value)}
-                  autoFocus
-                  required
-                />
-              </label>
+      <Modal
+        open={isImportModalOpen}
+        title="导入本地项目"
+        onClose={() => setIsImportModalOpen(false)}
+      >
+        <form onSubmit={handleConfirmImport} className={styles.modalBody}>
+          <FormField label="项目路径 (支持绝对路径)" htmlFor="import-path" required>
+            <TextInput
+              id="import-path"
+              placeholder="/Users/username/Projects/my_project"
+              value={importPath}
+              onChange={(e) => setImportPath(e.target.value)}
+              autoFocus
+              required
+            />
+          </FormField>
 
-              <label className={styles.inputLabel}>
-                项目别名 (可选)
-                <input
-                  type="text"
-                  className={styles.textInput}
-                  placeholder="项目名称（留空自动解析路径最后一级）"
-                  value={importName}
-                  onChange={(e) => setImportName(e.target.value)}
-                />
-              </label>
+          <FormField label="项目别名 (可选)" htmlFor="import-name">
+            <TextInput
+              id="import-name"
+              placeholder="项目名称（留空自动解析路径最后一级）"
+              value={importName}
+              onChange={(e) => setImportName(e.target.value)}
+            />
+          </FormField>
 
-              <div className={styles.modalActions}>
-                <button
-                  type="button"
-                  className={styles.cancelBtn}
-                  onClick={() => setIsImportModalOpen(false)}
-                >
-                  取消
-                </button>
-                <button type="submit" className={styles.submitBtn}>
-                  确认导入
-                </button>
-              </div>
-            </form>
+          <div className={styles.modalActions}>
+            <button
+              type="button"
+              className={styles.cancelBtn}
+              onClick={() => setIsImportModalOpen(false)}
+            >
+              取消
+            </button>
+            <button type="submit" className={styles.submitBtn}>
+              确认导入
+            </button>
           </div>
-        </div>
-      )}
+        </form>
+      </Modal>
 
       {/* 底部账户卡片 */}
       <div className={styles.footer}>
@@ -330,11 +339,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
           className={styles.userProfile}
           onClick={() => setIsUserPopoverOpen(!isUserPopoverOpen)}
           title="点击展开个人与系统菜单"
+          aria-label="打开用户菜单"
         >
-          <div className={styles.avatarCircle}>SB</div>
-          <span className={styles.userName}>Sean Bailey</span>
+          <div className={styles.avatarCircle}>BA</div>
+          <span className={styles.userName}>ButvanAgent</span>
         </div>
-        <button className={styles.actionIcon} title="帮助与设置" onClick={onOpenSettings}>
+        <button className={styles.actionIcon} title="帮助与设置" aria-label="帮助与设置" onClick={onOpenSettings}>
           <HelpCircle size={14} />
         </button>
       </div>

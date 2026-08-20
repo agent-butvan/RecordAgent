@@ -34,7 +34,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ onOpenSettings }) 
     setShowSubMenu(false);
   };
 
-  const displayModelName = activeModel?.name || '5.6 Terra';
+  const displayModelName = activeModel?.name || '选择模型';
 
   return (
     <div className={styles.container} ref={dropdownRef}>

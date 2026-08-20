@@ -20,10 +20,24 @@ export const Toggle: React.FC<ToggleProps> = ({
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (!disabled) {
+        onChange(!checked);
+      }
+    }
+  };
+
   return (
     <div
       className={`${styles.toggleContainer} ${disabled ? styles.disabled : ''}`}
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      tabIndex={disabled ? -1 : 0}
       onClick={handleClick}
+      onKeyDown={handleKeyDown}
     >
       <div className={`${styles.switch} ${checked ? styles.checked : ''}`}>
         <div className={`${styles.thumb} ${checked ? styles.thumbChecked : ''}`} />

@@ -9,7 +9,6 @@
   background-color: #ffffff;
   border: 1px solid #cbd5e1;
   border-radius: var(--radius-md);
-  padding: 6px 30px 6px 12px;
   font-family: var(--font-sans);
   font-size: 13px;
   font-weight: 500;
@@ -17,6 +16,15 @@
   outline: none;
   cursor: pointer;
   transition: all var(--transition-fast);
+}
+
+.sm {
+  padding: 6px 30px 6px 12px;
+}
+
+.md {
+  padding: 10px 32px 10px 14px;
+  border-radius: var(--radius-lg);
 }
 
 .select:hover {

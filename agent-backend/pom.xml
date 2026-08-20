@@ -20,6 +20,7 @@
     <modules>
         <module>server-network</module>
         <module>server-agents</module>
+        <module>server-feishu</module>
     </modules>
 
     <properties>
