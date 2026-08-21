@@ -562,6 +562,7 @@ export const MainLayout: React.FC<{
           />
           <ChatWorkspace
             messages={activeMessages}
+            sessionId={activeSessionId}
             onSendMessage={handleSendMessage}
             onOpenSettings={() => setIsSettingsOpen(true)}
             pendingPermission={pendingPermission}

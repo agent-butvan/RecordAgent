@@ -380,3 +380,16 @@ export async function deleteSessionApi(sessionId: string): Promise<{ success: bo
   }
 }
 
+/** 读取当前会话的任务计划书（不存在时返回 null）。 */
+export async function fetchPlan(sessionId: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/agent/chat/${sessionId}/plan`);
+    if (!res.ok) return null;
+    const json = (await res.json()) as { content?: string };
+    return json.content ?? null;
+  } catch (err) {
+    console.error('读取计划书失败:', err);
+    return null;
+  }
+}
+

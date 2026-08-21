@@ -577,3 +577,43 @@
 .actionBtn:hover {
   color: #4b5563;
 }
+
+/* 验收报告卡片样式 */
+.acceptanceReport {
+  border: 1px solid #d1e7dd;
+  border-left: 4px solid #198754;
+  border-radius: var(--radius-lg);
+  background: #f8fdf9;
+  padding: 16px 20px;
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text-primary);
+  word-break: break-word;
+  user-select: text;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.acceptanceReport h2 {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #198754;
+}
+
+.acceptanceReport p {
+  margin: 0 0 8px;
+}
+
+.acceptanceReport p:last-child {
+  margin-bottom: 0;
+}
+
+.acceptanceReport ol {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.acceptanceReport li {
+  margin-bottom: 6px;
+}

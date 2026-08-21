@@ -5,6 +5,7 @@ import type { ChatMessage } from '../../types/chat';
 import { Card } from '../common/Card';
 import { CommandCard } from './CommandCard';
 import { PermissionRequestCard } from './PermissionRequestCard';
+import { PlanApprovalCard } from './PlanApprovalCard';
 import type { PermissionToolPayload } from '../../services/api';
 import {
   Plus,
@@ -28,6 +29,7 @@ import styles from './ChatWorkspace.module.css';
 
 interface ChatWorkspaceProps {
   messages: ChatMessage[];
+  sessionId: string;
   onSendMessage: (prompt: string) => void;
   onOpenSettings: () => void;
   pendingPermission?: { assistantMessageId: string; tool: PermissionToolPayload } | null;
@@ -187,15 +189,23 @@ const AssistantMessageItem: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
       )}
 
       {/* 5. 最终回答正文 */}
-      <div className={styles.markdownBody}>
-        {msg.content ? (
+      {msg.content?.startsWith('## 验收报告') ? (
+        <article className={styles.acceptanceReport}>
           <ReactMarkdown remarkPlugins={[remarkGfm]}>
             {normalizeMarkdown(msg.content)}
           </ReactMarkdown>
-        ) : (
-          !hasReasoning && !hasTools && <span style={{ opacity: 0.5 }}>正在思考并生成回答...</span>
-        )}
-      </div>
+        </article>
+      ) : (
+        <div className={styles.markdownBody}>
+          {msg.content ? (
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {normalizeMarkdown(msg.content)}
+            </ReactMarkdown>
+          ) : (
+            !hasReasoning && !hasTools && <span style={{ opacity: 0.5 }}>正在思考并生成回答...</span>
+          )}
+        </div>
+      )}
 
       {/* 消息底部 4 个操作工具栏图标：复制、赞、踩、全屏/分享 */}
       {msg.content && (
@@ -220,6 +230,7 @@ const AssistantMessageItem: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
 
 export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   messages,
+  sessionId,
   onSendMessage,
   onOpenSettings,
   pendingPermission = null,
@@ -327,11 +338,19 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
       {/* 审批出现时完整替换输入区，避免 Agent 暂停时继续提交新问题。 */}
       {pendingPermission && onPermissionDecision ? (
         <div className={styles.permissionContainer}>
-          <PermissionRequestCard
-            tool={pendingPermission.tool}
-            isSubmitting={isPermissionSubmitting}
-            onDecision={onPermissionDecision}
-          />
+          {pendingPermission.tool.toolName === 'plan_exit' ? (
+            <PlanApprovalCard
+              sessionId={sessionId}
+              isSubmitting={isPermissionSubmitting}
+              onDecision={onPermissionDecision}
+            />
+          ) : (
+            <PermissionRequestCard
+              tool={pendingPermission.tool}
+              isSubmitting={isPermissionSubmitting}
+              onDecision={onPermissionDecision}
+            />
+          )}
         </div>
       ) : (
       <div className={styles.bottomContainer}>
