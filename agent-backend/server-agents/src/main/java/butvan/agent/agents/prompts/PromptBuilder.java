@@ -136,6 +136,7 @@ public class PromptBuilder {
                 .add(PromptsSections.identitySection())
                 .add(PromptsSections.systemSection())
                 .add(PromptsSections.doingTasksSection())
+                .add(PromptsSections.planAcceptanceSection())
                 .add(PromptsSections.executingActionsSection())
                 .add(PromptsSections.usingToolsSection())
                 .add(PromptsSections.toneStyleSection())

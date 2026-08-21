@@ -35,6 +35,7 @@ public record PermissionToolDto(
             case "write_file", "edit_file" -> "将修改本地文件内容";
             case "execute" -> "将在本地 Shell 中执行命令";
             case "http_request" -> "将向外部网络发送请求";
+            case "plan_exit" -> "将提交任务计划书，等待你审核批准后开始执行";
             default -> "改工具属于需要确认的高风险操作";
         };
     }

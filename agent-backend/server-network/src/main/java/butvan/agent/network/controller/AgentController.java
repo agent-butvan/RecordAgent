@@ -3,9 +3,11 @@ package butvan.agent.network.controller;
 import butvan.agent.agents.agent.*;
 import butvan.agent.agents.session.AgentStreamSession;
 import butvan.agent.network.annotation.ApiLog;
+import butvan.agent.network.dto.PlanResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -44,6 +46,17 @@ public class AgentController {
     public SseEmitter streamChat(@RequestBody AgentUserCall request) {
         // 初始对话流和确认后的恢复流共用同一套 SSE 发送/断开逻辑。
         return createEmitter(agentService.streamAgent(request));
+    }
+
+    @ApiLog("读取当前会话的任务计划书")
+    @GetMapping("/{sessionId}/plan")
+    public ResponseEntity<PlanResponse> currentPlan(@PathVariable String sessionId) {
+        String content = agentService.currentPlan(sessionId);
+        // 没有计划书时返回 404，前端据此展示空态
+        if (content == null || content.isBlank()) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(new PlanResponse(content));
     }
 
     /**

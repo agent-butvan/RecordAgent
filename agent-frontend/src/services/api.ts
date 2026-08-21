@@ -3,6 +3,7 @@ import type {
   SessionDetailDto,
   SessionKind,
 } from '../types/chat';
+import { invoke } from '@tauri-apps/api/core';
 
 export interface ModelConfig {
   vendor: string;
@@ -18,14 +19,49 @@ export interface ApiResponse<T> {
   data: T;
 }
 
-const API_BASE_URL = 'http://localhost:8081';
+/** 后端地址：浏览器/非 Tauri 环境回退到开发地址，Tauri 环境由 Rust 端动态注入 */
+let apiBaseUrl = 'http://localhost:8081';
+
+/** 判断当前是否运行在 Tauri 桌面端 */
+function isTauri(): boolean {
+  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+}
+
+/**
+ * 初始化后端 API 地址
+ *
+ * 在 Tauri 环境轮询 Rust 端 `get_backend_port` 命令，等待后端 sidecar
+ * 健康检查通过后写入动态端口；非 Tauri 环境保持开发地址不变。
+ * 应在应用渲染前调用一次。
+ */
+export async function initApiBaseUrl(): Promise<void> {
+  if (!isTauri()) return;
+
+  // 开发模式：后端由开发者在本机（如 IDEA）启动，直接连固定开发端口
+  const mode = await invoke<string>('get_backend_mode');
+  if (mode === 'dev') return;
+
+  // 最长等待 60 秒（后端启动通常需要数秒）
+  for (let i = 0; i < 120; i++) {
+    try {
+      const port = await invoke<number | null>('get_backend_port');
+      if (port) {
+        apiBaseUrl = `http://127.0.0.1:${port}`;
+        return;
+      }
+    } catch {
+      // 命令尚未就绪，继续轮询
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+}
 
 /**
  * 获取当前模型配置
  */
 export async function fetchModelConfig(): Promise<ModelConfig | null> {
   try {
-    const res = await fetch(`${API_BASE_URL}/agent/model/config`);
+    const res = await fetch(`${apiBaseUrl}/agent/model/config`);
     if (!res.ok) return null;
     const json: ApiResponse<ModelConfig> = await res.json();
     return json.data;
@@ -40,7 +76,7 @@ export async function fetchModelConfig(): Promise<ModelConfig | null> {
  */
 export async function fetchFullModelConfig(): Promise<any | null> {
   try {
-    const res = await fetch(`${API_BASE_URL}/agent/model/full-config`);
+    const res = await fetch(`${apiBaseUrl}/agent/model/full-config`);
     if (!res.ok) return null;
     const json: ApiResponse<any> = await res.json();
     return json.data;
@@ -55,7 +91,7 @@ export async function fetchFullModelConfig(): Promise<any | null> {
  */
 export async function saveFullModelConfig(fullConfig: any): Promise<{ success: boolean; message: string }> {
   try {
-    const res = await fetch(`${API_BASE_URL}/agent/model/full-config`, {
+    const res = await fetch(`${apiBaseUrl}/agent/model/full-config`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -77,7 +113,7 @@ export async function saveFullModelConfig(fullConfig: any): Promise<{ success: b
  */
 export async function fetchSupportedVendors(): Promise<string[]> {
   try {
-    const res = await fetch(`${API_BASE_URL}/agent/model/vendors`);
+    const res = await fetch(`${apiBaseUrl}/agent/model/vendors`);
     if (!res.ok) return ['gemini', 'openai', 'dashscope', 'deepseek', 'anthropic', 'ollama'];
     const json: ApiResponse<string[]> = await res.json();
     return json.data || [];
@@ -96,7 +132,7 @@ export async function saveModelConfig(params: {
   apiKey: string;
 }): Promise<{ success: boolean; message: string }> {
   try {
-    const res = await fetch(`${API_BASE_URL}/agent/model`, {
+    const res = await fetch(`${apiBaseUrl}/agent/model`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -156,7 +192,7 @@ export async function submitPermissionDecision(params: {
   approved: boolean;
   rememberForSession: boolean;
 }): Promise<PermissionDecisionResponse> {
-  const response = await fetch(`${API_BASE_URL}/agent/chat/permission/decision`, {
+  const response = await fetch(`${apiBaseUrl}/agent/chat/permission/decision`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params),
@@ -185,7 +221,7 @@ export async function streamAgentChat(
     const payloadContent = params.content || params.context || '';
     const isResume = Boolean(params.approvalId);
     const response = await fetch(
-      `${API_BASE_URL}/agent/chat${isResume ? '/permission/resume' : '/stream'}`,
+      `${apiBaseUrl}/agent/chat${isResume ? '/permission/resume' : '/stream'}`,
       {
       method: 'POST',
       headers: {
@@ -285,7 +321,7 @@ export async function streamAgentChat(
  */
 export async function fetchSessions(): Promise<SessionSummaryDto[]> {
   try {
-    const res = await fetch(`${API_BASE_URL}/agent/sessions`);
+    const res = await fetch(`${apiBaseUrl}/agent/sessions`);
     if (!res.ok) return [];
     const json: ApiResponse<SessionSummaryDto[]> = await res.json();
     return json.code === 200 && Array.isArray(json.data) ? json.data : [];
@@ -300,7 +336,7 @@ export async function fetchSessions(): Promise<SessionSummaryDto[]> {
  */
 export async function fetchSessionDetail(sessionId: string): Promise<SessionDetailDto | null> {
   try {
-    const res = await fetch(`${API_BASE_URL}/agent/sessions/${sessionId}`);
+    const res = await fetch(`${apiBaseUrl}/agent/sessions/${sessionId}`);
     if (!res.ok) return null;
     const json: ApiResponse<SessionDetailDto> = await res.json();
     return json.code === 200 ? json.data : null;
@@ -318,7 +354,7 @@ export async function createSessionApi(params?: {
   title?: string;
 }): Promise<{ success: boolean; data?: SessionSummaryDto; message?: string }> {
   try {
-    const res = await fetch(`${API_BASE_URL}/agent/sessions`, {
+    const res = await fetch(`${apiBaseUrl}/agent/sessions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -345,7 +381,7 @@ export async function updateSessionTitleApi(
   title: string
 ): Promise<{ success: boolean; data?: SessionSummaryDto; message?: string }> {
   try {
-    const res = await fetch(`${API_BASE_URL}/agent/sessions/${sessionId}`, {
+    const res = await fetch(`${apiBaseUrl}/agent/sessions/${sessionId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title }),
@@ -366,7 +402,7 @@ export async function updateSessionTitleApi(
  */
 export async function deleteSessionApi(sessionId: string): Promise<{ success: boolean; message?: string }> {
   try {
-    const res = await fetch(`${API_BASE_URL}/agent/sessions/${sessionId}`, {
+    const res = await fetch(`${apiBaseUrl}/agent/sessions/${sessionId}`, {
       method: 'DELETE',
     });
     const json: ApiResponse<void> = await res.json();
@@ -383,7 +419,7 @@ export async function deleteSessionApi(sessionId: string): Promise<{ success: bo
 /** 读取当前会话的任务计划书（不存在时返回 null）。 */
 export async function fetchPlan(sessionId: string): Promise<string | null> {
   try {
-    const res = await fetch(`${API_BASE_URL}/agent/chat/${sessionId}/plan`);
+    const res = await fetch(`${apiBaseUrl}/agent/chat/${sessionId}/plan`);
     if (!res.ok) return null;
     const json = (await res.json()) as { content?: string };
     return json.content ?? null;
@@ -392,4 +428,3 @@ export async function fetchPlan(sessionId: string): Promise<string | null> {
     return null;
   }
 }
-

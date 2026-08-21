@@ -23,6 +23,11 @@
 | `agent-frontend/src/context/` | 跨页面共享状态与领域上下文；不得把一次性局部状态提升到此处。 |
 | `agent-frontend/src/types/` | 前端领域类型、接口和 DTO 定义；禁止放置运行逻辑。 |
 | `agent-frontend/src-tauri/` | Tauri/Rust 桌面端能力；系统权限与原生能力必须最小化授权。 |
+| `agent-frontend/src-tauri/binaries/` | Tauri sidecar 产物目录：启动器脚本入库，fat jar 与最小 JRE 运行时不入库。 |
+| `agent-backend/scripts/` | 后端构建与打包脚本（sidecar 产物生成）；不得混入业务代码。 |
+| `scripts/` | 项目级一键打包脚本（前端 + 后端 sidecar 组装）；不得混入业务代码。 |
+| `scripts/backend-launcher/` | Windows 后端 sidecar 原生启动器源码（Rust）；由打包脚本在 Windows 上编译生成 exe。 |
+| `.github/workflows/` | GitHub Actions 自动化；当前含 tag 驱动的桌面端 Release 打包发布。 |
 | `agent-backend/server-network/` | Spring Boot 启动、Controller、DTO、API 通用能力、AOP 与网络适配层。 |
 | `agent-backend/server-agents/` | AgentScope、模型工厂、智能体编排、工作区与配置领域逻辑。 |
 | `agent-backend/server-feishu/` | 飞书等即时通讯渠道集成：长连接事件接收、消息收发与渠道适配；仅依赖 `server-agents`，不承载 Agent 编排逻辑。 |
@@ -37,6 +42,8 @@
 - 禁止提交 `node_modules`、`dist`、`target`、IDE 配置、日志、缓存、运行会话、真实密钥和用户本地配置。
 - 一个文件只承担一个清晰职责；页面编排、可复用组件、请求服务、领域类型和样式不得无边界混写。
 - 重命名、移动或删除文件后，必须同步更新所有导入、文档、测试和相关 `AGENTS.md` 索引。
+- 桌面端打包采用 Tauri sidecar 方案：统一入口为 `scripts/build-app.sh`（内部执行 `pnpm tauri build`，由 beforeBuildCommand 调用 `agent-backend/scripts/package-sidecar.sh` 生成后端 sidecar）；`pnpm tauri dev` 不打包、不拉起 sidecar，开发时后端在 IDEA 等本机环境启动（默认 8081）。打包模式下 Tauri（`src-tauri/src/backend.rs`）负责启动、健康检查与退出清理，端口动态分配；前端 API 地址由 `services/api.ts` 统一获取，禁止在组件中硬编码后端地址或端口。
+- 发布采用 git tag（`v*`）驱动：GitHub Actions（`.github/workflows/release.yml`）自动构建 macOS / Linux / Windows 安装包并上传草稿 Release；Windows 的 sidecar 由 Rust 原生启动器（`scripts/backend-launcher/`）支持。
 
 ## 三、后端工程规范
 

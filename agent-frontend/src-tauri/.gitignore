@@ -2,3 +2,7 @@
 # will have compiled files and executables
 /target/
 /gen/schemas
+
+# 后端 sidecar 构建产物（启动器脚本保留入库，jar 与 JRE 运行时不入库）
+/binaries/*.jar
+/binaries/butvan-backend-runtime/

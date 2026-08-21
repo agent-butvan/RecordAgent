@@ -1,0 +1,7 @@
+[package]
+name = "butvan-backend-launcher"
+version = "0.1.0"
+edition = "2021"
+description = "ButvanAgent 后端 sidecar 原生启动器（Windows 专用，兼容 Unix）"
+
+[dependencies]

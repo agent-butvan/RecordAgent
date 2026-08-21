@@ -24,6 +24,7 @@ import io.agentscope.core.permission.PermissionMode;
 import io.agentscope.core.state.AgentStateStore;
 import io.agentscope.harness.agent.HarnessAgent;
 import io.agentscope.harness.agent.memory.compaction.CompactionConfig;
+import io.agentscope.harness.agent.workspace.plan.PlanModeManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -297,6 +298,23 @@ public class AgentService {
     }
 
     /**
+     * 读取当前会话的任务计划书
+     * @param sessionId
+     * @return
+     */
+    public String currentPlan(String sessionId) {
+        // 复用会话有效性校验，防止读取已删除会话的文件
+        sessionCatalogService.requireActive(sessionId);
+        if (!modelHolder.isInitialized()) return "";
+        HarnessAgent agent = currentAgent();
+        RuntimeContext context = createRuntimeContext(sessionId);
+        // 计划文件默认位于工作区 plans/PLAN.md
+        String planPath = PlanModeManager.DEFAULT_PLAN_DIR + "/PLAN.md";
+        return agent.getWorkspaceManager()
+                .readManagedWorkspaceFileUtf8(context, planPath);
+    }
+
+    /**
      * 汇总实时工具事件
      * @param event
      * @param toolExecutions
@@ -397,6 +415,8 @@ public class AgentService {
                 .name("butvan_agent")
                 .sysPrompt(systemPrompt)
                 .model(model)
+                .enablePlanMode() // 开启计划模式
+                .planFileDirectory("plans")
                 .toolkit(toolRegistry.getToolkit())
                 .permissionContext(agentSecurity.createPermissionContext(permissionChecker))
                 .workspace(storageProperties.getWorkspaceDirectory())
@@ -431,7 +451,7 @@ public class AgentService {
             Map<String, TranscriptMessageDto.ToolExecutionDto> toolExecutions
     ) {
         String content = assistantContent.toString();
-        String thiking = assistantThinking.toString();
+        String thinking = assistantThinking.toString();
 
         // 防止系统时钟微笑回拨产生负数
         long durationMills = Math.max(0, Duration.between(statedAt, Instant.now()).toMillis());
@@ -440,7 +460,7 @@ public class AgentService {
                 sessionId,
                 turnId,
                 content,
-                thiking,
+                thinking,
                 status,
                 durationMills,
                 finalizeToolExecution(toolExecutions, status)

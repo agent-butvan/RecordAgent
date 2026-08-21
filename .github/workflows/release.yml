@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -25,8 +26,8 @@ jobs:
           body: |
             ## 构建产物
 
-            - 桌面端：macOS（dmg）、Windows（msi/nsis）、Linux（AppImage/deb）
-            - 后端：server-network 可执行 jar（运行需 Java 21）
+            - 桌面端：macOS（dmg/app）、Linux（AppImage/deb）、Windows（msi/nsis）
+            - 应用已内嵌后端（Tauri sidecar），无需单独下载后端 jar
           draft: true
           generate_release_notes: true
 
@@ -37,8 +38,8 @@ jobs:
       matrix:
         platform:
           - macos-latest
-          - windows-latest
           - ubuntu-latest
+          - windows-latest
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
@@ -46,7 +47,7 @@ jobs:
       - name: 安装 pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 10
 
       - name: 安装 Node.js
         uses: actions/setup-node@v4
@@ -58,6 +59,25 @@ jobs:
       - name: 安装 Rust 工具链
         uses: dtolnay/rust-toolchain@stable
 
+      # 后端 sidecar 打包需要 JDK 21（jlink/jdeps）与 Maven
+      - name: 安装 JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+
+      - name: 安装 Maven
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            brew install maven
+          elif [ "$RUNNER_OS" = "Linux" ]; then
+            sudo apt-get update && sudo apt-get install -y maven
+          else
+            choco install maven -y --no-progress
+          fi
+
       - name: 安装 Linux 系统依赖
         if: matrix.platform == 'ubuntu-latest'
         run: |
@@ -68,6 +88,8 @@ jobs:
         working-directory: agent-frontend
         run: pnpm install --frozen-lockfile
 
+      # beforeBuildCommand 会自动执行后端 sidecar 打包 + 前端构建，
+      # tauri-action 负责把 .dmg/.app、AppImage/.deb 上传到草稿 Release
       - name: 构建桌面安装包并上传
         uses: tauri-apps/tauri-action@v0
         env:
@@ -80,25 +102,11 @@ jobs:
           releaseDraft: true
           prerelease: false
 
-  upload-backend:
-    needs: create-release
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: 安装 JDK 21
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 21
-          cache: maven
-
-      - name: 构建后端 jar
-        working-directory: agent-backend
-        run: mvn -B package -DskipTests
-
-      - name: 上传后端 jar 到 Release
-        working-directory: agent-backend
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ github.ref_name }}" server-network/target/*.jar --clobber
+      # macOS 正式分发需要签名与公证，可将证书配置为仓库 Secrets 后启用：
+      # env:
+      #   APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      #   APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      #   APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+      #   APPLE_ID: ${{ secrets.APPLE_ID }}
+      #   APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+      #   APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}

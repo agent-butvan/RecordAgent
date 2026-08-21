@@ -34,7 +34,7 @@ public class AgentStorageProperties {
     private final Path workspaceDirectory;
 
     public AgentStorageProperties() {
-        rootDirectory = Paths.get(System.getProperty("user.home"), "butvan-agent");
+        rootDirectory = Paths.get(System.getProperty("user.home"), ".butvan-agent");
         sessionCatalogFile = rootDirectory.resolve("sessions").resolve("catalog.json");
         transcriptDirectory = rootDirectory.resolve("transcripts");
         agentStateDirectory = rootDirectory.resolve("agentscope").resolve("state");

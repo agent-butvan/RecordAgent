@@ -7,7 +7,7 @@
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
     "beforeDevCommand": "pnpm dev",
-    "beforeBuildCommand": "pnpm build"
+    "beforeBuildCommand": "bash ../agent-backend/scripts/package-sidecar.sh && pnpm build"
   },
   "app": {
     "windows": [
@@ -26,6 +26,13 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "externalBin": [
+      "binaries/butvan-backend"
+    ],
+    "resources": {
+      "binaries/butvan-backend.jar": "butvan-backend.jar",
+      "binaries/butvan-backend-runtime/": "butvan-backend-runtime/"
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

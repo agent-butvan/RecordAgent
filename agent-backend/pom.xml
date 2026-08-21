@@ -25,7 +25,8 @@
 
     <properties>
         <java.version>21</java.version>
-        <lombok.version>1.18.34</lombok.version>
+        <maven.compiler.proc>full</maven.compiler.proc>
+        <lombok.version>1.18.38</lombok.version>
         <agentscope.version>2.0.0</agentscope.version>
     </properties>
 
@@ -41,7 +42,7 @@
             <dependency>
                 <groupId>org.projectlombok</groupId>
                 <artifactId>lombok</artifactId>
-                <version>1.18.34</version>
+                <version>${lombok.version}</version>
             </dependency>
             <dependency>
                 <groupId>io.agentscope</groupId>

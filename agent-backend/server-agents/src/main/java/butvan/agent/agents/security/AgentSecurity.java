@@ -38,6 +38,7 @@ public class AgentSecurity {
         addAsk(builder, "write_file");
         addAsk(builder, "edit_file");
         addAsk(builder, "execute");
+        addAllow(builder, "plan_exit");
 
         return builder.build();
     }

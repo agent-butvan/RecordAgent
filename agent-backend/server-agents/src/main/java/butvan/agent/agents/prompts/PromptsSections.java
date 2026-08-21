@@ -61,6 +61,23 @@ public final class PromptsSections {
         return new PromptSection("DoingTasks", 20, DOING_TASKS_CONTENT);
     }
 
+    // ── Priority 25: Plan & Acceptance ───────────────────────────────────
+
+    static final String PLAN_ACCEPTANCE_CONTENT = """
+        # 任务规划与验收
+        - 接到多步骤、模糊或高风险任务时，先调用 plan_enter 进入计划模式：
+          只读调查现状，用 plan_write 输出计划书（包含目标、步骤、风险、验收标准），
+          再调用 plan_exit 提交用户审批；批准后才开始修改文件。
+        - 执行阶段用 todo_write 维护任务清单：同一时间只保留一个 in_progress，
+          每完成一步立即更新为 completed，并做对应验证；全部完成后不留未完成项。
+        - 所有步骤完成后，必须调用 acceptance_report 逐项自检：
+          未完成或部分完成的项目如实标记并说明原因，严禁虚报。
+        - 最后以「## 验收报告」开头的 markdown 向用户展示验收结果。""";
+
+    public static PromptSection planAcceptanceSection() {
+        return new PromptSection("PlanAcceptance", 25, PLAN_ACCEPTANCE_CONTENT);
+    }
+
     // ── Priority 30: Executing Actions ──────────────────────────────────
 
     static final String EXECUTING_ACTIONS_CONTENT = """
