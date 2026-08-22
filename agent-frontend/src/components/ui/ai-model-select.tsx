@@ -320,7 +320,7 @@ function assignRef<T>(
     if (typeof ref === "function") {
       ref(node)
     } else if (ref) {
-      ;(ref as React.MutableRefObject<T | null>).current = node
+      ; (ref as React.MutableRefObject<T | null>).current = node
     }
   }
 }
@@ -800,13 +800,13 @@ const ModelSelectorTrigger = React.forwardRef<
   const isDisabled = disabled || rootDisabled
   const label = selectedModel
     ? [
-        selectedModel.label,
-        selection.effort ? EFFORT_LABEL[selection.effort] : null,
-        selection.fast ? "Fast" : null,
-        selection.thinking ? "Thinking" : null,
-      ]
-        .filter(Boolean)
-        .join(" ")
+      selectedModel.label,
+      selection.effort ? EFFORT_LABEL[selection.effort] : null,
+      selection.fast ? "Fast" : null,
+      selection.thinking ? "Thinking" : null,
+    ]
+      .filter(Boolean)
+      .join(" ")
     : "Select model"
 
   return (

@@ -44,7 +44,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ onOpenSettings, cl
   const [isOpen, setIsOpen] = useState(false);
   const [hoveredModelId, setHoveredModelId] = useState<string | null>(null);
   const [pinnedDetailId, setPinnedDetailId] = useState<string | null>(null);
-  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
+  const [coords, setCoords] = useState<{ bottom: number; left: number } | null>(null);
   const [mounted, setMounted] = useState(false);
 
   const reduceMotion = usePrefersReducedMotion();
@@ -68,10 +68,19 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ onOpenSettings, cl
       const trigger = triggerRef.current;
       if (!trigger) return;
       const rect = trigger.getBoundingClientRect();
-      // Position above the toolbar with 8px margin
+      const popoverBottom = window.innerHeight - rect.top + 8;
+      const totalWidth = 480;
+      let left = rect.right - totalWidth;
+      if (left < 16) {
+        left = Math.max(16, rect.left);
+      }
+      if (left + totalWidth > window.innerWidth - 16) {
+        left = Math.max(16, window.innerWidth - totalWidth - 16);
+      }
+
       setCoords({
-        top: rect.top - 8,
-        left: Math.max(12, Math.min(rect.left, window.innerWidth - 490)),
+        bottom: popoverBottom,
+        left,
       });
     };
 
@@ -188,7 +197,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ onOpenSettings, cl
                 initial={
                   reduceMotion
                     ? { opacity: 0 }
-                    : { opacity: 0, y: 6, scale: 0.97, filter: 'blur(4px)' }
+                    : { opacity: 0, y: 8, scale: 0.96, filter: 'blur(4px)' }
                 }
                 animate={
                   reduceMotion
@@ -198,13 +207,12 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ onOpenSettings, cl
                 exit={
                   reduceMotion
                     ? { opacity: 0 }
-                    : { opacity: 0, y: 4, scale: 0.98, filter: 'blur(2px)' }
+                    : { opacity: 0, y: 6, scale: 0.98, filter: 'blur(2px)' }
                 }
                 transition={{ duration: 0.18, ease: EASE }}
                 style={{
-                  top: coords.top,
+                  bottom: coords.bottom,
                   left: coords.left,
-                  transform: 'translateY(-100%)',
                 }}
               >
                 {/* Left Panel: Model List */}
