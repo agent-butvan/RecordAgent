@@ -4,18 +4,33 @@ import {
   Trash2,
   Folder,
   Plus,
-  HelpCircle,
   FolderPlus,
   MessageSquare,
   ChevronRight,
   ChevronDown,
+  User,
+  Settings,
 } from 'lucide-react';
 import type { ChatSession, Project } from '../../types/chat';
-import { UserPopover } from '../common/UserPopover';
 import { FormField } from '../common/FormField';
 import { TextInput } from '../common/TextInput';
 import { Modal } from '../common/Modal';
+import { EmailBindingModal } from '../account/EmailBindingModal';
+import { fetchAccountStatus } from '../../services/api';
 import styles from './Sidebar.module.css';
+
+function getAvatarText(email: string | null): string {
+  if (!email) return '';
+  const prefix = email.split('@')[0] || '';
+  const clean = prefix.replace(/[^a-zA-Z0-9]/g, '');
+  if (clean.length >= 2) {
+    return clean.slice(0, 2).toUpperCase();
+  }
+  if (clean.length === 1) {
+    return clean.toUpperCase();
+  }
+  return email.slice(0, 1).toUpperCase() || 'U';
+}
 
 interface SidebarProps {
   projects: Project[];
@@ -28,6 +43,7 @@ interface SidebarProps {
   onDeleteSession: (id: string, e: React.MouseEvent) => void;
   onUpdateSessionTitle?: (id: string, newTitle: string) => void;
   onOpenSettings: () => void;
+  onOpenAccountSettings: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -41,8 +57,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onDeleteSession,
   onUpdateSessionTitle,
   onOpenSettings,
+  onOpenAccountSettings,
 }) => {
-  const [isUserPopoverOpen, setIsUserPopoverOpen] = useState(false);
+  const [isEmailBindingOpen, setIsEmailBindingOpen] = useState(false);
+  const [maskedEmail, setMaskedEmail] = useState<string | null>(null);
 
   // 双击修改会话标题状态
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
@@ -62,11 +80,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setIsImportModalOpen(false);
-        setIsUserPopoverOpen(false);
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  useEffect(() => {
+    fetchAccountStatus().then((status) => setMaskedEmail(status?.bound ? status.maskedEmail : null));
   }, []);
 
   // 区分普通会话与关联具体项目的会话
@@ -328,24 +349,44 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </form>
       </Modal>
 
-      {/* 底部账户卡片 */}
+      <EmailBindingModal
+        open={isEmailBindingOpen}
+        onClose={() => setIsEmailBindingOpen(false)}
+        onBound={setMaskedEmail}
+      />
+
+      {/* 底部用户个人信息与系统设置 */}
       <div className={styles.footer}>
-        <UserPopover
-          isOpen={isUserPopoverOpen}
-          onClose={() => setIsUserPopoverOpen(false)}
-          onOpenSettings={onOpenSettings}
-        />
-        <div
-          className={styles.userProfile}
-          onClick={() => setIsUserPopoverOpen(!isUserPopoverOpen)}
-          title="点击展开个人与系统菜单"
-          aria-label="打开用户菜单"
+        <button
+          className={styles.userProfileCard}
+          type="button"
+          onClick={() => (maskedEmail ? onOpenAccountSettings() : setIsEmailBindingOpen(true))}
+          title={maskedEmail ? `已绑定账号：${maskedEmail}（点击进入账户设置）` : '点击绑定邮箱'}
         >
-          <div className={styles.avatarCircle}>BA</div>
-          <span className={styles.userName}>ButvanAgent</span>
-        </div>
-        <button className={styles.actionIcon} title="帮助与设置" aria-label="帮助与设置" onClick={onOpenSettings}>
-          <HelpCircle size={14} />
+          <div className={styles.avatarWrapper}>
+            <div className={`${styles.avatar} ${maskedEmail ? styles.avatarBound : styles.avatarUnbound}`}>
+              {maskedEmail ? getAvatarText(maskedEmail) : <User size={14} />}
+            </div>
+            {maskedEmail && <span className={styles.verifiedDot} title="已验证" />}
+          </div>
+          <div className={styles.profileInfo}>
+            <span className={styles.profileName}>
+              {maskedEmail || '未绑定邮箱'}
+            </span>
+            <span className={styles.profileStatus}>
+              {maskedEmail ? '个人账户' : '点击绑定'}
+            </span>
+          </div>
+        </button>
+
+        <button
+          className={styles.settingsBtn}
+          type="button"
+          title="系统设置"
+          aria-label="系统设置"
+          onClick={onOpenSettings}
+        >
+          <Settings size={15} />
         </button>
       </div>
     </aside>
