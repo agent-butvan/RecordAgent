@@ -314,8 +314,13 @@ public class LocalConfigService {
                                 existing.getProviders().size());
                         fullData.setProviders(existing.getProviders());
                     }
-                    // 保留未知顶层节点（如 feishu 等渠道配置），避免被前端整包覆盖丢掉
-                    existing.getExtraFields().forEach(fullData::setExtraField);
+                    // 保留本次写入未提供的未知顶层节点（如 feishu 等渠道配置），
+                    // 但不能以旧值覆盖账户等模块本次明确更新的字段。
+                    existing.getExtraFields().forEach((key, value) -> {
+                        if (!fullData.getExtraFields().containsKey(key)) {
+                            fullData.setExtraField(key, value);
+                        }
+                    });
                 }
             }
 

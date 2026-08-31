@@ -3,6 +3,7 @@ import type {
   SessionDetailDto,
   SessionKind,
 } from '../types/chat';
+import type { SubagentProgressDto } from '../types/team';
 import { invoke } from '@tauri-apps/api/core';
 
 export interface ModelConfig {
@@ -19,8 +20,19 @@ export interface ApiResponse<T> {
   data: T;
 }
 
+export interface AccountStatus {
+  bound: boolean;
+  maskedEmail: string | null;
+  emailNotificationsEnabled: boolean;
+}
+
 /** 后端地址：浏览器/非 Tauri 环境回退到开发地址，Tauri 环境由 Rust 端动态注入 */
 let apiBaseUrl = 'http://localhost:8081';
+
+/** 获取当前生效的后端 API 基础地址（供其它 service 复用，禁止在组件中直接访问）。 */
+export function getApiBaseUrl(): string {
+  return apiBaseUrl;
+}
 
 /** 判断当前是否运行在 Tauri 桌面端 */
 function isTauri(): boolean {
@@ -152,6 +164,44 @@ export async function saveModelConfig(params: {
   }
 }
 
+/** 获取当前设备的邮箱绑定状态。 */
+export async function fetchAccountStatus(): Promise<AccountStatus | null> {
+  try {
+    const response = await fetch(`${apiBaseUrl}/agent/account/status`);
+    if (!response.ok) return null;
+    const json: ApiResponse<AccountStatus> = await response.json();
+    return json.code === 200 ? json.data : null;
+  } catch {
+    return null;
+  }
+}
+
+async function accountRequest<T>(path: string, body: Record<string, string>): Promise<{ success: boolean; message: string; data?: T }> {
+  try {
+    const response = await fetch(`${apiBaseUrl}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const json: ApiResponse<T> = await response.json();
+    return json.code === 200
+      ? { success: true, message: json.message || '操作成功', data: json.data }
+      : { success: false, message: json.message || '操作失败' };
+  } catch {
+    return { success: false, message: '无法连接后端服务，请稍后重试' };
+  }
+}
+
+/** 发送邮箱绑定验证码。 */
+export async function sendEmailVerificationCode(email: string) {
+  return accountRequest<string>('/agent/account/verification-code', { email });
+}
+
+/** 校验验证码并将邮箱绑定到当前设备。 */
+export async function bindEmailAccount(params: { email: string; password: string; verificationCode: string }) {
+  return accountRequest<AccountStatus>('/agent/account/bind', params);
+}
+
 export interface ToolCallPayload {
   toolCallId?: string;
   toolName?: string;
@@ -182,6 +232,17 @@ export interface PermissionRequiredPayload {
 export interface PermissionDecisionResponse {
   readyToResume: boolean;
   nextTool: PermissionToolPayload | null;
+}
+
+function isSubagentProgressDto(value: unknown): value is SubagentProgressDto {
+  if (typeof value !== 'object' || value === null) return false;
+  const event = value as Record<string, unknown>;
+  return (
+    typeof event.source === 'string' &&
+    typeof event.agentId === 'string' &&
+    typeof event.content === 'string' &&
+    (event.eventType === 'start' || event.eventType === 'text' || event.eventType === 'tool' || event.eventType === 'end')
+  );
 }
 
 /** 提交一条工具授权决定；本批全部完成时响应会标记 readyToResume。 */
@@ -215,7 +276,8 @@ export async function streamAgentChat(
   onToolCall?: (payload: ToolCallPayload) => void,
   onToolResult?: (payload: ToolResultPayload) => void,
   onThinking?: (thinkingText: string) => void,
-  onPermissionRequired?: (payload: PermissionRequiredPayload) => void
+  onPermissionRequired?: (payload: PermissionRequiredPayload) => void,
+  onSubagentProgress?: (payload: SubagentProgressDto) => void
 ): Promise<void> {
   try {
     const payloadContent = params.content || params.context || '';
@@ -284,6 +346,14 @@ export async function streamAgentChat(
           onPermissionRequired?.(JSON.parse(dataStr) as PermissionRequiredPayload);
         } catch {
           onError?.(new Error('权限确认事件格式错误'));
+        }
+      } else if (eventName === 'subagent') {
+        try {
+          const payload: unknown = JSON.parse(dataStr);
+          if (!isSubagentProgressDto(payload)) throw new Error('invalid payload');
+          onSubagentProgress?.(payload);
+        } catch {
+          onError?.(new Error('子 Agent 进度事件格式错误'));
         }
       } else if (eventName === 'error') {
         streamFinished = true;

@@ -13,7 +13,6 @@ interface ModelSelectorProps {
 
 const EASE = [0.2, 0, 0, 1] as const;
 const SPRING_SOFT = { type: 'spring' as const, stiffness: 420, damping: 32 };
-const SPRING_PRESS = { type: 'spring' as const, stiffness: 500, damping: 28 };
 
 function usePrefersReducedMotion() {
   const [reduceMotion, setReduceMotion] = useState(false);
@@ -149,7 +148,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ onOpenSettings, cl
   return (
     <div className={`${styles.container} ${className || ''}`}>
       {/* Trigger Button */}
-      <motion.button
+      <button
         ref={triggerRef}
         type="button"
         className={`${styles.triggerBtn} ${isOpen ? styles.triggerBtnOpen : ''}`}
@@ -160,9 +159,6 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ onOpenSettings, cl
             setHoveredModelId(null);
           }
         }}
-        whileHover={reduceMotion ? undefined : { scale: 1.02, y: -1 }}
-        whileTap={reduceMotion ? undefined : { scale: 0.97 }}
-        transition={SPRING_PRESS}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         title="点击切换模型"
@@ -184,7 +180,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ onOpenSettings, cl
         >
           <ChevronDown size={13} />
         </motion.span>
-      </motion.button>
+      </button>
 
       {/* Floating Popover via Portal */}
       {mounted &&
@@ -269,19 +265,14 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ onOpenSettings, cl
                                 </span>
 
                                 <div className={styles.itemTextGroup}>
-                                  <div className={styles.itemTitleRow}>
-                                    <span className={styles.itemName}>{model.name}</span>
-                                    {model.supportsReasoning && (
-                                      <span
-                                        className={`${styles.itemTag} ${styles.itemTagReasoning}`}
-                                      >
-                                        推理
-                                      </span>
-                                    )}
-                                  </div>
-                                  <span className={styles.itemProviderName}>
-                                    {model.providerName}
-                                  </span>
+                                  <span className={styles.itemName}>{model.name}</span>
+                                  {model.supportsReasoning && (
+                                    <span
+                                      className={`${styles.itemTag} ${styles.itemTagReasoning}`}
+                                    >
+                                      推理
+                                    </span>
+                                  )}
                                 </div>
 
                                 {isSelected && (

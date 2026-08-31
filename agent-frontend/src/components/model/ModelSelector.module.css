@@ -10,30 +10,27 @@
 .triggerBtn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   min-height: 28px;
-  padding: 3px 8px;
+  padding: 2px 4px;
   background: transparent;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  color: var(--text-secondary, #4b5563);
-  font-size: 12px;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-primary, #111827);
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   user-select: none;
-  transition: all 0.15s cubic-bezier(0.2, 0, 0, 1);
+  transition: opacity 0.15s ease;
 }
 
 .triggerBtn:hover {
-  background: var(--bg-surface-hover, #f1f3f5);
-  color: var(--text-primary, #111827);
-  border-color: var(--border-subtle, #e5e7eb);
+  background: transparent;
+  opacity: 0.8;
 }
 
 .triggerBtnOpen {
-  background: var(--bg-surface-hover, #f1f3f5);
-  color: var(--text-primary, #111827);
-  border-color: var(--border-subtle, #e5e7eb);
+  background: transparent;
 }
 
 .triggerModelInfo {
@@ -188,16 +185,10 @@
 
 .itemTextGroup {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 6px;
   min-width: 0;
   flex: 1;
-  gap: 1px;
-}
-
-.itemTitleRow {
-  display: flex;
-  align-items: center;
-  gap: 5px;
 }
 
 .itemName {
@@ -222,14 +213,6 @@
 .itemTagReasoning {
   background: #f5f3ff;
   color: #7c3aed;
-}
-
-.itemProviderName {
-  font-size: 11px;
-  color: var(--text-muted, #9ca3af);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .itemCheckIcon {

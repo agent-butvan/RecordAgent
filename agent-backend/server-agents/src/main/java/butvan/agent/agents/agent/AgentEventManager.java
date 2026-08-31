@@ -1,0 +1,110 @@
+package butvan.agent.agents.agent;
+
+import butvan.agent.agents.agent.event.AgentStreamEvent;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.agentscope.core.event.*;
+import org.springframework.stereotype.Component;
+
+import java.util.Map;
+
+/**
+ * 将 AgentScope 原始事件翻译为项目 SSE 业务事件。
+ *
+ * <p>纯翻译模块：不持有会话状态、不落库、不打业务日志以外的副作用。
+ * 工具参数增量缓冲由调用方传入（缓冲本身属于 AgentRun）。</p>
+ */
+@Component
+public class AgentEventManager {
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    public AgentStreamEvent map(AgentEvent event, Map<String, StringBuilder> toolArgsBuffer) {
+
+        if (event.getSource() != null) {
+            String source = event.getSource();
+            String agentId = parseAgentId(source);
+            if (event instanceof AgentStartEvent) {
+                return new AgentStreamEvent.SubagentProgress(source, agentId, "start", "");
+            }
+            if (event instanceof AgentEndEvent) {
+                return new AgentStreamEvent.SubagentProgress(source, agentId, "end", "");
+            }
+            if (event instanceof TextBlockDeltaEvent text) {
+                return new AgentStreamEvent.SubagentProgress(source, agentId, "text", text.getDelta());
+            }
+            if (event instanceof ToolCallStartEvent tool) {
+                return new AgentStreamEvent.SubagentProgress(
+                        source, agentId, "tool", tool.getToolCallName());
+            }
+            return null; // 其余子事件（thinking/结果增量等）暂不展示
+        }
+
+        // 文本增量：直接透传为业务事件
+        if (event instanceof TextBlockDeltaEvent textEvent) {
+            return new AgentStreamEvent.TextDelta(textEvent.getDelta());
+        }
+        // 思考增量：直接透传为业务事件
+        if (event instanceof ThinkingBlockDeltaEvent thinkingEvent) {
+            return new AgentStreamEvent.ThinkingDelta(thinkingEvent.getDelta());
+        }
+        // Agent 正常结束
+        if (event instanceof AgentEndEvent) {
+            return new AgentStreamEvent.Completed();
+        }
+        // 工具参数增量：只累积进缓冲，不单独产出业务事件
+        if (event instanceof ToolCallDeltaEvent deltaEvent) {
+            toolArgsBuffer.computeIfAbsent(deltaEvent.getToolCallId(), ignored -> new StringBuilder())
+                    .append(deltaEvent.getDelta() == null ? "" : deltaEvent.getDelta());
+            return null;
+        }
+        // 工具开始：command 未知，先给空串
+        if (event instanceof ToolCallStartEvent startEvent) {
+            return new AgentStreamEvent.ToolCall(
+                    startEvent.getToolCallId(), startEvent.getToolCallName(), "");
+        }
+        // 工具结束：取走累积参数并解析 command（原 payload() 的发起日志可收敛到这里）
+        if (event instanceof ToolCallEndEvent endEvent) {
+            String rawArguments = String.valueOf(toolArgsBuffer.remove(endEvent.getToolCallId()));
+            return new AgentStreamEvent.ToolCall(
+                    endEvent.getToolCallId(),
+                    endEvent.getToolCallName(),
+                    parseCommandFromArguments(rawArguments));
+        }
+        // 工具结果增量：追加到业务事件（原 payload() 的结果日志可收敛到这里）
+        if (event instanceof ToolResultTextDeltaEvent resultEvent) {
+            return new AgentStreamEvent.ToolResult(
+                    resultEvent.getToolCallId(),
+                    resultEvent.getToolCallName(),
+                    resultEvent.getDelta());
+        }
+        // 其余尚未接入 UI 的事件：显式忽略
+        return null;
+    }
+
+    /** 尝试从工具参数 JSON 取 command；非 JSON 参数则原样返回供 UI 展示。 */
+    private String parseCommandFromArguments(String rawArguments) {
+        // 空参数或 "null" 字面量：没有可展示的 command
+        if (rawArguments == null || rawArguments.isBlank() || "null".equals(rawArguments)) {
+            return "";
+        }
+        try {
+            // 参数是合法 JSON：优先取 command 字段
+            JsonNode node = objectMapper.readTree(rawArguments);
+            return node.has("command") ? node.get("command").asText() : rawArguments;
+        } catch (Exception exception) {
+            // 参数不是合法 JSON：原样返回供 UI 展示
+            return rawArguments;
+        }
+    }
+
+    /**
+     * 从 source 路径去最后一段 agentId
+     * @param source
+     * @return
+     */
+    private static String parseAgentId(String source) {
+        int idx = source == null ? -1 : source.lastIndexOf('/');
+        return idx >= 0 ? source.substring(idx + 1) : source;
+    }
+}

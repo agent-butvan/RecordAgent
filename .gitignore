@@ -8,6 +8,7 @@ docs/
 .codex/
 .dsh-plugins/
 .impeccable/critique/
+.impeccable/review/
 
 # 后端启动器构建产物
 scripts/backend-launcher/target/

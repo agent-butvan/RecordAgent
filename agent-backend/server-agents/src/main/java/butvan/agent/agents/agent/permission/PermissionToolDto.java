@@ -1,4 +1,4 @@
-package butvan.agent.agents.agent;
+package butvan.agent.agents.agent.permission;
 
 import io.agentscope.core.message.ToolUseBlock;
 

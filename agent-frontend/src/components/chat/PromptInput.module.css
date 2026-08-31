@@ -1,0 +1,128 @@
+/* PromptInput.module.css - ChatGPT 风格 AI 对话输入框 */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 8px;
+  background-color: #ffffff;
+  border: 1px solid var(--border-medium);
+  border-radius: 28px;
+  cursor: text;
+  transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.container:focus-within {
+  border-color: var(--border-focus);
+}
+
+.textarea {
+  width: 100%;
+  min-height: 48px;
+  max-height: 200px;
+  resize: none;
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 12px 14px;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.textarea::placeholder {
+  color: var(--text-muted);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 6px 4px;
+  min-width: 0;
+}
+
+.toolbarLeft {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+.toolbarRight {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.divider {
+  width: 1px;
+  height: 18px;
+  background-color: var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.iconBtn:hover:not(:disabled) {
+  background-color: var(--bg-surface-hover);
+  color: var(--text-primary);
+}
+
+.iconBtn:disabled {
+  cursor: not-allowed;
+}
+
+.micBtnActive {
+  background-color: #fee2e2;
+  color: #dc2626;
+  animation: microphonePulse 1.4s ease-in-out infinite;
+}
+
+.micBtnActive:hover:not(:disabled) {
+  background-color: #fecaca;
+}
+
+@keyframes microphonePulse {
+  50% {
+    box-shadow: 0 0 0 5px rgba(220, 38, 38, 0.12);
+  }
+}
+
+.sendBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background-color: #9ca3af;
+  border: none;
+  color: #ffffff;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.sendBtnActive {
+  background-color: var(--accent-dark);
+}
+
+.sendBtnActive:hover {
+  background-color: #27272a;
+}

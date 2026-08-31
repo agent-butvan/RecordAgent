@@ -1,7 +1,7 @@
 package butvan.agent.feishu.service;
 
 import butvan.agent.agents.agent.AgentService;
-import butvan.agent.agents.agent.AgentStreamEvent;
+import butvan.agent.agents.agent.event.AgentStreamEvent;
 import butvan.agent.agents.agent.AgentUserCall;
 import butvan.agent.agents.session.AgentStreamSession;
 import lombok.RequiredArgsConstructor;

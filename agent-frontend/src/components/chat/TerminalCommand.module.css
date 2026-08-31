@@ -1,0 +1,180 @@
+.container {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: #ffffff;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  user-select: text;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  font-size: 11px;
+}
+
+.commandGroup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.terminalIcon {
+  width: 14px;
+  height: 14px;
+  color: #7c3aed;
+  flex-shrink: 0;
+}
+
+.prompt {
+  color: var(--text-muted);
+  font-weight: 700;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.command {
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.metaGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.duration {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.runningBadge,
+.exitOk,
+.exitFail {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-size: 10.5px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.runningBadge {
+  background: rgba(124, 58, 237, 0.1);
+  color: #7c3aed;
+}
+
+.runningDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #7c3aed;
+  animation: dotPulse 1.2s ease-in-out infinite;
+}
+
+.exitOk {
+  background: rgba(5, 150, 105, 0.1);
+  color: #059669;
+}
+
+.exitFail {
+  background: rgba(225, 29, 72, 0.1);
+  color: #e11d48;
+}
+
+.copyBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 4px;
+  padding: 3px;
+  cursor: pointer;
+  transition: color var(--transition-fast);
+}
+
+.copyBtn:hover {
+  color: var(--text-primary);
+}
+
+.copyIcon {
+  width: 12px;
+  height: 12px;
+}
+
+.copyOkIcon {
+  width: 12px;
+  height: 12px;
+  color: #059669;
+}
+
+.outputArea {
+  position: relative;
+  padding: 10px;
+  overflow-x: auto;
+  background: rgba(248, 250, 252, 0.6);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.outputPre {
+  margin: 0;
+  font-family: var(--font-mono);
+  white-space: pre;
+}
+
+.line {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.lineDefault {
+  color: var(--text-secondary);
+}
+
+.linePass {
+  color: #059669;
+  font-weight: 500;
+}
+
+.lineFail {
+  color: #e11d48;
+  font-weight: 500;
+}
+
+.lineWarn {
+  color: #d97706;
+}
+
+@keyframes dotPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}

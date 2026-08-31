@@ -1,0 +1,27 @@
+.content { display: flex; flex-direction: column; min-height: 0; }
+.header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px; border-bottom: 1px solid var(--border-subtle); }
+.title { display: flex; align-items: center; gap: 7px; color: var(--text-primary); font-size: 13px; font-weight: 700; }
+.summary, .empty, .error { margin: 4px 0 0; font-size: 12px; line-height: 1.5; }
+.summary, .empty { color: var(--text-muted); }
+.refresh { display: inline-flex; width: 28px; height: 28px; flex: 0 0 auto; align-items: center; justify-content: center; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: var(--bg-app); color: var(--text-secondary); }
+.refresh:hover:not(:disabled) { border-color: var(--border-medium); color: var(--text-primary); }
+.refresh:disabled { cursor: wait; }
+.refreshing { animation: spin 0.8s linear infinite; }
+.empty, .error { padding: 16px; }
+.error { color: #b91c1c; }
+.taskList { display: flex; flex-direction: column; gap: 8px; padding: 12px; }
+.task { min-width: 0; padding: 10px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--bg-app); }
+.taskHeader { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.taskId { min-width: 0; overflow: hidden; color: var(--text-primary); font-family: var(--font-mono); font-size: 11px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.activeStatus, .terminalStatus { margin-left: auto; flex: 0 0 auto; font-size: 11px; }
+.activeStatus, .runningIcon { color: #2563eb; }
+.terminalStatus, .mutedIcon { color: var(--text-muted); }
+.successIcon { flex: 0 0 auto; color: #15803d; }
+.errorIcon { flex: 0 0 auto; color: #dc2626; }
+.runningIcon, .mutedIcon { flex: 0 0 auto; }
+.result, .taskError { display: -webkit-box; margin: 8px 0 0; overflow: hidden; font-size: 11px; line-height: 1.55; -webkit-box-orient: vertical; -webkit-line-clamp: 3; white-space: pre-wrap; word-break: break-word; }
+.result { color: var(--text-secondary); }
+.taskError { color: #b91c1c; }
+.cancel { margin-top: 8px; color: #b91c1c; }
+.cancel:hover:not(:disabled) { background: #fef2f2; color: #991b1b; }
+@keyframes spin { to { transform: rotate(360deg); } }

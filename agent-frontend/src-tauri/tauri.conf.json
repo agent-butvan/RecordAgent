@@ -20,7 +20,19 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "$HOME/**",
+          "$PICTURE/**",
+          "$DESKTOP/**",
+          "$DOCUMENT/**",
+          "$DOWNLOAD/**",
+          "$VIDEO/**",
+          "$PUBLIC/**"
+        ]
+      }
     }
   },
   "bundle": {

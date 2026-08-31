@@ -1,0 +1,87 @@
+/* ChapterScrubber.module.css - 章节缩放时间轨（Codex 风格） */
+
+.container {
+  position: relative;
+}
+
+.list {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+}
+
+.rowBtn {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.rowBtnRight {
+  justify-content: flex-start;
+}
+
+.rowBtnLeft {
+  justify-content: flex-end;
+}
+
+.tickBase {
+  display: block;
+  height: 2px;
+  border-radius: var(--radius-full);
+}
+
+.tick {
+  background: #cbd5e1;
+}
+
+.tickCurrent {
+  background: var(--accent-blue);
+}
+
+/* 预览卡片：纯平设计，1px 描边承载层级，无阴影 */
+.card {
+  position: absolute;
+  z-index: 30;
+  width: 260px;
+  pointer-events: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: #ffffff;
+  padding: 12px 14px;
+  color: var(--text-primary);
+}
+
+.cardMeta {
+  margin-bottom: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.cardTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.cardDesc {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  word-break: break-word;
+}

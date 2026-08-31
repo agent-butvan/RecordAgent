@@ -1,6 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   SquarePen,
+  Search,
+  X,
   Trash2,
   Folder,
   Plus,
@@ -8,8 +11,11 @@ import {
   MessageSquare,
   ChevronRight,
   ChevronDown,
+  MoreHorizontal,
+  Pencil,
   User,
   Settings,
+  CalendarDays,
 } from 'lucide-react';
 import type { ChatSession, Project } from '../../types/chat';
 import { FormField } from '../common/FormField';
@@ -32,7 +38,46 @@ function getAvatarText(email: string | null): string {
   return email.slice(0, 1).toUpperCase() || 'U';
 }
 
+type TimeGroupKey = 'today' | 'yesterday' | 'last7' | 'last30' | 'older';
+
+const TIME_GROUP_ORDER: TimeGroupKey[] = ['today', 'yesterday', 'last7', 'last30', 'older'];
+
+const TIME_GROUP_LABELS: Record<TimeGroupKey, string> = {
+  today: '今天',
+  yesterday: '昨天',
+  last7: '过去 7 天',
+  last30: '过去 30 天',
+  older: '更早',
+};
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const SIDEBAR_DEFAULT_WIDTH = 260;
+const SIDEBAR_MIN_WIDTH = 220;
+const SIDEBAR_MAX_WIDTH = 400;
+const SIDEBAR_WIDTH_KEY = 'butvan.sidebarWidth';
+
+/** 按最近活跃时间将会话分桶（ChatGPT 式时间分组）。 */
+function getTimeGroup(timestamp: number): TimeGroupKey {
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const diffDays = Math.floor((startOfToday.getTime() - timestamp) / DAY_MS);
+  if (diffDays <= 0) return 'today';
+  if (diffDays === 1) return 'yesterday';
+  if (diffDays < 7) return 'last7';
+  if (diffDays < 30) return 'last30';
+  return 'older';
+}
+
+function sortByUpdatedDesc(a: ChatSession, b: ChatSession): number {
+  return b.updatedAt - a.updatedAt;
+}
+
 interface SidebarProps {
+  activeFeature: 'chat' | 'calendar';
+  onSelectFeature: (feature: 'chat' | 'calendar') => void;
+  /** 用户头像 URL；未配置时使用邮箱前两位作为默认头像 */
+  avatarUrl?: string;
   projects: Project[];
   sessions: ChatSession[];
   activeSessionId: string;
@@ -47,6 +92,9 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
+  activeFeature,
+  onSelectFeature,
+  avatarUrl,
   projects,
   sessions,
   activeSessionId,
@@ -62,42 +110,147 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [isEmailBindingOpen, setIsEmailBindingOpen] = useState(false);
   const [maskedEmail, setMaskedEmail] = useState<string | null>(null);
 
-  // 双击修改会话标题状态
+  // 双击 / 菜单重命名会话标题
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
 
-  // 区分项目与最近组的展开/收起折叠状态
-  const [isProjectsSectionExpanded, setIsProjectsSectionExpanded] = useState(true);
-  const [isRecentSectionExpanded, setIsRecentSectionExpanded] = useState(true);
+  // 项目分区展开/收起
+  const [isProjectsExpanded, setIsProjectsExpanded] = useState(true);
   const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({});
+
+  // 会话搜索与悬停菜单
+  const [searchQuery, setSearchQuery] = useState('');
+  const [menuSession, setMenuSession] = useState<{
+    session: ChatSession;
+    x: number;
+    y: number;
+  } | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importPath, setImportPath] = useState('');
   const [importName, setImportName] = useState('');
+
+  // 侧边栏拖拽调整宽度
+  const sidebarRef = useRef<HTMLElement>(null);
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    try {
+      const saved = Number(localStorage.getItem(SIDEBAR_WIDTH_KEY));
+      if (saved >= SIDEBAR_MIN_WIDTH && saved <= SIDEBAR_MAX_WIDTH) {
+        return saved;
+      }
+    } catch {
+      // 忽略本地存储异常，使用默认宽度
+    }
+    return SIDEBAR_DEFAULT_WIDTH;
+  });
+  const sidebarWidthRef = useRef(sidebarWidth);
+  sidebarWidthRef.current = sidebarWidth;
+  const [isResizing, setIsResizing] = useState(false);
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const onMouseMove = (e: MouseEvent) => {
+      const rect = sidebarRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const next = Math.min(
+        SIDEBAR_MAX_WIDTH,
+        Math.max(SIDEBAR_MIN_WIDTH, Math.round(e.clientX - rect.left))
+      );
+      setSidebarWidth(next);
+    };
+
+    const onMouseUp = () => {
+      setIsResizing(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      try {
+        localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidthRef.current));
+      } catch {
+        // 忽略本地存储异常
+      }
+    };
+
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, [isResizing]);
 
   // Esc 关闭弹窗与用户菜单
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setIsImportModalOpen(false);
+        setMenuSession(null);
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
+  // 点击会话菜单外部时关闭
+  useEffect(() => {
+    if (!menuSession) return;
+    const onPointerDown = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuSession(null);
+      }
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    return () => document.removeEventListener('mousedown', onPointerDown);
+  }, [menuSession]);
+
   useEffect(() => {
     fetchAccountStatus().then((status) => setMaskedEmail(status?.bound ? status.maskedEmail : null));
   }, []);
 
-  // 区分普通会话与关联具体项目的会话
   const generalSessions = sessions.filter((s) => !s.projectId);
+  const sortedGeneral = [...generalSessions].sort(sortByUpdatedDesc);
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const isSearching = normalizedQuery.length > 0;
+
+  const searchResults = isSearching
+    ? [...sessions].sort(sortByUpdatedDesc).filter((s) => s.title.toLowerCase().includes(normalizedQuery))
+    : [];
+
+  const groupedGeneral = TIME_GROUP_ORDER.map((key) => ({
+    key,
+    label: TIME_GROUP_LABELS[key],
+    sessions: sortedGeneral.filter((s) => getTimeGroup(s.updatedAt) === key),
+  })).filter((group) => group.sessions.length > 0);
 
   const toggleProject = (projectId: string) => {
     setExpandedProjects((prev) => ({
       ...prev,
       [projectId]: !prev[projectId],
     }));
+  };
+
+  const openSessionMenu = (e: React.MouseEvent<HTMLButtonElement>, session: ChatSession) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const menuWidth = 176;
+    const left = Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 8);
+    setMenuSession({ session, x: left, y: rect.bottom + 4 });
+  };
+
+  const startRename = (session: ChatSession) => {
+    setMenuSession(null);
+    setEditingSessionId(session.id);
+    setEditingTitle(session.title || '');
+  };
+
+  const commitRename = (session: ChatSession) => {
+    if (editingTitle.trim() && onUpdateSessionTitle && editingTitle.trim() !== session.title) {
+      onUpdateSessionTitle(session.id, editingTitle.trim());
+    }
+    setEditingSessionId(null);
   };
 
   const handleConfirmImport = (e: React.FormEvent) => {
@@ -110,202 +263,327 @@ export const Sidebar: React.FC<SidebarProps> = ({
     setIsImportModalOpen(false);
   };
 
+  const renderSessionRow = (session: ChatSession, withMenu = true) => {
+    const isActive = session.id === activeSessionId;
+    const isEditing = editingSessionId === session.id;
+    const isMenuOpen = menuSession?.session.id === session.id;
+
+    return (
+      <div
+        key={session.id}
+        className={`${styles.sessionItem} ${isActive ? styles.sessionActive : ''}`}
+        onClick={() => !isEditing && onSelectSession(session.id)}
+      >
+        <MessageSquare size={15} className={styles.sessionIcon} />
+
+        {isEditing ? (
+          <input
+            type="text"
+            className={styles.renameInput}
+            value={editingTitle}
+            onChange={(e) => setEditingTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.stopPropagation();
+                commitRename(session);
+              } else if (e.key === 'Escape') {
+                e.stopPropagation();
+                setEditingSessionId(null);
+              }
+            }}
+            onBlur={() => commitRename(session)}
+            autoFocus
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : (
+          <span
+            className={styles.sessionTitle}
+            title={`${session.title || '新对话'}（双击修改标题）`}
+            onDoubleClick={(e) => {
+              e.stopPropagation();
+              setEditingSessionId(session.id);
+              setEditingTitle(session.title || '');
+            }}
+          >
+            {session.title || '新对话'}
+          </span>
+        )}
+
+        {withMenu && !isEditing && (
+          <button
+            type="button"
+            className={`${styles.menuBtn} ${isMenuOpen ? styles.menuBtnOpen : ''}`}
+            title="更多操作"
+            aria-label="更多操作"
+            onClick={(e) => openSessionMenu(e, session)}
+          >
+            <MoreHorizontal size={15} />
+          </button>
+        )}
+      </div>
+    );
+  };
+
   return (
-    <aside className={styles.sidebar}>
-      <div className={styles.topContainer}>
-        {/* 1. 项目大类 */}
-        <div className={styles.sectionGroup}>
-          <div className={styles.groupHeader}>
-            <div
-              className={styles.groupTitleClickable}
-              onClick={() => setIsProjectsSectionExpanded(!isProjectsSectionExpanded)}
-            >
-              <span className={styles.groupTitle}>项目</span>
-              {isProjectsSectionExpanded ? (
-                <ChevronDown size={14} className={styles.arrowIcon} />
-              ) : (
-                <ChevronRight size={14} className={styles.arrowIcon} />
-              )}
-            </div>
+    <aside ref={sidebarRef} className={styles.sidebar} style={{ width: sidebarWidth }}>
+      {/* 右缘拖拽手柄：调整侧边栏宽度，双击恢复默认宽度 */}
+      <div
+        className={`${styles.resizeHandle} ${isResizing ? styles.resizeHandleActive : ''}`}
+        onMouseDown={(e) => {
+          e.preventDefault();
+          setIsResizing(true);
+        }}
+        onDoubleClick={() => setSidebarWidth(SIDEBAR_DEFAULT_WIDTH)}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="拖拽调整侧边栏宽度"
+      />
+      {/*
+        DIRECTION CONTRACT
+        THESIS: 按 ChatGPT 官方会话历史的布局与交互重构侧边栏：搜索、时间分组、悬停菜单；新建聊天为列表标题行上的编辑图标。
+        OWN-WORLD: 近白冷灰 #F7F8FA 纯平面，无边框无阴影；选中态仅文字变黑；蓝色仅作文件夹与焦点色。
+        STORY: 用户一眼找到“新建聊天”，按 今天/昨天/近7天/近30天 回溯会话，悬停即可重命名或删除。
+        FIRST VIEWPORT: 顶部搜索框 → 对话/日历功能选择器 → 项目分区 + 时间分组列表（标题行右侧编辑图标新建聊天）→ 底部用户信息与设置。
+        FORM: ChatGPT 会话侧栏（用户钉定方向，非概念轮盘）。FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance.
+      */}
+      <div className={styles.topArea}>
+        {/* 会话搜索 */}
+        <div className={styles.searchBox}>
+          <Search size={14} className={styles.searchIcon} />
+          <input
+            type="text"
+            className={styles.searchInput}
+            placeholder="搜索对话"
+            aria-label="搜索对话"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                setSearchQuery('');
+                e.currentTarget.blur();
+              }
+            }}
+          />
+          {searchQuery && (
             <button
-              className={styles.iconBtnSmall}
-              title="导入本地项目"
-              aria-label="导入本地项目"
-              onClick={() => setIsImportModalOpen(true)}
+              type="button"
+              className={styles.clearBtn}
+              title="清空搜索"
+              aria-label="清空搜索"
+              onClick={() => setSearchQuery('')}
             >
-              <FolderPlus size={14} />
+              <X size={13} />
             </button>
-          </div>
-
-          {isProjectsSectionExpanded && (
-            <div className={styles.sectionContent}>
-              {projects.length === 0 ? (
-                <div className={styles.emptyLinkRow} onClick={() => setIsImportModalOpen(true)}>
-                  <span>+ 点击导入项目</span>
-                </div>
-              ) : (
-                <div className={styles.projectList}>
-                  {projects.map((project) => {
-                    const isExpanded = expandedProjects[project.id] ?? true;
-                    const projectSessions = sessions.filter((s) => s.projectId === project.id);
-
-                    return (
-                      <div key={project.id} className={styles.projectItemContainer}>
-                        <div className={styles.projectHead}>
-                          <div className={styles.projectHeadLeft} onClick={() => toggleProject(project.id)}>
-                            {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-                            <Folder size={13} style={{ color: '#2563eb', marginLeft: '2px' }} />
-                            <span className={styles.projectName} title={project.path}>{project.name}</span>
-                          </div>
-                          <button
-                            className={styles.iconBtnSmall}
-                            title="在此项目下新建会话"
-                            aria-label="在此项目下新建会话"
-                            onClick={() => onNewProjectChat(project.id)}
-                          >
-                            <Plus size={13} />
-                          </button>
-                        </div>
-
-                        {isExpanded && (
-                          <div className={styles.projectSubSessions}>
-                            {projectSessions.map((session) => {
-                              const isActive = session.id === activeSessionId;
-                              return (
-                                <div
-                                  key={session.id}
-                                  className={`${styles.sessionItem} ${isActive ? styles.sessionActive : ''}`}
-                                  onClick={() => onSelectSession(session.id)}
-                                >
-                                  <span className={styles.sessionTitle} title={session.title}>
-                                    {session.title || '新对话'}
-                                  </span>
-                                  <button
-                                    className={styles.deleteBtn}
-                                    title="删除会话"
-                                    aria-label="删除会话"
-                                    onClick={(e) => onDeleteSession(session.id, e)}
-                                  >
-                                    <Trash2 size={12} />
-                                  </button>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
           )}
         </div>
 
-        {/* 2. 最近 / 普通会话大类 */}
-        <div className={styles.sectionGroup}>
-          <div className={styles.groupHeader}>
-            <div
-              className={styles.groupTitleClickable}
-              onClick={() => setIsRecentSectionExpanded(!isRecentSectionExpanded)}
-            >
-              <span className={styles.groupTitle}>最近</span>
-              {isRecentSectionExpanded ? (
-                <ChevronDown size={14} className={styles.arrowIcon} />
-              ) : (
-                <ChevronRight size={14} className={styles.arrowIcon} />
-              )}
-            </div>
-            <div className={styles.groupActions}>
-              <button
-                className={styles.iconBtnSmall}
-                title="新建普通对话"
-                aria-label="新建普通对话"
-                onClick={onNewGeneralChat}
-              >
-                <SquarePen size={14} />
-              </button>
-            </div>
-          </div>
+        {/* 功能入口：日历（点击在日历与对话之间切换） */}
+        <button
+          type="button"
+          className={`${styles.featureTab} ${activeFeature === 'calendar' ? styles.featureTabActive : ''}`}
+          onClick={() => onSelectFeature(activeFeature === 'calendar' ? 'chat' : 'calendar')}
+          title={activeFeature === 'calendar' ? '返回对话' : '打开日历'}
+          aria-pressed={activeFeature === 'calendar'}
+        >
+          <CalendarDays size={14} />
+          <span>日历</span>
+        </button>
 
-          {isRecentSectionExpanded && (
-            <div className={styles.sectionContent}>
-              <div className={styles.sessionList}>
-                {generalSessions.map((session) => {
-                  const isActive = session.id === activeSessionId;
-                  const isEditing = editingSessionId === session.id;
-
-                  return (
-                    <div
-                      key={session.id}
-                      className={`${styles.sessionItem} ${isActive ? styles.sessionActive : ''}`}
-                      onClick={() => !isEditing && onSelectSession(session.id)}
-                    >
-                      <MessageSquare size={13} style={{ opacity: 0.6, flexShrink: 0 }} />
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          className={styles.sessionTitleInput || styles.textInput}
-                          style={{
-                            height: '24px',
-                            fontSize: '12px',
-                            padding: '0 6px',
-                            width: '100%',
-                            background: '#ffffff',
-                            border: '1px solid #3b82f6',
-                            borderRadius: '4px',
-                          }}
-                          value={editingTitle}
-                          onChange={(e) => setEditingTitle(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.stopPropagation();
-                              if (editingTitle.trim() && onUpdateSessionTitle) {
-                                onUpdateSessionTitle(session.id, editingTitle.trim());
-                              }
-                              setEditingSessionId(null);
-                            } else if (e.key === 'Escape') {
-                              setEditingSessionId(null);
-                            }
-                          }}
-                          onBlur={() => {
-                            if (editingTitle.trim() && onUpdateSessionTitle && editingTitle !== session.title) {
-                              onUpdateSessionTitle(session.id, editingTitle.trim());
-                            }
-                            setEditingSessionId(null);
-                          }}
-                          autoFocus
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      ) : (
-                        <span
-                          className={styles.sessionTitle}
-                          title={`${session.title || '新对话'}（双击修改标题）`}
-                          onDoubleClick={(e) => {
-                            e.stopPropagation();
-                            setEditingSessionId(session.id);
-                            setEditingTitle(session.title || '');
-                          }}
-                        >
-                          {session.title || '新对话'}
-                        </span>
-                      )}
-                      <button
-                        className={styles.deleteBtn}
-                        title="删除会话"
-                        aria-label="删除会话"
-                        onClick={(e) => onDeleteSession(session.id, e)}
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
-                  );
-                })}
+        <div className={styles.scrollArea}>
+          {isSearching ? (
+            /* 搜索结果：不分项目/时间，扁平展示 */
+            <section className={styles.sectionGroup}>
+              <div className={styles.groupHeader}>
+                <span className={styles.groupTitle}>搜索结果</span>
+                <span className={styles.resultCount}>{searchResults.length} 条</span>
               </div>
-            </div>
+              <div className={styles.sessionList}>
+                {searchResults.length > 0 ? (
+                  searchResults.map((session) => renderSessionRow(session))
+                ) : (
+                  <div className={styles.emptyText}>未找到相关对话</div>
+                )}
+              </div>
+            </section>
+          ) : (
+            <>
+              {/* 1. 项目大类 */}
+              <section className={styles.sectionGroup}>
+                <div className={styles.groupHeader}>
+                  <button
+                    type="button"
+                    className={styles.groupTitleBtn}
+                    onClick={() => setIsProjectsExpanded((prev) => !prev)}
+                    aria-expanded={isProjectsExpanded}
+                  >
+                    {isProjectsExpanded ? (
+                      <ChevronDown size={13} className={styles.arrowIcon} />
+                    ) : (
+                      <ChevronRight size={13} className={styles.arrowIcon} />
+                    )}
+                    <span className={styles.groupTitle}>项目</span>
+                  </button>
+                  <button
+                    className={styles.iconBtnSmall}
+                    title="导入本地项目"
+                    aria-label="导入本地项目"
+                    onClick={() => setIsImportModalOpen(true)}
+                  >
+                    <FolderPlus size={14} />
+                  </button>
+                </div>
+
+                {isProjectsExpanded && (
+                  <div className={styles.sectionContent}>
+                    {projects.length === 0 ? (
+                      <button
+                        type="button"
+                        className={styles.emptyLinkRow}
+                        onClick={() => setIsImportModalOpen(true)}
+                      >
+                        <Plus size={13} />
+                        <span>导入项目</span>
+                      </button>
+                    ) : (
+                      <div className={styles.projectList}>
+                        {projects.map((project) => {
+                          const isExpanded = expandedProjects[project.id] ?? true;
+                          const projectSessions = sessions
+                            .filter((s) => s.projectId === project.id)
+                            .sort(sortByUpdatedDesc);
+
+                          return (
+                            <div key={project.id} className={styles.projectItemContainer}>
+                              <div className={styles.projectHead}>
+                                <button
+                                  type="button"
+                                  className={styles.projectHeadLeft}
+                                  onClick={() => toggleProject(project.id)}
+                                  aria-expanded={isExpanded}
+                                >
+                                  {isExpanded ? (
+                                    <ChevronDown size={13} className={styles.arrowIcon} />
+                                  ) : (
+                                    <ChevronRight size={13} className={styles.arrowIcon} />
+                                  )}
+                                  <Folder size={14} className={styles.folderIcon} />
+                                  <span className={styles.projectName} title={project.path}>
+                                    {project.name}
+                                  </span>
+                                </button>
+                                <button
+                                  className={styles.iconBtnSmall}
+                                  title="在此项目下新建会话"
+                                  aria-label="在此项目下新建会话"
+                                  onClick={() => onNewProjectChat(project.id)}
+                                >
+                                  <Plus size={14} />
+                                </button>
+                              </div>
+
+                              {isExpanded && (
+                                <div className={styles.projectSubSessions}>
+                                  {projectSessions.length > 0 ? (
+                                    projectSessions.map((session) => {
+                                      const isActive = session.id === activeSessionId;
+                                      return (
+                                        <div
+                                          key={session.id}
+                                          className={`${styles.projectSession} ${isActive ? styles.projectSessionActive : ''}`}
+                                          onClick={() => onSelectSession(session.id)}
+                                        >
+                                          <span className={styles.sessionTitle} title={session.title}>
+                                            {session.title || '新对话'}
+                                          </span>
+                                          <button
+                                            className={styles.deleteBtn}
+                                            title="删除会话"
+                                            aria-label="删除会话"
+                                            onClick={(e) => onDeleteSession(session.id, e)}
+                                          >
+                                            <Trash2 size={12} />
+                                          </button>
+                                        </div>
+                                      );
+                                    })
+                                  ) : (
+                                    <div className={styles.emptyText}>暂无项目会话</div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </section>
+
+              {/* 2. 最近会话（ChatGPT 式时间分组） */}
+              <section className={styles.sectionGroup}>
+                <div className={styles.groupHeader}>
+                  <span className={styles.groupTitle}>最近</span>
+                  <button
+                    className={styles.iconBtnSmall}
+                    title="新建聊天"
+                    aria-label="新建聊天"
+                    onClick={onNewGeneralChat}
+                  >
+                    <SquarePen size={14} />
+                  </button>
+                </div>
+                {groupedGeneral.length > 0 ? (
+                  groupedGeneral.map((group) => (
+                    <div key={group.key} className={styles.timeGroup}>
+                      <div className={styles.timeLabel}>{group.label}</div>
+                      <div className={styles.sessionList}>
+                        {group.sessions.map((session) => renderSessionRow(session))}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className={styles.emptyText}>暂无对话</div>
+                )}
+              </section>
+            </>
           )}
         </div>
       </div>
+
+      {/* 会话操作菜单（Portal 渲染，避免被滚动区裁剪） */}
+      {menuSession &&
+        createPortal(
+          <div
+            ref={menuRef}
+            className={styles.sessionMenu}
+            role="menu"
+            style={{ left: menuSession.x, top: menuSession.y }}
+          >
+            <button
+              type="button"
+              role="menuitem"
+              className={styles.menuItem}
+              onClick={() => startRename(menuSession.session)}
+            >
+              <Pencil size={13} />
+              <span>重命名</span>
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              className={`${styles.menuItem} ${styles.menuItemDanger}`}
+              onClick={(e) => {
+                setMenuSession(null);
+                onDeleteSession(menuSession.session.id, e);
+              }}
+            >
+              <Trash2 size={13} />
+              <span>删除</span>
+            </button>
+          </div>,
+          document.body
+        )}
 
       {/* 导入项目 UI 弹窗 */}
       <Modal
@@ -364,9 +642,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           title={maskedEmail ? `已绑定账号：${maskedEmail}（点击进入账户设置）` : '点击绑定邮箱'}
         >
           <div className={styles.avatarWrapper}>
-            <div className={`${styles.avatar} ${maskedEmail ? styles.avatarBound : styles.avatarUnbound}`}>
-              {maskedEmail ? getAvatarText(maskedEmail) : <User size={14} />}
-            </div>
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="用户头像" className={styles.avatarImage} />
+            ) : (
+              <div className={`${styles.avatar} ${maskedEmail ? styles.avatarBound : styles.avatarUnbound}`}>
+                {maskedEmail ? getAvatarText(maskedEmail) : <User size={15} />}
+              </div>
+            )}
             {maskedEmail && <span className={styles.verifiedDot} title="已验证" />}
           </div>
           <div className={styles.profileInfo}>
@@ -392,3 +674,5 @@ export const Sidebar: React.FC<SidebarProps> = ({
     </aside>
   );
 };
+
+export default Sidebar;

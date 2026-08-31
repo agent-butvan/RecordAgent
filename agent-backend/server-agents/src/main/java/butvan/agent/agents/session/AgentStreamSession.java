@@ -1,6 +1,6 @@
 package butvan.agent.agents.session;
 
-import butvan.agent.agents.agent.AgentStreamEvent;
+import butvan.agent.agents.agent.event.AgentStreamEvent;
 
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;

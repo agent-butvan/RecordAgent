@@ -1,5 +1,6 @@
-package butvan.agent.agents.agent;
+package butvan.agent.agents.agent.permission;
 
+import butvan.agent.agents.agent.run.AgentRun;
 import io.agentscope.core.event.ConfirmResult;
 import io.agentscope.core.message.ToolUseBlock;
 
@@ -74,19 +75,6 @@ public final class PendingApproval {
         return tools.size();
     }
 
-    /**
-     * 只有全部决定后才构造恢复 AgentScope 的 ConfirmResult 列表
-     * @return
-     */
-    public synchronized List<ConfirmResult> toConfirmResult() {
-        if (!allDecided()) {
-            throw new IllegalArgumentException("仍有工具尚未确认");
-        }
-        return tools.stream()
-                .map(tool -> new ConfirmResult(
-                        decisions.get(tool.getId()).approved(), tool
-                )).toList();
-    }
 
     /** 只有全部决定后才构造恢复 AgentScope 的 ConfirmResult 列表。 */
     public synchronized List<ConfirmResult> toConfirmResults() {

@@ -1,5 +1,6 @@
-package butvan.agent.agents.agent;
+package butvan.agent.agents.agent.permission;
 
+import butvan.agent.agents.agent.run.AgentRun;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import io.agentscope.core.message.ToolUseBlock;

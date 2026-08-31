@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ModelProviderContext } from './context/ModelContext';
 import { Sidebar } from './components/layout/Sidebar';
 import { ChatWorkspace } from './components/chat/ChatWorkspace';
+import { CalendarView } from './components/calendar/CalendarView';
 import { ModelSettingsPage } from './components/model/ModelSettingsPage';
 import { ModelInitPage } from './components/model/ModelInitPage';
+import { MessageProvider } from './components/common/Message';
 import {
   fetchModelConfig,
   fetchSupportedVendors,
@@ -17,6 +19,8 @@ import {
 } from './services/api';
 import type { PermissionToolPayload } from './services/api';
 import type { ChatSession, ChatMessage, Project, SessionSummaryDto, TranscriptMessageDto } from './types/chat';
+import type { SubagentProgressDto, TaskDto } from './types/team';
+import { cancelSubagentTask, fetchSubagentTasks } from './services/taskApi';
 
 function mapTranscriptToChatMessage(dto: TranscriptMessageDto): ChatMessage {
   const isUser = dto.role?.toUpperCase() === 'USER';
@@ -53,10 +57,13 @@ function mapTranscriptToChatMessage(dto: TranscriptMessageDto): ChatMessage {
 export const MainLayout: React.FC<{
   isSettingsOpen: boolean;
   setIsSettingsOpen: (open: boolean) => void;
-}> = ({ isSettingsOpen, setIsSettingsOpen }) => {
+  settingsTab: string;
+  setSettingsTab: (tab: string) => void;
+}> = ({ isSettingsOpen, setIsSettingsOpen, settingsTab, setSettingsTab }) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string>('');
+  const [activeFeature, setActiveFeature] = useState<'chat' | 'calendar'>('chat');
   const [pendingPermission, setPendingPermission] = useState<{
     sessionId: string;
     assistantMessageId: string;
@@ -64,6 +71,73 @@ export const MainLayout: React.FC<{
     tool: PermissionToolPayload;
   } | null>(null);
   const [isPermissionSubmitting, setIsPermissionSubmitting] = useState(false);
+  const [subagentTasks, setSubagentTasks] = useState<TaskDto[]>([]);
+  const [isSubagentTasksLoading, setIsSubagentTasksLoading] = useState(false);
+  const [subagentTaskError, setSubagentTaskError] = useState<string | null>(null);
+  const [cancellingTaskId, setCancellingTaskId] = useState<string | null>(null);
+  const activeSessionIdRef = useRef(activeSessionId);
+
+  useEffect(() => {
+    activeSessionIdRef.current = activeSessionId;
+  }, [activeSessionId]);
+
+  const refreshSubagentTasks = useCallback(async (sessionId = activeSessionId) => {
+    if (!sessionId) {
+      setSubagentTasks([]);
+      return;
+    }
+
+    setIsSubagentTasksLoading(true);
+    try {
+      const tasks = await fetchSubagentTasks(sessionId);
+      if (sessionId !== activeSessionIdRef.current) return;
+      setSubagentTasks(tasks);
+      setSubagentTaskError(null);
+    } catch (error) {
+      if (sessionId !== activeSessionIdRef.current) return;
+      setSubagentTaskError(error instanceof Error ? error.message : '读取子 Agent 任务失败，请稍后重试');
+    } finally {
+      if (sessionId === activeSessionIdRef.current) setIsSubagentTasksLoading(false);
+    }
+  }, [activeSessionId]);
+
+  useEffect(() => {
+    if (!activeSessionId) {
+      setSubagentTasks([]);
+      return;
+    }
+    void refreshSubagentTasks(activeSessionId);
+    const timer = window.setInterval(() => void refreshSubagentTasks(activeSessionId), 5_000);
+    return () => window.clearInterval(timer);
+  }, [activeSessionId, refreshSubagentTasks]);
+
+  const handleCancelSubagentTask = async (taskId: string) => {
+    if (!activeSessionId || cancellingTaskId) return;
+    setCancellingTaskId(taskId);
+    try {
+      await cancelSubagentTask(activeSessionId, taskId);
+      await refreshSubagentTasks(activeSessionId);
+    } catch (error) {
+      setSubagentTaskError(error instanceof Error ? error.message : '取消子 Agent 任务失败，请稍后重试');
+    } finally {
+      setCancellingTaskId(null);
+    }
+  };
+
+  const appendSubagentProgress = (
+    sessionId: string,
+    messageId: string,
+    progress: SubagentProgressDto,
+  ) => {
+    setSessions((previous) => previous.map((session) => session.id === sessionId
+      ? {
+          ...session,
+          messages: session.messages.map((message) => message.id === messageId
+            ? { ...message, subagentProgress: [...(message.subagentProgress || []), progress] }
+            : message),
+        }
+      : session));
+  };
 
   // 1. 初始化从后端 API 获取会话列表数据
   useEffect(() => {
@@ -132,6 +206,9 @@ export const MainLayout: React.FC<{
 
   const activeSession = sessions.find((s) => s.id === activeSessionId);
   const activeMessages = activeSession?.messages || [];
+  const activeProjectPath = activeSession?.projectId
+    ? (projects.find((project) => project.id === activeSession.projectId)?.path ?? null)
+    : null;
 
   // 3. 新建普通独立会话（UUID 由后端统一生成）
   const handleNewGeneralChat = async () => {
@@ -211,6 +288,12 @@ export const MainLayout: React.FC<{
       prev.map((s) => (s.id === id ? { ...s, title: newTitle } : s))
     );
     await updateSessionTitleApi(id, newTitle);
+  };
+
+  // 7.5 选择会话：切换到对应会话并确保回到对话视图（日历模式下点击会话可跳回）
+  const handleSelectSession = (id: string) => {
+    setActiveSessionId(id);
+    setActiveFeature('chat');
   };
 
   // 8. 发送消息发起 SSE 流
@@ -456,6 +539,10 @@ export const MainLayout: React.FC<{
           tool: permissionPayload.tool,
         });
       },
+      (progress) => {
+        appendSubagentProgress(currentSessionId, assistantMsgId, progress);
+        void refreshSubagentTasks(currentSessionId);
+      },
     );
   };
 
@@ -531,6 +618,10 @@ export const MainLayout: React.FC<{
           approvalId: permissionPayload.approvalId,
           tool: permissionPayload.tool,
         }),
+        (progress) => {
+          appendSubagentProgress(current.sessionId, current.assistantMessageId, progress);
+          void refreshSubagentTasks(current.sessionId);
+        },
       );
     } catch (error) {
       updateAssistantMessage(current.sessionId, current.assistantMessageId, (message) => ({
@@ -545,30 +636,44 @@ export const MainLayout: React.FC<{
   return (
     <div style={{ display: 'flex', width: '100vw', height: '100vh', overflow: 'hidden' }}>
       {isSettingsOpen ? (
-        <ModelSettingsPage onBack={() => setIsSettingsOpen(false)} />
+        <ModelSettingsPage onBack={() => setIsSettingsOpen(false)} initialTab={settingsTab} />
       ) : (
         <>
           <Sidebar
+            activeFeature={activeFeature}
+            onSelectFeature={setActiveFeature}
             projects={projects}
             sessions={sessions}
             activeSessionId={activeSessionId}
-            onSelectSession={setActiveSessionId}
+            onSelectSession={handleSelectSession}
             onNewGeneralChat={handleNewGeneralChat}
             onNewProjectChat={handleNewProjectChat}
             onImportProject={handleImportProject}
             onDeleteSession={handleDeleteSession}
             onUpdateSessionTitle={handleUpdateSessionTitle}
-            onOpenSettings={() => setIsSettingsOpen(true)}
+            onOpenSettings={() => { setSettingsTab('general'); setIsSettingsOpen(true); }}
+            onOpenAccountSettings={() => { setSettingsTab('account'); setIsSettingsOpen(true); }}
           />
-          <ChatWorkspace
-            messages={activeMessages}
-            sessionId={activeSessionId}
-            onSendMessage={handleSendMessage}
-            onOpenSettings={() => setIsSettingsOpen(true)}
-            pendingPermission={pendingPermission}
-            isPermissionSubmitting={isPermissionSubmitting}
-            onPermissionDecision={handlePermissionDecision}
-          />
+          {activeFeature === 'calendar' ? (
+            <CalendarView />
+          ) : (
+            <ChatWorkspace
+              messages={activeMessages}
+              sessionId={activeSessionId}
+              onSendMessage={handleSendMessage}
+              onOpenSettings={() => setIsSettingsOpen(true)}
+              pendingPermission={pendingPermission}
+              isPermissionSubmitting={isPermissionSubmitting}
+              onPermissionDecision={handlePermissionDecision}
+              subagentTasks={subagentTasks}
+              isSubagentTasksLoading={isSubagentTasksLoading}
+              subagentTaskError={subagentTaskError}
+              cancellingTaskId={cancellingTaskId}
+              onRefreshSubagentTasks={() => void refreshSubagentTasks()}
+              onCancelSubagentTask={handleCancelSubagentTask}
+              projectPath={activeProjectPath}
+            />
+          )}
         </>
       )}
     </div>
@@ -578,6 +683,7 @@ export const MainLayout: React.FC<{
 
 export const App: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState('general');
   const [needsInit, setNeedsInit] = useState<boolean>(false);
   const [vendors, setVendors] = useState<string[]>(['gemini', 'openai', 'dashscope', 'deepseek', 'anthropic', 'ollama']);
   const [loading, setLoading] = useState<boolean>(true);
@@ -638,12 +744,16 @@ export const App: React.FC = () => {
   }
 
   return (
+    <MessageProvider>
     <ModelProviderContext>
       <MainLayout
         isSettingsOpen={isSettingsOpen}
         setIsSettingsOpen={setIsSettingsOpen}
+        settingsTab={settingsTab}
+        setSettingsTab={setSettingsTab}
       />
     </ModelProviderContext>
+    </MessageProvider>
   );
 };
 

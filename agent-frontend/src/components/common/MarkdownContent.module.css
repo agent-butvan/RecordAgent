@@ -1,0 +1,256 @@
+.markdown {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-primary);
+  word-break: break-word;
+  user-select: text;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.markdown > :first-child {
+  margin-top: 0;
+}
+
+.markdown > :last-child {
+  margin-bottom: 0;
+}
+
+/* 标题层级 */
+.markdown h1,
+.markdown h2,
+.markdown h3,
+.markdown h4,
+.markdown h5,
+.markdown h6 {
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: -0.015em;
+  color: var(--text-primary);
+  margin: 24px 0 10px;
+}
+
+.markdown h1 {
+  font-size: 22px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.markdown h2 {
+  font-size: 18px;
+  margin-top: 28px;
+}
+
+.markdown h3 {
+  font-size: 16px;
+}
+
+.markdown h4 {
+  font-size: 14.5px;
+}
+
+.markdown h5,
+.markdown h6 {
+  font-size: 13.5px;
+}
+
+.markdown p {
+  margin: 8px 0;
+}
+
+.markdown strong {
+  font-weight: 650;
+  color: var(--text-primary);
+}
+
+.markdown em {
+  color: var(--text-secondary);
+}
+
+/* 链接 */
+.markdown a {
+  color: #2563eb;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(37, 99, 235, 0.35);
+  text-underline-offset: 3px;
+  transition: border-color 150ms ease, color 150ms ease;
+}
+
+.markdown a:hover {
+  color: #1d4ed8;
+  border-bottom-color: #1d4ed8;
+}
+
+/* 行内代码（排除代码块 pre 内的 code） */
+.markdown :not(pre) > code:not([class*='language-']) {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  padding: 1.5px 5px;
+  color: #0f172a;
+}
+
+/* 列表 */
+.markdown ul,
+.markdown ol {
+  margin: 8px 0;
+  padding-left: 22px;
+}
+
+.markdown li {
+  margin: 3px 0;
+}
+
+.markdown li::marker {
+  color: var(--text-muted);
+}
+
+/* GFM 任务列表 */
+.markdown input[type='checkbox'] {
+  accent-color: #2563eb;
+  margin-right: 6px;
+  vertical-align: -1px;
+}
+
+/* 引用 */
+.markdown blockquote {
+  margin: 10px 0;
+  padding: 8px 12px;
+  border-left: 3px solid #cbd5e1;
+  border-radius: 0 6px 6px 0;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+}
+
+.markdown blockquote > :first-child {
+  margin-top: 0;
+}
+
+.markdown blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+/* 极简表格：无边框无背景、内容居中 */
+.tableWrap {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin: 12px 0;
+  overflow-x: auto;
+}
+
+.markdown table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.markdown th,
+.markdown td {
+  padding: 10px 14px;
+  text-align: center;
+  vertical-align: middle;
+  border: none;
+  background: none;
+}
+
+.markdown th {
+  font-weight: 600;
+  color: #334155;
+}
+
+/* 分隔线 */
+.markdown hr {
+  border: none;
+  border-top: 1px solid var(--border-subtle);
+  margin: 16px 0;
+}
+
+/* 图片 */
+.markdown img {
+  display: block;
+  max-width: min(100%, 480px);
+  max-height: 340px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 10px;
+  border: 1px solid #e3e8ef;
+  margin: 8px 0;
+  cursor: zoom-in;
+  transition: opacity 150ms ease;
+}
+
+.markdown img:hover {
+  opacity: 0.92;
+}
+
+/* 图片详情预览（Lightbox） */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  background: rgba(15, 23, 42, 0.72);
+  cursor: zoom-out;
+  animation: lightboxFade 0.18s ease-out;
+}
+
+@keyframes lightboxFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.lightboxImg {
+  max-width: min(92vw, 1200px);
+  max-height: 88vh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 12px;
+  background: #ffffff;
+  cursor: default;
+}
+
+.lightboxClose {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.14);
+  border: none;
+  border-radius: 50%;
+  color: #ffffff;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+
+.lightboxClose:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+/* 键盘键 */
+.markdown kbd {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 1px 5px;
+  color: #334155;
+}

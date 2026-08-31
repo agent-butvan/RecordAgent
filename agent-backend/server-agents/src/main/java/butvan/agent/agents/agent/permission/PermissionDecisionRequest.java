@@ -1,4 +1,4 @@
-package butvan.agent.agents.agent;
+package butvan.agent.agents.agent.permission;
 
 /**
  * 前端对单个待确认工具提交决定

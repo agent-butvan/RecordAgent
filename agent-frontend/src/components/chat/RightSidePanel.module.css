@@ -1,0 +1,104 @@
+.panel {
+  width: 0;
+  flex: 0 0 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid transparent;
+  background: var(--bg-surface);
+  transition: width var(--transition-normal), flex-basis var(--transition-normal), border-color var(--transition-normal);
+}
+
+.panelOpen {
+  width: 300px;
+  flex-basis: 300px;
+  border-left-color: var(--border-subtle);
+}
+
+.panelClosed {
+  visibility: hidden;
+  transition: width var(--transition-normal), flex-basis var(--transition-normal), border-color var(--transition-normal), visibility 0s linear 0.2s;
+}
+
+.tabBar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  padding: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-app);
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.tab:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
+
+.tabActive {
+  background: var(--bg-app);
+  border-color: var(--border-medium);
+  color: var(--text-primary);
+}
+
+.closeBtn {
+  display: inline-flex;
+  width: 26px;
+  height: 26px;
+  margin-left: auto;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.closeBtn:hover { border-color: var(--border-subtle); background: var(--bg-surface-hover); color: var(--text-primary); }
+
+.content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* 面板内错误边界的兜底样式 */
+.boundaryError {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px 14px;
+}
+
+.boundaryErrorTitle { color: var(--text-primary); font-size: 13px; font-weight: 700; }
+.boundaryErrorText { color: var(--text-muted); font-size: 12px; line-height: 1.55; }
+.boundaryRetry {
+  align-self: flex-start;
+  height: 26px;
+  padding: 0 12px;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-sm);
+  background: var(--bg-app);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.boundaryRetry:hover { border-color: var(--border-focus); color: var(--accent-blue); }
+
+@media (max-width: 940px) {
+  .panel { display: none; }
+}

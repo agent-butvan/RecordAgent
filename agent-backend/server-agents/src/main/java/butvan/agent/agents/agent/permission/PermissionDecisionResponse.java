@@ -1,4 +1,4 @@
-package butvan.agent.agents.agent;
+package butvan.agent.agents.agent.permission;
 
 /**
  * 单条决定保存后的结果,前端据此展示下一条或开始恢复流

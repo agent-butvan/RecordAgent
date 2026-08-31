@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useModel } from '../../context/ModelContext';
-import { fetchSupportedVendors } from '../../services/api';
+import { fetchAccountStatus, fetchSupportedVendors, type AccountStatus } from '../../services/api';
 import { Button } from '../common/Button';
 import { Card } from '../common/Card';
 import { Toggle } from '../common/Toggle';
@@ -34,6 +34,7 @@ import styles from './ModelSettingsPage.module.css';
 
 interface ModelSettingsPageProps {
   onBack: () => void;
+  initialTab?: string;
 }
 
 const VENDOR_DEFAULT_URLS: Record<string, string> = {
@@ -45,7 +46,7 @@ const VENDOR_DEFAULT_URLS: Record<string, string> = {
   ollama: 'http://localhost:11434/v1',
 };
 
-export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack }) => {
+export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, initialTab = 'general' }) => {
   const {
     activeProviderId,
     activeModelId,
@@ -56,8 +57,9 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack }) 
     getAllModels
   } = useModel();
 
-  const [activeTab, setActiveTab] = useState<string>('general');
+  const [activeTab, setActiveTab] = useState<string>(initialTab);
   const [supportedVendors, setSupportedVendors] = useState<string[]>(['gemini', 'openai', 'dashscope', 'deepseek', 'anthropic', 'ollama']);
+  const [accountStatus, setAccountStatus] = useState<AccountStatus | null>(null);
   
   // General Tab State matching Screenshot 3
   const [defaultPermission, setDefaultPermission] = useState(true);
@@ -97,6 +99,12 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack }) 
     };
     loadVendors();
   }, []);
+
+  useEffect(() => {
+    fetchAccountStatus().then(setAccountStatus);
+  }, []);
+
+  useEffect(() => setActiveTab(initialTab), [initialTab]);
 
   const handleVendorChange = (v: string) => {
     setFormVendor(v);
@@ -479,7 +487,24 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack }) 
           </div>
         )}
 
-        {activeTab !== 'config' && activeTab !== 'general' && (
+        {activeTab === 'account' && (
+          <div className={styles.sectionContainer}>
+            <h1 className={styles.pageTitle}>账户</h1>
+            <div className={styles.sectionHeader}>邮箱账户</div>
+            <Card variant="flat" className={styles.settingsCard}>
+              <div className={styles.settingRow}>
+                <div className={styles.rowInfo}>
+                  <div className={styles.rowTitle}>{accountStatus?.maskedEmail || '暂未绑定邮箱'}</div>
+                  <div className={styles.rowSub}>
+                    {accountStatus?.bound ? '邮箱已验证，可用于接收 Agent 通知。' : '绑定邮箱后可接收 Agent 通知。'}
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {activeTab !== 'config' && activeTab !== 'general' && activeTab !== 'account' && (
           <div style={{ padding: '40px 0', color: '#64748b' }}>
             <h3 style={{ fontSize: '16px', fontWeight: 600 }}>{activeTab.toUpperCase()} 设置页面</h3>
             <p style={{ marginTop: '8px', fontSize: '13px' }}>可在“常规”或“配置 (模型 API Key)”中查看与修改配置。</p>

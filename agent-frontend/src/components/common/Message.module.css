@@ -1,0 +1,25 @@
+.message {
+  align-items: center;
+  border-radius: 6px;
+  display: flex;
+  font-size: 12px;
+  gap: 6px;
+  line-height: 1.5;
+  margin: 0;
+  padding: 8px 10px;
+}
+
+.viewport {
+  left: 50%;
+  max-width: min(480px, calc(100vw - 32px));
+  position: fixed;
+  top: 18px;
+  transform: translateX(-50%);
+  z-index: 1000;
+}
+
+.viewport .message { border: 1px solid currentColor; box-shadow: none; }
+
+.success { background: #ecfdf5; color: #047857; }
+.error { background: #fef2f2; color: #b91c1c; }
+.info { background: #eff6ff; color: #1d4ed8; }

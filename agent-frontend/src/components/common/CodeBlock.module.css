@@ -1,0 +1,175 @@
+/* CodeBlock.module.css - AI Coding Agent 代码展示卡片（浅色开发者工具风） */
+
+.card {
+  margin: 12px 0;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  transition: border-color 150ms ease;
+  animation: codeFadeIn 0.25s ease-out;
+}
+
+.card:hover {
+  border-color: #cbd5e1;
+}
+
+@keyframes codeFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Header：语言 badge + 文件名 + 复制按钮 */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 58px;
+  padding: 0 10px 8px 14px;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.langBadge {
+  flex-shrink: 0;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.filename {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.copyBtn {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: #0f172a;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.copyBtn:hover {
+  background: #f1f5f9;
+}
+
+.copyBtn:active {
+  background: #e2e8f0;
+}
+
+.copyBtn:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
+}
+
+/* 代码区域 */
+.codeArea {
+  margin: 0;
+  padding: 8px 12px 10px;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: #1f2937;
+  user-select: text;
+}
+
+.codeArea code {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+/* ── 柔和语法高亮（浅色、低饱和，非 VS Code 默认色） ── */
+.codeArea :global(.hljs-comment),
+.codeArea :global(.hljs-quote) {
+  color: #64748b;
+  font-style: italic;
+}
+
+.codeArea :global(.hljs-keyword),
+.codeArea :global(.hljs-selector-tag),
+.codeArea :global(.hljs-doctag),
+.codeArea :global(.hljs-literal),
+.codeArea :global(.hljs-type),
+.codeArea :global(.hljs-built_in) {
+  color: #cf222e;
+}
+
+.codeArea :global(.hljs-string),
+.codeArea :global(.hljs-attr),
+.codeArea :global(.hljs-addition) {
+  color: #0a3069;
+}
+
+.codeArea :global(.hljs-number),
+.codeArea :global(.hljs-attribute),
+.codeArea :global(.hljs-symbol),
+.codeArea :global(.hljs-bullet),
+.codeArea :global(.hljs-template-variable),
+.codeArea :global(.hljs-variable),
+.codeArea :global(.hljs-operator),
+.codeArea :global(.hljs-regexp),
+.codeArea :global(.hljs-meta),
+.codeArea :global(.hljs-link) {
+  color: #0550ae;
+}
+
+.codeArea :global(.hljs-title),
+.codeArea :global(.hljs-title.function_),
+.codeArea :global(.hljs-function),
+.codeArea :global(.hljs-section) {
+  color: #7c3aed;
+}
+
+.codeArea :global(.hljs-selector-class),
+.codeArea :global(.hljs-selector-id),
+.codeArea :global(.hljs-name),
+.codeArea :global(.hljs-tag),
+.codeArea :global(.hljs-template-tag) {
+  color: #116329;
+}
+
+.codeArea :global(.hljs-deletion),
+.codeArea :global(.hljs-params) {
+  color: #6e7781;
+}
+
+.codeArea :global(.hljs-emphasis) {
+  font-style: italic;
+}
+
+.codeArea :global(.hljs-strong) {
+  font-weight: 700;
+}

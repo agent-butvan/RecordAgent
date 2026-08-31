@@ -1,5 +1,8 @@
 package butvan.agent.agents.agent;
 
+import butvan.agent.agents.agent.permission.PendingApproval;
+import butvan.agent.agents.agent.permission.PendingApprovalStore;
+import butvan.agent.agents.agent.run.AgentRun;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.message.ToolUseBlock;
 import org.junit.jupiter.api.Test;

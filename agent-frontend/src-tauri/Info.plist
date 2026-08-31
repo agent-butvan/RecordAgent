@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>ButvanAgent 需要使用麦克风，将您的语音转换为聊天输入内容。</string>
+  <key>NSSpeechRecognitionUsageDescription</key>
+  <string>ButvanAgent 需要使用语音识别，将您的语音转换为聊天输入内容。</string>
+</dict>
+</plist>

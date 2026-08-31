@@ -1,0 +1,124 @@
+package butvan.agent.agents.agent.run;
+
+import butvan.agent.agents.agent.event.AgentStreamEvent;
+import butvan.agent.agents.session.dto.TranscriptMessageDto;
+import io.agentscope.core.agent.RuntimeContext;
+
+import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * 一次尚未完成的用户会和，只在服务进程内存活
+ */
+public class AgentRun {
+
+    private final String sessionId;
+    private final String userId;
+    private final String turnId;
+    private final RuntimeContext runtimeContext;
+    private final Instant startedAt;
+    private final StringBuilder content = new StringBuilder();
+    private final StringBuilder thinking = new StringBuilder();
+    // 初始 SSE 与恢复 SSE 共用同一份工具参数和执行记录
+    private final Map<String, StringBuilder> toolArgsBuffer = new ConcurrentHashMap<>();
+    private final Map<String, TranscriptMessageDto.ToolExecutionDto> toolExecutions = new LinkedHashMap<>();
+
+    public AgentRun(String sessionId, String userId, String turnId, RuntimeContext runtimeContext) {
+        this.sessionId = sessionId;
+        this.userId = userId;
+        this.turnId = turnId;
+        this.runtimeContext = runtimeContext;
+        this.startedAt = Instant.now();
+    }
+
+    // 下面 getter 仅暴露恢复和最终落库需要的数据。
+    public String sessionId() { return sessionId; }
+    public String userId() { return userId; }
+    public String turnId() { return turnId; }
+    public RuntimeContext runtimeContext() { return runtimeContext; }
+    public Instant startedAt() { return startedAt; }
+    // 收尾落库读取最终正文（只读快照，不暴露内部 StringBuilder）
+    public String contentAsString() {
+        return content.toString();
+    }
+    // 收尾落库读取最终思考（只读快照）
+    public String thinkingAsString() {
+        return thinking.toString();
+    }
+    public Map<String, StringBuilder> toolArgsBuffer() { return toolArgsBuffer; }
+
+    /**
+     * 将映射后的业务事件累计到运行态：正文/思考增量与工具执行记录
+     * @param event
+     */
+    public void record(AgentStreamEvent event) {
+
+        // 正文增量：直接累加到最终正文
+        if (event instanceof AgentStreamEvent.TextDelta text) {
+            content.append(text.content());
+
+            // 思考增量：直接累加到最终思考过程
+        } else if (event instanceof AgentStreamEvent.ThinkingDelta thinkingDelta) {
+            thinking.append(thinkingDelta.content());
+
+            // 工具调用发起：记录一条 RUNNING 状态
+        } else if (event instanceof AgentStreamEvent.ToolCall toolCall) {
+            recordToolCall(toolCall);
+
+            // 工具结果返回：追加输出并标记 COMPLETED
+        } else if (event instanceof AgentStreamEvent.ToolResult toolResult) {
+            recordToResult(toolResult);
+        }
+    }
+
+    private void recordToResult(AgentStreamEvent.ToolResult toolResult) {
+        // 追加本次结果输出；command 沿用之前已记录的值
+        toolExecutions.compute(toolResult.toolCallId(), (key, previous) ->
+                new TranscriptMessageDto.ToolExecutionDto(
+                        toolResult.toolCallId(),
+                        toolResult.toolName(),
+                        previous == null ? "" : previous.command(),
+                        (previous == null ? "" : previous.output()) + toolResult.result(),
+                        TranscriptMessageDto.ToolStatus.COMPLETED // 已收到完成结果
+                ));
+    }
+
+    private void recordToolCall(AgentStreamEvent.ToolCall toolCall) {
+        // 同一 callId 只保留一条记录；command 为空时沿用上一次的值
+        toolExecutions.compute(toolCall.toolCallId(), (key, previous) ->
+                new TranscriptMessageDto.ToolExecutionDto(
+                        toolCall.toolCallId(),
+                        toolCall.toolName(),
+                        toolCall.command().isBlank() && previous != null ? previous.command() : toolCall.command(),
+                        previous == null ? "" : previous.output(),
+                        TranscriptMessageDto.ToolStatus.RUNNING // 工具尚未返回结果
+                ));
+    }
+
+    /**
+     * 将尚未收到结果的 RUNNING 工具转换为最终状态
+     * @param messageStatus
+     * @return
+     */
+    public List<TranscriptMessageDto.ToolExecutionDto> finalizeTools(
+            TranscriptMessageDto.MessageStatus messageStatus
+    ) {
+        // 根据消息状态决定兜底状态
+        TranscriptMessageDto.ToolStatus fallbackStatus = switch (messageStatus) {
+            case COMPLETED, FAILED -> TranscriptMessageDto.ToolStatus.FAILED;
+            case CANCELLED -> TranscriptMessageDto.ToolStatus.CANCELLED;
+        };
+        // 只把任处于 RUNNING 的记录改为兜底状态，其余原样保留
+        return toolExecutions.values().stream()
+                .map(tool -> tool.status() == TranscriptMessageDto.ToolStatus.RUNNING
+                        ? new TranscriptMessageDto.ToolExecutionDto(
+                                tool.toolCallId(), tool.toolName(), tool.command(), tool.output(), fallbackStatus
+                        ) : tool
+                ).toList();
+    }
+
+
+}

@@ -1,5 +1,6 @@
-package butvan.agent.agents.agent;
+package butvan.agent.agents.agent.event;
 
+import butvan.agent.agents.agent.permission.PermissionToolDto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -11,10 +12,8 @@ import java.util.Map;
  * <p>业务层只负责产生此事件，Controller 再将其转换为 SSE，避免 AgentScope 与 Spring Web
  * 相互耦合。</p>
  */
-public sealed interface AgentStreamEvent permits AgentStreamEvent.Completed, AgentStreamEvent.Failed, AgentStreamEvent.PermissionRequired, AgentStreamEvent.TextDelta, AgentStreamEvent.ThinkingDelta, AgentStreamEvent.ToolCall, AgentStreamEvent.ToolResult
+public sealed interface AgentStreamEvent permits AgentStreamEvent.Completed, AgentStreamEvent.Failed, AgentStreamEvent.PermissionRequired, AgentStreamEvent.SubagentProgress, AgentStreamEvent.TextDelta, AgentStreamEvent.ThinkingDelta, AgentStreamEvent.ToolCall, AgentStreamEvent.ToolResult
 {
-
-    Logger log = LoggerFactory.getLogger(AgentStreamEvent.class);
 
     /**
      * 事件名称
@@ -126,7 +125,6 @@ public sealed interface AgentStreamEvent permits AgentStreamEvent.Completed, Age
 
         @Override
         public Object payload() {
-            log.info("发起工具调用 callId: [{}], 工具: [{}], 指令: [{}]", toolCallId, toolName, command);
             return Map.of(
                     "toolCallId", toolCallId != null ? toolCallId : "",
                     "toolName", toolName != null ? toolName : "",
@@ -150,7 +148,6 @@ public sealed interface AgentStreamEvent permits AgentStreamEvent.Completed, Age
 
         @Override
         public Object payload() {
-            log.info("工具 callId: [{}] [{}] 调用完成，输出字节数: [{}]", toolCallId, toolName, result != null ? result.length() : 0);
             return Map.of(
                     "toolCallId", toolCallId != null ? toolCallId : "",
                     "toolName", toolName != null ? toolName : "",
@@ -176,6 +173,31 @@ public sealed interface AgentStreamEvent permits AgentStreamEvent.Completed, Age
         @Override
         public boolean isTerminal() {
             return true;
+        }
+    }
+
+    /**
+     * 子 Agent 进度事件。
+     *
+     * @param source    事件源路径（如 main/explore），用于前端分组
+     * @param agentId   子 Agent 类型名
+     * @param eventType 子事件类型（start / text / tool / end）
+     * @param content   文本增量或工具名等
+     */
+    record SubagentProgress(String source, String agentId, String eventType, String content)
+            implements AgentStreamEvent {
+
+        @Override
+        public String eventName() {
+            return "subagent";
+        }
+
+        @Override
+        public Object payload() {
+            return Map.of("source", source == null ? "" : source,
+                    "agentId", agentId == null ? "" : agentId,
+                    "eventType", eventType == null ? "" : eventType,
+                    "content", content == null ? "" : content);
         }
     }
 }

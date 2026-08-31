@@ -1,0 +1,124 @@
+.container {
+  width: 100%;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 12px;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.header[aria-expanded='true'] {
+  border-bottom-color: var(--border-subtle);
+}
+
+.header:hover {
+  background: var(--bg-surface-hover);
+}
+
+.title,
+.agentHeader,
+.tool,
+.running,
+.complete {
+  display: flex;
+  align-items: center;
+}
+
+.title {
+  gap: 7px;
+}
+
+.chevron {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: transform var(--transition-fast);
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.agent {
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-app);
+}
+
+.agentHeader {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.agentName {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.running,
+.complete {
+  flex-shrink: 0;
+  gap: 5px;
+  font-size: 11px;
+}
+
+.running { color: #2563eb; }
+.complete { color: #15803d; }
+
+.pulse {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse 1.3s ease-in-out infinite;
+}
+
+.tool {
+  gap: 5px;
+  margin-top: 6px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.content {
+  display: -webkit-box;
+  margin-top: 6px;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.55;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+@keyframes pulse { 50% { opacity: 0.35; } }
