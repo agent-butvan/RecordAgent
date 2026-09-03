@@ -3,30 +3,16 @@ import { useModel } from '../../context/ModelContext';
 import { fetchAccountStatus, fetchSupportedVendors, type AccountStatus } from '../../services/api';
 import { Button } from '../common/Button';
 import { Card } from '../common/Card';
-import { Toggle } from '../common/Toggle';
 import { Select } from '../common/Select';
 import { FormField } from '../common/FormField';
 import { TextInput } from '../common/TextInput';
 import { Modal } from '../common/Modal';
 import { Badge } from '../common/Badge';
-import { ModelCard } from './ModelCard';
+import { ModelCard, type ModelCardItem } from './ModelCard';
 import {
   ArrowLeft,
-  User,
-  Settings,
-  Sun,
-  Mic,
   Sliders,
-  Sparkles,
-  Keyboard,
-  CreditCard,
   Shield,
-  Camera,
-  Plug,
-  Globe,
-  Monitor,
-  GitBranch,
-  FolderArchive,
   Plus,
   Inbox
 } from 'lucide-react';
@@ -46,7 +32,7 @@ const VENDOR_DEFAULT_URLS: Record<string, string> = {
   ollama: 'http://localhost:11434/v1',
 };
 
-export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, initialTab = 'general' }) => {
+export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, initialTab = 'config' }) => {
   const {
     activeProviderId,
     activeModelId,
@@ -61,16 +47,6 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
   const [supportedVendors, setSupportedVendors] = useState<string[]>(['gemini', 'openai', 'dashscope', 'deepseek', 'anthropic', 'ollama']);
   const [accountStatus, setAccountStatus] = useState<AccountStatus | null>(null);
   
-  // General Tab State matching Screenshot 3
-  const [defaultPermission, setDefaultPermission] = useState(true);
-  const [fullPermission, setFullPermission] = useState(true);
-  const [openTarget, setOpenTarget] = useState('vscode');
-  const [language, setLanguage] = useState('auto');
-  const [showInMenuBar, setShowInMenuBar] = useState(true);
-  const [showBottomPanel, setShowBottomPanel] = useState(true);
-  const [terminalPos, setTerminalPos] = useState<'bottom' | 'right'>('bottom');
-  const [preventSleep, setPreventSleep] = useState(false);
-
   const allModels = getAllModels();
 
   // Form State
@@ -134,79 +110,35 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
     setShowAddForm(false);
   };
 
-  const handleTestItem = async (modelItem: any) => {
+  const handleTestItem = async (modelItem: ModelCardItem) => {
     const key = `${modelItem.providerId}-${modelItem.id}`;
     setTestingMap((prev) => ({ ...prev, [key]: true }));
 
-    const res = await testConnectionByUrl(modelItem.baseUrl, modelItem.apiKey, modelItem.providerType);
+    const res = await testConnectionByUrl(
+      modelItem.baseUrl || '',
+      modelItem.apiKey || '',
+      modelItem.providerType,
+    );
     setTestResults((prev) => ({ ...prev, [key]: res }));
     setTestingMap((prev) => ({ ...prev, [key]: false }));
   };
 
   return (
     <div className={styles.pageContainer}>
-      {/* Left Settings Navigation Sidebar matching Screenshot 3 */}
+      {/* 左侧仅展示已有实现的设置项。 */}
       <div className={styles.settingsSidebar}>
         <button className={styles.backBtn} onClick={onBack}>
           <ArrowLeft size={14} />
           返回应用
         </button>
 
-        <input
-          className={styles.searchInput}
-          placeholder="搜索设置..."
-        />
-
-        {/* Group 1: 个人 */}
         <div className={styles.navGroup}>
-          <div className={styles.groupLabel}>个人</div>
-          <button
-            className={`${styles.navItem} ${activeTab === 'general' ? styles.navItemActive : ''}`}
-            onClick={() => setActiveTab('general')}
-          >
-            <Settings size={14} /> 常规
-          </button>
+          <div className={styles.groupLabel}>设置</div>
           <button
             className={`${styles.navItem} ${activeTab === 'config' ? styles.navItemActive : ''}`}
             onClick={() => setActiveTab('config')}
           >
             <Sliders size={14} /> 配置 (模型 API Key)
-          </button>
-          <button
-            className={`${styles.navItem} ${activeTab === 'profile' ? styles.navItemActive : ''}`}
-            onClick={() => setActiveTab('profile')}
-          >
-            <User size={14} /> 个人资料
-          </button>
-          <button
-            className={`${styles.navItem} ${activeTab === 'appearance' ? styles.navItemActive : ''}`}
-            onClick={() => setActiveTab('appearance')}
-          >
-            <Sun size={14} /> 外观
-          </button>
-          <button
-            className={`${styles.navItem} ${activeTab === 'voice' ? styles.navItemActive : ''}`}
-            onClick={() => setActiveTab('voice')}
-          >
-            <Mic size={14} /> 语音
-          </button>
-          <button
-            className={`${styles.navItem} ${activeTab === 'personalize' ? styles.navItemActive : ''}`}
-            onClick={() => setActiveTab('personalize')}
-          >
-            <Sparkles size={14} /> 个性化
-          </button>
-          <button
-            className={`${styles.navItem} ${activeTab === 'shortcuts' ? styles.navItemActive : ''}`}
-            onClick={() => setActiveTab('shortcuts')}
-          >
-            <Keyboard size={14} /> 键盘快捷键
-          </button>
-          <button
-            className={`${styles.navItem} ${activeTab === 'billing' ? styles.navItemActive : ''}`}
-            onClick={() => setActiveTab('billing')}
-          >
-            <CreditCard size={14} /> 使用情况和计费
           </button>
           <button
             className={`${styles.navItem} ${activeTab === 'account' ? styles.navItemActive : ''}`}
@@ -215,176 +147,25 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
             <Shield size={14} /> 账户
           </button>
         </div>
-
-        {/* Group 2: 集成 */}
-        <div className={styles.navGroup}>
-          <div className={styles.groupLabel}>集成</div>
-          <button className={styles.navItem}><Camera size={14} /> 智能快照</button>
-          <button className={styles.navItem}><Plug size={14} /> 插件</button>
-          <button className={styles.navItem}><Globe size={14} /> 浏览器</button>
-          <button className={styles.navItem}><Monitor size={14} /> 电脑操控</button>
-        </div>
-
-        {/* Group 3: 编码 */}
-        <div className={styles.navGroup}>
-          <div className={styles.groupLabel}>编码</div>
-          <button className={styles.navItem}><GitBranch size={14} /> Git与工作树</button>
-        </div>
-
-        {/* Group 4: 已归档 */}
-        <div className={styles.navGroup}>
-          <div className={styles.groupLabel}>已归档</div>
-          <button className={styles.navItem}><FolderArchive size={14} /> 已归档的聊天</button>
-        </div>
       </div>
 
       {/* Right Settings Content Section */}
       <div className={styles.settingsContent}>
-        {/* TAB 1: 常规设置 (Matching Screenshot 3) */}
-        {activeTab === 'general' && (
-          <div className={styles.sectionContainer}>
-            <h1 className={styles.pageTitle}>常规</h1>
-
-            {/* Permission Card Section */}
-            <div className={styles.sectionHeader}>权限</div>
-            <Card variant="flat" className={styles.settingsCard}>
-              <div className={styles.settingRow}>
-                <div className={styles.rowInfo}>
-                  <div className={styles.rowTitle}>默认权限</div>
-                  <div className={styles.rowSub}>默认情况下，ButvanAgent 可以读取和编辑其工作空间中的文件。需要时，它可以请求额外访问权限。</div>
-                </div>
-                <Toggle checked={defaultPermission} onChange={setDefaultPermission} />
-              </div>
-
-              <div className={styles.divider} />
-
-              <div className={styles.settingRow}>
-                <div className={styles.rowInfo}>
-                  <div className={styles.rowTitle}>完全访问权限</div>
-                  <div className={styles.rowSub}>当以完整访问权限运行时，它无需你的批准即可编辑你电脑上的任何文件，并运行可访问网络的命令。<a href="#" style={{ color: '#2563eb' }}>了解更多</a></div>
-                </div>
-                <Toggle checked={fullPermission} onChange={setFullPermission} />
-              </div>
-            </Card>
-
-            {/* General Settings Card Section */}
-            <div className={styles.sectionHeader} style={{ marginTop: '28px' }}>常规</div>
-            <Card variant="flat" className={styles.settingsCard}>
-              <div className={styles.settingRow}>
-                <div className={styles.rowInfo}>
-                  <div className={styles.rowTitle}>默认文件打开目标</div>
-                  <div className={styles.rowSub}>默认打开文件和文件夹的位置</div>
-                </div>
-                <Select
-                  value={openTarget}
-                  onChange={(e) => setOpenTarget(e.target.value)}
-                  options={[
-                    { label: 'VS Code', value: 'vscode' },
-                    { label: 'Cursor', value: 'cursor' },
-                    { label: 'IntelliJ IDEA', value: 'idea' },
-                  ]}
-                />
-              </div>
-
-              <div className={styles.divider} />
-
-              <div className={styles.settingRow}>
-                <div className={styles.rowInfo}>
-                  <div className={styles.rowTitle}>语言</div>
-                  <div className={styles.rowSub}>应用 UI 语言</div>
-                </div>
-                <Select
-                  value={language}
-                  onChange={(e) => setLanguage(e.target.value)}
-                  options={[
-                    { label: '自动检测', value: 'auto' },
-                    { label: '简体中文', value: 'zh' },
-                    { label: 'English', value: 'en' },
-                  ]}
-                />
-              </div>
-
-              <div className={styles.divider} />
-
-              <div className={styles.settingRow}>
-                <div className={styles.rowInfo}>
-                  <div className={styles.rowTitle}>在菜单栏中显示</div>
-                  <div className={styles.rowSub}>关闭主窗口后，仍在 macOS 菜单栏中保留 ButvanAgent</div>
-                </div>
-                <Toggle checked={showInMenuBar} onChange={setShowInMenuBar} />
-              </div>
-
-              <div className={styles.divider} />
-
-              <div className={styles.settingRow}>
-                <div className={styles.rowInfo}>
-                  <div className={styles.rowTitle}>底部面板</div>
-                  <div className={styles.rowSub}>在应用标题栏中显示底部面板控件</div>
-                </div>
-                <Toggle checked={showBottomPanel} onChange={setShowBottomPanel} />
-              </div>
-
-              <div className={styles.divider} />
-
-              <div className={styles.settingRow}>
-                <div className={styles.rowInfo}>
-                  <div className={styles.rowTitle}>默认终端位置</div>
-                  <div className={styles.rowSub}>选择终端快捷键和环境操作在何处打开终端标签页</div>
-                </div>
-                <div className={styles.segmentControl}>
-                  <button
-                    className={`${styles.segmentBtn} ${terminalPos === 'bottom' ? styles.segmentActive : ''}`}
-                    onClick={() => setTerminalPos('bottom')}
-                  >
-                    底部
-                  </button>
-                  <button
-                    className={`${styles.segmentBtn} ${terminalPos === 'right' ? styles.segmentActive : ''}`}
-                    onClick={() => setTerminalPos('right')}
-                  >
-                    右侧
-                  </button>
-                </div>
-              </div>
-
-              <div className={styles.divider} />
-
-              <div className={styles.settingRow}>
-                <div className={styles.rowInfo}>
-                  <div className={styles.rowTitle}>运行时防止系统休眠</div>
-                  <div className={styles.rowSub}>在 Agent 运行任务时，让电脑保持唤醒状态</div>
-                </div>
-                <Toggle checked={preventSleep} onChange={setPreventSleep} />
-              </div>
-
-              <div className={styles.divider} />
-
-              <div className={styles.settingRow}>
-                <div className={styles.rowInfo}>
-                  <div className={styles.rowTitle}>打开开源许可证</div>
-                  <div className={styles.rowSub}>捆绑依赖项的第三方声明</div>
-                </div>
-                <Button variant="secondary" size="sm">查看</Button>
-              </div>
-            </Card>
-          </div>
-        )}
-
-        {/* TAB 2: 模型配置列表 (Config) */}
+        {/* 模型配置 */}
         {activeTab === 'config' && (
-          <div>
+          <div className={styles.configPage}>
             <div className={styles.topHeader}>
               <div>
-                <h2 className={styles.title}>模型配置列表 (Model List)</h2>
+                <h1 className={styles.title}>模型配置</h1>
                 <p className={styles.configSubtitle}>
-                  托管在本地 ~/.butvan-agent/config.json 的多厂商 AI 大模型配置
+                  管理本地保存的模型，可随时测试连接并切换当前模型。
                 </p>
               </div>
 
               <div className={styles.headerActions}>
-                <Badge variant="primary">已配置 {allModels.length} 个模型</Badge>
+                <Badge variant="default">{allModels.length} 个模型</Badge>
                 <Button variant="primary" icon={<Plus size={15} />} onClick={() => setShowAddForm(true)}>
-                  新增配置模型
+                  添加模型
                 </Button>
               </div>
             </div>
@@ -504,12 +285,6 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
           </div>
         )}
 
-        {activeTab !== 'config' && activeTab !== 'general' && activeTab !== 'account' && (
-          <div style={{ padding: '40px 0', color: '#64748b' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 600 }}>{activeTab.toUpperCase()} 设置页面</h3>
-            <p style={{ marginTop: '8px', fontSize: '13px' }}>可在“常规”或“配置 (模型 API Key)”中查看与修改配置。</p>
-          </div>
-        )}
       </div>
     </div>
   );

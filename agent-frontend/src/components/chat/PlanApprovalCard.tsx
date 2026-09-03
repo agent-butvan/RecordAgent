@@ -3,6 +3,7 @@ import { ClipboardList, Check, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { fetchPlan } from '../../services/api';
+import { LoadingTree } from '../common/LoadingTree';
 import styles from './PermissionRequestCard.module.css';
 
 interface PlanApprovalCardProps {
@@ -42,7 +43,7 @@ export function PlanApprovalCard({
       </div>
 
       {plan === null ? (
-        <p className={styles.description}>计划书加载中…</p>
+        <LoadingTree size="small" label="正在读取计划书…" />
       ) : plan === '' ? (
         <p className={styles.description}>暂无计划书内容</p>
       ) : (

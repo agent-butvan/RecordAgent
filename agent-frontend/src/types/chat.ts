@@ -5,6 +5,7 @@ export type SessionKind = 'GENERAL' | 'PROJECT';
 export type SessionStatus = 'ACTIVE' | 'DELETING';
 export type MessageRole = 'USER' | 'ASSISTANT';
 export type MessageStatus = 'COMPLETED' | 'FAILED' | 'CANCELLED';
+export type SessionPermissionMode = 'ASK' | 'AUTO_EDIT' | 'FULL_ACCESS';
 
 /** Agent 响应时间线节点类型 */
 export type TraceNodeType =

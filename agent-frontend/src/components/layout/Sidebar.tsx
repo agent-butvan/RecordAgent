@@ -21,6 +21,7 @@ import type { ChatSession, Project } from '../../types/chat';
 import { FormField } from '../common/FormField';
 import { TextInput } from '../common/TextInput';
 import { Modal } from '../common/Modal';
+import { Message } from '../common/Message';
 import { EmailBindingModal } from '../account/EmailBindingModal';
 import { fetchAccountStatus } from '../../services/api';
 import styles from './Sidebar.module.css';
@@ -85,7 +86,7 @@ interface SidebarProps {
   onNewGeneralChat: () => void;
   onNewProjectChat: (projectId: string) => void;
   onImportProject: (name: string, path: string) => void;
-  onDeleteSession: (id: string, e: React.MouseEvent) => void;
+  onDeleteSession: (id: string) => Promise<{ success: boolean; message?: string }>;
   onUpdateSessionTitle?: (id: string, newTitle: string) => void;
   onOpenSettings: () => void;
   onOpenAccountSettings: () => void;
@@ -126,6 +127,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     y: number;
   } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [deleteSession, setDeleteSession] = useState<ChatSession | null>(null);
+  const [isDeletingSession, setIsDeletingSession] = useState(false);
+  const [deleteSessionError, setDeleteSessionError] = useState<string | null>(null);
 
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importPath, setImportPath] = useState('');
@@ -244,6 +248,37 @@ export const Sidebar: React.FC<SidebarProps> = ({
     setMenuSession(null);
     setEditingSessionId(session.id);
     setEditingTitle(session.title || '');
+  };
+
+  const requestDeleteSession = (session: ChatSession, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setMenuSession(null);
+    setDeleteSessionError(null);
+    setDeleteSession(session);
+  };
+
+  const closeDeleteSession = () => {
+    if (isDeletingSession) return;
+    setDeleteSession(null);
+    setDeleteSessionError(null);
+  };
+
+  const confirmDeleteSession = async () => {
+    if (!deleteSession || isDeletingSession) return;
+    setIsDeletingSession(true);
+    setDeleteSessionError(null);
+    try {
+      const result = await onDeleteSession(deleteSession.id);
+      if (result.success) {
+        setDeleteSession(null);
+        return;
+      }
+      setDeleteSessionError(result.message || '删除会话失败，请稍后重试。');
+    } catch (error) {
+      setDeleteSessionError(error instanceof Error ? error.message : '删除会话失败，请稍后重试。');
+    } finally {
+      setIsDeletingSession(false);
+    }
   };
 
   const commitRename = (session: ChatSession) => {
@@ -496,10 +531,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                             {session.title || '新对话'}
                                           </span>
                                           <button
+                                            type="button"
                                             className={styles.deleteBtn}
                                             title="删除会话"
                                             aria-label="删除会话"
-                                            onClick={(e) => onDeleteSession(session.id, e)}
+                                            onClick={(e) => requestDeleteSession(session, e)}
                                           >
                                             <Trash2 size={12} />
                                           </button>
@@ -573,10 +609,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               type="button"
               role="menuitem"
               className={`${styles.menuItem} ${styles.menuItemDanger}`}
-              onClick={(e) => {
-                setMenuSession(null);
-                onDeleteSession(menuSession.session.id, e);
-              }}
+              onClick={(e) => requestDeleteSession(menuSession.session, e)}
             >
               <Trash2 size={13} />
               <span>删除</span>
@@ -625,6 +658,40 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        open={deleteSession !== null}
+        title="删除会话？"
+        onClose={closeDeleteSession}
+        width={420}
+        centered
+      >
+        <div className={styles.deleteModalBody}>
+          <p className={styles.deleteDescription}>
+            “{deleteSession?.title || '新对话'}”及其全部聊天记录将被永久删除，此操作无法撤销。
+          </p>
+          {deleteSessionError && <Message tone="error">{deleteSessionError}</Message>}
+          <div className={styles.modalActions}>
+            <button
+              type="button"
+              className={styles.cancelBtn}
+              onClick={closeDeleteSession}
+              disabled={isDeletingSession}
+              autoFocus
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              className={styles.deleteConfirmBtn}
+              onClick={() => void confirmDeleteSession()}
+              disabled={isDeletingSession}
+            >
+              {isDeletingSession ? '正在删除…' : '删除会话'}
+            </button>
+          </div>
+        </div>
       </Modal>
 
       <EmailBindingModal

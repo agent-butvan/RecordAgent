@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ChevronRight, File, Folder, FolderOpen, RefreshCw } from 'lucide-react';
 import type { FileTreeNode } from '../../types/team';
 import { fetchProjectFileTree } from '../../services/fileTreeApi';
+import { LoadingTree } from '../common/LoadingTree';
 import styles from './ProjectFileTree.module.css';
 
 interface ProjectFileTreeProps {
@@ -125,11 +126,7 @@ export const ProjectFileTree: React.FC<ProjectFileTreeProps> = ({ projectPath })
           </button>
         </div>
       ) : isLoading && tree.length === 0 ? (
-        <div className={styles.skeleton} aria-hidden="true">
-          {[0, 1, 2, 3, 4].map((i) => (
-            <div key={i} className={styles.skeletonRow} style={{ width: `${78 - i * 7}%` }} />
-          ))}
-        </div>
+        <LoadingTree size="small" label="正在读取项目文件…" />
       ) : tree.length === 0 ? (
         <p className={styles.empty}>项目目录为空或暂无可展示文件。</p>
       ) : (

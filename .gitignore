@@ -1,8 +1,10 @@
 # macOS
 .DS_Store
 
-# 本地文档（不入库）
-docs/
+# 本地教程文档不入库；正式发布指南例外，作为交付契约随代码维护。
+docs/*
+!docs/
+!docs/RELEASE.md
 
 # 本地工具状态与缓存（不提交）
 .codex/

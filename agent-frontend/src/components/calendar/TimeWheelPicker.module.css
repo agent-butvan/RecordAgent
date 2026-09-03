@@ -1,0 +1,222 @@
+.picker {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.trigger {
+  width: 100%;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 5px 0 11px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: #ffffff;
+  color: var(--text-secondary);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.trigger:hover {
+  border-color: var(--border-medium);
+}
+
+.triggerOpen,
+.trigger:focus-within {
+  border-color: var(--accent-blue);
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(47, 105, 218, 0.12);
+}
+
+.trigger > svg {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+}
+
+.trigger input {
+  min-width: 0;
+  height: 100%;
+  flex: 1;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+}
+
+.trigger input::placeholder {
+  color: var(--text-muted);
+  font-weight: 450;
+}
+
+.toggleButton {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.toggleButton:hover {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.toggleButton svg {
+  transition: transform var(--transition-fast);
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.wheelPanel {
+  width: 196px;
+  max-width: 100%;
+  align-self: flex-start;
+  margin-top: 5px;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.wheels {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 12px minmax(0, 1fr);
+  align-items: center;
+  padding: 5px 8px 3px;
+}
+
+.wheelColumn {
+  position: relative;
+  height: 84px;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  outline: none;
+  touch-action: none;
+}
+
+.wheelColumn::before,
+.wheelColumn::after {
+  position: absolute;
+  right: 0;
+  left: 0;
+  z-index: 3;
+  height: 28px;
+  content: '';
+  pointer-events: none;
+}
+
+.wheelColumn::before {
+  top: 0;
+  background: linear-gradient(to bottom, #ffffff 18%, rgba(255, 255, 255, 0));
+}
+
+.wheelColumn::after {
+  bottom: 0;
+  background: linear-gradient(to top, #ffffff 18%, rgba(255, 255, 255, 0));
+}
+
+.wheelColumn:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--accent-blue);
+}
+
+.selection {
+  position: absolute;
+  top: 28px;
+  right: 0;
+  left: 0;
+  z-index: 0;
+  height: 28px;
+  border-radius: var(--radius-md);
+  background: #f1f4f8;
+  pointer-events: none;
+}
+
+.wheelTrack {
+  position: relative;
+  z-index: 1;
+  padding-top: 28px;
+  padding-bottom: 28px;
+  cursor: grab;
+}
+
+.wheelTrack:active {
+  cursor: grabbing;
+}
+
+.wheelItem {
+  width: 100%;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+
+.wheelItemSelected {
+  color: var(--text-primary);
+  font-weight: 650;
+}
+
+.colon {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 650;
+  text-align: center;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 0 5px 5px;
+}
+
+.actions button {
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 7px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.actions button:hover {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.actions .doneButton {
+  background: #edf3ff;
+  color: var(--accent-blue);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wheelTrack,
+  .wheelItem {
+    transition: none;
+  }
+}

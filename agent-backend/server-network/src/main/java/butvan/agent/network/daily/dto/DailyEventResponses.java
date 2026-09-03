@@ -1,0 +1,104 @@
+package butvan.agent.network.daily.dto;
+
+import butvan.agent.network.daily.model.DailyEventModels.DailyDay;
+import butvan.agent.network.daily.model.DailyEventModels.DailyDaySummary;
+import butvan.agent.network.daily.model.DailyEventModels.DailyEvent;
+import butvan.agent.network.daily.model.DailyEventModels.ExpenseDetails;
+import butvan.agent.network.daily.model.DailyEventModels.JournalDetails;
+import butvan.agent.network.daily.model.DailyEventModels.ScheduleDetails;
+import butvan.agent.network.daily.model.DailyEventModels.TodoDetails;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
+
+/** 日记录读取接口的独立响应 DTO 与领域映射。 */
+public final class DailyEventResponses {
+
+    private DailyEventResponses() {
+    }
+
+    /** 一条日记录响应。 */
+    public record EventResponse(
+            String id,
+            LocalDate eventDate,
+            String eventType,
+            String title,
+            String source,
+            String status,
+            int version,
+            Instant createdAt,
+            Instant updatedAt,
+            Object details) {
+    }
+
+    /** 某日完整时间线响应。 */
+    public record DayResponse(LocalDate date, List<EventResponse> events) {
+    }
+
+    /** 日期范围内单日摘要响应。 */
+    public record DaySummaryResponse(
+            LocalDate date,
+            int eventCount,
+            int todoCount,
+            int completedTodoCount,
+            int scheduleCount,
+            BigDecimal expenseTotal,
+            String headline) {
+    }
+
+    /** 待办详情响应。 */
+    public record TodoDetailResponse(String time, String priority, boolean completed) {
+    }
+
+    /** 日程详情响应。 */
+    public record ScheduleDetailResponse(String startTime, String endTime, String location, String timezone) {
+    }
+
+    /** 花销详情响应。 */
+    public record ExpenseDetailResponse(
+            String category, String note, BigDecimal amount, String time, String currency) {
+    }
+
+    /** 手记详情响应。 */
+    public record JournalDetailResponse(String body, String mood) {
+    }
+
+    /** 将领域日记录转换为协议 DTO。 */
+    public static EventResponse from(DailyEvent event) {
+        return new EventResponse(
+                event.id(), event.eventDate(), event.eventType(), event.title(), event.source(), event.status(),
+                event.version(), event.createdAt(), event.updatedAt(), mapDetails(event.details()));
+    }
+
+    /** 将某日领域结果转换为协议 DTO。 */
+    public static DayResponse from(DailyDay day) {
+        return new DayResponse(day.date(), day.events().stream().map(DailyEventResponses::from).toList());
+    }
+
+    /** 将范围摘要转换为协议 DTO。 */
+    public static DaySummaryResponse from(DailyDaySummary summary) {
+        return new DaySummaryResponse(
+                summary.date(), summary.eventCount(), summary.todoCount(), summary.completedTodoCount(),
+                summary.scheduleCount(), summary.expenseTotal(), summary.headline());
+    }
+
+    private static Object mapDetails(Object details) {
+        if (details instanceof TodoDetails todo) {
+            return new TodoDetailResponse(todo.time(), todo.priority(), todo.completed());
+        }
+        if (details instanceof ScheduleDetails schedule) {
+            return new ScheduleDetailResponse(
+                    schedule.startTime(), schedule.endTime(), schedule.location(), schedule.timezone());
+        }
+        if (details instanceof ExpenseDetails expense) {
+            return new ExpenseDetailResponse(
+                    expense.category(), expense.note(), expense.amount(), expense.time(), expense.currency());
+        }
+        if (details instanceof JournalDetails journal) {
+            return new JournalDetailResponse(journal.body(), journal.mood());
+        }
+        return null;
+    }
+}

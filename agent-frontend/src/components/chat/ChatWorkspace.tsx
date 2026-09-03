@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import type { ChatMessage } from '../../types/chat';
+import type { ChatMessage, SessionPermissionMode } from '../../types/chat';
 import type { TaskDto } from '../../types/team';
 import { Card } from '../common/Card';
+import { LoadingTree } from '../common/LoadingTree';
 import { PermissionRequestCard } from './PermissionRequestCard';
 import { PlanApprovalCard } from './PlanApprovalCard';
 import { AgentResponse } from './AgentResponse';
@@ -25,14 +26,18 @@ import {
   Maximize2,
   Bot,
   FolderTree,
-  PanelRightClose,
-  PanelRightOpen,
+  MessageSquare,
+  PanelRight,
 } from 'lucide-react';
 import styles from './ChatWorkspace.module.css';
 
 interface ChatWorkspaceProps {
   messages: ChatMessage[];
   sessionId: string;
+  sessionTitle?: string;
+  isSessionLoading?: boolean;
+  sessionLoadError?: string | null;
+  onRetrySessionLoad?: () => void;
   onSendMessage: (prompt: string) => void;
   onOpenSettings: () => void;
   pendingPermission?: { assistantMessageId: string; tool: PermissionToolPayload } | null;
@@ -46,6 +51,10 @@ interface ChatWorkspaceProps {
   onCancelSubagentTask: (taskId: string) => void;
   /** 项目级聊天的项目根目录（非项目聊天为 null）。 */
   projectPath?: string | null;
+  permissionMode: SessionPermissionMode;
+  onPermissionModeChange: (mode: SessionPermissionMode) => void;
+  isPermissionModeDisabled?: boolean;
+  isPermissionModeSaving?: boolean;
 }
 
 const AssistantMessageItem: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
@@ -106,6 +115,10 @@ const AssistantMessageItem: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
 export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   messages,
   sessionId,
+  sessionTitle = '新对话',
+  isSessionLoading = false,
+  sessionLoadError = null,
+  onRetrySessionLoad,
   onSendMessage,
   onOpenSettings,
   pendingPermission = null,
@@ -118,26 +131,69 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   onRefreshSubagentTasks,
   onCancelSubagentTask,
   projectPath = null,
+  permissionMode,
+  onPermissionModeChange,
+  isPermissionModeDisabled = false,
+  isPermissionModeSaving = false,
 }) => {
   const [inputPrompt, setInputPrompt] = useState('');
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
-  const [rightPanelTab, setRightPanelTab] = useState('tasks');
+  const [rightPanelTabs, setRightPanelTabs] = useState<string[]>([]);
+  const [rightPanelTab, setRightPanelTab] = useState<string | null>(null);
   const messagesAreaRef = useRef<HTMLDivElement>(null);
 
-  const panelTabs = useMemo<RightPanelTab[]>(() => {
-    const tabs: RightPanelTab[] = [{ id: 'tasks', label: '任务', icon: Bot }];
+  const availablePanelTabs = useMemo<RightPanelTab[]>(() => {
+    const tabs: RightPanelTab[] = [{
+      id: 'tasks',
+      label: '任务',
+      icon: Bot,
+    }];
     if (projectPath) {
-      tabs.push({ id: 'files', label: '文件', icon: FolderTree });
+      tabs.push({
+        id: 'files',
+        label: '文件',
+        icon: FolderTree,
+      });
     }
     return tabs;
   }, [projectPath]);
 
-  // 切换到非项目聊天时，若当前停留在“文件”页签则回落到“任务”。
+  const openedPanelTabs = availablePanelTabs.filter((tab) => rightPanelTabs.includes(tab.id));
+
+  // 切换到非项目聊天时关闭不再可用的“文件”标签。
   useEffect(() => {
-    if (!projectPath && rightPanelTab === 'files') {
-      setRightPanelTab('tasks');
+    if (!projectPath) {
+      setRightPanelTabs((tabs) => tabs.filter((tabId) => tabId !== 'files'));
+      setRightPanelTab((activeTab) => activeTab === 'files' ? null : activeTab);
     }
-  }, [projectPath, rightPanelTab]);
+  }, [projectPath]);
+
+  useEffect(() => {
+    const togglePanel = (event: KeyboardEvent) => {
+      if (event.altKey && event.metaKey && event.code === 'KeyB') {
+        event.preventDefault();
+        setRightPanelOpen((open) => !open);
+      }
+    };
+    window.addEventListener('keydown', togglePanel);
+    return () => window.removeEventListener('keydown', togglePanel);
+  }, []);
+
+  const openPanelTab = (tabId: string) => {
+    if (!availablePanelTabs.some((tab) => tab.id === tabId)) return;
+    setRightPanelTabs((tabs) => tabs.includes(tabId) ? tabs : [...tabs, tabId]);
+    setRightPanelTab(tabId);
+    setRightPanelOpen(true);
+  };
+
+  const closePanelTab = (tabId: string) => {
+    const closedIndex = rightPanelTabs.indexOf(tabId);
+    const nextTabs = rightPanelTabs.filter((openTabId) => openTabId !== tabId);
+    setRightPanelTabs(nextTabs);
+    if (rightPanelTab === tabId) {
+      setRightPanelTab(nextTabs[closedIndex] ?? nextTabs[closedIndex - 1] ?? null);
+    }
+  };
 
   useEffect(() => {
     const area = messagesAreaRef.current;
@@ -190,33 +246,57 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
         onValueChange={setInputPrompt}
         onSend={handleSend}
         onOpenSettings={onOpenSettings}
+        permissionMode={permissionMode}
+        onPermissionModeChange={onPermissionModeChange}
+        isPermissionModeDisabled={isPermissionModeDisabled}
+        isPermissionModeSaving={isPermissionModeSaving}
       />
     </div>
   );
 
   return (
     <div className={styles.workspace}>
-      {/* 顶部工具条：右上角为右侧面板开关 */}
+      {/* 顶部工作区：当前会话信息与右侧面板开关 */}
       <div className={styles.workspaceHeader}>
+        <div className={styles.workspaceIdentity}>
+          {projectPath ? (
+            <FolderTree size={16} aria-hidden="true" />
+          ) : (
+            <MessageSquare size={16} aria-hidden="true" />
+          )}
+          <span className={styles.workspaceTitle} title={sessionTitle || '新对话'}>
+            {sessionTitle || '新对话'}
+          </span>
+        </div>
         <button
           type="button"
           className={`${styles.panelToggle} ${rightPanelOpen ? styles.panelToggleActive : ''}`}
           onClick={() => setRightPanelOpen((open) => !open)}
           aria-expanded={rightPanelOpen}
           aria-label={rightPanelOpen ? '收起右侧面板' : '展开右侧面板'}
-          title="右侧面板"
+          aria-keyshortcuts="Alt+Meta+B"
+          title={`${rightPanelOpen ? '隐藏' : '显示'}侧边面板（⌥⌘B）`}
         >
-          {rightPanelOpen ? (
-            <PanelRightClose size={16} aria-hidden="true" />
-          ) : (
-            <PanelRightOpen size={16} aria-hidden="true" />
-          )}
+          <PanelRight size={17} strokeWidth={1.7} aria-hidden="true" />
         </button>
       </div>
 
       <div className={styles.workspaceBody}>
         {/* Hero Empty State OR Chat Messages */}
-        {messages.length === 0 ? (
+        {sessionLoadError ? (
+          <div className={styles.sessionLoadState} role="alert">
+            <p>{sessionLoadError}</p>
+            {onRetrySessionLoad && (
+              <button type="button" className={styles.retryLoadBtn} onClick={onRetrySessionLoad}>
+                重新加载
+              </button>
+            )}
+          </div>
+        ) : isSessionLoading ? (
+          <div className={styles.sessionLoadState}>
+            <LoadingTree size="large" label="正在读取聊天记录…" />
+          </div>
+        ) : messages.length === 0 ? (
           <div className={styles.centerHero}>
             <Cloud className={styles.cloudIcon} />
             <h1 className={styles.heroTitle}>要在 <span style={{ textDecoration: 'underline', textUnderlineOffset: '6px' }}>ButvanAgent</span> 内开发什么？</h1>
@@ -298,10 +378,12 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
 
         <RightSidePanel
           open={rightPanelOpen}
-          tabs={panelTabs}
+          availableTabs={availablePanelTabs}
+          tabs={openedPanelTabs}
           activeTab={rightPanelTab}
           onTabChange={setRightPanelTab}
-          onClose={() => setRightPanelOpen(false)}
+          onOpenTab={openPanelTab}
+          onCloseTab={closePanelTab}
         >
           {rightPanelTab === 'tasks' ? (
             <SubagentTaskPanel

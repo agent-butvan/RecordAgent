@@ -1,11 +1,13 @@
 import { motion } from 'framer-motion';
 import { Check } from 'lucide-react';
 import type { CalendarTodo } from '../../types/calendar';
+import { DailyRecordDeleteButton } from './DailyRecordDeleteButton';
 import styles from './DailyTodoList.module.css';
 
 interface DailyTodoListProps {
   todos: CalendarTodo[];
   onToggle: (todoId: string) => void;
+  onDelete: (todo: CalendarTodo) => void;
 }
 
 const priorityLabels = {
@@ -15,7 +17,7 @@ const priorityLabels = {
 } as const;
 
 /** 带手绘划线反馈的当日待办清单。 */
-export const DailyTodoList: React.FC<DailyTodoListProps> = ({ todos, onToggle }) => {
+export const DailyTodoList: React.FC<DailyTodoListProps> = ({ todos, onToggle, onDelete }) => {
   if (todos.length === 0) {
     return <p className={styles.empty}>这一天没有待办，留给自己一点空白。</p>;
   }
@@ -23,17 +25,19 @@ export const DailyTodoList: React.FC<DailyTodoListProps> = ({ todos, onToggle })
   return (
     <div className={styles.list}>
       {todos.map((todo) => (
-        <label key={todo.id} className={styles.item}>
-          <input
-            className={styles.checkboxInput}
-            type="checkbox"
-            checked={todo.completed}
-            onChange={() => onToggle(todo.id)}
-            aria-label={`标记“${todo.title}”完成`}
-          />
-          <span className={styles.checkbox} aria-hidden="true">
-            {todo.completed && <Check size={13} strokeWidth={2.6} />}
-          </span>
+        <div key={todo.id} className={styles.item}>
+          <label className={styles.toggle}>
+            <input
+              className={styles.checkboxInput}
+              type="checkbox"
+              checked={todo.completed}
+              onChange={() => onToggle(todo.id)}
+              aria-label={`标记“${todo.title}”完成`}
+            />
+            <span className={styles.checkbox} aria-hidden="true">
+              {todo.completed && <Check size={13} strokeWidth={2.6} />}
+            </span>
+          </label>
           <span className={styles.todoContent}>
             <span className={styles.todoLine}>
               <span className={todo.completed ? styles.todoTitleDone : styles.todoTitle}>{todo.title}</span>
@@ -60,7 +64,8 @@ export const DailyTodoList: React.FC<DailyTodoListProps> = ({ todos, onToggle })
               {todo.time && <span>{todo.time}</span>}
             </span>
           </span>
-        </label>
+          <DailyRecordDeleteButton label={`待办“${todo.title}”`} onDelete={() => onDelete(todo)} />
+        </div>
       ))}
     </div>
   );

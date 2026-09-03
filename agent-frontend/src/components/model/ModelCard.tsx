@@ -69,6 +69,8 @@ export const ModelCard: React.FC<ModelCardProps> = ({
         </div>
 
         <div className={styles.info}>
+          <span className={styles.modelName} title={item.id}>{item.name}</span>
+
           <div className={styles.metaRow}>
             <span className={styles.vendorName}>{vendorName}</span>
             {item.supportsReasoning && (
@@ -78,12 +80,6 @@ export const ModelCard: React.FC<ModelCardProps> = ({
               <span className={styles.contextTag}>{contextLabel} 上下文</span>
             )}
           </div>
-
-          <span className={styles.modelName} title={item.id}>{item.name}</span>
-
-          {item.baseUrl && (
-            <span className={styles.baseUrl} title={item.baseUrl}>{item.baseUrl}</span>
-          )}
 
           {item.description && (
             <span className={styles.desc}>{item.description}</span>
@@ -98,36 +94,34 @@ export const ModelCard: React.FC<ModelCardProps> = ({
           </span>
         )}
 
-        <div className={styles.actionRow}>
-          <button
-            className={styles.testBtn}
-            onClick={onTest}
-            disabled={isTesting}
-          >
-            {isTesting && <Loader2 size={13} className={styles.spin} />}
-            {isTesting ? '测试中...' : '测试连接'}
-          </button>
+        <button
+          className={styles.testBtn}
+          onClick={onTest}
+          disabled={isTesting}
+        >
+          {isTesting && <Loader2 size={13} className={styles.spin} />}
+          {isTesting ? '测试中...' : '测试连接'}
+        </button>
 
-          {isActive ? (
-            <span className={styles.activeTag}>
-              <Check size={12} />
-              当前激活
-            </span>
-          ) : (
-            <button className={styles.selectBtn} onClick={onSelect}>
-              设为当前
-            </button>
-          )}
-
-          <button
-            className={styles.deleteBtn}
-            onClick={onDelete}
-            title="删除模型"
-            aria-label={`删除模型 ${item.name}`}
-          >
-            <Trash2 size={14} />
+        {isActive ? (
+          <span className={styles.activeTag}>
+            <Check size={12} />
+            当前模型
+          </span>
+        ) : (
+          <button className={styles.selectBtn} onClick={onSelect}>
+            设为当前
           </button>
-        </div>
+        )}
+
+        <button
+          className={styles.deleteBtn}
+          onClick={onDelete}
+          title="删除模型"
+          aria-label={`删除模型 ${item.name}`}
+        >
+          <Trash2 size={14} />
+        </button>
       </div>
     </div>
   );

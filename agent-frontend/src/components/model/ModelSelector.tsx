@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
-import { ChevronDown, Check, Settings, Sparkles, Info } from 'lucide-react';
+import { Check, Settings, Sparkles, Info } from 'lucide-react';
 import { useModel } from '../../context/ModelContext';
 import { VendorIcon } from './VendorIcon';
 import styles from './ModelSelector.module.css';
@@ -173,13 +173,6 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ onOpenSettings, cl
           )}
         </div>
 
-        <motion.span
-          className={styles.triggerChevron}
-          animate={{ rotate: isOpen ? 180 : 0 }}
-          transition={{ duration: 0.2, ease: EASE }}
-        >
-          <ChevronDown size={13} />
-        </motion.span>
       </button>
 
       {/* Floating Popover via Portal */}

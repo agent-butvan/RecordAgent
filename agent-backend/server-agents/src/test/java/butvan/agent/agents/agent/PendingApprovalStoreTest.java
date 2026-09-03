@@ -45,4 +45,19 @@ class PendingApprovalStoreTest {
         assertFalse(store.hasPending("local-default", "session-2"));
         assertFalse(store.hasPending("other-user", "session-1"));
     }
+
+    @Test
+    void clearSessionRemovesPendingApprovalAndRememberedDecision() {
+        ToolUseBlock tool = new ToolUseBlock("call-1", "execute", Map.of("command", "ls"));
+        AgentRun run = new AgentRun("session-1", "local-default", "turn-1",
+                RuntimeContext.builder().userId("local-default").sessionId("session-1").build());
+        PendingApprovalStore store = new PendingApprovalStore();
+        store.save(new PendingApproval(run, List.of(tool)));
+        store.remember("local-default", "session-1", tool, true);
+
+        store.clearSession("local-default", "session-1");
+
+        assertFalse(store.hasPending("local-default", "session-1"));
+        assertTrue(store.remembered("local-default", "session-1", tool).isEmpty());
+    }
 }

@@ -41,30 +41,33 @@ while [[ $# -gt 0 ]]; do
 done
 
 # ---- 前置检查 ----
-for CMD in pnpm cargo rustc java mvn; do
+for CMD in node pnpm cargo rustc java mvn; do
   if ! command -v "$CMD" >/dev/null 2>&1; then
     echo "缺少依赖: $CMD（请先安装并确保在 PATH 中）" >&2
     exit 1
   fi
 done
-echo "==> 0/3 前置检查通过（pnpm / cargo / rustc / java / mvn）"
+echo "==> 0/4 前置检查通过（node / pnpm / cargo / rustc / java / mvn）"
+
+echo "==> 1/4 校验版本一致性"
+node "$ROOT_DIR/scripts/sync-version.mjs" --check
 
 cd "$FRONTEND_DIR"
 
 if [ ! -d node_modules ]; then
-  echo "==> 1/3 安装前端依赖"
+  echo "==> 2/4 安装前端依赖"
   pnpm install
 else
-  echo "==> 1/3 前端依赖已就绪"
+  echo "==> 2/4 前端依赖已就绪"
 fi
 
 # ---- 组装 tauri build 参数 ----
 TAURI_ARGS=()
 if [ "$DEBUG_MODE" = "1" ]; then
   TAURI_ARGS+=(--debug)
-  echo "==> 2/3 开始 debug 打包（快速验证用，不推荐分发）"
+  echo "==> 3/4 开始 debug 打包（快速验证用，不推荐分发）"
 else
-  echo "==> 2/3 开始 release 打包（自动先生成后端 sidecar）"
+  echo "==> 3/4 开始 release 打包（自动先生成后端 sidecar）"
 fi
 if [ -n "$BUNDLES" ]; then
   TAURI_ARGS+=(--bundles "$BUNDLES")
@@ -72,7 +75,7 @@ if [ -n "$BUNDLES" ]; then
 fi
 
 # beforeBuildCommand 会自动执行后端 sidecar 打包 + 前端构建
-echo "==> 3/3 执行 pnpm tauri build"
+echo "==> 4/4 执行 pnpm tauri build"
 if [ ${#TAURI_ARGS[@]} -gt 0 ]; then
   pnpm tauri build "${TAURI_ARGS[@]}"
 else

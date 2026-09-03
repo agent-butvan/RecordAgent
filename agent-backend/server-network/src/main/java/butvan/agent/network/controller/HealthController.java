@@ -3,6 +3,8 @@ package butvan.agent.network.controller;
 import butvan.agent.network.annotation.ApiLog;
 import butvan.agent.network.common.Result;
 import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -15,7 +17,10 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 @RestController
 @RequestMapping("/api/health")
+@RequiredArgsConstructor
 public class HealthController {
+
+    private final JdbcTemplate jdbcTemplate;
 
     /**
      * 服务就绪探测接口
@@ -25,6 +30,7 @@ public class HealthController {
     @ApiLog("桌面端后端健康检查")
     @GetMapping
     public Result<String> health() {
+        jdbcTemplate.queryForObject("SELECT 1", Integer.class);
         return Result.success("ok");
     }
 }

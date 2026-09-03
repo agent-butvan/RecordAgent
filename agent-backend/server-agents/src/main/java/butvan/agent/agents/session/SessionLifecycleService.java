@@ -4,6 +4,8 @@ import butvan.agent.agents.identity.CurrentUserProvider;
 import butvan.agent.agents.session.dto.CreateSessionRequest;
 import butvan.agent.agents.session.dto.SessionDetailDto;
 import butvan.agent.agents.session.dto.SessionSummaryDto;
+import butvan.agent.agents.session.dto.SessionPermissionMode;
+import butvan.agent.agents.agent.permission.PendingApprovalStore;
 import io.agentscope.core.state.AgentStateStore;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,6 +26,8 @@ public class SessionLifecycleService {
     private final TranscriptService transcriptService;
     private final CurrentUserProvider currentUserProvider;
     private final AgentStateStore agentStateStore;
+    private final PendingApprovalStore pendingApprovalStore;
+    private final SessionTitleService sessionTitleService;
 
 
     public List<SessionSummaryDto> listSessions() {
@@ -43,6 +47,18 @@ public class SessionLifecycleService {
         return sessionCatalogService.updateTitle(sessionId, title);
     }
 
+    public SessionSummaryDto generateTitle(String sessionId) {
+        return sessionTitleService.generateIfNeeded(sessionId);
+    }
+
+    public SessionPermissionMode getPermissionMode(String sessionId) {
+        return sessionCatalogService.getPermissionMode(sessionId);
+    }
+
+    public SessionPermissionMode updatePermissionMode(String sessionId, SessionPermissionMode mode) {
+        return sessionCatalogService.updatePermissionMode(sessionId, mode);
+    }
+
     /**
      * 删除顺序必须固定：先阻止新请求，在删除应用消息，随后删除AgentState，最后一出目录册
      * @param sessionId
@@ -51,6 +67,7 @@ public class SessionLifecycleService {
         sessionCatalogService.markDeleting(sessionId);
         transcriptService.delete(sessionId);
 
+        pendingApprovalStore.clearSession(currentUserProvider.currentUserId(), sessionId);
         agentStateStore.delete(currentUserProvider.currentUserId(), sessionId);
         sessionCatalogService.remove(sessionId);
     }

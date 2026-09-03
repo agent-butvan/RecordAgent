@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   CalendarDays,
   CheckCheck,
@@ -11,15 +11,40 @@ import {
   ReceiptText,
   WalletCards,
 } from 'lucide-react';
-import type { CalendarDayEntry } from '../../types/calendar';
+import type { CalendarDayEntry, CalendarJournal, CalendarRecordDraft } from '../../types/calendar';
+import type { DailyDaySummary } from '../../types/dailyEvent';
+import {
+  createDailyRecord,
+  deleteDailyEvent,
+  fetchDailyDay,
+  fetchDailySummaries,
+  formatLocalDate,
+  setDailyTodoCompleted,
+  updateDailyJournal,
+} from '../../services/dailyEvents';
+import { Button } from '../common/Button';
+import { Message } from '../common/Message';
+import { Modal } from '../common/Modal';
+import { TopBar } from '../common/TopBar';
+import { CalendarDayPreview } from './CalendarDayPreview';
+import { CalendarQuickCreate } from './CalendarQuickCreate';
+import { DailyRecordDeleteButton } from './DailyRecordDeleteButton';
 import { DailyTodoList } from './DailyTodoList';
-import { calendarDateKey, createCalendarDemoData } from './calendarDemoData';
+import { JournalEditorPage } from './JournalEditorPage';
+import { toCalendarDayEntry } from './dailyEventViewModel';
 import styles from './CalendarView.module.css';
 
 const WEEKDAY_LABELS = ['一', '二', '三', '四', '五', '六', '日'];
 const WEEKDAY_FULL = '日一二三四五六';
 const WEEK_STARTS_ON = 1;
 const GRID_SIZE = 42;
+
+interface DeleteTarget {
+  id: string;
+  version: number;
+  kind: '待办' | '日程' | '花销' | '手记';
+  title: string;
+}
 
 function startOfDay(date: Date): Date {
   const copy = new Date(date);
@@ -41,14 +66,32 @@ function totalExpense(entry: CalendarDayEntry): number {
   return entry.expenses.reduce((total, expense) => total + expense.amount, 0);
 }
 
-const EMPTY_ENTRY: CalendarDayEntry = { todos: [], expenses: [], schedules: [], photos: [] };
+function hasEntryContent(entry: CalendarDayEntry): boolean {
+  return Boolean(
+    entry.todos.length
+    || entry.expenses.length
+    || entry.schedules.length
+    || entry.journal
+    || entry.photos.length
+    || entry.otherRecords?.length,
+  );
+}
+
+const EMPTY_ENTRY: CalendarDayEntry = { todos: [], expenses: [], schedules: [], photos: [], otherRecords: [] };
 
 /** 日记录原型：月历负责浏览，每日详情聚合待办、花销、手记、图片和日程。 */
 export const CalendarView: React.FC = () => {
   const today = useMemo(() => startOfDay(new Date()), []);
   const [cursor, setCursor] = useState(today);
   const [selected, setSelected] = useState(today);
-  const [entries, setEntries] = useState(() => createCalendarDemoData(today));
+  const [entries, setEntries] = useState<Record<string, CalendarDayEntry>>({});
+  const [summaries, setSummaries] = useState<Record<string, DailyDaySummary>>({});
+  const [isDayLoading, setIsDayLoading] = useState(true);
+  const [dataError, setDataError] = useState<string | null>(null);
+  const [journalEditorDate, setJournalEditorDate] = useState<Date | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const days = useMemo(() => {
     const firstOfMonth = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
@@ -57,7 +100,13 @@ export const CalendarView: React.FC = () => {
     return Array.from({ length: GRID_SIZE }, (_, index) => addDays(gridStart, index));
   }, [cursor]);
 
-  const selectedKey = calendarDateKey(selected);
+  const monthRecords = useMemo(() => Object.values(summaries), [summaries]);
+  const monthTodoTotal = monthRecords.reduce((total, record) => total + record.todoCount, 0);
+  const monthTodoCompleted = monthRecords.reduce((total, record) => total + record.completedTodoCount, 0);
+  const monthTodoRate = monthTodoTotal ? Math.round((monthTodoCompleted / monthTodoTotal) * 100) : 0;
+  const monthExpenseTotal = monthRecords.reduce((total, record) => total + record.expenseTotal, 0);
+
+  const selectedKey = formatLocalDate(selected);
   const selectedEntry = entries[selectedKey] ?? EMPTY_ENTRY;
   const completedCount = selectedEntry.todos.filter((todo) => todo.completed).length;
   const hasDailyRecord = Boolean(
@@ -65,7 +114,8 @@ export const CalendarView: React.FC = () => {
     || selectedEntry.expenses.length
     || selectedEntry.schedules.length
     || selectedEntry.journal
-    || selectedEntry.photos.length,
+    || selectedEntry.photos.length
+    || selectedEntry.otherRecords?.length,
   );
   const selectedLabel = `${selected.getFullYear()}年${selected.getMonth() + 1}月${selected.getDate()}日 · 星期${WEEKDAY_FULL[selected.getDay()]}`;
 
@@ -76,92 +126,289 @@ export const CalendarView: React.FC = () => {
     setSelected(today);
   };
 
-  const toggleTodo = (todoId: string) => {
-    setEntries((current) => {
-      const entry = current[selectedKey];
-      if (!entry) return current;
-      return {
-        ...current,
-        [selectedKey]: {
-          ...entry,
-          todos: entry.todos.map((todo) => (todo.id === todoId ? { ...todo, completed: !todo.completed } : todo)),
-        },
-      };
-    });
+  const loadDay = useCallback(async (date: Date) => {
+    const key = formatLocalDate(date);
+    const day = await fetchDailyDay(date);
+    setEntries((current) => ({ ...current, [key]: toCalendarDayEntry(day) }));
+  }, []);
+
+  const loadMonth = useCallback(async () => {
+    const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+    const last = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
+    const items = await fetchDailySummaries(first, last);
+    setSummaries(Object.fromEntries(items.map((item) => [item.date, item])));
+  }, [cursor]);
+
+  useEffect(() => {
+    let active = true;
+    setIsDayLoading(true);
+    setDataError(null);
+    fetchDailyDay(selected)
+      .then((day) => {
+        if (active) setEntries((current) => ({ ...current, [day.date]: toCalendarDayEntry(day) }));
+      })
+      .catch((error: unknown) => {
+        if (active) setDataError(error instanceof Error ? error.message : '读取日记录失败');
+      })
+      .finally(() => {
+        if (active) setIsDayLoading(false);
+      });
+    return () => { active = false; };
+  }, [selected]);
+
+  useEffect(() => {
+    let active = true;
+    setDataError(null);
+    const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
+    const last = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
+    fetchDailySummaries(first, last)
+      .then((items) => {
+        if (active) setSummaries(Object.fromEntries(items.map((item) => [item.date, item])));
+      })
+      .catch((error: unknown) => {
+        if (active) setDataError(error instanceof Error ? error.message : '读取月度摘要失败');
+      });
+    return () => { active = false; };
+  }, [cursor]);
+
+  const refreshSelectedAndMonth = async () => {
+    await Promise.all([loadDay(selected), loadMonth()]);
   };
 
+  const toggleTodo = async (todoId: string) => {
+    const todo = selectedEntry.todos.find((item) => item.id === todoId);
+    if (!todo) return;
+    try {
+      setDataError(null);
+      await setDailyTodoCompleted(todo.id, !todo.completed, todo.version ?? 0);
+      await refreshSelectedAndMonth();
+    } catch (error: unknown) {
+      setDataError(error instanceof Error ? error.message : '修改待办失败');
+    }
+  };
+
+  const createRecord = async (draft: CalendarRecordDraft) => {
+    try {
+      setDataError(null);
+      await createDailyRecord(selected, draft);
+      await refreshSelectedAndMonth();
+    } catch (error: unknown) {
+      setDataError(error instanceof Error ? error.message : '创建日记录失败');
+    }
+  };
+
+  const requestDelete = (
+    record: { id?: string; version?: number },
+    kind: DeleteTarget['kind'],
+    title: string,
+  ) => {
+    if (!record.id || record.version === undefined) {
+      setDataError(`缺少${kind}版本信息，无法安全删除，请刷新后重试`);
+      return;
+    }
+    setDeleteError(null);
+    setDeleteTarget({ id: record.id, version: record.version, kind, title });
+  };
+
+  const closeDeleteDialog = () => {
+    if (isDeleting) return;
+    setDeleteTarget(null);
+    setDeleteError(null);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget || isDeleting) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteDailyEvent(deleteTarget.id, deleteTarget.version);
+      setDeleteTarget(null);
+      setDataError(null);
+      try {
+        await refreshSelectedAndMonth();
+      } catch (error: unknown) {
+        setDataError(error instanceof Error ? `记录已删除，但刷新失败：${error.message}` : '记录已删除，但刷新失败');
+      }
+    } catch (error: unknown) {
+      setDeleteError(error instanceof Error ? error.message : `删除${deleteTarget.kind}失败`);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const saveJournal = async (journal: CalendarJournal) => {
+    if (!journalEditorDate) return;
+    try {
+      setDataError(null);
+      const existing = entries[formatLocalDate(journalEditorDate)]?.journal;
+      if (existing?.id) {
+        await updateDailyJournal(journalEditorDate, { ...journal, id: existing.id, version: existing.version });
+      } else {
+        await createDailyRecord(journalEditorDate, {
+          kind: 'journal', title: journal.title, excerpt: journal.excerpt, mood: journal.mood,
+        });
+      }
+      await loadDay(journalEditorDate);
+      await loadMonth();
+      setSelected(journalEditorDate);
+      setJournalEditorDate(null);
+    } catch (error: unknown) {
+      setDataError(error instanceof Error ? error.message : '保存手记失败');
+    }
+  };
+
+  if (journalEditorDate) {
+    const journalKey = formatLocalDate(journalEditorDate);
+    return (
+      <JournalEditorPage
+        date={journalEditorDate}
+        initialJournal={entries[journalKey]?.journal}
+        onBack={() => setJournalEditorDate(null)}
+        onSave={saveJournal}
+        error={dataError}
+      />
+    );
+  }
+
   return (
-    <main className={styles.page}>
-      <div className={styles.content}>
-        <header className={styles.header}>
-          <div>
-            <h1 className={styles.title}>我的日历</h1>
-            <p className={styles.subtitle}>把每一天的安排、花费和瞬间放在一起。</p>
-          </div>
+    <main className={styles.workspace}>
+      <TopBar
+        icon={<CalendarDays size={16} strokeWidth={1.8} />}
+        title="日历"
+        subtitle="本地数据"
+        actions={(
           <div className={styles.controls}>
+            <CalendarQuickCreate
+              selectedDate={selected}
+              onCreate={createRecord}
+              onWriteJournal={() => setJournalEditorDate(selected)}
+            />
             <button type="button" className={styles.todayBtn} onClick={goToday}>今天</button>
             <div className={styles.navGroup}>
               <button type="button" className={styles.navBtn} title="上个月" aria-label="上个月" onClick={() => moveMonth(-1)}><ChevronLeft size={17} /></button>
               <button type="button" className={styles.navBtn} title="下个月" aria-label="下个月" onClick={() => moveMonth(1)}><ChevronRight size={17} /></button>
             </div>
           </div>
-        </header>
+        )}
+      />
+      <div className={styles.page}>
+        <div className={styles.content}>
+          {dataError && <div className={styles.dataError} role="alert">{dataError}</div>}
+          <div className={styles.calendarLayout}>
+            <section className={styles.monthPanel} aria-label="月历">
+              <div className={styles.monthTitleRow}>
+                <h2>{cursor.getFullYear()}年{cursor.getMonth() + 1}月</h2>
+                <span>月视图</span>
+              </div>
+              <div className={styles.weekHeader}>
+                {WEEKDAY_LABELS.map((label) => <span key={label}>{label}</span>)}
+              </div>
+              <div className={styles.grid}>
+                {days.map((day, index) => {
+                  const inMonth = day.getMonth() === cursor.getMonth();
+                  const isToday = isSameDay(day, today);
+                  const isSelected = isSameDay(day, selected);
+                  const dateKey = formatLocalDate(day);
+                  const entry = entries[dateKey];
+                  const summary = summaries[dateKey];
+                  const hasContent = Boolean(summary?.eventCount || (entry && hasEntryContent(entry)));
+                  const showPreview = Boolean(inMonth && entry && hasEntryContent(entry));
+                  const completedTodos = summary?.completedTodoCount
+                    ?? entry?.todos.filter((todo) => todo.completed).length
+                    ?? 0;
+                  const todoCount = summary?.todoCount ?? entry?.todos.length ?? 0;
+                  const scheduleCount = summary?.scheduleCount ?? entry?.schedules.length ?? 0;
+                  const expenseTotal = summary?.expenseTotal ?? (entry ? totalExpense(entry) : 0);
+                  const dayPreview = summary?.headline
+                    ?? entry?.schedules[0]?.title
+                    ?? entry?.todos.find((todo) => !todo.completed)?.title
+                    ?? entry?.otherRecords?.[0]?.title
+                    ?? (entry?.expenses.length ? `支出 ¥${totalExpense(entry).toFixed(0)}` : entry?.journal ? '写下手记' : '记录照片');
+                  const dayMeta = [
+                    scheduleCount ? `${scheduleCount} 个日程` : null,
+                    todoCount ? `${completedTodos}/${todoCount} 待办` : null,
+                    expenseTotal ? `¥${expenseTotal.toFixed(0)}` : null,
+                  ].filter(Boolean).slice(0, 2).join(' · ');
+                  const previewId = `calendar-day-preview-${dateKey}`;
+                  return (
+                    <button
+                      key={dateKey}
+                      type="button"
+                      className={[styles.dayCell, inMonth ? '' : styles.dayCellOutside, isToday ? styles.dayCellToday : '', isSelected ? styles.dayCellSelected : ''].join(' ')}
+                      onClick={() => setSelected(startOfDay(day))}
+                      aria-pressed={isSelected}
+                      aria-describedby={showPreview ? previewId : undefined}
+                      aria-label={`${day.getMonth() + 1}月${day.getDate()}日${hasContent ? '，有日记录' : ''}`}
+                    >
+                      <span className={styles.dayNumber}>{day.getDate()}</span>
+                      {hasContent && <span className={styles.dayContent}>
+                        <span className={styles.daySignals} aria-hidden="true">
+                          {scheduleCount ? <i className={styles.signalSchedule} /> : null}
+                          {todoCount ? <i className={styles.signalTodo} /> : null}
+                          {expenseTotal ? <i className={styles.signalExpense} /> : null}
+                        </span>
+                        <span className={styles.dayPreview}>{dayPreview}</span>
+                        <span className={styles.dayMeta}>{dayMeta}</span>
+                      </span>}
+                      {entry && showPreview && (
+                        <CalendarDayPreview
+                          id={previewId}
+                          date={day}
+                          entry={entry}
+                          alignRight={index % 7 >= 5}
+                        />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className={styles.legend}>
+                <span><i className={styles.signalSchedule} />日程</span>
+                <span><i className={styles.signalTodo} />待办</span>
+                <span><i className={styles.signalExpense} />花销</span>
+              </div>
 
-        <div className={styles.calendarLayout}>
-          <section className={styles.monthPanel} aria-label="月历">
-            <div className={styles.monthTitleRow}>
-              <h2>{cursor.getFullYear()}年{cursor.getMonth() + 1}月</h2>
-              <span>演示数据</span>
-            </div>
-            <div className={styles.weekHeader}>
-              {WEEKDAY_LABELS.map((label) => <span key={label}>{label}</span>)}
-            </div>
-            <div className={styles.grid}>
-              {days.map((day) => {
-                const inMonth = day.getMonth() === cursor.getMonth();
-                const isToday = isSameDay(day, today);
-                const isSelected = isSameDay(day, selected);
-                const entry = entries[calendarDateKey(day)];
-                const hasContent = Boolean(entry && (entry.todos.length || entry.expenses.length || entry.schedules.length || entry.journal || entry.photos.length));
-                const dayPreview = entry?.schedules[0]?.title
-                  ?? entry?.todos.find((todo) => !todo.completed)?.title
-                  ?? (entry?.expenses.length ? `支出 ¥${totalExpense(entry).toFixed(0)}` : entry?.journal ? '写下手记' : '记录照片');
-                return (
-                  <button
-                    key={calendarDateKey(day)}
-                    type="button"
-                    className={[styles.dayCell, inMonth ? '' : styles.dayCellOutside, isToday ? styles.dayCellToday : '', isSelected ? styles.dayCellSelected : ''].join(' ')}
-                    onClick={() => setSelected(startOfDay(day))}
-                    aria-pressed={isSelected}
-                    aria-label={`${day.getMonth() + 1}月${day.getDate()}日${hasContent ? '，有日记录' : ''}`}
-                  >
-                    <span className={styles.dayNumber}>{day.getDate()}</span>
-                    {hasContent && <span className={styles.dayContent}>
-                      <span className={styles.daySignals} aria-hidden="true">
-                        {entry?.schedules.length ? <i className={styles.signalSchedule} /> : null}
-                        {entry?.todos.length ? <i className={styles.signalTodo} /> : null}
-                        {entry?.expenses.length ? <i className={styles.signalExpense} /> : null}
-                      </span>
-                      <span className={styles.dayPreview}>{dayPreview}</span>
-                    </span>}
-                  </button>
-                );
-              })}
-            </div>
-            <div className={styles.legend}>
-              <span><i className={styles.signalSchedule} />日程</span>
-              <span><i className={styles.signalTodo} />待办</span>
-              <span><i className={styles.signalExpense} />花销</span>
-            </div>
-          </section>
+              <section className={styles.monthReview} aria-label="本月回顾">
+                <div className={styles.monthReviewHeading}>
+                  <h3>本月回顾</h3>
+                  <span>{monthRecords.length} 天有记录</span>
+                </div>
+                {monthRecords.length ? <>
+                  <dl className={styles.monthStats}>
+                    <div><dt>记录天数</dt><dd>{monthRecords.length}</dd></div>
+                    <div><dt>待办完成</dt><dd>{monthTodoRate}%</dd></div>
+                    <div><dt>本月支出</dt><dd>¥{monthExpenseTotal.toFixed(2)}</dd></div>
+                  </dl>
+                  <div className={styles.monthHighlights}>
+                    <p>本月足迹</p>
+                    <div className={styles.highlightList}>
+                      {monthRecords.slice(0, 4).map((record) => {
+                        const recordDate = new Date(`${record.date}T00:00:00`);
+                        return (
+                          <button
+                            type="button"
+                            key={record.date}
+                            className={`${styles.highlightItem} ${isSameDay(recordDate, selected) ? styles.highlightItemActive : ''}`}
+                            onClick={() => setSelected(startOfDay(recordDate))}
+                          >
+                            <span className={styles.highlightDate}>{String(recordDate.getDate()).padStart(2, '0')}</span>
+                            <span className={styles.highlightText}>{record.headline}</span>
+                            <ChevronRight size={13} aria-hidden="true" />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </> : <p className={styles.monthReviewEmpty}>这个月还没有留下记录。</p>}
+              </section>
+            </section>
 
           <section className={styles.dayPanel} aria-label={`${selectedLabel}的日记录`}>
             <div className={styles.dayHeading}>
               <div>
                 <h2>{selectedLabel}</h2>
-                <p>{hasDailyRecord ? '这是今天留下的生活切片。' : '这一天还没有留下记录。'}</p>
+                <p>{hasDailyRecord ? '当天记录' : '暂无记录'}</p>
               </div>
-              <span className={styles.demoBadge}>模拟数据</span>
             </div>
 
             <div className={styles.summaryLine} aria-label="当天汇总">
@@ -170,41 +417,75 @@ export const CalendarView: React.FC = () => {
               <span><Clock3 size={15} /><strong>{selectedEntry.schedules.length}</strong> 个日程</span>
             </div>
 
-            {hasDailyRecord ? <div className={styles.recordSections}>
+            {isDayLoading ? <div className={styles.emptyDay}>
+              <CalendarDays size={20} aria-hidden="true" />
+              <strong>正在读取日记录</strong>
+            </div> : hasDailyRecord ? <div className={styles.recordSections}>
               <section className={styles.recordSection}>
-                <div className={styles.sectionHeading}><span className={styles.iconBox}><CheckCheck size={15} /></span><h3>今日待办</h3></div>
-                <DailyTodoList todos={selectedEntry.todos} onToggle={toggleTodo} />
+                <div className={styles.sectionHeading}><CheckCheck size={15} aria-hidden="true" /><h3>今日待办</h3></div>
+                <DailyTodoList
+                  todos={selectedEntry.todos}
+                  onToggle={toggleTodo}
+                  onDelete={(todo) => requestDelete(todo, '待办', todo.title)}
+                />
               </section>
 
               <section className={styles.recordSection}>
-                <div className={styles.sectionHeading}><span className={styles.iconBox}><Clock3 size={15} /></span><h3>日程</h3></div>
+                <div className={styles.sectionHeading}><Clock3 size={15} aria-hidden="true" /><h3>日程</h3></div>
                 {selectedEntry.schedules.length ? <div className={styles.scheduleList}>
                   {selectedEntry.schedules.map((schedule) => <div key={schedule.id} className={styles.scheduleItem}>
                     <span className={`${styles.scheduleDot} ${styles[`schedule${schedule.color[0].toUpperCase()}${schedule.color.slice(1)}`]}`} />
                     <span className={styles.scheduleTime}>{schedule.startTime}<br />{schedule.endTime}</span>
                     <span className={styles.scheduleBody}><strong>{schedule.title}</strong>{schedule.location && <small><MapPin size={11} />{schedule.location}</small>}</span>
+                    <DailyRecordDeleteButton label={`日程“${schedule.title}”`} onDelete={() => requestDelete(schedule, '日程', schedule.title)} />
                   </div>)}
                 </div> : <p className={styles.emptyText}>今天没有日程安排。</p>}
               </section>
 
               <section className={styles.recordSection}>
-                <div className={styles.sectionHeading}><span className={styles.iconBox}><ReceiptText size={15} /></span><h3>花销明细</h3><span className={styles.sectionTotal}>共 ¥{totalExpense(selectedEntry).toFixed(2)}</span></div>
+                <div className={styles.sectionHeading}><ReceiptText size={15} aria-hidden="true" /><h3>花销明细</h3><span className={styles.sectionTotal}>共 ¥{totalExpense(selectedEntry).toFixed(2)}</span></div>
                 {selectedEntry.expenses.length ? <div className={styles.expenseList}>
                   {selectedEntry.expenses.map((expense) => <div key={expense.id} className={styles.expenseItem}>
                     <span className={`${styles.expenseIcon} ${styles[`expense${expense.color[0].toUpperCase()}${expense.color.slice(1)}`]}`}>{expense.category.slice(0, 1)}</span>
                     <span className={styles.expenseBody}><strong>{expense.category}</strong><small>{expense.note} · {expense.time}</small></span>
                     <strong className={styles.expenseAmount}>-¥{expense.amount.toFixed(2)}</strong>
+                    <DailyRecordDeleteButton label={`花销“${expense.category}”`} onDelete={() => requestDelete(expense, '花销', expense.category)} />
                   </div>)}
                 </div> : <p className={styles.emptyText}>没有记录花销。</p>}
               </section>
 
               {(selectedEntry.journal || selectedEntry.photos.length > 0) && <section className={styles.recordSection}>
-                <div className={styles.sectionHeading}><span className={styles.iconBox}><NotebookPen size={15} /></span><h3>手记与图片</h3></div>
-                {selectedEntry.journal && <div className={styles.journal}><p>“{selectedEntry.journal.excerpt}”</p><span>{selectedEntry.journal.mood}</span></div>}
+                <div className={styles.sectionHeading}>
+                  <NotebookPen size={15} aria-hidden="true" />
+                  <h3>手记与图片</h3>
+                  {selectedEntry.journal && <div className={styles.sectionActions}>
+                    <button type="button" className={styles.journalEditButton} onClick={() => setJournalEditorDate(selected)}>编辑</button>
+                    <DailyRecordDeleteButton
+                      label="手记"
+                      onDelete={() => requestDelete(selectedEntry.journal ?? {}, '手记', selectedEntry.journal?.title || '无标题手记')}
+                    />
+                  </div>}
+                </div>
+                {selectedEntry.journal && <div className={styles.journal}>
+                  {selectedEntry.journal.title && <strong>{selectedEntry.journal.title}</strong>}
+                  <p>{selectedEntry.journal.excerpt}</p>
+                  <span>{selectedEntry.journal.mood}</span>
+                </div>}
                 {selectedEntry.photos.length > 0 && <div className={styles.photoGrid}>
                   {selectedEntry.photos.map((photo) => <img key={photo.id} src={photo.url} alt={photo.alt} />)}
                   <span className={styles.photoCount}><Image size={13} />{selectedEntry.photos.length} 张</span>
                 </div>}
+              </section>}
+
+              {Boolean(selectedEntry.otherRecords?.length) && <section className={styles.recordSection}>
+                <div className={styles.sectionHeading}><NotebookPen size={15} aria-hidden="true" /><h3>其他记录</h3></div>
+                <div className={styles.scheduleList}>
+                  {selectedEntry.otherRecords?.map((record) => <div key={record.id} className={styles.scheduleItem}>
+                    <span className={`${styles.scheduleDot} ${styles.scheduleViolet}`} />
+                    <span className={styles.scheduleTime}>{record.type}</span>
+                    <span className={styles.scheduleBody}><strong>{record.title}</strong></span>
+                  </div>)}
+                </div>
               </section>}
             </div> : <div className={styles.emptyDay}>
               <CalendarDays size={20} aria-hidden="true" />
@@ -212,8 +493,31 @@ export const CalendarView: React.FC = () => {
               <p>待办、日程、花销、手记和图片都会在这里汇总。</p>
             </div>}
           </section>
+          </div>
         </div>
       </div>
+      <Modal
+        open={deleteTarget !== null}
+        title={`删除${deleteTarget?.kind ?? '记录'}？`}
+        onClose={closeDeleteDialog}
+        width={420}
+        centered
+      >
+        <div className={styles.deleteDialogBody}>
+          <p className={styles.deleteDescription}>
+            “{deleteTarget?.title}”将被永久删除，此操作无法撤销。
+          </p>
+          {deleteError && <Message tone="error">{deleteError}</Message>}
+          <div className={styles.deleteDialogActions}>
+            <Button type="button" variant="outline" onClick={closeDeleteDialog} disabled={isDeleting} autoFocus>
+              取消
+            </Button>
+            <Button type="button" variant="danger" onClick={() => void confirmDelete()} disabled={isDeleting}>
+              {isDeleting ? '正在删除…' : `删除${deleteTarget?.kind ?? '记录'}`}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </main>
   );
 };

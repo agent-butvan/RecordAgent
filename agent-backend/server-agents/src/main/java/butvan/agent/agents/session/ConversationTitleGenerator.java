@@ -1,0 +1,13 @@
+package butvan.agent.agents.session;
+
+/** 根据首个用户问题生成简短会话标题的模型端口。 */
+public interface ConversationTitleGenerator {
+
+    /**
+     * 生成不带引号、序号或解释的标题。
+     *
+     * @param firstQuestion 会话首个用户问题
+     * @return 模型生成的候选标题
+     */
+    String generate(String firstQuestion);
+}

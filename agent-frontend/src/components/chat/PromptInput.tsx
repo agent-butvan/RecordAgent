@@ -1,6 +1,8 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Plus, ArrowUp, Mic } from 'lucide-react';
 import { ModelSelector } from '../model/ModelSelector';
+import { PermissionModeSelector } from './PermissionModeSelector';
+import type { SessionPermissionMode } from '../../types/chat';
 import { useMessage } from '../common/Message';
 import {
   createSpeechRecognition,
@@ -17,6 +19,10 @@ interface PromptInputProps {
   onOpenSettings: () => void;
   className?: string;
   placeholder?: string;
+  permissionMode: SessionPermissionMode;
+  onPermissionModeChange: (mode: SessionPermissionMode) => void;
+  isPermissionModeDisabled?: boolean;
+  isPermissionModeSaving?: boolean;
 }
 
 /**
@@ -30,6 +36,10 @@ export const PromptInput: React.FC<PromptInputProps> = ({
   onOpenSettings,
   className,
   placeholder = '随心输入',
+  permissionMode,
+  onPermissionModeChange,
+  isPermissionModeDisabled = false,
+  isPermissionModeSaving = false,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const speechRecognitionRef = useRef<SpeechRecognitionController | null>(null);
@@ -137,6 +147,13 @@ export const PromptInput: React.FC<PromptInputProps> = ({
           </button>
 
           <div className={styles.divider} />
+
+          <PermissionModeSelector
+            value={permissionMode}
+            onChange={onPermissionModeChange}
+            disabled={isPermissionModeDisabled}
+            isSaving={isPermissionModeSaving}
+          />
 
           <ModelSelector onOpenSettings={onOpenSettings} />
         </div>

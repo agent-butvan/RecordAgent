@@ -2,6 +2,7 @@ import type {
   SessionSummaryDto,
   SessionDetailDto,
   SessionKind,
+  SessionPermissionMode,
 } from '../types/chat';
 import type { SubagentProgressDto } from '../types/team';
 import { invoke } from '@tauri-apps/api/core';
@@ -465,6 +466,50 @@ export async function updateSessionTitleApi(
     console.error('更新会话标题 API 调用失败:', err);
     return { success: false, message: err?.message || '网络连接失败' };
   }
+}
+
+/** 根据首个用户问题为仍使用占位名称的会话生成标题。 */
+export async function generateSessionTitle(sessionId: string): Promise<SessionSummaryDto | null> {
+  try {
+    const response = await fetch(`${apiBaseUrl}/agent/sessions/${sessionId}/title/generate`, {
+      method: 'POST',
+    });
+    if (!response.ok) return null;
+    const json: ApiResponse<SessionSummaryDto> = await response.json();
+    return json.code === 200 ? json.data : null;
+  } catch (error) {
+    console.error('生成会话标题失败:', error);
+    return null;
+  }
+}
+
+export interface PermissionModeResponse {
+  mode: SessionPermissionMode;
+}
+
+/** 获取当前会话持久化的权限模式。 */
+export async function fetchSessionPermissionMode(sessionId: string): Promise<SessionPermissionMode> {
+  const response = await fetch(`${apiBaseUrl}/agent/sessions/${sessionId}/permission-mode`);
+  if (!response.ok) throw new Error(`读取权限模式失败：HTTP ${response.status}`);
+  const json: ApiResponse<PermissionModeResponse> = await response.json();
+  if (json.code !== 200 || !json.data?.mode) throw new Error(json.message || '读取权限模式失败');
+  return json.data.mode;
+}
+
+/** 修改并持久化当前会话权限模式。 */
+export async function updateSessionPermissionMode(
+  sessionId: string,
+  mode: SessionPermissionMode,
+): Promise<SessionPermissionMode> {
+  const response = await fetch(`${apiBaseUrl}/agent/sessions/${sessionId}/permission-mode`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mode }),
+  });
+  if (!response.ok) throw new Error(`修改权限模式失败：HTTP ${response.status}`);
+  const json: ApiResponse<PermissionModeResponse> = await response.json();
+  if (json.code !== 200 || !json.data?.mode) throw new Error(json.message || '修改权限模式失败');
+  return json.data.mode;
 }
 
 /**

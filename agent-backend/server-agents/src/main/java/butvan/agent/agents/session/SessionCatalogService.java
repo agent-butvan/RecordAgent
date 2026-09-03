@@ -3,6 +3,7 @@ package butvan.agent.agents.session;
 import butvan.agent.agents.identity.CurrentUserProvider;
 import butvan.agent.agents.session.dto.CreateSessionRequest;
 import butvan.agent.agents.session.dto.SessionKind;
+import butvan.agent.agents.session.dto.SessionPermissionMode;
 import butvan.agent.agents.session.dto.SessionStatus;
 import butvan.agent.agents.session.dto.SessionSummaryDto;
 import butvan.agent.agents.storage.AgentStorageProperties;
@@ -99,10 +100,55 @@ public class SessionCatalogService {
             CatalogRecord record = records.get(index);
             if (ownerId.equals(record.ownerId()) && record.id().equals(sessionId)
                     && record.status() == SessionStatus.ACTIVE) {
-                CatalogRecord updated = record.withTitle(normalizeTitle(title, record.title()));
+                CatalogRecord updated = record.withTitle(normalizeTitle(title, record.title()), TitleSource.USER);
                 records.set(index, updated);
                 writeRecords(records);
                 return updated.toDto();
+            }
+        }
+        throw new IllegalArgumentException("会话不存在、无权访问或正在删除");
+    }
+
+    /** 仅当标题仍由系统占位时写入自动生成标题，避免覆盖用户手动重命名。 */
+    public synchronized SessionSummaryDto updateGeneratedTitle(String sessionId, String title) {
+        List<CatalogRecord> records = readRecords();
+        String ownerId = currentUserProvider.currentUserId();
+
+        for (int index = 0; index < records.size(); index++) {
+            CatalogRecord record = records.get(index);
+            if (ownerId.equals(record.ownerId()) && record.id().equals(sessionId)
+                    && record.status() == SessionStatus.ACTIVE) {
+                if (record.effectiveTitleSource() != TitleSource.DEFAULT) {
+                    return record.toDto();
+                }
+                CatalogRecord updated = record.withTitle(normalizeTitle(title, record.title()), TitleSource.AI);
+                records.set(index, updated);
+                writeRecords(records);
+                return updated.toDto();
+            }
+        }
+        throw new IllegalArgumentException("会话不存在、无权访问或正在删除");
+    }
+
+    /** 返回会话当前权限模式，旧目录记录默认使用逐次批准。 */
+    public synchronized SessionPermissionMode getPermissionMode(String sessionId) {
+        return requireRecord(sessionId).effectivePermissionMode();
+    }
+
+    /** 持久化会话权限模式。 */
+    public synchronized SessionPermissionMode updatePermissionMode(String sessionId, SessionPermissionMode mode) {
+        if (mode == null) {
+            throw new IllegalArgumentException("权限模式不能为空");
+        }
+        List<CatalogRecord> records = readRecords();
+        String ownerId = currentUserProvider.currentUserId();
+        for (int index = 0; index < records.size(); index++) {
+            CatalogRecord record = records.get(index);
+            if (ownerId.equals(record.ownerId()) && record.id().equals(sessionId)
+                    && record.status() == SessionStatus.ACTIVE) {
+                records.set(index, record.withPermissionMode(mode));
+                writeRecords(records);
+                return mode;
             }
         }
         throw new IllegalArgumentException("会话不存在、无权访问或正在删除");
@@ -179,6 +225,16 @@ public class SessionCatalogService {
         }
     }
 
+    private CatalogRecord requireRecord(String sessionId) {
+        String ownerId = currentUserProvider.currentUserId();
+        return readRecords().stream()
+                .filter(record -> ownerId.equals(record.ownerId()))
+                .filter(record -> record.id().equals(sessionId))
+                .filter(record -> record.status() == SessionStatus.ACTIVE)
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("会话不存在、无权访问或正在删除"));
+    }
+
     private String normalizeTitle(String rawTitle, String defaultTitle) {
         if (rawTitle == null || rawTitle.isBlank()) {
             return defaultTitle;
@@ -206,6 +262,8 @@ public class SessionCatalogService {
      * @param createAt
      * @param updateAt
      * @param status
+     * @param titleSource 标题来源；旧数据缺失时根据标题内容兼容推断
+     * @param permissionMode 会话权限模式；旧数据缺失时回退 ASK
      */
     private record CatalogRecord(
             String id,
@@ -215,27 +273,48 @@ public class SessionCatalogService {
             String lastMessagePreview,
             Instant createAt,
             Instant updateAt,
-            SessionStatus status
+            SessionStatus status,
+            TitleSource titleSource,
+            SessionPermissionMode permissionMode
     ) {
 
         static CatalogRecord from(String ownerId, SessionSummaryDto dto) {
-            return new CatalogRecord(dto.id(), ownerId, dto.kind(), dto.title(), dto.lastMessagePreview(), dto.createdAt(), dto.updatedAt(), dto.status());
+            return new CatalogRecord(dto.id(), ownerId, dto.kind(), dto.title(), dto.lastMessagePreview(), dto.createdAt(), dto.updatedAt(), dto.status(), TitleSource.DEFAULT, SessionPermissionMode.ASK);
         }
 
-        CatalogRecord withTitle(String newTitle) {
-            return new CatalogRecord(id, ownerId, kind, newTitle, lastMessagePreview, createAt, updateAt, status);
+        CatalogRecord withTitle(String newTitle, TitleSource newSource) {
+            return new CatalogRecord(id, ownerId, kind, newTitle, lastMessagePreview, createAt, updateAt, status, newSource, permissionMode);
         }
 
         CatalogRecord withPreview(String preview) {
-            return new CatalogRecord(id, ownerId, kind, title, preview, createAt, updateAt, status);
+            return new CatalogRecord(id, ownerId, kind, title, preview, createAt, updateAt, status, titleSource, permissionMode);
         }
 
         CatalogRecord withStatus(SessionStatus newStatus) {
-            return new CatalogRecord(id, ownerId, kind, title, lastMessagePreview, createAt, updateAt, newStatus);
+            return new CatalogRecord(id, ownerId, kind, title, lastMessagePreview, createAt, updateAt, newStatus, titleSource, permissionMode);
+        }
+
+        CatalogRecord withPermissionMode(SessionPermissionMode newMode) {
+            return new CatalogRecord(id, ownerId, kind, title, lastMessagePreview, createAt, updateAt, status, titleSource, newMode);
+        }
+
+        TitleSource effectiveTitleSource() {
+            if (titleSource != null) return titleSource;
+            return title == null || title.isBlank() || "新对话".equals(title) ? TitleSource.DEFAULT : TitleSource.USER;
+        }
+
+        SessionPermissionMode effectivePermissionMode() {
+            return permissionMode == null ? SessionPermissionMode.ASK : permissionMode;
         }
 
         SessionSummaryDto toDto() {
             return new SessionSummaryDto(id, kind, title, lastMessagePreview, createAt, updateAt, status);
         }
+    }
+
+    private enum TitleSource {
+        DEFAULT,
+        AI,
+        USER
     }
 }

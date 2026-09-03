@@ -8,14 +8,35 @@
   overflow: hidden;
 }
 
-/* 顶部工具条：右侧面板开关 */
+/* 顶部工作区：会话信息与右侧面板开关 */
 .workspaceHeader {
-  flex: 0 0 44px;
+  flex: 0 0 48px;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  padding: 0 12px;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+  padding: 0 12px 0 18px;
+  border-bottom: 1px solid var(--border-subtle);
   background: var(--bg-app);
+}
+
+.workspaceIdentity {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  color: var(--text-secondary);
+}
+
+.workspaceTitle {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .panelToggle {
@@ -24,7 +45,7 @@
   height: 30px;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--border-subtle);
+  border: none;
   border-radius: var(--radius-md);
   background: var(--bg-app);
   color: var(--text-secondary);
@@ -32,14 +53,13 @@
 }
 
 .panelToggle:hover {
-  border-color: var(--border-medium);
-  background: var(--bg-surface-hover);
+  background: #f1f1f1;
   color: var(--text-primary);
 }
 
 .panelToggleActive {
-  border-color: var(--border-focus);
-  color: var(--accent-blue);
+  background: #f1f1f1;
+  color: #111111;
 }
 
 /* 主内容区与右侧面板并排 */
@@ -49,6 +69,43 @@
   min-height: 0;
   min-width: 0;
   position: relative;
+}
+
+.sessionLoadState {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 32px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.sessionLoadState p {
+  max-width: 42ch;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.retryLoadBtn {
+  padding: 6px 12px;
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  background: var(--bg-app);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.retryLoadBtn:hover {
+  background: var(--bg-surface-hover);
+  border-color: var(--border-focus);
 }
 
 .centerHero {
@@ -87,7 +144,7 @@
 }
 
 @media (max-width: 940px) {
-  .workspaceHeader { display: none; }
+  .panelToggle { display: none; }
 }
 
 .railColumn {

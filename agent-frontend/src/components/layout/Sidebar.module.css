@@ -520,7 +520,7 @@
   transition: background-color var(--transition-fast);
 }
 
-.cancelBtn:hover {
+.cancelBtn:hover:not(:disabled) {
   background-color: #f5f6f8;
 }
 
@@ -538,6 +538,48 @@
 
 .submitBtn:hover {
   background-color: #1d4ed8;
+}
+
+.deleteModalBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.deleteDescription {
+  margin: 0;
+  color: #4b5563;
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.deleteConfirmBtn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: none;
+  background: #dc2626;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.deleteConfirmBtn:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.cancelBtn:disabled,
+.deleteConfirmBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.cancelBtn:focus-visible,
+.deleteConfirmBtn:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
 }
 
 /* 底部用户信息 */

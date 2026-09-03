@@ -1,0 +1,35 @@
+.button {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: color var(--transition-fast), background-color var(--transition-fast), opacity var(--transition-fast);
+}
+
+.button:hover {
+  background: #fff1f0;
+  color: #b42318;
+}
+
+.button:focus-visible {
+  opacity: 1;
+}
+
+:global(*:hover) > .button,
+:global(*:focus-within) > .button {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .button {
+    opacity: 1;
+  }
+}

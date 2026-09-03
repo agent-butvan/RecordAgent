@@ -1,5 +1,6 @@
 package butvan.agent.agents.security;
 
+import butvan.agent.agents.session.dto.SessionPermissionMode;
 import io.agentscope.core.permission.PermissionBehavior;
 import io.agentscope.core.permission.PermissionContextState;
 import io.agentscope.core.permission.PermissionMode;
@@ -19,6 +20,36 @@ import java.util.List;
 @Component
 public class AgentSecurity {
 
+    /** 不产生外部副作用的读取、状态查询与结果整理工具。 */
+    private static final List<String> SAFE_TOOLS = List.of(
+            "read_file",
+            "grep_files",
+            "glob_files",
+            "list_files",
+            "memory_search",
+            "memory_get",
+            "session_search",
+            "session_history",
+            "session_list",
+            "agent_list",
+            "task_output",
+            "task_list",
+            "wait_async_results",
+            "acceptance_report",
+            "plan_exit"
+    );
+
+    /** 自动批准编辑模式额外允许的工作区编辑与常规智能体协作工具。 */
+    private static final List<String> AUTO_EDIT_TOOLS = List.of(
+            "write_file",
+            "edit_file",
+            "web_search",
+            "memory_save",
+            "agent_generate",
+            "agent_spawn",
+            "agent_send"
+    );
+
     /**
      *
      *
@@ -26,33 +57,37 @@ public class AgentSecurity {
      * @return 组装完毕的 PermissionContextState 实例
      */
     public PermissionContextState createPermissionContext(PermissionChecker checker) {
-        PermissionContextState.Builder builder = PermissionContextState.builder()
-                .mode(checker == null ? PermissionMode.DEFAULT : checker.getMode());
+        PermissionMode configured = checker == null ? PermissionMode.DEFAULT : checker.getMode();
+        return createPermissionContext(switch (configured) {
+            case ACCEPT_EDITS -> SessionPermissionMode.AUTO_EDIT;
+            case BYPASS -> SessionPermissionMode.FULL_ACCESS;
+            default -> SessionPermissionMode.ASK;
+        });
+    }
 
-        addAllow(builder, "read_file");
-        addAllow(builder, "grep_files");
-        addAllow(builder, "glob_files");
-        addAllow(builder, "list_files");
-        addAllow(builder, "memory_search");
+    /** 为单个会话构造完整权限上下文，避免不同模式之间残留动态规则。 */
+    public PermissionContextState createPermissionContext(SessionPermissionMode mode) {
+        PermissionMode frameworkMode = switch (mode) {
+            case ASK -> PermissionMode.DEFAULT;
+            case AUTO_EDIT -> PermissionMode.ACCEPT_EDITS;
+            case FULL_ACCESS -> PermissionMode.BYPASS;
+        };
+        PermissionContextState.Builder builder = PermissionContextState.builder().mode(frameworkMode);
 
-        addAsk(builder, "write_file");
-        addAsk(builder, "edit_file");
-        addAsk(builder, "execute");
-        addAllow(builder, "plan_exit");
+        SAFE_TOOLS.forEach(toolName -> addAllow(builder, toolName, "builtInSafeTool"));
+
+        if (mode == SessionPermissionMode.AUTO_EDIT) {
+            AUTO_EDIT_TOOLS.forEach(toolName -> addAllow(builder, toolName, "autoEditTool"));
+        }
 
         return builder.build();
     }
 
 
-    private void addAllow(PermissionContextState.Builder builder, String toolName) {
+    private void addAllow(PermissionContextState.Builder builder, String toolName, String source) {
         builder.addAllowRule(toolName, new PermissionRule(
-                toolName, null, PermissionBehavior.ALLOW, "builtInReadOnly"
+                toolName, null, PermissionBehavior.ALLOW, source
         ));
     }
 
-    private void addAsk(PermissionContextState.Builder builder, String toolName) {
-        builder.addAskRule(toolName, new PermissionRule(
-                toolName, null, PermissionBehavior.ASK, "builtInHighRisk"
-        ));
-    }
 }

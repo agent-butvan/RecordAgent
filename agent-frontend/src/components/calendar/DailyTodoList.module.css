@@ -1,8 +1,9 @@
 .list { display: flex; flex-direction: column; }
-.item { display: flex; align-items: flex-start; gap: 10px; padding: 11px 0; cursor: pointer; border-bottom: 1px solid var(--border-subtle); }
+.item { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--border-subtle); }
 .item:last-child { border-bottom: none; padding-bottom: 0; }
+.toggle { display: inline-flex; align-items: center; cursor: pointer; }
 .checkboxInput { position: absolute; opacity: 0; pointer-events: none; }
-.checkbox { width: 18px; height: 18px; margin-top: 1px; border: 1px solid var(--border-medium); border-radius: 5px; display: inline-flex; align-items: center; justify-content: center; color: #fff; flex: 0 0 auto; transition: background-color var(--transition-fast), border-color var(--transition-fast); }
+.checkbox { width: 18px; height: 18px; border: 1px solid var(--border-medium); border-radius: 5px; display: inline-flex; align-items: center; justify-content: center; color: #fff; flex: 0 0 auto; transition: background-color var(--transition-fast), border-color var(--transition-fast); }
 .checkboxInput:checked + .checkbox { background: var(--accent-blue); border-color: var(--accent-blue); }
 .checkboxInput:focus-visible + .checkbox { outline: 2px solid var(--accent-blue); outline-offset: 2px; }
 .todoContent { min-width: 0; flex: 1; }

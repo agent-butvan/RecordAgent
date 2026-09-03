@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import styles from './Modal.module.css';
 
@@ -9,6 +10,8 @@ export interface ModalProps {
   children: React.ReactNode;
   /** 弹框宽度，默认 520px */
   width?: number | string;
+  /** 是否在应用窗口中垂直居中；默认保持顶部对齐 */
+  centered?: boolean;
   className?: string;
 }
 
@@ -24,6 +27,7 @@ export const Modal: React.FC<ModalProps> = ({
   onClose,
   children,
   width = 520,
+  centered = false,
   className = '',
 }) => {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -65,8 +69,11 @@ export const Modal: React.FC<ModalProps> = ({
 
   if (!open) return null;
 
-  return (
-    <div className={styles.overlay} onMouseDown={onClose}>
+  return createPortal(
+    <div
+      className={`${styles.overlay} ${centered ? styles.overlayCentered : ''}`}
+      onMouseDown={onClose}
+    >
       <div
         ref={panelRef}
         className={`${styles.panel} ${className}`}
@@ -91,6 +98,7 @@ export const Modal: React.FC<ModalProps> = ({
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };

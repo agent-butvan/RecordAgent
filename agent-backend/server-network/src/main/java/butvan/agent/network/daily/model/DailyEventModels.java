@@ -1,0 +1,128 @@
+package butvan.agent.network.daily.model;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.List;
+
+/** 日记录模块的领域值对象集合。 */
+public final class DailyEventModels {
+
+    private DailyEventModels() {
+    }
+
+    /** 所有日记录类型共享的小型写入接口。 */
+    public interface DailyEventCommand {
+        LocalDate eventDate();
+
+        String title();
+
+        String eventType();
+    }
+
+    /** 创建待办的领域命令。 */
+    public record TodoCommand(LocalDate eventDate, String title, String time, String priority)
+            implements DailyEventCommand {
+        @Override
+        public String eventType() {
+            return "todo";
+        }
+    }
+
+    /** 待办类型的结构化详情。 */
+    public record TodoDetails(String time, String priority, boolean completed) {
+    }
+
+    /** 创建日程的领域命令。 */
+    public record ScheduleCommand(
+            LocalDate eventDate,
+            String title,
+            String startTime,
+            String endTime,
+            String location,
+            ZoneId timezone) implements DailyEventCommand {
+        @Override
+        public String eventType() {
+            return "schedule";
+        }
+    }
+
+    /** 日程类型的结构化详情。 */
+    public record ScheduleDetails(
+            String startTime,
+            String endTime,
+            String location,
+            String timezone) {
+    }
+
+    /** 创建花销的领域命令。 */
+    public record ExpenseCommand(
+            LocalDate eventDate,
+            String category,
+            String note,
+            BigDecimal amount,
+            String time,
+            String currency) implements DailyEventCommand {
+        @Override
+        public String title() {
+            return note;
+        }
+
+        @Override
+        public String eventType() {
+            return "expense";
+        }
+    }
+
+    /** 花销类型的结构化详情。 */
+    public record ExpenseDetails(
+            String category,
+            String note,
+            BigDecimal amount,
+            String time,
+            String currency) {
+    }
+
+    /** 创建手记的领域命令。 */
+    public record JournalCommand(LocalDate eventDate, String title, String body, String mood)
+            implements DailyEventCommand {
+        @Override
+        public String eventType() {
+            return "journal";
+        }
+    }
+
+    /** 手记类型的结构化详情。 */
+    public record JournalDetails(String body, String mood) {
+    }
+
+    /** 一条可出现在某日时间线中的日记录。 */
+    public record DailyEvent(
+            String id,
+            LocalDate eventDate,
+            String eventType,
+            String title,
+            String source,
+            String status,
+            int version,
+            Instant createdAt,
+            Instant updatedAt,
+            Object details) {
+    }
+
+    /** 某一天的全部日记录。 */
+    public record DailyDay(LocalDate date, List<DailyEvent> events) {
+    }
+
+    /** 月历等范围视图需要的轻量日汇总。 */
+    public record DailyDaySummary(
+            LocalDate date,
+            int eventCount,
+            int todoCount,
+            int completedTodoCount,
+            int scheduleCount,
+            BigDecimal expenseTotal,
+            String headline) {
+    }
+}

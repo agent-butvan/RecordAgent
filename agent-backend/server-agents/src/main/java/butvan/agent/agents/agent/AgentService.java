@@ -9,6 +9,8 @@ import butvan.agent.agents.session.AgentStreamSession;
 import butvan.agent.agents.session.SessionCatalogService;
 import butvan.agent.agents.session.TranscriptService;
 import butvan.agent.agents.session.dto.TranscriptMessageDto;
+import butvan.agent.agents.session.dto.SessionPermissionMode;
+import butvan.agent.agents.security.AgentSecurity;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.*;
 import io.agentscope.core.message.Msg;
@@ -16,6 +18,7 @@ import io.agentscope.core.message.MsgRole;
 import io.agentscope.core.message.ToolUseBlock;
 import io.agentscope.core.message.UserMessage;
 import io.agentscope.harness.agent.HarnessAgent;
+import io.agentscope.core.permission.PermissionMode;
 import io.agentscope.harness.agent.workspace.plan.PlanModeManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,6 +45,7 @@ public class AgentService {
     private final PendingApprovalStore pendingApprovalStore;
     private final AgentEventManager agentEventManager;
     private final AgentFactory agentFactory;
+    private final AgentSecurity agentSecurity;
     private final AgentRunCompleter agentRunCompleter;
 
     /**
@@ -132,6 +136,11 @@ public class AgentService {
      */
     private void runAgentStream(AgentRun run, List<Msg> inputMessages, AgentStreamSession streamSession)    {
         HarnessAgent agent = agentFactory.currentAgent();
+        SessionPermissionMode productMode = sessionCatalogService.getPermissionMode(run.sessionId());
+        agent.getDelegate().getAgentState(run.userId(), run.sessionId())
+                .setPermissionContext(agentSecurity.createPermissionContext(productMode));
+        // setPermissionMode 同时重建当前会话的权限引擎并持久化新的上下文。
+        agent.setPermissionMode(run.userId(), run.sessionId(), toAgentScopeMode(productMode));
 
         for (AgentEvent event : agent.streamEvents(inputMessages,
                 run.runtimeContext()).toIterable()) {
@@ -164,6 +173,15 @@ public class AgentService {
         // 事件流自然结束：正常收尾
         agentRunCompleter.complete(run, TranscriptMessageDto.MessageStatus.COMPLETED);
         putEvent(streamSession, new AgentStreamEvent.Completed());
+    }
+
+    /** 将产品文案稳定映射到 AgentScope 的运行模式。 */
+    private PermissionMode toAgentScopeMode(SessionPermissionMode mode) {
+        return switch (mode) {
+            case ASK -> PermissionMode.DEFAULT;
+            case AUTO_EDIT -> PermissionMode.ACCEPT_EDITS;
+            case FULL_ACCESS -> PermissionMode.BYPASS;
+        };
     }
 
     /**

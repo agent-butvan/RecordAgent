@@ -34,11 +34,21 @@ public class AgentStorageProperties {
     private final Path workspaceDirectory;
 
     public AgentStorageProperties() {
-        rootDirectory = Paths.get(System.getProperty("user.home"), ".butvan-agent");
-        sessionCatalogFile = rootDirectory.resolve("sessions").resolve("catalog.json");
-        transcriptDirectory = rootDirectory.resolve("transcripts");
-        agentStateDirectory = rootDirectory.resolve("agentscope").resolve("state");
-        workspaceDirectory = rootDirectory.resolve("agentscope").resolve("workspace");
+        this(Paths.get(System.getProperty("user.home"), ".butvan-agent"));
+    }
+
+    /**
+     * 使用显式数据根目录初始化存储路径，供隔离测试与后续可移植部署复用。
+     *
+     * @param rootDirectory ButvanAgent 拥有的数据根目录
+     */
+    public AgentStorageProperties(Path rootDirectory) {
+        if (rootDirectory == null) throw new IllegalArgumentException("数据根目录不能为空");
+        this.rootDirectory = rootDirectory.toAbsolutePath().normalize();
+        sessionCatalogFile = this.rootDirectory.resolve("sessions").resolve("catalog.json");
+        transcriptDirectory = this.rootDirectory.resolve("transcripts");
+        agentStateDirectory = this.rootDirectory.resolve("agentscope").resolve("state");
+        workspaceDirectory = this.rootDirectory.resolve("agentscope").resolve("workspace");
 
         // 应用启动的时候创建本项目明确拥有的目录
         createDirectories(sessionCatalogFile.getParent());

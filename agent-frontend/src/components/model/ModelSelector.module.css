@@ -66,14 +66,6 @@
   flex-shrink: 0;
 }
 
-.triggerChevron {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-muted, #9ca3af);
-  flex-shrink: 0;
-}
-
 /* Floating Popover Container (Rendered in Portal) */
 .popoverContainer {
   position: fixed;

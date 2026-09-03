@@ -2,6 +2,7 @@ import React from 'react';
 import { Bot, CircleAlert, CircleCheck, CircleX, Clock3, RefreshCw, Square } from 'lucide-react';
 import type { TaskDto } from '../../types/team';
 import { Button } from '../common/Button';
+import { LoadingTree } from '../common/LoadingTree';
 import styles from './SubagentTaskPanel.module.css';
 
 export interface SubagentTaskPanelProps {
@@ -55,8 +56,10 @@ export const SubagentTaskPanel: React.FC<SubagentTaskPanelProps> = ({
 
       {error ? (
         <p className={styles.error} role="status">{error}</p>
+      ) : isLoading && tasks.length === 0 ? (
+        <LoadingTree size="small" label="正在读取任务…" />
       ) : tasks.length === 0 ? (
-        <p className={styles.empty}>{isLoading ? '正在读取任务…' : '子 Agent 启动后台任务后会显示在这里。'}</p>
+        <p className={styles.empty}>子 Agent 启动后台任务后会显示在这里。</p>
       ) : (
         <div className={styles.taskList}>
           {tasks.map((task) => {

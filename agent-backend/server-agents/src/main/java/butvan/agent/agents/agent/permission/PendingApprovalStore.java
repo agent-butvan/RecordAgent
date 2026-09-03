@@ -62,6 +62,10 @@ public class PendingApprovalStore {
     public void clearSession(String userId, String sessionId) {
         String prefix = userId + ":" + sessionId + ":";
         sessionDecisions.keySet().removeIf(key -> key.startsWith(prefix));
+        approvals.entrySet().removeIf(entry -> {
+            AgentRun run = entry.getValue().run();
+            return run.userId().equals(userId) && run.sessionId().equals(sessionId);
+        });
     }
 
     private String key(String userId, String sessionId, ToolUseBlock tool) {

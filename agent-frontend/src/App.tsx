@@ -6,6 +6,8 @@ import { CalendarView } from './components/calendar/CalendarView';
 import { ModelSettingsPage } from './components/model/ModelSettingsPage';
 import { ModelInitPage } from './components/model/ModelInitPage';
 import { MessageProvider } from './components/common/Message';
+import { useMessage } from './components/common/Message';
+import { LoadingTree } from './components/common/LoadingTree';
 import {
   fetchModelConfig,
   fetchSupportedVendors,
@@ -16,9 +18,12 @@ import {
   updateSessionTitleApi,
   deleteSessionApi,
   submitPermissionDecision,
+  generateSessionTitle,
+  fetchSessionPermissionMode,
+  updateSessionPermissionMode,
 } from './services/api';
 import type { PermissionToolPayload } from './services/api';
-import type { ChatSession, ChatMessage, Project, SessionSummaryDto, TranscriptMessageDto } from './types/chat';
+import type { ChatSession, ChatMessage, Project, SessionSummaryDto, TranscriptMessageDto, SessionPermissionMode } from './types/chat';
 import type { SubagentProgressDto, TaskDto } from './types/team';
 import { cancelSubagentTask, fetchSubagentTasks } from './services/taskApi';
 
@@ -60,6 +65,7 @@ export const MainLayout: React.FC<{
   settingsTab: string;
   setSettingsTab: (tab: string) => void;
 }> = ({ isSettingsOpen, setIsSettingsOpen, settingsTab, setSettingsTab }) => {
+  const { showMessage } = useMessage();
   const [projects, setProjects] = useState<Project[]>([]);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string>('');
@@ -75,11 +81,63 @@ export const MainLayout: React.FC<{
   const [isSubagentTasksLoading, setIsSubagentTasksLoading] = useState(false);
   const [subagentTaskError, setSubagentTaskError] = useState<string | null>(null);
   const [cancellingTaskId, setCancellingTaskId] = useState<string | null>(null);
+  const [permissionModes, setPermissionModes] = useState<Record<string, SessionPermissionMode>>({});
+  const [savingPermissionSessionId, setSavingPermissionSessionId] = useState<string | null>(null);
+  const [streamingSessionIds, setStreamingSessionIds] = useState<Set<string>>(() => new Set());
+  const [sessionLoadErrors, setSessionLoadErrors] = useState<Record<string, string>>({});
   const activeSessionIdRef = useRef(activeSessionId);
 
   useEffect(() => {
     activeSessionIdRef.current = activeSessionId;
   }, [activeSessionId]);
+
+  const setSessionStreaming = useCallback((sessionId: string, streaming: boolean) => {
+    setStreamingSessionIds((previous) => {
+      const next = new Set(previous);
+      if (streaming) next.add(sessionId);
+      else next.delete(sessionId);
+      return next;
+    });
+  }, []);
+
+  const syncSessionDetail = useCallback(async (sessionId: string, generateTitle = false) => {
+    setSessionLoadErrors((previous) => {
+      if (!previous[sessionId]) return previous;
+      const next = { ...previous };
+      delete next[sessionId];
+      return next;
+    });
+    let detail = await fetchSessionDetail(sessionId);
+    if (!detail) {
+      setSessionLoadErrors((previous) => ({
+        ...previous,
+        [sessionId]: '聊天记录读取失败，请检查网络连接后重试。',
+      }));
+      return;
+    }
+    const hasUserMessage = detail.messages.some((message) => message.role === 'USER');
+    if (detail.summary.title === '新对话' && (generateTitle || hasUserMessage)) {
+      await generateSessionTitle(sessionId);
+      detail = await fetchSessionDetail(sessionId);
+      if (!detail) {
+        setSessionLoadErrors((previous) => ({
+          ...previous,
+          [sessionId]: '聊天记录读取失败，请检查网络连接后重试。',
+        }));
+        return;
+      }
+    }
+    const messages = detail.messages.map(mapTranscriptToChatMessage);
+    setSessions((previous) => previous.map((session) => session.id === sessionId
+      ? {
+          ...session,
+          title: detail.summary.title,
+          lastMessagePreview: detail.summary.lastMessagePreview,
+          messages,
+          isLoaded: true,
+        }
+      : session));
+  }, []);
 
   const refreshSubagentTasks = useCallback(async (sessionId = activeSessionId) => {
     if (!sessionId) {
@@ -182,30 +240,29 @@ export const MainLayout: React.FC<{
 
     const currentSession = sessions.find((s) => s.id === activeSessionId);
     if (currentSession && !currentSession.isLoaded) {
-      fetchSessionDetail(activeSessionId).then((detail) => {
-        if (detail) {
-          const loadedMessages: ChatMessage[] = detail.messages.map(mapTranscriptToChatMessage);
-
-          setSessions((prev) =>
-            prev.map((s) =>
-              s.id === activeSessionId
-                ? {
-                    ...s,
-                    title: detail.summary.title,
-                    lastMessagePreview: detail.summary.lastMessagePreview,
-                    messages: loadedMessages,
-                    isLoaded: true,
-                  }
-                : s
-            )
-          );
-        }
-      });
+      void syncSessionDetail(activeSessionId);
     }
-  }, [activeSessionId, sessions]);
+  }, [activeSessionId, sessions, syncSessionDetail]);
+
+  // 权限模式属于会话状态：切换会话时按需读取，网络失败时安全回退到逐次批准。
+  useEffect(() => {
+    if (!activeSessionId || permissionModes[activeSessionId]) return;
+    let cancelled = false;
+    fetchSessionPermissionMode(activeSessionId)
+      .then((mode) => {
+        if (!cancelled) setPermissionModes((previous) => ({ ...previous, [activeSessionId]: mode }));
+      })
+      .catch(() => {
+        if (!cancelled) setPermissionModes((previous) => ({ ...previous, [activeSessionId]: 'ASK' }));
+      });
+    return () => { cancelled = true; };
+  }, [activeSessionId, permissionModes]);
 
   const activeSession = sessions.find((s) => s.id === activeSessionId);
   const activeMessages = activeSession?.messages || [];
+  const activeSessionLoadError = activeSession && !activeSession.isLoaded
+    ? sessionLoadErrors[activeSession.id] ?? null
+    : null;
   const activeProjectPath = activeSession?.projectId
     ? (projects.find((project) => project.id === activeSession.projectId)?.path ?? null)
     : null;
@@ -266,9 +323,10 @@ export const MainLayout: React.FC<{
   };
 
   // 6. 删除会话
-  const handleDeleteSession = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!window.confirm('确定删除该会话吗？此操作不可撤销。')) return;
+  const handleDeleteSession = async (id: string): Promise<{ success: boolean; message?: string }> => {
+    if (streamingSessionIds.has(id) || pendingPermission?.sessionId === id) {
+      return { success: false, message: '当前会话仍在运行或等待权限确认，请结束后再删除。' };
+    }
     const res = await deleteSessionApi(id);
     if (res.success) {
       setSessions((prev) => {
@@ -279,7 +337,25 @@ export const MainLayout: React.FC<{
         }
         return updated;
       });
+      setPermissionModes((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      setSessionLoadErrors((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      setStreamingSessionIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      showMessage('success', '会话已删除。');
+      return { success: true };
     }
+    return { success: false, message: res.message || '删除会话失败，请稍后重试。' };
   };
 
   // 7. 修改会话标题
@@ -296,6 +372,24 @@ export const MainLayout: React.FC<{
     setActiveFeature('chat');
   };
 
+  const handlePermissionModeChange = async (mode: SessionPermissionMode) => {
+    if (!activeSessionId || savingPermissionSessionId || streamingSessionIds.has(activeSessionId)
+        || pendingPermission?.sessionId === activeSessionId) return;
+    const sessionId = activeSessionId;
+    const previous = permissionModes[sessionId] ?? 'ASK';
+    setPermissionModes((current) => ({ ...current, [sessionId]: mode }));
+    setSavingPermissionSessionId(sessionId);
+    try {
+      const saved = await updateSessionPermissionMode(sessionId, mode);
+      setPermissionModes((current) => ({ ...current, [sessionId]: saved }));
+    } catch (error) {
+      setPermissionModes((current) => ({ ...current, [sessionId]: previous }));
+      showMessage('error', error instanceof Error ? error.message : '权限模式保存失败，请重试。');
+    } finally {
+      setSavingPermissionSessionId(null);
+    }
+  };
+
   // 8. 发送消息发起 SSE 流
   const handleSendMessage = async (prompt: string) => {
     let currentSessionId = activeSessionId;
@@ -303,7 +397,7 @@ export const MainLayout: React.FC<{
 
     // 若无激活会话，首先调用后端生成新会话 ID
     if (!targetSession) {
-      const res = await createSessionApi({ kind: 'GENERAL', title: prompt.substring(0, 18) });
+      const res = await createSessionApi({ kind: 'GENERAL', title: '新对话' });
       if (res.success && res.data) {
         currentSessionId = res.data.id;
         targetSession = {
@@ -356,6 +450,7 @@ export const MainLayout: React.FC<{
     );
 
     // 发起 SSE 流式调用，发送 content 字段
+    setSessionStreaming(currentSessionId, true);
     streamAgentChat(
       {
         sessionId: currentSessionId,
@@ -379,6 +474,7 @@ export const MainLayout: React.FC<{
         );
       },
       () => {
+        setSessionStreaming(currentSessionId, false);
         // 流式对话完成后同步耗时并重新刷新后端的最新详情
         setSessions((prev) =>
           prev.map((s) => {
@@ -402,25 +498,10 @@ export const MainLayout: React.FC<{
         );
 
         // 从后端重新同步最新的消息和摘要（包含更新的目录册 title / preview 及后端持久化的完整消息）
-        fetchSessionDetail(currentSessionId).then((detail) => {
-          if (detail) {
-            const loadedMessages: ChatMessage[] = detail.messages.map(mapTranscriptToChatMessage);
-            setSessions((prev) =>
-              prev.map((s) =>
-                s.id === currentSessionId
-                  ? {
-                      ...s,
-                      title: detail.summary.title,
-                      lastMessagePreview: detail.summary.lastMessagePreview,
-                      messages: loadedMessages,
-                    }
-                  : s
-              )
-            );
-          }
-        });
+        void syncSessionDetail(currentSessionId, targetSession?.title === '新对话');
       },
       (err) => {
+        setSessionStreaming(currentSessionId, false);
         console.error('Session 流式对话异常:', err);
         setSessions((prev) =>
           prev.map((s) => {
@@ -532,6 +613,7 @@ export const MainLayout: React.FC<{
         );
       },
       (permissionPayload) => {
+        setSessionStreaming(currentSessionId, false);
         setPendingPermission({
           sessionId: currentSessionId,
           assistantMessageId: assistantMsgId,
@@ -578,25 +660,24 @@ export const MainLayout: React.FC<{
       }
 
       setPendingPermission(null);
+      setSessionStreaming(current.sessionId, true);
       await streamAgentChat(
         { sessionId: current.sessionId, approvalId: current.approvalId },
         (text) => updateAssistantMessage(current.sessionId, current.assistantMessageId,
           (message) => ({ ...message, content: message.content + text })),
         () => {
+          setSessionStreaming(current.sessionId, false);
           updateAssistantMessage(current.sessionId, current.assistantMessageId, (message) => ({
             ...message,
             elapsedTime: Math.max(1, Math.floor((Date.now() - (message.startTime || message.createdAt)) / 1000)),
           }));
-          fetchSessionDetail(current.sessionId).then((detail) => {
-            if (!detail) return;
-            const messages = detail.messages.map(mapTranscriptToChatMessage);
-            setSessions((prev) => prev.map((session) => session.id === current.sessionId
-              ? { ...session, title: detail.summary.title, lastMessagePreview: detail.summary.lastMessagePreview, messages }
-              : session));
-          });
+          void syncSessionDetail(current.sessionId, true);
         },
-        (error) => updateAssistantMessage(current.sessionId, current.assistantMessageId,
-          (message) => ({ ...message, content: message.content || `恢复任务失败：${error.message}` })),
+        (error) => {
+          setSessionStreaming(current.sessionId, false);
+          updateAssistantMessage(current.sessionId, current.assistantMessageId,
+            (message) => ({ ...message, content: message.content || `恢复任务失败：${error.message}` }));
+        },
         (tool) => updateAssistantMessage(current.sessionId, current.assistantMessageId, (message) => ({
           ...message,
           tools: [...(message.tools || []), {
@@ -612,18 +693,21 @@ export const MainLayout: React.FC<{
         })),
         (thinking) => updateAssistantMessage(current.sessionId, current.assistantMessageId,
           (message) => ({ ...message, reasoning: (message.reasoning || '') + thinking })),
-        (permissionPayload) => setPendingPermission({
-          sessionId: current.sessionId,
-          assistantMessageId: current.assistantMessageId,
-          approvalId: permissionPayload.approvalId,
-          tool: permissionPayload.tool,
-        }),
+        (permissionPayload) => {
+          setSessionStreaming(current.sessionId, false);
+          setPendingPermission({
+            sessionId: current.sessionId,
+            assistantMessageId: current.assistantMessageId,
+            approvalId: permissionPayload.approvalId,
+            tool: permissionPayload.tool,
+          });
+        },
         (progress) => {
           appendSubagentProgress(current.sessionId, current.assistantMessageId, progress);
           void refreshSubagentTasks(current.sessionId);
         },
       );
-    } catch (error) {
+    } catch {
       updateAssistantMessage(current.sessionId, current.assistantMessageId, (message) => ({
         ...message,
         content: message.content || '提交权限决定失败，请重试。',
@@ -651,7 +735,7 @@ export const MainLayout: React.FC<{
             onImportProject={handleImportProject}
             onDeleteSession={handleDeleteSession}
             onUpdateSessionTitle={handleUpdateSessionTitle}
-            onOpenSettings={() => { setSettingsTab('general'); setIsSettingsOpen(true); }}
+            onOpenSettings={() => { setSettingsTab('config'); setIsSettingsOpen(true); }}
             onOpenAccountSettings={() => { setSettingsTab('account'); setIsSettingsOpen(true); }}
           />
           {activeFeature === 'calendar' ? (
@@ -660,6 +744,12 @@ export const MainLayout: React.FC<{
             <ChatWorkspace
               messages={activeMessages}
               sessionId={activeSessionId}
+              sessionTitle={activeSession?.title || '新对话'}
+              isSessionLoading={Boolean(activeSession && !activeSession.isLoaded && !activeSessionLoadError)}
+              sessionLoadError={activeSessionLoadError}
+              onRetrySessionLoad={() => {
+                if (activeSessionId) void syncSessionDetail(activeSessionId);
+              }}
               onSendMessage={handleSendMessage}
               onOpenSettings={() => setIsSettingsOpen(true)}
               pendingPermission={pendingPermission}
@@ -672,6 +762,13 @@ export const MainLayout: React.FC<{
               onRefreshSubagentTasks={() => void refreshSubagentTasks()}
               onCancelSubagentTask={handleCancelSubagentTask}
               projectPath={activeProjectPath}
+              permissionMode={permissionModes[activeSessionId] ?? 'ASK'}
+              onPermissionModeChange={handlePermissionModeChange}
+              isPermissionModeDisabled={!activeSessionId
+                || streamingSessionIds.has(activeSessionId)
+                || pendingPermission?.sessionId === activeSessionId
+                || savingPermissionSessionId === activeSessionId}
+              isPermissionModeSaving={savingPermissionSessionId === activeSessionId}
             />
           )}
         </>
@@ -683,7 +780,7 @@ export const MainLayout: React.FC<{
 
 export const App: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [settingsTab, setSettingsTab] = useState('general');
+  const [settingsTab, setSettingsTab] = useState('config');
   const [needsInit, setNeedsInit] = useState<boolean>(false);
   const [vendors, setVendors] = useState<string[]>(['gemini', 'openai', 'dashscope', 'deepseek', 'anthropic', 'ollama']);
   const [loading, setLoading] = useState<boolean>(true);
@@ -724,8 +821,7 @@ export const App: React.FC = () => {
   if (loading) {
     return (
       <div className="bootScreen">
-        <div className="bootSpinner" aria-hidden="true" />
-        <span>正在加载...</span>
+        <LoadingTree size="large" label="正在启动 ButvanAgent…" />
       </div>
     );
   }

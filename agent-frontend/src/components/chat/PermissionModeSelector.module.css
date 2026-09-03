@@ -1,0 +1,191 @@
+.root {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+}
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  max-width: 150px;
+  padding: 3px 7px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: 500 12px/1.2 var(--font-sans);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.trigger:hover:not(:disabled),
+.trigger[aria-expanded='true'] {
+  color: var(--text-primary);
+  background: var(--bg-surface-hover);
+  border-color: var(--border-subtle);
+}
+
+.trigger:focus-visible,
+.option:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+.trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.triggerDanger {
+  color: #c2410c;
+}
+
+.menu {
+  position: absolute;
+  inset-inline-start: 0;
+  bottom: calc(100% + 10px);
+  z-index: 120;
+  width: min(390px, calc(100vw - 32px));
+  padding: 6px;
+  border: 1px solid var(--border-medium);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 14px 35px rgba(15, 23, 42, 0.14);
+}
+
+.menuIntro {
+  padding: 7px 10px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.option {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 18px;
+  align-items: start;
+  gap: 10px;
+  width: 100%;
+  padding: 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-primary);
+  text-align: start;
+  cursor: pointer;
+}
+
+.option:hover,
+.option:focus-visible,
+.optionSelected {
+  background: var(--bg-surface-hover);
+}
+
+.optionIcon {
+  margin-top: 1px;
+  color: var(--text-secondary);
+}
+
+.optionCopy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.optionLabel {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.optionDescription {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.check {
+  margin-top: 1px;
+  color: var(--accent-primary);
+}
+
+.optionDanger,
+.optionDanger .optionIcon,
+.optionDanger .optionDescription,
+.optionDanger .check {
+  color: #c2410c;
+}
+
+.confirmation {
+  margin-top: 5px;
+  padding: 11px;
+  border: 1px solid #fed7aa;
+  border-radius: 7px;
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.confirmationTitle {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.confirmationDescription {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.confirmationActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.cancelButton,
+.confirmButton {
+  min-height: 30px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font: 500 12px/1 var(--font-sans);
+  cursor: pointer;
+}
+
+.cancelButton {
+  border: 1px solid #fdba74;
+  background: #fff;
+  color: #9a3412;
+}
+
+.confirmButton {
+  border: 1px solid #c2410c;
+  background: #c2410c;
+  color: #fff;
+}
+
+.cancelButton:focus-visible,
+.confirmButton:focus-visible {
+  outline: 2px solid #ea580c;
+  outline-offset: 2px;
+}
+
+@media (max-width: 680px) {
+  .trigger span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .menu {
+    width: min(340px, calc(100vw - 24px));
+    inset-inline-start: auto;
+    inset-inline-end: 0;
+  }
+}
