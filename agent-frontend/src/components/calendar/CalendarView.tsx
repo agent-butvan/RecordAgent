@@ -474,7 +474,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenFinance }) => 
                 </div> : <p className={styles.emptyText}>今天没有日程安排。</p>}
               </section>
 
-              <section className={styles.recordSection}>
+              <section className={`${styles.recordSection} ${styles.cashflowSection}`}>
                 <div className={styles.sectionHeading}><ReceiptText size={15} aria-hidden="true" /><h3>收支明细</h3>
                   <span className={styles.cashflowTotals}>
                     <b className={styles.expenseText}>支出 ¥{totalExpense(selectedEntry).toFixed(2)}</b>

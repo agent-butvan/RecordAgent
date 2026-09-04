@@ -466,6 +466,14 @@
   padding-bottom: 0;
 }
 
+.cashflowSection {
+  padding-bottom: 8px;
+}
+
+.cashflowSection + .recordSection {
+  padding-top: 8px;
+}
+
 .sectionHeading {
   display: flex;
   align-items: center;
