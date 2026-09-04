@@ -5,10 +5,13 @@ import { clearRecordTrash, createRecord, createRecordTab, deleteRecordTab, expor
 import type { RecordEntry, RecordTab, RecordType, SaveRecordInput } from '../../types/record';
 import { RecordEditor } from './RecordEditor';
 import { RECORD_TYPES } from './recordTypes';
+import { useMessage } from '../common/Message';
 import styles from './RecordPage.module.css';
 
 const TYPE_LABELS = Object.fromEntries(RECORD_TYPES.map((item) => [item.value, item.label])) as Record<RecordType, string>;
 type EditorTarget = { entry?: RecordEntry; tabId?: string; type: RecordType };
+const SUMMARY_COPY_KEY = 'butvan-record-summary-copy';
+const DEFAULT_SUMMARY_COPY = '持续积累八股文和面试题，把零散记忆变成可以表达的答案。';
 
 function formatDate(date: Date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
 function displayTitle(entry: RecordEntry) { return entry.title || entry.contentText.split('\n')[0] || '无标题记录'; }
@@ -23,6 +26,7 @@ function typeForTab(tab?: RecordTab): RecordType {
 
 /** 极简资料看板：全部内容通过统一 Tab 导航和统一写作编辑器管理。 */
 export function RecordPage() {
+  const { showMessage } = useMessage();
   const today = useMemo(() => new Date(), []);
   const todayKey = formatDate(today);
   const [records, setRecords] = useState<RecordEntry[]>([]);
@@ -32,7 +36,9 @@ export function RecordPage() {
   const [editing, setEditing] = useState<EditorTarget | null>(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [feedback, setFeedback] = useState<{ kind: 'error' | 'success'; text: string } | null>(null);
+  const [summaryCopy, setSummaryCopy] = useState(() => localStorage.getItem(SUMMARY_COPY_KEY) || DEFAULT_SUMMARY_COPY);
+  const [summaryDraft, setSummaryDraft] = useState(summaryCopy);
+  const [editingSummaryCopy, setEditingSummaryCopy] = useState(false);
   const [newTabName, setNewTabName] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -44,9 +50,9 @@ export function RecordPage() {
     try {
       const [recordItems, tabItems] = await Promise.all([fetchRecords(range.from, range.to, { query: query.trim() }), fetchRecordTabs()]);
       setRecords(recordItems); setTabs(tabItems);
-    } catch (reason) { setFeedback({ kind: 'error', text: reason instanceof Error ? reason.message : '资料加载失败' }); }
+    } catch (reason) { showMessage('error', reason instanceof Error ? reason.message : '资料加载失败'); }
     finally { setLoading(false); }
-  }, [query, range.from, range.to]);
+  }, [query, range.from, range.to, showMessage]);
   useEffect(() => { const timer = window.setTimeout(() => void load(), query ? 250 : 0); return () => window.clearTimeout(timer); }, [load, query]);
 
   const activeTab = tabs.find((tab) => tab.id === activeTabId);
@@ -61,8 +67,8 @@ export function RecordPage() {
     setSaving(true);
     try {
       if (editing?.entry) await updateRecord(editing.entry.id, editing.entry.version, input); else await createRecord(input);
-      setEditing(null); await load(); setFeedback({ kind: 'success', text: '资料已保存' });
-    } catch (reason) { setFeedback({ kind: 'error', text: reason instanceof Error ? reason.message : '保存失败' }); throw reason; }
+      setEditing(null); await load(); showMessage('success', '资料已保存');
+    } catch (reason) { showMessage('error', reason instanceof Error ? reason.message : '保存失败'); throw reason; }
     finally { setSaving(false); }
   };
 
@@ -70,8 +76,8 @@ export function RecordPage() {
   const remove = async (entry: RecordEntry) => {
     if (confirmDeleteId !== entry.id) { setConfirmDeleteId(entry.id); return; }
     setDeletingId(entry.id);
-    try { await trashRecord(entry.id, entry.version); setConfirmDeleteId(null); await load(); setFeedback({ kind: 'success', text: '资料已移入回收站' }); }
-    catch (reason) { setFeedback({ kind: 'error', text: reason instanceof Error ? reason.message : '删除失败' }); }
+    try { await trashRecord(entry.id, entry.version); setConfirmDeleteId(null); await load(); showMessage('success', '资料已移入回收站'); }
+    catch (reason) { showMessage('error', reason instanceof Error ? reason.message : '删除失败'); }
     finally { setDeletingId(null); }
   };
 
@@ -86,20 +92,25 @@ export function RecordPage() {
         <button className={styles.iconButton} onClick={() => void exportRecordBackup()} title="导出备份"><Download size={14} /></button>
         <label className={styles.iconButton} title="导入备份"><Upload size={14} /><input type="file" accept=".zip,application/zip" onChange={async (event) => {
           const file = event.target.files?.[0]; if (!file) return;
-          if (window.confirm('导入会替换当前全部资料，确定继续吗？')) try { const count = await importRecordBackup(file); await load(); setFeedback({ kind: 'success', text: `已恢复 ${count} 条资料` }); } catch (reason) { setFeedback({ kind: 'error', text: reason instanceof Error ? reason.message : '导入失败' }); }
+          if (window.confirm('导入会替换当前全部资料，确定继续吗？')) try { const count = await importRecordBackup(file); await load(); showMessage('success', `已恢复 ${count} 条资料`); } catch (reason) { showMessage('error', reason instanceof Error ? reason.message : '导入失败'); }
           event.target.value = '';
         }} /></label>
         <button className={styles.iconButton} onClick={() => void fetchRecordTrash().then(setTrashEntries)} title="回收站"><Trash2 size={14} /></button>
         <button className={styles.primaryButton} onClick={beginCreate}><Plus size={15} />新增资料</button>
       </div>
     </div>
-    {feedback && <div className={`${styles.feedback} ${feedback.kind === 'success' ? styles.success : ''}`}>{feedback.text}<button onClick={() => setFeedback(null)}>关闭</button></div>}
     <div className={styles.dashboard}>
       <section className={styles.summary} aria-label="本周学习情况">
         <div><strong>{learningDays}<small>/ 7</small></strong><span>本周学习天数</span></div>
         <div><strong>{weekLearning.length}</strong><span>本周新增资料</span></div>
         <div><strong>{weekReviews.length ? <Check size={20} /> : '—'}</strong><span>{weekReviews.length ? `已完成 ${weekReviews.length} 次复盘` : '本周尚未复盘'}</span></div>
-        <p>持续积累八股文和面试题，把零散记忆变成可以表达的答案。</p>
+        {editingSummaryCopy ? <input className={styles.summaryCopyInput} value={summaryDraft} autoFocus maxLength={120}
+          aria-label="学习提示文案" onChange={(event) => setSummaryDraft(event.target.value)} onBlur={() => {
+            const nextCopy = summaryDraft.trim() || DEFAULT_SUMMARY_COPY;
+            setSummaryCopy(nextCopy); setSummaryDraft(nextCopy); localStorage.setItem(SUMMARY_COPY_KEY, nextCopy); setEditingSummaryCopy(false);
+          }} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); if (event.key === 'Escape') { setSummaryDraft(summaryCopy); setEditingSummaryCopy(false); } }} />
+          : <p className={styles.summaryCopy} tabIndex={0} role="button" aria-label="学习提示文案，双击编辑" title="双击编辑" onDoubleClick={() => setEditingSummaryCopy(true)}
+            onKeyDown={(event) => { if (event.key === 'Enter' || event.key === 'F2') setEditingSummaryCopy(true); }}>{summaryCopy}</p>}
       </section>
 
       <section className={styles.library}>
@@ -110,7 +121,7 @@ export function RecordPage() {
           <button className={activeTabId === 'all' ? styles.activeTab : ''} onClick={() => setActiveTabId('all')}>全部</button>
           {tabs.map((tab) => <button key={tab.id} className={activeTabId === tab.id ? styles.activeTab : ''} onClick={() => setActiveTabId(tab.id)}>{tab.name}</button>)}
           {newTabName === null ? <button className={styles.addTab} onClick={() => setNewTabName('')}><Plus size={13} />新建 Tab</button> :
-            <form className={styles.newTabForm} onSubmit={async (event) => { event.preventDefault(); if (!newTabName.trim()) return; try { const tab = await createRecordTab(newTabName); setNewTabName(null); await load(); setActiveTabId(tab.id); } catch (reason) { setFeedback({ kind: 'error', text: reason instanceof Error ? reason.message : 'Tab 创建失败' }); } }}>
+            <form className={styles.newTabForm} onSubmit={async (event) => { event.preventDefault(); if (!newTabName.trim()) return; try { const tab = await createRecordTab(newTabName); setNewTabName(null); await load(); setActiveTabId(tab.id); } catch (reason) { showMessage('error', reason instanceof Error ? reason.message : 'Tab 创建失败'); } }}>
               <input value={newTabName} onChange={(event) => setNewTabName(event.target.value)} placeholder="Tab 名称" autoFocus maxLength={20} />
               <button type="submit">创建</button><button type="button" onClick={() => setNewTabName(null)}><X size={13} /></button>
             </form>}
@@ -121,7 +132,7 @@ export function RecordPage() {
           <div className={styles.recordContent}><div><strong>{displayTitle(entry)}</strong>{entry.pinned && <span>置顶</span>}</div><p>{entry.contentText || '暂无正文'}</p>
             <footer><span>{TYPE_LABELS[entry.type]}</span>{entry.tags.map((tag) => <span key={tag}>#{tag}</span>)}</footer></div>
           <div className={styles.rowActions}>
-            <button onClick={async (event) => { event.stopPropagation(); try { await updateRecordFlags(entry.id, entry.version, { favorite: !entry.favorite }); await load(); } catch (reason) { setFeedback({ kind: 'error', text: reason instanceof Error ? reason.message : '收藏失败' }); } }} aria-label="收藏"><Heart size={14} fill={entry.favorite ? 'currentColor' : 'none'} /></button>
+            <button onClick={async (event) => { event.stopPropagation(); try { await updateRecordFlags(entry.id, entry.version, { favorite: !entry.favorite }); await load(); } catch (reason) { showMessage('error', reason instanceof Error ? reason.message : '收藏失败'); } }} aria-label="收藏"><Heart size={14} fill={entry.favorite ? 'currentColor' : 'none'} /></button>
             <button className={confirmDeleteId === entry.id ? styles.confirmDelete : ''} disabled={deletingId === entry.id} onClick={(event) => { event.stopPropagation(); void remove(entry); }}>{confirmDeleteId === entry.id ? (deletingId === entry.id ? '删除中…' : '确认删除') : <Trash2 size={14} />}</button>
           </div>
         </article>) : <div className={styles.empty}><FileText size={20} /><strong>这个 Tab 还没有资料</strong><span>点击“新增资料”，内容会直接归入当前 Tab。</span><button onClick={beginCreate}>新增第一篇资料</button></div>}</div>

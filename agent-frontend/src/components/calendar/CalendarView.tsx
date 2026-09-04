@@ -76,13 +76,14 @@ function hasEntryContent(entry: CalendarDayEntry): boolean {
     || entry.expenses.length
     || entry.incomes.length
     || entry.schedules.length
+    || entry.journals?.length
     || entry.journal
     || entry.photos.length
     || entry.otherRecords?.length,
   );
 }
 
-const EMPTY_ENTRY: CalendarDayEntry = { todos: [], expenses: [], incomes: [], schedules: [], photos: [], otherRecords: [] };
+const EMPTY_ENTRY: CalendarDayEntry = { todos: [], expenses: [], incomes: [], schedules: [], journals: [], photos: [], otherRecords: [] };
 
 interface CalendarViewProps {
   onOpenFinance: () => void;
@@ -98,6 +99,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenFinance }) => 
   const [isDayLoading, setIsDayLoading] = useState(true);
   const [dataError, setDataError] = useState<string | null>(null);
   const [journalEditorDate, setJournalEditorDate] = useState<Date | null>(null);
+  const [journalEditorId, setJournalEditorId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -119,6 +121,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenFinance }) => 
 
   const selectedKey = formatLocalDate(selected);
   const selectedEntry = entries[selectedKey] ?? EMPTY_ENTRY;
+  const selectedJournals = selectedEntry.journals ?? (selectedEntry.journal ? [selectedEntry.journal] : []);
   const completedCount = selectedEntry.todos.filter((todo) => todo.completed).length;
   const selectedCashflows = [
     ...selectedEntry.expenses.map((record) => ({ ...record, transactionType: 'expense' as const })),
@@ -129,7 +132,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenFinance }) => 
     || selectedEntry.expenses.length
     || selectedEntry.incomes.length
     || selectedEntry.schedules.length
-    || selectedEntry.journal
+    || selectedJournals.length
     || selectedEntry.photos.length
     || selectedEntry.otherRecords?.length,
   );
@@ -256,7 +259,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenFinance }) => 
     if (!journalEditorDate) return;
     try {
       setDataError(null);
-      const existing = entries[formatLocalDate(journalEditorDate)]?.journal;
+      const editorEntry = entries[formatLocalDate(journalEditorDate)];
+      const journals = editorEntry?.journals ?? (editorEntry?.journal ? [editorEntry.journal] : []);
+      const existing = journals.find((item) => item.id === journalEditorId);
       if (existing?.id) {
         await updateDailyJournal(journalEditorDate, { ...journal, id: existing.id, version: existing.version });
       } else {
@@ -268,6 +273,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenFinance }) => 
       await loadMonth();
       setSelected(journalEditorDate);
       setJournalEditorDate(null);
+      setJournalEditorId(null);
     } catch (error: unknown) {
       setDataError(error instanceof Error ? error.message : '保存手记失败');
     }
@@ -275,11 +281,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenFinance }) => 
 
   if (journalEditorDate) {
     const journalKey = formatLocalDate(journalEditorDate);
+    const journalEntry = entries[journalKey];
+    const journals = journalEntry?.journals ?? (journalEntry?.journal ? [journalEntry.journal] : []);
     return (
       <JournalEditorPage
         date={journalEditorDate}
-        initialJournal={entries[journalKey]?.journal}
-        onBack={() => setJournalEditorDate(null)}
+        initialJournal={journals.find((item) => item.id === journalEditorId)}
+        onBack={() => { setJournalEditorDate(null); setJournalEditorId(null); }}
         onSave={saveJournal}
         error={dataError}
       />
@@ -297,7 +305,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenFinance }) => 
             <CalendarQuickCreate
               selectedDate={selected}
               onCreate={createRecord}
-              onWriteJournal={() => setJournalEditorDate(selected)}
+              onWriteJournal={() => {
+                setJournalEditorId(selectedJournals.find((journal) => journal.source !== 'record')?.id ?? null);
+                setJournalEditorDate(selected);
+              }}
               onOpenFinance={onOpenFinance}
             />
             <button type="button" className={styles.todayBtn} onClick={goToday}>今天</button>
@@ -484,23 +495,21 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenFinance }) => 
                 </div> : <p className={styles.emptyText}>没有收支记录。</p>}
               </section>
 
-              {(selectedEntry.journal || selectedEntry.photos.length > 0) && <section className={styles.recordSection}>
+              {(selectedJournals.length > 0 || selectedEntry.photos.length > 0) && <section className={styles.recordSection}>
                 <div className={styles.sectionHeading}>
                   <NotebookPen size={15} aria-hidden="true" />
                   <h3>手记与图片</h3>
-                  {selectedEntry.journal && <div className={styles.sectionActions}>
-                    <button type="button" className={styles.journalEditButton} onClick={() => setJournalEditorDate(selected)}>编辑</button>
-                    <DailyRecordDeleteButton
-                      label="手记"
-                      onDelete={() => requestDelete(selectedEntry.journal ?? {}, '手记', selectedEntry.journal?.title || '无标题手记')}
-                    />
-                  </div>}
                 </div>
-                {selectedEntry.journal && <div className={styles.journal}>
-                  {selectedEntry.journal.title && <strong>{selectedEntry.journal.title}</strong>}
-                  <p>{selectedEntry.journal.excerpt}</p>
-                  <span>{selectedEntry.journal.mood}</span>
-                </div>}
+                {selectedJournals.length > 0 && <div className={styles.journalList}>{selectedJournals.map((journal) => <div className={styles.journal} key={journal.id ?? `${journal.updatedAt}-${journal.title}`}>
+                  <div className={styles.journalHeading}>{journal.title && <strong>{journal.title}</strong>}
+                    {journal.source === 'record' ? <span className={styles.syncedLabel}>来自记录</span> : <div className={styles.sectionActions}>
+                      <button type="button" className={styles.journalEditButton} onClick={() => { setJournalEditorId(journal.id ?? null); setJournalEditorDate(selected); }}>编辑</button>
+                      <DailyRecordDeleteButton label="手记" onDelete={() => requestDelete(journal, '手记', journal.title || '无标题手记')} />
+                    </div>}
+                  </div>
+                  <p>{journal.excerpt}</p>
+                  {journal.source !== 'record' && journal.mood && <span>{journal.mood}</span>}
+                </div>)}</div>}
                 {selectedEntry.photos.length > 0 && <div className={styles.photoGrid}>
                   {selectedEntry.photos.map((photo) => <img key={photo.id} src={photo.url} alt={photo.alt} />)}
                   <span className={styles.photoCount}><Image size={13} />{selectedEntry.photos.length} 张</span>

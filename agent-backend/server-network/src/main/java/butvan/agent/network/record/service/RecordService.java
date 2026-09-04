@@ -5,6 +5,7 @@ import butvan.agent.network.record.model.RecordModels.RecordCommand;
 import butvan.agent.network.record.model.RecordModels.RecordEntry;
 import butvan.agent.network.record.model.RecordModels.RecordType;
 import butvan.agent.network.record.repository.RecordRepository;
+import butvan.agent.network.daily.service.DailyEventService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +23,7 @@ public class RecordService {
     private static final int MAX_CONTENT_LENGTH = 2_000_000;
     private final RecordRepository repository;
     private final RecordTabService tabService;
+    private final DailyEventService dailyEventService;
 
     /** 查询记录列表。 */
     public List<RecordEntry> search(String ownerId, LocalDate from, LocalDate to,
@@ -53,6 +55,7 @@ public class RecordService {
         repository.insert(id, ownerId, command.recordDate(), command.type(), cleanTitle(command.title()),
                 command.contentHtml(), command.contentText(), tabId, week.year(), week.number(), now);
         repository.replaceTags(ownerId, id, normalizedTags(command.tags()), now);
+        syncJournal(ownerId, id, command);
         return get(ownerId, id);
     }
 
@@ -60,6 +63,7 @@ public class RecordService {
     @Transactional
     public RecordEntry update(String ownerId, String id, int expectedVersion, RecordCommand command) {
         validate(command);
+        RecordEntry current = get(ownerId, id);
         WeekBinding week = weekBinding(command);
         String tabId = tabService.resolve(ownerId, command.tabId(), command.type());
         Instant now = Instant.now();
@@ -68,6 +72,8 @@ public class RecordService {
             throw new IllegalArgumentException("记录已被修改或不存在，请刷新后重试");
         }
         repository.replaceTags(ownerId, id, normalizedTags(command.tags()), now);
+        if (command.type() == RecordType.JOURNAL) syncJournal(ownerId, id, command);
+        else if (current.type() == RecordType.JOURNAL) dailyEventService.removeRecordJournal(ownerId, id);
         return get(ownerId, id);
     }
 
@@ -86,22 +92,43 @@ public class RecordService {
     }
 
     /** 将记录移入回收站。 */
+    @Transactional
     public void trash(String ownerId, String id, int expectedVersion) {
+        RecordEntry current = get(ownerId, id);
         if (!repository.setTrashed(ownerId, id, expectedVersion, Instant.now(), Instant.now())) {
             throw new IllegalArgumentException("记录已被修改或不存在，请刷新后重试");
         }
+        if (current.type() == RecordType.JOURNAL) dailyEventService.removeRecordJournal(ownerId, id);
     }
 
     /** 从回收站恢复记录。 */
+    @Transactional
     public RecordEntry restore(String ownerId, String id, int expectedVersion) {
         if (!repository.setTrashed(ownerId, id, expectedVersion, null, Instant.now())) {
             throw new IllegalArgumentException("记录已被修改或不存在，请刷新后重试");
         }
-        return get(ownerId, id);
+        RecordEntry restored = get(ownerId, id);
+        if (restored.type() == RecordType.JOURNAL) {
+            dailyEventService.syncRecordJournal(ownerId, id, restored.recordDate(), restored.title(), restored.contentText());
+        }
+        return restored;
     }
 
     public List<RecordEntry> trashEntries(String ownerId) { return repository.findTrash(ownerId); }
-    public int clearTrash(String ownerId) { return repository.clearTrash(ownerId); }
+    @Transactional
+    public int clearTrash(String ownerId) {
+        repository.findTrash(ownerId).stream().filter(record -> record.type() == RecordType.JOURNAL)
+                .forEach(record -> dailyEventService.removeRecordJournal(ownerId, record.id()));
+        return repository.clearTrash(ownerId);
+    }
+
+    /** 导入备份前清除记录及其日历同步投影。 */
+    @Transactional
+    public int clearAllForImport(String ownerId) {
+        repository.findAll(ownerId).stream().filter(record -> record.type() == RecordType.JOURNAL)
+                .forEach(record -> dailyEventService.removeRecordJournal(ownerId, record.id()));
+        return repository.clearAll(ownerId);
+    }
 
     private void validate(RecordCommand command) {
         if (command == null || command.recordDate() == null || command.type() == null) {
@@ -140,6 +167,13 @@ public class RecordService {
                 .map(String::trim).filter(value -> !value.isEmpty()).distinct().peek(value -> {
                     if (value.length() > 40) throw new IllegalArgumentException("标签不能超过 40 个字符");
                 }).toList();
+    }
+
+    private void syncJournal(String ownerId, String recordId, RecordCommand command) {
+        if (command.type() == RecordType.JOURNAL) {
+            dailyEventService.syncRecordJournal(ownerId, recordId, command.recordDate(),
+                    cleanTitle(command.title()), command.contentText());
+        }
     }
 
     private record WeekBinding(Integer year, Integer number) { }

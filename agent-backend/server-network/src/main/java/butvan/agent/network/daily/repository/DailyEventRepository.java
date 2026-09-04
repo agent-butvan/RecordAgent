@@ -33,12 +33,19 @@ public class DailyEventRepository {
 
     /** 插入日记录公共字段。 */
     public void insertEvent(String id, String ownerId, LocalDate date, String type, String title, Instant now) {
+        insertEvent(id, ownerId, date, type, title, "manual", null, now);
+    }
+
+    /** 插入带来源引用的日记录，供其他领域通过稳定引用同步到日历。 */
+    public void insertEvent(String id, String ownerId, LocalDate date, String type, String title,
+                            String source, String sourceReference, Instant now) {
         jdbcTemplate.update("""
                 INSERT INTO daily_event (
                     id, owner_id, event_date, event_type, title, source, status,
-                    extension_json, version, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, 'manual', 'confirmed', '{}', 0, ?, ?)
-                """, id, ownerId, date.toString(), type, title, now.toString(), now.toString());
+                    source_reference, extension_json, version, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, 'confirmed', ?, '{}', 0, ?, ?)
+                """, id, ownerId, date.toString(), type, title, source, sourceReference,
+                now.toString(), now.toString());
     }
 
     /** 查询某日全部日记录的公共字段。 */
@@ -79,6 +86,22 @@ public class DailyEventRepository {
                 resultSet.getString("source"), resultSet.getString("status"),
                 resultSet.getInt("version"), Instant.parse(resultSet.getString("created_at")),
                 Instant.parse(resultSet.getString("updated_at"))), ownerId, eventId);
+        return rows.stream().findFirst();
+    }
+
+    /** 通过来源领域的稳定引用查找同步日记录。 */
+    public Optional<DailyEventRow> findBySourceReference(String ownerId, String source, String sourceReference) {
+        List<DailyEventRow> rows = jdbcTemplate.query("""
+                SELECT id, event_date, event_type, title, source, status,
+                       version, created_at, updated_at
+                FROM daily_event
+                WHERE owner_id = ? AND source = ? AND source_reference = ?
+                """, (resultSet, rowNumber) -> new DailyEventRow(
+                resultSet.getString("id"), LocalDate.parse(resultSet.getString("event_date")),
+                resultSet.getString("event_type"), resultSet.getString("title"),
+                resultSet.getString("source"), resultSet.getString("status"),
+                resultSet.getInt("version"), Instant.parse(resultSet.getString("created_at")),
+                Instant.parse(resultSet.getString("updated_at"))), ownerId, source, sourceReference);
         return rows.stream().findFirst();
     }
 

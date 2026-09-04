@@ -70,7 +70,7 @@ public class RecordBackupService {
                     }
                 }
             }
-            repository.clearAll(ownerId);
+            recordService.clearAllForImport(ownerId);
             Map<String, String> tabIds = new HashMap<>();
             List<RecordTab> currentTabs = tabService.list(ownerId);
             for (RecordTab sourceTab : manifest.tabs() == null ? List.<RecordTab>of() : manifest.tabs()) {

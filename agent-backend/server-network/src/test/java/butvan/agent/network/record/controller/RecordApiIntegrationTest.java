@@ -8,6 +8,9 @@ import butvan.agent.network.record.service.RecordService;
 import butvan.agent.network.record.service.RecordAttachmentService;
 import butvan.agent.network.record.service.RecordBackupService;
 import butvan.agent.network.record.service.RecordTabService;
+import butvan.agent.network.daily.DailyEventModuleConfiguration;
+import butvan.agent.network.daily.model.DailyEventModels.JournalDetails;
+import butvan.agent.network.daily.service.DailyEventService;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
@@ -33,6 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class RecordApiIntegrationTest {
     private static final Path DATABASE_PATH = createDatabasePath();
     @jakarta.annotation.Resource private MockMvc mockMvc;
+    @jakarta.annotation.Resource private DailyEventService dailyEventService;
 
     @DynamicPropertySource
     static void databaseProperties(DynamicPropertyRegistry registry) { registry.add("butvan.database.path", DATABASE_PATH::toString); }
@@ -86,6 +90,44 @@ class RecordApiIntegrationTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data[0].type").value("weekly_review"));
     }
 
+    @Test
+    void recordJournalIsVisibleInCalendarAndRemovedWithItsSourceRecord() throws Exception {
+        String response = mockMvc.perform(post("/agent/records").contentType("application/json").content("""
+                {"recordDate":"2026-10-01","type":"journal","title":"十月手记",
+                 "contentHtml":"<p>今天完成了资料整理。</p>","contentText":"今天完成了资料整理。","tags":[]}
+                """))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        var node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(response).path("data");
+
+        var synced = dailyEventService.getDay("local-default", java.time.LocalDate.of(2026, 10, 1))
+                .events().stream().filter(event -> "record".equals(event.source())).findFirst().orElseThrow();
+        org.junit.jupiter.api.Assertions.assertEquals("十月手记", synced.title());
+        org.junit.jupiter.api.Assertions.assertEquals("今天完成了资料整理。",
+                ((JournalDetails) synced.details()).body());
+
+        String updatedResponse = mockMvc.perform(put("/agent/records/" + node.path("id").asText())
+                        .param("expectedVersion", node.path("version").asText())
+                        .contentType("application/json").content("""
+                                {"recordDate":"2026-10-02","type":"journal","title":"十月手记补充",
+                                 "contentHtml":"<p>补充了第二版。</p>","contentText":"补充了第二版。","tags":[]}
+                                """))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        var updatedNode = new com.fasterxml.jackson.databind.ObjectMapper().readTree(updatedResponse).path("data");
+        var updatedJournal = dailyEventService.getDay("local-default", java.time.LocalDate.of(2026, 10, 2))
+                .events().stream().filter(event -> "record".equals(event.source())).findFirst().orElseThrow();
+        org.junit.jupiter.api.Assertions.assertEquals("十月手记补充", updatedJournal.title());
+        org.junit.jupiter.api.Assertions.assertTrue(
+                dailyEventService.getDay("local-default", java.time.LocalDate.of(2026, 10, 1)).events().isEmpty());
+
+        mockMvc.perform(delete("/agent/records/" + node.path("id").asText())
+                        .param("expectedVersion", updatedNode.path("version").asText()))
+                .andExpect(status().isOk());
+        org.junit.jupiter.api.Assertions.assertTrue(
+                dailyEventService.getDay("local-default", java.time.LocalDate.of(2026, 10, 2)).events().isEmpty());
+    }
+
     private static Path createDatabasePath() {
         try { return Files.createTempDirectory("butvan-record-api-test-").resolve("butvan.db"); }
         catch (IOException exception) { throw new IllegalStateException("无法创建记录接口测试数据库目录", exception); }
@@ -93,7 +135,7 @@ class RecordApiIntegrationTest {
 
     @SpringBootConfiguration
     @EnableAutoConfiguration
-    @Import({LocalDatabaseConfiguration.class, RecordRepository.class, RecordService.class,
+    @Import({LocalDatabaseConfiguration.class, DailyEventModuleConfiguration.class, RecordRepository.class, RecordService.class,
             RecordAttachmentService.class, RecordBackupService.class, RecordTabService.class,
             RecordController.class, ApiExceptionHandler.class, CurrentUserProvider.class})
     static class TestApplication { }

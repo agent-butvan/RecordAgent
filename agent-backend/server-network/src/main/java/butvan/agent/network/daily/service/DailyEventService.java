@@ -49,6 +49,39 @@ public class DailyEventService {
                 .orElseThrow(() -> new IllegalStateException("待办创建后无法读取"));
     }
 
+    /** 将记录资料库中的每日手记幂等同步到日历，稳定来源引用可避免重复创建。 */
+    @Transactional
+    public void syncRecordJournal(String ownerId, String recordId, LocalDate date, String title, String body) {
+        if (recordId == null || recordId.isBlank()) throw new IllegalArgumentException("记录 ID 不能为空");
+        JournalCommand command = new JournalCommand(date, title, body == null ? "" : body, "来自记录");
+        validate(ownerId, command);
+        DailyEventRow existing = repository.findBySourceReference(ownerId, "record", recordId).orElse(null);
+        if (existing == null) {
+            String eventId = "record-" + recordId;
+            Instant now = Instant.now();
+            String cleanTitle = title == null || title.isBlank() ? "无标题记录" : title.trim();
+            repository.insertEvent(eventId, ownerId, date, command.eventType(), cleanTitle,
+                    "record", recordId, now);
+            typeRegistry.insert(eventId, command);
+            return;
+        }
+        typeRegistry.update(existing.id(), command);
+        String cleanTitle = title == null || title.isBlank() ? "无标题记录" : title.trim();
+        if (!repository.updateEvent(ownerId, existing.id(), existing.version(), date, cleanTitle, Instant.now())) {
+            throw new IllegalStateException("手记同步时已被其他操作修改，请重试");
+        }
+    }
+
+    /** 移除由记录资料库同步而来的日历手记。 */
+    @Transactional
+    public void removeRecordJournal(String ownerId, String recordId) {
+        repository.findBySourceReference(ownerId, "record", recordId).ifPresent(existing -> {
+            if (!repository.delete(ownerId, existing.id(), existing.version())) {
+                throw new IllegalStateException("手记同步时已被其他操作修改，请重试");
+            }
+        });
+    }
+
     /** 查询某一天的全部日记录。 */
     @Transactional(readOnly = true)
     public DailyDay getDay(String ownerId, LocalDate date) {
