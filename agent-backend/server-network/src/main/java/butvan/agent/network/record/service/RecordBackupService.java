@@ -3,6 +3,7 @@ package butvan.agent.network.record.service;
 import butvan.agent.network.record.model.RecordModels.RecordAttachment;
 import butvan.agent.network.record.model.RecordModels.RecordCommand;
 import butvan.agent.network.record.model.RecordModels.RecordEntry;
+import butvan.agent.network.record.model.RecordModels.RecordTab;
 import butvan.agent.network.record.repository.RecordRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -24,17 +25,18 @@ public class RecordBackupService {
     private final RecordRepository repository;
     private final RecordService recordService;
     private final RecordAttachmentService attachmentService;
+    private final RecordTabService tabService;
     private final ObjectMapper objectMapper;
 
     public record BackupItem(RecordEntry record, List<RecordAttachment> attachments) { }
-    public record BackupManifest(int formatVersion, List<BackupItem> items) { }
+    public record BackupManifest(int formatVersion, List<RecordTab> tabs, List<BackupItem> items) { }
 
     /** 导出完整可恢复清单，并附带人类可读 Markdown 和原始附件。 */
     public byte[] exportBackup(String ownerId) {
         try (ByteArrayOutputStream output = new ByteArrayOutputStream(); ZipOutputStream zip = new ZipOutputStream(output)) {
             List<BackupItem> items = repository.findAll(ownerId).stream()
                     .map(record -> new BackupItem(record, attachmentService.list(ownerId, record.id()))).toList();
-            put(zip, "manifest.json", objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(new BackupManifest(1, items)));
+            put(zip, "manifest.json", objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(new BackupManifest(2, tabService.list(ownerId), items)));
             for (BackupItem item : items) {
                 RecordEntry record = item.record();
                 String title = record.title() == null ? record.contentText().lines().findFirst().orElse("无标题") : record.title();
@@ -59,7 +61,7 @@ public class RecordBackupService {
             byte[] manifestBytes = entries.get("manifest.json");
             if (manifestBytes == null) throw new IllegalArgumentException("备份缺少 manifest.json");
             BackupManifest manifest = objectMapper.readValue(manifestBytes, BackupManifest.class);
-            if (manifest.formatVersion() != 1 || manifest.items() == null) throw new IllegalArgumentException("不支持的备份格式");
+            if ((manifest.formatVersion() != 1 && manifest.formatVersion() != 2) || manifest.items() == null) throw new IllegalArgumentException("不支持的备份格式");
             for (BackupItem item : manifest.items()) {
                 if (item == null || item.record() == null) throw new IllegalArgumentException("备份记录结构不完整");
                 for (RecordAttachment attachment : item.attachments() == null ? List.<RecordAttachment>of() : item.attachments()) {
@@ -69,11 +71,20 @@ public class RecordBackupService {
                 }
             }
             repository.clearAll(ownerId);
+            Map<String, String> tabIds = new HashMap<>();
+            List<RecordTab> currentTabs = tabService.list(ownerId);
+            for (RecordTab sourceTab : manifest.tabs() == null ? List.<RecordTab>of() : manifest.tabs()) {
+                RecordTab target = sourceTab.systemKey() == null
+                        ? currentTabs.stream().filter(tab -> tab.systemKey() == null && tab.name().equals(sourceTab.name())).findFirst()
+                            .orElseGet(() -> tabService.create(ownerId, sourceTab.name()))
+                        : currentTabs.stream().filter(tab -> sourceTab.systemKey().equals(tab.systemKey())).findFirst().orElse(null);
+                if (target != null) tabIds.put(sourceTab.id(), target.id());
+            }
             int imported = 0;
             for (BackupItem item : manifest.items()) {
                 RecordEntry source = item.record();
                 RecordEntry restored = recordService.create(ownerId, new RecordCommand(source.recordDate(), source.type(),
-                        source.title(), source.contentHtml(), source.contentText(), source.tags()));
+                        source.title(), source.contentHtml(), source.contentText(), source.tags(), tabIds.get(source.tabId())));
                 if (source.pinned() || source.favorite() || source.archived()) {
                     restored = recordService.updateFlags(ownerId, restored.id(), restored.version(), source.pinned(), source.favorite(), source.archived());
                 }

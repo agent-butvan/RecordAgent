@@ -7,6 +7,7 @@ import butvan.agent.network.record.repository.RecordRepository;
 import butvan.agent.network.record.service.RecordService;
 import butvan.agent.network.record.service.RecordAttachmentService;
 import butvan.agent.network.record.service.RecordBackupService;
+import butvan.agent.network.record.service.RecordTabService;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
@@ -58,6 +59,18 @@ class RecordApiIntegrationTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(1));
         mockMvc.perform(get("/agent/records/days").param("from", "2026-09-01").param("to", "2026-09-30"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data[0].weeklyReviewCompleted").value(true));
+
+        String tabJson = mockMvc.perform(post("/agent/records/tabs").contentType("application/json")
+                        .content("{\"name\":\"Spring 专题\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.systemKey").isEmpty())
+                .andReturn().getResponse().getContentAsString();
+        String customTabId = new com.fasterxml.jackson.databind.ObjectMapper().readTree(tabJson).path("data").path("id").asText();
+        mockMvc.perform(post("/agent/records").contentType("application/json").content("""
+                {"recordDate":"2026-09-04","type":"learning","title":"Spring 循环依赖",
+                 "contentHtml":"<p>三级缓存</p>","contentText":"三级缓存","tags":[],"tabId":"%s"}
+                """.formatted(customTabId))).andExpect(status().isOk()).andExpect(jsonPath("$.data.tabId").value(customTabId));
+        mockMvc.perform(get("/agent/records").param("from", "2026-09-01").param("to", "2026-09-30").param("tabId", customTabId))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(1));
         mockMvc.perform(delete("/agent/records/" + recordId)
                         .param("expectedVersion", node.path("version").asText()))
                 .andExpect(status().isOk());
@@ -68,7 +81,7 @@ class RecordApiIntegrationTest {
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
         mockMvc.perform(multipart("/agent/records/backup")
                         .file(new MockMultipartFile("file", "backup.zip", "application/zip", backup)))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.data").value(1));
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data").value(2));
         mockMvc.perform(get("/agent/records/trash"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data[0].type").value("weekly_review"));
     }
@@ -81,7 +94,7 @@ class RecordApiIntegrationTest {
     @SpringBootConfiguration
     @EnableAutoConfiguration
     @Import({LocalDatabaseConfiguration.class, RecordRepository.class, RecordService.class,
-            RecordAttachmentService.class, RecordBackupService.class,
+            RecordAttachmentService.class, RecordBackupService.class, RecordTabService.class,
             RecordController.class, ApiExceptionHandler.class, CurrentUserProvider.class})
     static class TestApplication { }
 }

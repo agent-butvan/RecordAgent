@@ -8,6 +8,7 @@ export interface RecordEntry {
   contentHtml: string;
   contentText: string;
   tags: string[];
+  tabId: string | null;
   pinned: boolean;
   favorite: boolean;
   archived: boolean;
@@ -32,6 +33,14 @@ export interface SaveRecordInput {
   contentHtml: string;
   contentText: string;
   tags: string[];
+  tabId?: string;
+}
+
+export interface RecordTab {
+  id: string;
+  name: string;
+  systemKey: string | null;
+  sortOrder: number;
 }
 
 export interface RecordAttachment {

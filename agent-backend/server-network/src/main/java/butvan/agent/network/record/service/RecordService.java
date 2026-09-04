@@ -21,13 +21,14 @@ import java.util.UUID;
 public class RecordService {
     private static final int MAX_CONTENT_LENGTH = 2_000_000;
     private final RecordRepository repository;
+    private final RecordTabService tabService;
 
     /** 查询记录列表。 */
     public List<RecordEntry> search(String ownerId, LocalDate from, LocalDate to,
-                                    String type, String tag, String query) {
+                                    String type, String tag, String query, String tabId) {
         requireRange(from, to);
         if (type != null && !type.isBlank()) RecordType.parse(type);
-        return repository.search(ownerId, from, to, type, tag, query);
+        return repository.search(ownerId, from, to, type, tag, query, tabId);
     }
 
     /** 查询日历摘要。 */
@@ -48,8 +49,9 @@ public class RecordService {
         String id = UUID.randomUUID().toString();
         Instant now = Instant.now();
         WeekBinding week = weekBinding(command);
+        String tabId = tabService.resolve(ownerId, command.tabId(), command.type());
         repository.insert(id, ownerId, command.recordDate(), command.type(), cleanTitle(command.title()),
-                command.contentHtml(), command.contentText(), week.year(), week.number(), now);
+                command.contentHtml(), command.contentText(), tabId, week.year(), week.number(), now);
         repository.replaceTags(ownerId, id, normalizedTags(command.tags()), now);
         return get(ownerId, id);
     }
@@ -59,9 +61,10 @@ public class RecordService {
     public RecordEntry update(String ownerId, String id, int expectedVersion, RecordCommand command) {
         validate(command);
         WeekBinding week = weekBinding(command);
+        String tabId = tabService.resolve(ownerId, command.tabId(), command.type());
         Instant now = Instant.now();
         if (!repository.update(ownerId, id, expectedVersion, command.recordDate(), command.type(),
-                cleanTitle(command.title()), command.contentHtml(), command.contentText(), week.year(), week.number(), now)) {
+                cleanTitle(command.title()), command.contentHtml(), command.contentText(), tabId, week.year(), week.number(), now)) {
             throw new IllegalArgumentException("记录已被修改或不存在，请刷新后重试");
         }
         repository.replaceTags(ownerId, id, normalizedTags(command.tags()), now);

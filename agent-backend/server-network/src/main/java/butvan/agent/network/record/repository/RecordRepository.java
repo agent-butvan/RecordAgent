@@ -4,6 +4,7 @@ import butvan.agent.network.record.model.RecordModels.DaySummary;
 import butvan.agent.network.record.model.RecordModels.RecordEntry;
 import butvan.agent.network.record.model.RecordModels.RecordType;
 import butvan.agent.network.record.model.RecordModels.RecordAttachment;
+import butvan.agent.network.record.model.RecordModels.RecordTab;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -22,7 +23,7 @@ public class RecordRepository {
     private final JdbcTemplate jdbcTemplate;
 
     /** 查询日期范围内的正常记录，可选按类型、标签和正文关键词过滤。 */
-    public List<RecordEntry> search(String ownerId, LocalDate from, LocalDate to, String type, String tag, String query) {
+    public List<RecordEntry> search(String ownerId, LocalDate from, LocalDate to, String type, String tag, String query, String tabId) {
         String like = "%" + (query == null ? "" : query.trim()) + "%";
         return jdbcTemplate.query("""
                 SELECT DISTINCT r.* FROM record_entry r
@@ -30,10 +31,11 @@ public class RecordRepository {
                 LEFT JOIN record_tag t ON t.id = rt.tag_id
                 WHERE r.owner_id = ? AND r.record_date BETWEEN ? AND ? AND r.trashed_at IS NULL
                   AND r.archived = 0 AND (? = '' OR r.record_type = ?)
+                  AND (? = '' OR r.tab_id = ?)
                   AND (? = '' OR t.name = ?) AND (? = '%%' OR r.title LIKE ? OR r.content_text LIKE ?)
                 ORDER BY r.pinned DESC, r.record_date DESC, r.updated_at DESC
                 """, (rs, rowNum) -> map(rs, findTags(rs.getString("id"))), ownerId, from.toString(), to.toString(),
-                safe(type), safe(type), safe(tag), safe(tag), like, like, like);
+                safe(type), safe(type), safe(tabId), safe(tabId), safe(tag), safe(tag), like, like, like);
     }
 
     /** 查询回收站记录。 */
@@ -56,22 +58,22 @@ public class RecordRepository {
 
     /** 插入记录主数据。 */
     public void insert(String id, String ownerId, LocalDate date, RecordType type, String title, String html,
-                       String text, Integer weekYear, Integer weekNumber, Instant now) {
+                       String text, String tabId, Integer weekYear, Integer weekNumber, Instant now) {
         jdbcTemplate.update("""
                 INSERT INTO record_entry (id, owner_id, record_date, record_type, title, content_html, content_text,
-                    week_year, week_number, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, id, ownerId, date.toString(), type.value(), title, html, text, weekYear, weekNumber,
+                    tab_id, week_year, week_number, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, id, ownerId, date.toString(), type.value(), title, html, text, tabId, weekYear, weekNumber,
                 now.toString(), now.toString());
     }
 
     /** 以乐观锁覆盖可编辑内容。 */
     public boolean update(String ownerId, String id, int version, LocalDate date, RecordType type, String title,
-                          String html, String text, Integer weekYear, Integer weekNumber, Instant now) {
+                          String html, String text, String tabId, Integer weekYear, Integer weekNumber, Instant now) {
         return jdbcTemplate.update("""
                 UPDATE record_entry SET record_date = ?, record_type = ?, title = ?, content_html = ?, content_text = ?,
-                    week_year = ?, week_number = ?, version = version + 1, updated_at = ?
+                    tab_id = ?, week_year = ?, week_number = ?, version = version + 1, updated_at = ?
                 WHERE owner_id = ? AND id = ? AND version = ? AND trashed_at IS NULL
-                """, date.toString(), type.value(), title, html, text, weekYear, weekNumber, now.toString(),
+                """, date.toString(), type.value(), title, html, text, tabId, weekYear, weekNumber, now.toString(),
                 ownerId, id, version) == 1;
     }
 
@@ -99,6 +101,26 @@ public class RecordRepository {
 
     /** 导入完整备份前清除当前用户的记录数据。 */
     public int clearAll(String ownerId) { return jdbcTemplate.update("DELETE FROM record_entry WHERE owner_id = ?", ownerId); }
+
+    /** 查询用户全部分类 Tab。 */
+    public List<RecordTab> findTabs(String ownerId) {
+        return jdbcTemplate.query("SELECT id, name, system_key, sort_order FROM record_tab WHERE owner_id = ? ORDER BY sort_order, created_at",
+                (rs, rowNum) -> new RecordTab(rs.getString("id"), rs.getString("name"), rs.getString("system_key"), rs.getInt("sort_order")), ownerId);
+    }
+
+    public Optional<RecordTab> findTab(String ownerId, String tabId) {
+        return findTabs(ownerId).stream().filter(tab -> tab.id().equals(tabId)).findFirst();
+    }
+
+    public void insertTab(String id, String ownerId, String name, String systemKey, int sortOrder, Instant now) {
+        jdbcTemplate.update("INSERT OR IGNORE INTO record_tab (id, owner_id, name, system_key, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                id, ownerId, name, systemKey, sortOrder, now.toString());
+    }
+
+    public boolean deleteCustomTab(String ownerId, String tabId) {
+        jdbcTemplate.update("UPDATE record_entry SET tab_id = NULL WHERE owner_id = ? AND tab_id = ?", ownerId, tabId);
+        return jdbcTemplate.update("DELETE FROM record_tab WHERE owner_id = ? AND id = ? AND system_key IS NULL", ownerId, tabId) == 1;
+    }
 
     /** 保存附件元数据。 */
     public void insertAttachment(RecordAttachment attachment) {
@@ -170,7 +192,7 @@ public class RecordRepository {
         String trashedAt = rs.getString("trashed_at");
         return new RecordEntry(rs.getString("id"), LocalDate.parse(rs.getString("record_date")),
                 RecordType.parse(rs.getString("record_type")), rs.getString("title"), rs.getString("content_html"),
-                rs.getString("content_text"), tags, rs.getBoolean("pinned"), rs.getBoolean("favorite"),
+                rs.getString("content_text"), tags, rs.getString("tab_id"), rs.getBoolean("pinned"), rs.getBoolean("favorite"),
                 rs.getBoolean("archived"), trashedAt == null ? null : Instant.parse(trashedAt),
                 (Integer) rs.getObject("week_year"), (Integer) rs.getObject("week_number"), rs.getInt("version"),
                 Instant.parse(rs.getString("created_at")), Instant.parse(rs.getString("updated_at")));

@@ -3,6 +3,7 @@ package butvan.agent.network.record.dto;
 import butvan.agent.network.record.model.RecordModels.DaySummary;
 import butvan.agent.network.record.model.RecordModels.RecordEntry;
 import butvan.agent.network.record.model.RecordModels.RecordAttachment;
+import butvan.agent.network.record.model.RecordModels.RecordTab;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -15,7 +16,7 @@ public final class RecordDtos {
 
     /** 新建或编辑记录请求。 */
     public record SaveRecordRequest(LocalDate recordDate, String type, String title,
-                                    String contentHtml, String contentText, List<String> tags) {
+                                    String contentHtml, String contentText, List<String> tags, String tabId) {
     }
 
     /** 置顶、收藏和归档状态修改请求；空字段表示保持原值。 */
@@ -25,6 +26,7 @@ public final class RecordDtos {
     /** 记录响应。 */
     public record RecordResponse(String id, LocalDate recordDate, String type, String title,
                                  String contentHtml, String contentText, List<String> tags,
+                                 String tabId,
                                  boolean pinned, boolean favorite, boolean archived, Instant trashedAt,
                                  Integer weekYear, Integer weekNumber, int version,
                                  Instant createdAt, Instant updatedAt) {
@@ -40,7 +42,7 @@ public final class RecordDtos {
 
     public static RecordResponse from(RecordEntry entry) {
         return new RecordResponse(entry.id(), entry.recordDate(), entry.type().value(), entry.title(),
-                entry.contentHtml(), entry.contentText(), entry.tags(), entry.pinned(), entry.favorite(),
+                entry.contentHtml(), entry.contentText(), entry.tags(), entry.tabId(), entry.pinned(), entry.favorite(),
                 entry.archived(), entry.trashedAt(), entry.weekYear(), entry.weekNumber(), entry.version(),
                 entry.createdAt(), entry.updatedAt());
     }
@@ -53,4 +55,8 @@ public final class RecordDtos {
         return new AttachmentResponse(attachment.id(), attachment.recordId(), attachment.originalName(),
                 attachment.mediaType(), attachment.sizeBytes(), attachment.createdAt());
     }
+
+    public record CreateTabRequest(String name) { }
+    public record TabResponse(String id, String name, String systemKey, int sortOrder) { }
+    public static TabResponse from(RecordTab tab) { return new TabResponse(tab.id(), tab.name(), tab.systemKey(), tab.sortOrder()); }
 }

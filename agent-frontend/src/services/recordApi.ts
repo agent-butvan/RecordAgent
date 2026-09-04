@@ -1,5 +1,5 @@
 import { getApiBaseUrl, type ApiResponse } from './api';
-import type { RecordAttachment, RecordDaySummary, RecordEntry, SaveRecordInput } from '../types/record';
+import type { RecordAttachment, RecordDaySummary, RecordEntry, RecordTab, SaveRecordInput } from '../types/record';
 
 async function recordRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${getApiBaseUrl()}${path}`, init);
@@ -16,11 +16,12 @@ const json = (method: string, body?: object): RequestInit => ({
 });
 
 /** 查询日期范围内的记录，筛选条件由后端统一解释。 */
-export function fetchRecords(from: string, to: string, filters: { type?: string; tag?: string; query?: string } = {}) {
+export function fetchRecords(from: string, to: string, filters: { type?: string; tag?: string; query?: string; tabId?: string } = {}) {
   const params = new URLSearchParams({ from, to });
   if (filters.type) params.set('type', filters.type);
   if (filters.tag) params.set('tag', filters.tag);
   if (filters.query) params.set('query', filters.query);
+  if (filters.tabId) params.set('tabId', filters.tabId);
   return recordRequest<RecordEntry[]>(`/agent/records?${params}`);
 }
 
@@ -50,6 +51,10 @@ export function restoreRecord(id: string, version: number) {
   return recordRequest<RecordEntry>(`/agent/records/${encode(id)}/restore?expectedVersion=${version}`, json('POST'));
 }
 export function clearRecordTrash() { return recordRequest<number>('/agent/records/trash', json('DELETE')); }
+
+export function fetchRecordTabs() { return recordRequest<RecordTab[]>('/agent/records/tabs'); }
+export function createRecordTab(name: string) { return recordRequest<RecordTab>('/agent/records/tabs', json('POST', { name })); }
+export function deleteRecordTab(tabId: string) { return recordRequest<string>(`/agent/records/tabs/${encode(tabId)}`, json('DELETE')); }
 
 export function fetchRecordAttachments(recordId: string) {
   return recordRequest<RecordAttachment[]>(`/agent/records/${encode(recordId)}/attachments`);

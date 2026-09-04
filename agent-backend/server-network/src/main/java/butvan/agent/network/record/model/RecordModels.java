@@ -28,12 +28,13 @@ public final class RecordModels {
 
     /** 创建或覆盖记录所需的完整输入。 */
     public record RecordCommand(LocalDate recordDate, RecordType type, String title,
-                                String contentHtml, String contentText, List<String> tags) {
+                                String contentHtml, String contentText, List<String> tags, String tabId) {
     }
 
     /** 一条可展示的记录。 */
     public record RecordEntry(String id, LocalDate recordDate, RecordType type, String title,
                               String contentHtml, String contentText, List<String> tags,
+                              String tabId,
                               boolean pinned, boolean favorite, boolean archived, Instant trashedAt,
                               Integer weekYear, Integer weekNumber, int version,
                               Instant createdAt, Instant updatedAt) {
@@ -47,4 +48,7 @@ public final class RecordModels {
     public record RecordAttachment(String id, String recordId, String originalName, String storedName,
                                    String mediaType, long sizeBytes, Instant createdAt) {
     }
+
+    /** 首页分类 Tab；systemKey 为空时表示用户自定义 Tab。 */
+    public record RecordTab(String id, String name, String systemKey, int sortOrder) { }
 }

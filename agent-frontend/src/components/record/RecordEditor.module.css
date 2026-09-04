@@ -1,26 +1,4 @@
-.editorShell { border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background: #fff; overflow: hidden; }
-.editorHeader { height: 42px; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-bottom: 1px solid var(--border-subtle); background: var(--bg-surface); }
-.editorHeader select, .editorHeader input { height: 28px; border: 1px solid var(--border-medium); border-radius: var(--radius-md); background: #fff; color: var(--text-secondary); padding: 0 8px; font: inherit; font-size: 12px; }
-.editorHeader button { width: 28px; height: 28px; margin-left: auto; display: grid; place-items: center; border: 0; background: transparent; color: var(--text-muted); }
-.titleInput { width: 100%; border: 0; padding: 22px 24px 8px; outline: 0; color: var(--text-primary); font-size: 24px; font-weight: 650; letter-spacing: -.025em; user-select: text; }
-.toolbar { display: flex; gap: 2px; padding: 8px 20px; border-bottom: 1px solid var(--border-subtle); }
-.toolbar button { width: 30px; height: 28px; display: grid; place-items: center; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-secondary); }
-.toolbar button:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
-.content { min-height: 260px; padding: 18px 24px 28px; outline: 0; color: var(--text-primary); font-size: 14px; line-height: 1.75; user-select: text; }
-.content:empty::before { content: attr(data-placeholder); color: var(--text-muted); pointer-events: none; }
-.content h2 { margin: 18px 0 8px; font-size: 19px; }
-.content blockquote { margin: 12px 0; padding-left: 12px; border-left: 1px solid var(--accent-blue); color: var(--text-secondary); }
-.content ul { padding-left: 22px; }
-.tagsInput { width: calc(100% - 48px); margin: 0 24px 12px; padding: 9px 0; border: 0; border-top: 1px solid var(--border-subtle); outline: 0; color: var(--text-secondary); font: inherit; font-size: 12px; user-select: text; }
-.attachments { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 24px 12px; }
-.attachments a, .attachments label { height: 28px; display: inline-flex; align-items: center; gap: 5px; padding: 0 8px; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-secondary); font-size: 11px; text-decoration: none; cursor: pointer; }
-.attachments input { display: none; }
-.attachments .imageAttachment { height: 74px; padding: 5px; flex-direction: column; align-items: flex-start; }
-.imageAttachment img { width: 72px; height: 44px; border-radius: var(--radius-sm); object-fit: cover; }
-.imageAttachment span { max-width: 72px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.footer { min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 12px 8px 20px; border-top: 1px solid var(--border-subtle); color: var(--text-muted); font-size: 11px; }
-.saveButton { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 0; border-radius: var(--radius-md); background: var(--accent-blue); color: #fff; font-weight: 600; }
-.compact .toolbar, .compact .editorHeader { border-bottom-color: #edf0f3; }
-.compact .content { min-height: 86px; padding: 14px 18px; }
-.compact .footer { border-top: 0; }
-@media (max-width: 800px) { .titleInput { font-size: 20px; } .content { min-height: 220px; } }
+.metaControls { display: flex; align-items: center; gap: 14px; }.metaControls select, .metaControls input { width: auto; }
+.details { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--border-subtle); }.tagsInput { width: 100%; padding: 8px 0; border: 0; outline: 0; background: transparent; color: var(--text-secondary); font: inherit; font-size: 12px; user-select: text; }
+.attachments { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }.attachments a, .attachments label { min-height: 30px; display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-secondary); font-size: 11px; text-decoration: none; cursor: pointer; }.attachments input { display: none; }.attachments img { width: 42px; height: 32px; border-radius: var(--radius-sm); object-fit: cover; }.attachments span { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width:760px) { .metaControls { flex-wrap: wrap; gap: 8px; } }

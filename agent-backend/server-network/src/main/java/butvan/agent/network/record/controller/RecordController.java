@@ -13,6 +13,7 @@ import butvan.agent.network.record.model.RecordModels.RecordType;
 import butvan.agent.network.record.service.RecordService;
 import butvan.agent.network.record.service.RecordAttachmentService;
 import butvan.agent.network.record.service.RecordBackupService;
+import butvan.agent.network.record.service.RecordTabService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.core.io.Resource;
@@ -35,14 +36,16 @@ public class RecordController {
     private final CurrentUserProvider currentUserProvider;
     private final RecordAttachmentService attachmentService;
     private final RecordBackupService backupService;
+    private final RecordTabService tabService;
 
     @ApiLog("查询记录列表")
     @GetMapping
     public Result<List<RecordResponse>> list(@RequestParam LocalDate from, @RequestParam LocalDate to,
                                             @RequestParam(required = false) String type,
                                             @RequestParam(required = false) String tag,
-                                            @RequestParam(required = false) String query) {
-        return Result.success(recordService.search(owner(), from, to, type, tag, query).stream().map(RecordDtos::from).toList());
+                                            @RequestParam(required = false) String query,
+                                            @RequestParam(required = false) String tabId) {
+        return Result.success(recordService.search(owner(), from, to, type, tag, query, tabId).stream().map(RecordDtos::from).toList());
     }
 
     @ApiLog("查询记录日历摘要")
@@ -145,8 +148,27 @@ public class RecordController {
     private RecordCommand command(SaveRecordRequest request) {
         return new RecordCommand(request.recordDate(), RecordType.parse(request.type()), request.title(),
                 request.contentHtml() == null ? "" : request.contentHtml(),
-                request.contentText() == null ? "" : request.contentText(), request.tags());
+                request.contentText() == null ? "" : request.contentText(), request.tags(), request.tabId());
     }
 
     private String owner() { return currentUserProvider.currentUserId(); }
+
+    @ApiLog("查询记录分类 Tab")
+    @GetMapping("/tabs")
+    public Result<List<RecordDtos.TabResponse>> tabs() {
+        return Result.success(tabService.list(owner()).stream().map(RecordDtos::from).toList());
+    }
+
+    @ApiLog("创建自定义记录分类 Tab")
+    @PostMapping("/tabs")
+    public Result<RecordDtos.TabResponse> createTab(@RequestBody RecordDtos.CreateTabRequest request) {
+        return Result.success(RecordDtos.from(tabService.create(owner(), request.name())));
+    }
+
+    @ApiLog("删除自定义记录分类 Tab")
+    @DeleteMapping("/tabs/{tabId}")
+    public Result<String> deleteTab(@PathVariable String tabId) {
+        tabService.delete(owner(), tabId);
+        return Result.success("Tab 已删除");
+    }
 }
