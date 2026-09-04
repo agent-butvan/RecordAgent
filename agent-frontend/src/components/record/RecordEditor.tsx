@@ -8,6 +8,7 @@ import styles from './RecordEditor.module.css';
 interface Props {
   date: string;
   entry?: RecordEntry | null;
+  initialType?: RecordType;
   compact?: boolean;
   saving: boolean;
   onSave: (input: SaveRecordInput) => Promise<void>;
@@ -24,10 +25,10 @@ function sanitizeHtml(html: string) {
 }
 
 /** 飞书风格轻量富文本编辑器；快速入口与完整编辑共用同一保存模型。 */
-export function RecordEditor({ date, entry, compact = false, saving, onSave, onClose }: Props) {
+export function RecordEditor({ date, entry, initialType = 'quick', compact = false, saving, onSave, onClose }: Props) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [title, setTitle] = useState(entry?.title ?? '');
-  const [type, setType] = useState<RecordType>(entry?.type ?? 'quick');
+  const [type, setType] = useState<RecordType>(entry?.type ?? initialType);
   const [recordDate, setRecordDate] = useState(entry?.recordDate ?? date);
   const [tags, setTags] = useState(entry?.tags.join('，') ?? '');
   const [error, setError] = useState('');
@@ -51,18 +52,14 @@ export function RecordEditor({ date, entry, compact = false, saving, onSave, onC
     const contentText = editorRef.current?.innerText.trim() ?? '';
     if (!title.trim() && !contentText) { setError('写下一点内容后再保存'); return; }
     setError('');
-    await onSave({
-      recordDate,
-      type,
-      title: title.trim() || undefined,
-      contentHtml,
-      contentText,
-      tags: tags.split(/[，,]/).map((item) => item.trim()).filter(Boolean),
-    });
-    if (compact) {
-      if (editorRef.current) editorRef.current.innerHTML = '';
-      setTitle(''); setTags(''); setType('quick');
-    }
+    try {
+      await onSave({ recordDate, type, title: title.trim() || undefined, contentHtml, contentText,
+        tags: tags.split(/[，,]/).map((item) => item.trim()).filter(Boolean) });
+      if (compact) {
+        if (editorRef.current) editorRef.current.innerHTML = '';
+        setTitle(''); setTags(''); setType('quick');
+      }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : '保存失败，请重试'); }
   };
 
   return (
@@ -76,11 +73,11 @@ export function RecordEditor({ date, entry, compact = false, saving, onSave, onC
       </div>
       {!compact && <input className={styles.titleInput} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="标题（可选）" />}
       <div className={styles.toolbar} aria-label="正文格式">
-        <button type="button" onClick={() => format('bold')} title="粗体"><Bold size={15} /></button>
-        <button type="button" onClick={() => format('italic')} title="斜体"><Italic size={15} /></button>
-        <button type="button" onClick={() => format('formatBlock', 'h2')} title="标题"><Heading2 size={15} /></button>
-        <button type="button" onClick={() => format('insertUnorderedList')} title="列表"><List size={15} /></button>
-        <button type="button" onClick={() => format('formatBlock', 'blockquote')} title="引用"><Quote size={15} /></button>
+        <button type="button" onMouseDown={(event) => { event.preventDefault(); format('bold'); }} title="粗体"><Bold size={15} /></button>
+        <button type="button" onMouseDown={(event) => { event.preventDefault(); format('italic'); }} title="斜体"><Italic size={15} /></button>
+        <button type="button" onMouseDown={(event) => { event.preventDefault(); format('formatBlock', 'h2'); }} title="标题"><Heading2 size={15} /></button>
+        <button type="button" onMouseDown={(event) => { event.preventDefault(); format('insertUnorderedList'); }} title="列表"><List size={15} /></button>
+        <button type="button" onMouseDown={(event) => { event.preventDefault(); format('formatBlock', 'blockquote'); }} title="引用"><Quote size={15} /></button>
       </div>
       <div ref={editorRef} className={styles.content} contentEditable suppressContentEditableWarning data-placeholder={compact ? '记下此刻的想法…' : '开始写作…'} />
       {!compact && entry && <div className={styles.attachments}>
