@@ -443,14 +443,12 @@
 .summaryLine .scheduleSummary svg, .summaryLine .scheduleSummary strong { color: #3f638f; }
 
 .summaryLine .expenseSummary strong,
-.expenseText,
-.expenseAmount {
+.expenseText {
   color: #a64b43;
 }
 
 .summaryLine .incomeSummary strong,
-.incomeText,
-.incomeAmount {
+.incomeText {
   color: #31725a;
 }
 
@@ -490,8 +488,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-.scheduleList,
-.cashflowList {
+.scheduleList {
   display: flex;
   flex-direction: column;
 }
@@ -505,8 +502,7 @@
   border-bottom: 1px solid var(--border-subtle);
 }
 
-.scheduleItem:last-child,
-.cashflowItem:last-child {
+.scheduleItem:last-child {
   padding-bottom: 0;
   border-bottom: none;
 }
@@ -550,68 +546,6 @@
   font-size: 10px;
 }
 
-.cashflowItem {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.cashflowIcon {
-  width: 24px;
-  height: 24px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  border-radius: var(--radius-sm);
-  background: #eef1f5;
-  color: var(--text-secondary);
-  font-size: 10px;
-  font-weight: 650;
-}
-
-.expenseIconTone {
-  background: #faf0ef;
-  color: #93443d;
-}
-
-.incomeIconTone {
-  background: #edf6f1;
-  color: #31725a;
-}
-
-.cashflowBody {
-  min-width: 0;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  font-size: 12px;
-  line-height: 1.35;
-}
-
-.cashflowBody small {
-  overflow: hidden;
-  margin-top: 2px;
-  color: var(--text-muted);
-  font-size: 10px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.expenseAmount {
-  font-size: 11px;
-  font-weight: 650;
-  font-variant-numeric: tabular-nums;
-}
-
-.incomeAmount {
-  font-size: 11px;
-  font-weight: 650;
-  font-variant-numeric: tabular-nums;
-}
-
 .cashflowTotals {
   margin-left: auto;
   display: inline-flex;
@@ -622,6 +556,48 @@
 
 .cashflowTotals b {
   font-weight: 600;
+}
+
+.cashflowDialogSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.cashflowDialogSummary span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cashflowDialogSummary strong {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.cashflowDialogList {
+  max-height: min(58vh, 520px);
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-color: var(--border-medium) transparent;
+  scrollbar-width: thin;
+}
+
+.cashflowDialogList::-webkit-scrollbar {
+  width: 6px;
+}
+
+.cashflowDialogList::-webkit-scrollbar-thumb {
+  border-radius: var(--radius-sm);
+  background: var(--border-medium);
 }
 
 .journal {

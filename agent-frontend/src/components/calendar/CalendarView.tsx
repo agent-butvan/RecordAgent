@@ -28,6 +28,7 @@ import { Modal } from '../common/Modal';
 import { TopBar } from '../common/TopBar';
 import { CalendarDayPreview } from './CalendarDayPreview';
 import { CalendarQuickCreate } from './CalendarQuickCreate';
+import { DailyCashflowList } from './DailyCashflowList';
 import { DailyRecordDeleteButton } from './DailyRecordDeleteButton';
 import { DailyTodoList } from './DailyTodoList';
 import { JournalEditorPage } from './JournalEditorPage';
@@ -103,6 +104,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenFinance }) => 
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isCashflowModalOpen, setIsCashflowModalOpen] = useState(false);
 
   const days = useMemo(() => {
     const firstOfMonth = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
@@ -123,10 +125,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenFinance }) => 
   const selectedEntry = entries[selectedKey] ?? EMPTY_ENTRY;
   const selectedJournals = selectedEntry.journals ?? (selectedEntry.journal ? [selectedEntry.journal] : []);
   const completedCount = selectedEntry.todos.filter((todo) => todo.completed).length;
-  const selectedCashflows = [
-    ...selectedEntry.expenses.map((record) => ({ ...record, transactionType: 'expense' as const })),
-    ...selectedEntry.incomes.map((record) => ({ ...record, transactionType: 'income' as const })),
-  ].sort((left, right) => left.time.localeCompare(right.time));
+  const selectedCashflowCount = selectedEntry.expenses.length + selectedEntry.incomes.length;
   const hasDailyRecord = Boolean(
     selectedEntry.todos.length
     || selectedEntry.expenses.length
@@ -482,17 +481,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenFinance }) => 
                     <b className={styles.incomeText}>收入 ¥{totalIncome(selectedEntry).toFixed(2)}</b>
                   </span>
                 </div>
-                {selectedCashflows.length ? <div className={styles.cashflowList}>
-                  {selectedCashflows.map((record) => {
-                    const isExpense = record.transactionType === 'expense';
-                    return <div key={`${record.transactionType}-${record.id}`} className={styles.cashflowItem}>
-                      <span className={`${styles.cashflowIcon} ${isExpense ? styles.expenseIconTone : styles.incomeIconTone}`}>{record.category.slice(0, 1)}</span>
-                      <span className={styles.cashflowBody}><strong>{record.category}</strong><small>{record.note} · {record.time}</small></span>
-                      <strong className={isExpense ? styles.expenseAmount : styles.incomeAmount}>{isExpense ? '-' : '+'}¥{record.amount.toFixed(2)}</strong>
-                      {isExpense && record.source !== 'finance' && <DailyRecordDeleteButton label={`花销“${record.category}”`} onDelete={() => requestDelete(record, '花销', record.category)} />}
-                    </div>;
-                  })}
-                </div> : <p className={styles.emptyText}>没有收支记录。</p>}
+                {selectedCashflowCount ? (
+                  <DailyCashflowList
+                    expenses={selectedEntry.expenses}
+                    incomes={selectedEntry.incomes}
+                    maxItems={3}
+                    onViewAll={() => setIsCashflowModalOpen(true)}
+                    onDeleteExpense={(record) => requestDelete(record, '花销', record.category)}
+                  />
+                ) : <p className={styles.emptyText}>没有收支记录。</p>}
               </section>
 
               {(selectedJournals.length > 0 || selectedEntry.photos.length > 0) && <section className={styles.recordSection}>
@@ -535,6 +532,25 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenFinance }) => 
           </div>
         </div>
       </div>
+      <Modal
+        open={isCashflowModalOpen}
+        title="当日收支明细"
+        onClose={() => setIsCashflowModalOpen(false)}
+        width={560}
+        centered
+      >
+        <div className={styles.cashflowDialogSummary}>
+          <span>{selectedLabel}</span>
+          <strong>共 {selectedCashflowCount} 条</strong>
+        </div>
+        <div className={styles.cashflowDialogList}>
+          <DailyCashflowList
+            expenses={selectedEntry.expenses}
+            incomes={selectedEntry.incomes}
+            onDeleteExpense={(record) => requestDelete(record, '花销', record.category)}
+          />
+        </div>
+      </Modal>
       <Modal
         open={deleteTarget !== null}
         title={`删除${deleteTarget?.kind ?? '记录'}？`}
