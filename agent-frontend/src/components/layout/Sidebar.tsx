@@ -17,6 +17,7 @@ import {
   Settings,
   CalendarDays,
   WalletCards,
+  LibraryBig,
 } from 'lucide-react';
 import type { ChatSession, Project } from '../../types/chat';
 import { FormField } from '../common/FormField';
@@ -76,8 +77,8 @@ function sortByUpdatedDesc(a: ChatSession, b: ChatSession): number {
 }
 
 interface SidebarProps {
-  activeFeature: 'chat' | 'calendar' | 'finance';
-  onSelectFeature: (feature: 'chat' | 'calendar' | 'finance') => void;
+  activeFeature: 'chat' | 'calendar' | 'finance' | 'record';
+  onSelectFeature: (feature: 'chat' | 'calendar' | 'finance' | 'record') => void;
   /** 用户头像 URL；未配置时使用邮箱前两位作为默认头像 */
   avatarUrl?: string;
   projects: Project[];
@@ -431,6 +432,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <WalletCards size={14} />
             <span>财务</span>
+          </button>
+          <button
+            type="button"
+            className={`${styles.featureTab} ${activeFeature === 'record' ? styles.featureTabActive : ''}`}
+            onClick={() => onSelectFeature('record')}
+            aria-current={activeFeature === 'record' ? 'page' : undefined}
+          >
+            <LibraryBig size={14} />
+            <span>记录</span>
           </button>
         </nav>
 

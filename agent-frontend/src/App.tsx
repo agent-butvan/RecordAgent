@@ -4,6 +4,7 @@ import { Sidebar } from './components/layout/Sidebar';
 import { ChatWorkspace } from './components/chat/ChatWorkspace';
 import { CalendarView } from './components/calendar/CalendarView';
 import { FinancePage } from './components/finance/FinancePage';
+import { RecordPage } from './components/record/RecordPage';
 import { ModelSettingsPage } from './components/model/ModelSettingsPage';
 import { ModelInitPage } from './components/model/ModelInitPage';
 import { MessageProvider } from './components/common/Message';
@@ -74,7 +75,7 @@ export const MainLayout: React.FC<{
   const [projects, setProjects] = useState<Project[]>([]);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string>('');
-  const [activeFeature, setActiveFeature] = useState<'chat' | 'calendar' | 'finance'>('chat');
+  const [activeFeature, setActiveFeature] = useState<'chat' | 'calendar' | 'finance' | 'record'>('chat');
   const [pendingPermission, setPendingPermission] = useState<{
     sessionId: string;
     assistantMessageId: string;
@@ -773,6 +774,8 @@ export const MainLayout: React.FC<{
             <CalendarView onOpenFinance={() => setActiveFeature('finance')} />
           ) : activeFeature === 'finance' ? (
             <FinancePage />
+          ) : activeFeature === 'record' ? (
+            <RecordPage />
           ) : (
             <ChatWorkspace
               messages={activeMessages}
