@@ -151,6 +151,12 @@ public class RecordRepository {
                 id, ownerId, name, systemKey, sortOrder, now.toString());
     }
 
+    /** 更新当前用户指定 Tab 的展示顺序。 */
+    public boolean updateTabSortOrder(String ownerId, String tabId, int sortOrder) {
+        return jdbcTemplate.update("UPDATE record_tab SET sort_order = ? WHERE owner_id = ? AND id = ?",
+                sortOrder, ownerId, tabId) == 1;
+    }
+
     public boolean deleteCustomTab(String ownerId, String tabId) {
         jdbcTemplate.update("UPDATE record_entry SET tab_id = NULL WHERE owner_id = ? AND tab_id = ?", ownerId, tabId);
         return jdbcTemplate.update("DELETE FROM record_tab WHERE owner_id = ? AND id = ? AND system_key IS NULL", ownerId, tabId) == 1;

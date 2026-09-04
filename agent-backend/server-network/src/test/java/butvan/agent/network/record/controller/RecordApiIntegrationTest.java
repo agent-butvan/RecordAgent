@@ -26,6 +26,7 @@ import org.springframework.mock.web.MockMultipartFile;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -93,6 +94,25 @@ class RecordApiIntegrationTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data").value(1));
         mockMvc.perform(get("/agent/records/trash"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(0));
+    }
+
+    @Test
+    void reordersAllRecordTabsAndPersistsTheResult() throws Exception {
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        var originalTabs = mapper.readTree(mockMvc.perform(get("/agent/records/tabs"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).path("data");
+        var reversedIds = new ArrayList<String>();
+        for (int index = originalTabs.size() - 1; index >= 0; index--) reversedIds.add(originalTabs.get(index).path("id").asText());
+
+        mockMvc.perform(put("/agent/records/tabs/order").contentType("application/json")
+                        .content(mapper.writeValueAsString(java.util.Map.of("tabIds", reversedIds))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value(reversedIds.getFirst()));
+
+        mockMvc.perform(get("/agent/records/tabs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value(reversedIds.getFirst()))
+                .andExpect(jsonPath("$.data[0].sortOrder").value(10));
     }
 
     @Test

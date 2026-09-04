@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent, type KeyboardEvent } from 'react';
 import { Check, Download, FileText, Heart, Plus, RotateCcw, Search, Trash2, Upload, X } from 'lucide-react';
 import { clearRecordTrash, createRecord, createRecordTab, deleteRecordTab, exportRecordBackup, fetchRecords,
-  fetchRecordTabs, fetchRecordTrash, importRecordBackup, restoreRecord, trashRecord, updateRecord, updateRecordFlags } from '../../services/recordApi';
+  fetchRecordTabs, fetchRecordTrash, importRecordBackup, reorderRecordTabs, restoreRecord, trashRecord, updateRecord, updateRecordFlags } from '../../services/recordApi';
 import type { RecordEntry, RecordTab, RecordType, SaveRecordInput } from '../../types/record';
 import { RecordEditor } from './RecordEditor';
 import { RECORD_TYPES } from './recordTypes';
+import { Button } from '../common/Button';
 import { useMessage } from '../common/Message';
+import { Modal } from '../common/Modal';
 import styles from './RecordPage.module.css';
 
 const TYPE_LABELS = Object.fromEntries(RECORD_TYPES.map((item) => [item.value, item.label])) as Record<RecordType, string>;
@@ -39,7 +41,13 @@ export function RecordPage() {
   const [summaryCopy, setSummaryCopy] = useState(() => localStorage.getItem(SUMMARY_COPY_KEY) || DEFAULT_SUMMARY_COPY);
   const [summaryDraft, setSummaryDraft] = useState(summaryCopy);
   const [editingSummaryCopy, setEditingSummaryCopy] = useState(false);
-  const [newTabName, setNewTabName] = useState<string | null>(null);
+  const [newTabName, setNewTabName] = useState('');
+  const [isNewTabModalOpen, setIsNewTabModalOpen] = useState(false);
+  const [creatingTab, setCreatingTab] = useState(false);
+  const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
+  const [dragOverTabId, setDragOverTabId] = useState<string | null>(null);
+  const [reorderingTabs, setReorderingTabs] = useState(false);
+  const newTabInputRef = useRef<HTMLInputElement>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [trashEntries, setTrashEntries] = useState<RecordEntry[] | null>(null);
@@ -56,6 +64,11 @@ export function RecordPage() {
     finally { setLoading(false); }
   }, [query, range.from, range.to, showMessage]);
   useEffect(() => { const timer = window.setTimeout(() => void load(), query ? 250 : 0); return () => window.clearTimeout(timer); }, [load, query]);
+  useEffect(() => {
+    if (!isNewTabModalOpen) return;
+    const frame = window.requestAnimationFrame(() => newTabInputRef.current?.focus());
+    return () => window.cancelAnimationFrame(frame);
+  }, [isNewTabModalOpen]);
 
   const activeTab = tabs.find((tab) => tab.id === activeTabId);
   const visibleRecords = activeTabId === 'all' ? records : records.filter((entry) => entry.tabId === activeTabId);
@@ -99,6 +112,68 @@ export function RecordPage() {
     }
   };
 
+  const closeNewTabModal = () => {
+    if (creatingTab) return;
+    setIsNewTabModalOpen(false);
+    setNewTabName('');
+  };
+
+  const submitNewTab = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const name = newTabName.trim();
+    if (!name || creatingTab) return;
+    setCreatingTab(true);
+    try {
+      const tab = await createRecordTab(name);
+      setIsNewTabModalOpen(false);
+      setNewTabName('');
+      await load();
+      setActiveTabId(tab.id);
+      showMessage('success', 'Tab 已创建');
+    } catch (reason) {
+      showMessage('error', reason instanceof Error ? reason.message : 'Tab 创建失败');
+    } finally {
+      setCreatingTab(false);
+    }
+  };
+
+  const persistTabOrder = async (nextTabs: RecordTab[], previousTabs: RecordTab[]) => {
+    setTabs(nextTabs);
+    setReorderingTabs(true);
+    try {
+      setTabs(await reorderRecordTabs(nextTabs.map((tab) => tab.id)));
+    } catch (reason) {
+      setTabs(previousTabs);
+      showMessage('error', reason instanceof Error ? reason.message : 'Tab 排序保存失败');
+    } finally {
+      setReorderingTabs(false);
+    }
+  };
+
+  const moveTab = (tabId: string, targetIndex: number) => {
+    if (reorderingTabs) return;
+    const sourceIndex = tabs.findIndex((tab) => tab.id === tabId);
+    if (sourceIndex < 0 || targetIndex < 0 || targetIndex >= tabs.length || sourceIndex === targetIndex) return;
+    const nextTabs = [...tabs];
+    const [movedTab] = nextTabs.splice(sourceIndex, 1);
+    nextTabs.splice(targetIndex, 0, movedTab);
+    void persistTabOrder(nextTabs, tabs);
+  };
+
+  const handleTabDrop = (event: DragEvent<HTMLButtonElement>, targetId: string) => {
+    event.preventDefault();
+    if (draggedTabId) moveTab(draggedTabId, tabs.findIndex((tab) => tab.id === targetId));
+    setDraggedTabId(null);
+    setDragOverTabId(null);
+  };
+
+  const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, tabId: string) => {
+    if (!event.altKey || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return;
+    event.preventDefault();
+    const currentIndex = tabs.findIndex((tab) => tab.id === tabId);
+    moveTab(tabId, currentIndex + (event.key === 'ArrowLeft' ? -1 : 1));
+  };
+
   if (editing) return <RecordEditor date={editing.entry?.recordDate ?? todayKey} entry={editing.entry}
     initialType={editing.entry?.type ?? editing.type} initialTabId={editing.entry?.tabId ?? editing.tabId}
     tabs={tabs} saving={saving} onSave={save} onBack={() => setEditing(null)} />;
@@ -137,12 +212,14 @@ export function RecordPage() {
         </div>
         <nav className={styles.tabs} aria-label="资料分类">
           <button className={activeTabId === 'all' ? styles.activeTab : ''} onClick={() => setActiveTabId('all')}>全部</button>
-          {tabs.map((tab) => <button key={tab.id} className={activeTabId === tab.id ? styles.activeTab : ''} onClick={() => setActiveTabId(tab.id)}>{tab.name}</button>)}
-          {newTabName === null ? <button className={styles.addTab} onClick={() => setNewTabName('')}><Plus size={13} />新建 Tab</button> :
-            <form className={styles.newTabForm} onSubmit={async (event) => { event.preventDefault(); if (!newTabName.trim()) return; try { const tab = await createRecordTab(newTabName); setNewTabName(null); await load(); setActiveTabId(tab.id); } catch (reason) { showMessage('error', reason instanceof Error ? reason.message : 'Tab 创建失败'); } }}>
-              <input value={newTabName} onChange={(event) => setNewTabName(event.target.value)} placeholder="Tab 名称" autoFocus maxLength={20} />
-              <button type="submit">创建</button><button type="button" onClick={() => setNewTabName(null)}><X size={13} /></button>
-            </form>}
+          {tabs.map((tab) => <button key={tab.id} draggable={!reorderingTabs}
+            className={`${styles.tabButton} ${activeTabId === tab.id ? styles.activeTab : ''} ${draggedTabId === tab.id ? styles.draggingTab : ''} ${dragOverTabId === tab.id && draggedTabId !== tab.id ? styles.dragTarget : ''}`}
+            aria-label={`${tab.name}，可拖拽排序`} title="拖拽排序；也可按 Alt + 左右方向键调整"
+            onClick={() => setActiveTabId(tab.id)} onKeyDown={(event) => handleTabKeyDown(event, tab.id)}
+            onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', tab.id); setDraggedTabId(tab.id); }}
+            onDragEnter={() => setDragOverTabId(tab.id)} onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; }}
+            onDrop={(event) => handleTabDrop(event, tab.id)} onDragEnd={() => { setDraggedTabId(null); setDragOverTabId(null); }}>{tab.name}</button>)}
+          <button className={styles.addTab} onClick={() => setIsNewTabModalOpen(true)}><Plus size={13} />新建 Tab</button>
         </nav>
 
         <div className={styles.recordList}>{loading ? <div className={styles.empty}>正在加载…</div> : visibleRecords.length ? visibleRecords.map((entry) => <article key={entry.id} className={styles.recordRow} onClick={() => setEditing({ entry, type: entry.type })} tabIndex={0}>
@@ -159,5 +236,17 @@ export function RecordPage() {
 
     {trashEntries && <div className={styles.trashPage}><div className={styles.trashHeader}><div><h2>回收站</h2><span>{trashEntries.length} 条资料</span></div><div>{trashEntries.length > 0 && <button type="button" className={confirmClearTrash ? styles.confirmClear : ''} disabled={clearingTrash} onClick={() => void clearTrash()}>{clearingTrash ? '清空中…' : confirmClearTrash ? '确认清空' : '清空'}</button>}<button type="button" disabled={clearingTrash} onClick={() => { setConfirmClearTrash(false); setTrashEntries(null); }} aria-label="关闭回收站"><X size={16} /></button></div></div>
       <div className={styles.trashList}>{trashEntries.length ? trashEntries.map((entry) => <article key={entry.id}><div><strong>{displayTitle(entry)}</strong><span>{entry.recordDate}</span></div><button onClick={async () => { await restoreRecord(entry.id, entry.version); setTrashEntries(await fetchRecordTrash()); await load(); }}><RotateCcw size={14} />恢复</button></article>) : <div className={styles.empty}>回收站是空的</div>}</div></div>}
+    <Modal open={isNewTabModalOpen} title="新建 Tab" onClose={closeNewTabModal} width={420} centered>
+      <form className={styles.newTabDialog} onSubmit={submitNewTab}>
+        <label htmlFor="new-record-tab">Tab 名称</label>
+        <input ref={newTabInputRef} id="new-record-tab" value={newTabName} onChange={(event) => setNewTabName(event.target.value)}
+          placeholder="例如：项目复盘" maxLength={20} required disabled={creatingTab} />
+        <span className={styles.inputHint}>最多 20 个字符</span>
+        <div className={styles.dialogActions}>
+          <Button type="button" variant="outline" onClick={closeNewTabModal} disabled={creatingTab}>取消</Button>
+          <Button type="submit" variant="primary" disabled={!newTabName.trim() || creatingTab}>{creatingTab ? '创建中…' : '创建'}</Button>
+        </div>
+      </form>
+    </Modal>
   </main>;
 }

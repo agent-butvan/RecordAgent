@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
 
@@ -45,6 +46,25 @@ public class RecordTabService {
     /** 仅允许删除自定义 Tab，其中记录回到“全部”视图。 */
     public void delete(String ownerId, String tabId) {
         if (!repository.deleteCustomTab(ownerId, tabId)) throw new IllegalArgumentException("系统 Tab 不可删除或 Tab 不存在");
+    }
+
+    /** 按客户端提交的完整 ID 序列持久化 Tab 顺序，避免遗漏或越权修改。 */
+    @Transactional
+    public List<RecordTab> reorder(String ownerId, List<String> tabIds) {
+        List<RecordTab> currentTabs = list(ownerId);
+        if (tabIds == null || tabIds.size() != currentTabs.size()) {
+            throw new IllegalArgumentException("Tab 排序数据不完整，请刷新后重试");
+        }
+        var currentIds = currentTabs.stream().map(RecordTab::id).collect(java.util.stream.Collectors.toSet());
+        if (new HashSet<>(tabIds).size() != tabIds.size() || !currentIds.equals(new HashSet<>(tabIds))) {
+            throw new IllegalArgumentException("Tab 排序数据无效，请刷新后重试");
+        }
+        for (int index = 0; index < tabIds.size(); index++) {
+            if (!repository.updateTabSortOrder(ownerId, tabIds.get(index), (index + 1) * 10)) {
+                throw new IllegalArgumentException("Tab 不存在，请刷新后重试");
+            }
+        }
+        return repository.findTabs(ownerId);
     }
 
     /** 校验显式 Tab，未提供时根据记录类型选择系统默认 Tab。 */

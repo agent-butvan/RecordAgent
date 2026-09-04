@@ -165,6 +165,16 @@ public class RecordController {
         return Result.success(RecordDtos.from(tabService.create(owner(), request.name())));
     }
 
+    /**
+     * PUT /agent/records/tabs/order：接收当前用户全部 Tab ID 的有序列表并返回排序后的 Tab；
+     * ID 缺失、重复或不属于当前用户时返回业务码 400，仅可修改当前登录用户的数据。
+     */
+    @ApiLog("调整记录分类 Tab 顺序")
+    @PutMapping("/tabs/order")
+    public Result<List<RecordDtos.TabResponse>> reorderTabs(@RequestBody RecordDtos.ReorderTabsRequest request) {
+        return Result.success(tabService.reorder(owner(), request.tabIds()).stream().map(RecordDtos::from).toList());
+    }
+
     @ApiLog("删除自定义记录分类 Tab")
     @DeleteMapping("/tabs/{tabId}")
     public Result<String> deleteTab(@PathVariable String tabId) {

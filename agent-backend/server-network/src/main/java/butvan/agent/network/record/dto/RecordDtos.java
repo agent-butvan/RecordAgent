@@ -58,6 +58,8 @@ public final class RecordDtos {
     }
 
     public record CreateTabRequest(String name) { }
+    /** Tab 排序请求；必须包含当前用户的全部 Tab ID，顺序即展示顺序。 */
+    public record ReorderTabsRequest(List<String> tabIds) { }
     public record TabResponse(String id, String name, String systemKey, int sortOrder) { }
     public static TabResponse from(RecordTab tab) { return new TabResponse(tab.id(), tab.name(), tab.systemKey(), tab.sortOrder()); }
 }

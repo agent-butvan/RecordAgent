@@ -54,6 +54,9 @@ export function clearRecordTrash() { return recordRequest<number>('/agent/record
 
 export function fetchRecordTabs() { return recordRequest<RecordTab[]>('/agent/records/tabs'); }
 export function createRecordTab(name: string) { return recordRequest<RecordTab>('/agent/records/tabs', json('POST', { name })); }
+export function reorderRecordTabs(tabIds: string[]) {
+  return recordRequest<RecordTab[]>('/agent/records/tabs/order', json('PUT', { tabIds }));
+}
 export function deleteRecordTab(tabId: string) { return recordRequest<string>(`/agent/records/tabs/${encode(tabId)}`, json('DELETE')); }
 
 export function fetchRecordAttachments(recordId: string) {
