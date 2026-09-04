@@ -8,12 +8,10 @@
   align-items: center;
   gap: 9px;
   padding: 10px 0;
-  border-bottom: 1px solid var(--border-subtle);
 }
 
 .item:last-child {
   padding-bottom: 0;
-  border-bottom: none;
 }
 
 .icon {
