@@ -7,6 +7,7 @@ import butvan.agent.network.daily.model.DailyEventModels.ExpenseCommand;
 import butvan.agent.network.daily.model.DailyEventModels.JournalCommand;
 import butvan.agent.network.daily.model.DailyEventModels.JournalDetails;
 import butvan.agent.network.daily.model.DailyEventModels.ScheduleCommand;
+import butvan.agent.network.daily.model.DailyEventModels.ScheduleDetails;
 import butvan.agent.network.daily.model.DailyEventModels.TodoCommand;
 import butvan.agent.network.daily.model.DailyEventModels.TodoDetails;
 import org.junit.jupiter.api.Test;
@@ -100,6 +101,66 @@ class DailyEventServiceIntegrationTest {
     }
 
     @Test
+    void recurringTodosShareCompletionWithinTheirConfiguredPeriod() {
+        LocalDate start = LocalDate.of(2026, 9, 1);
+        DailyEvent daily = dailyEventService.create(
+                "recurring-user", new TodoCommand(start, "学习一个知识点", null, "medium", "daily"));
+        DailyEvent weekly = dailyEventService.create(
+                "recurring-user", new TodoCommand(start, "完成一次复盘", null, "high", "weekly"));
+        DailyEvent monthly = dailyEventService.create(
+                "recurring-user", new TodoCommand(start, "读完一本书", null, "low", "monthly"));
+
+        LocalDate wednesday = LocalDate.of(2026, 9, 2);
+        DailyEvent completedWeekly = dailyEventService.setTodoCompleted(
+                "recurring-user", weekly.id(), true, weekly.version(), wednesday);
+        dailyEventService.setTodoCompleted(
+                "recurring-user", daily.id(), true, daily.version(), wednesday);
+        dailyEventService.setTodoCompleted(
+                "recurring-user", monthly.id(), true, monthly.version(), wednesday);
+
+        var sameWeek = dailyEventService.getDay("recurring-user", LocalDate.of(2026, 9, 6));
+        assertTrue(todoDetails(sameWeek.events(), weekly.id()).completed());
+        assertTrue(todoDetails(sameWeek.events(), monthly.id()).completed());
+        assertFalse(todoDetails(sameWeek.events(), daily.id()).completed());
+        assertEquals("weekly", assertInstanceOf(TodoDetails.class, completedWeekly.details()).recurrence());
+
+        var nextWeek = dailyEventService.getDay("recurring-user", LocalDate.of(2026, 9, 7));
+        assertFalse(todoDetails(nextWeek.events(), weekly.id()).completed());
+        assertTrue(todoDetails(nextWeek.events(), monthly.id()).completed());
+        assertEquals(3, nextWeek.events().size());
+
+        var summaries = dailyEventService.getDays("recurring-user", start, wednesday);
+        assertEquals(3, summaries.getFirst().todoCount());
+        assertEquals(1, summaries.get(1).todoCount());
+        assertEquals(1, summaries.get(1).completedTodoCount());
+    }
+
+    @Test
+    void scheduleCanBeCreatedWithoutStartOrEndTime() {
+        LocalDate date = LocalDate.of(2026, 9, 10);
+        DailyEvent created = dailyEventService.create(
+                "optional-time-user", new ScheduleCommand(date, "等待确认的日程", null, null, null,
+                        ZoneId.of("Asia/Shanghai")));
+
+        ScheduleDetails details = assertInstanceOf(ScheduleDetails.class, created.details());
+        assertEquals(null, details.startTime());
+        assertEquals(null, details.endTime());
+    }
+
+    @Test
+    void recurringTodoSummaryDoesNotProjectPendingWorkIntoFutureDays() {
+        LocalDate today = LocalDate.now();
+        dailyEventService.create(
+                "recurring-cutoff-user", new TodoCommand(today, "每天学习", null, "medium", "daily"));
+
+        var summaries = dailyEventService.getDays("recurring-cutoff-user", today, today.plusDays(3));
+
+        assertEquals(1, summaries.size());
+        assertEquals(today, summaries.getFirst().date());
+        assertEquals(1, summaries.getFirst().todoCount());
+    }
+
+    @Test
     void journalCanBeUpdatedWithoutCreatingAnotherDailyEvent() {
         LocalDate date = LocalDate.of(2026, 9, 7);
         DailyEvent created = dailyEventService.create(
@@ -166,5 +227,14 @@ class DailyEventServiceIntegrationTest {
         } catch (IOException exception) {
             throw new IllegalStateException("无法创建日记录测试数据库目录", exception);
         }
+    }
+
+    private static TodoDetails todoDetails(java.util.List<DailyEvent> events, String eventId) {
+        return events.stream()
+                .filter(event -> event.id().equals(eventId))
+                .map(DailyEvent::details)
+                .map(TodoDetails.class::cast)
+                .findFirst()
+                .orElseThrow();
     }
 }

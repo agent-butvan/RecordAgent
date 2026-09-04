@@ -1,0 +1,44 @@
+.deck { padding-top: 8px; }
+.cardStage { position: relative; height: 174px; padding: 0 12px 14px 0; }
+.backCard, .accountCard { position: absolute; inset: 0 12px 14px 0; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); }
+.backCard { pointer-events: none; }
+.backCardFar { transform: translate(12px, 12px) rotate(1.2deg); background: #f4f6f8; }
+.backCardNear { transform: translate(6px, 6px) rotate(.45deg); background: #fafbfc; }
+.accountCard { z-index: 2; display: flex; flex-direction: column; justify-content: space-between; padding: 15px 16px 13px; color: #213047; transform: rotate(-.7deg); transform-origin: 46% 100%; animation: dealCard 220ms cubic-bezier(.16, 1, .3, 1); transition: transform 180ms cubic-bezier(.16, 1, .3, 1), border-color 180ms ease-out; }
+.accountCard:hover { transform: translateY(-2px) rotate(0); border-color: #b8c4d4; }
+.wechatTone { background: #f0f7f3; color: #315f4c; }
+.alipayTone { background: #f1f5fb; color: #315782; }
+.bankTone { background: #f3f5f8; color: #3d506c; }
+.neutralTone { background: #f7f5f1; color: #665a49; }
+.accountCard header, .accountCard footer { display: flex; align-items: center; }
+.accountCard header { gap: 9px; }
+.cardIcon { width: 34px; height: 34px; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; border: 1px solid currentColor; border-radius: var(--radius-md); opacity: .78; }
+.cardIdentity { min-width: 0; display: flex; flex-direction: column; }
+.cardIdentity strong { overflow: hidden; color: currentColor; font-size: 12px; font-weight: 650; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.cardIdentity small { margin-top: 2px; color: currentColor; font-size: 9px; opacity: .66; }
+.cardCount { margin-left: auto; color: currentColor; font-size: 9px; font-variant-numeric: tabular-nums; opacity: .58; }
+.cardBalance { display: flex; flex-direction: column; }
+.cardBalance span { color: currentColor; font-size: 9.5px; opacity: .65; }
+.cardBalance strong { margin-top: 3px; color: currentColor; font-size: 22px; font-weight: 650; letter-spacing: -.025em; font-variant-numeric: tabular-nums; }
+.accountCard footer { justify-content: space-between; color: currentColor; font-size: 9px; letter-spacing: .02em; opacity: .66; }
+.deckNavigation { display: grid; grid-template-columns: 28px minmax(0, 1fr) 28px; align-items: center; gap: 6px; }
+.arrowButton { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--bg-app); color: var(--text-secondary); }
+.arrowButton:hover:not(:disabled) { border-color: var(--border-medium); background: var(--bg-surface); color: var(--text-primary); }
+.arrowButton:focus-visible, .accountSelectors button:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 1px; }
+.arrowButton:disabled { color: var(--border-medium); cursor: default; }
+.accountSelectors { min-width: 0; display: flex; gap: 5px; overflow-x: auto; padding: 2px; scrollbar-width: none; }
+.accountSelectors::-webkit-scrollbar { display: none; }
+.accountSelectors button { min-width: 34px; max-width: 112px; height: 30px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 0 8px; border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--text-muted); }
+.accountSelectors button:hover { background: var(--bg-surface); color: var(--text-primary); }
+.accountSelectors button > svg { flex: 0 0 auto; }
+.accountSelectors button > span { overflow: hidden; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.accountSelectors .selectorActive { border-color: var(--border-medium); background: var(--bg-surface); color: var(--text-primary); }
+
+@keyframes dealCard {
+  from { opacity: .72; transform: translate(5px, 7px) rotate(1deg); }
+  to { opacity: 1; transform: rotate(-.7deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .accountCard { animation: none; transition: none; }
+}

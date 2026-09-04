@@ -3,6 +3,7 @@ import { ModelProviderContext } from './context/ModelContext';
 import { Sidebar } from './components/layout/Sidebar';
 import { ChatWorkspace } from './components/chat/ChatWorkspace';
 import { CalendarView } from './components/calendar/CalendarView';
+import { FinancePage } from './components/finance/FinancePage';
 import { ModelSettingsPage } from './components/model/ModelSettingsPage';
 import { ModelInitPage } from './components/model/ModelInitPage';
 import { MessageProvider } from './components/common/Message';
@@ -25,7 +26,11 @@ import {
 import type { PermissionToolPayload } from './services/api';
 import type { ChatSession, ChatMessage, Project, SessionSummaryDto, TranscriptMessageDto, SessionPermissionMode } from './types/chat';
 import type { SubagentProgressDto, TaskDto } from './types/team';
-import { cancelSubagentTask, fetchSubagentTasks } from './services/taskApi';
+import {
+  cancelSubagentTask,
+  fetchSubagentTasks,
+  subscribeSubagentTaskEvents,
+} from './services/taskApi';
 
 function mapTranscriptToChatMessage(dto: TranscriptMessageDto): ChatMessage {
   const isUser = dto.role?.toUpperCase() === 'USER';
@@ -69,7 +74,7 @@ export const MainLayout: React.FC<{
   const [projects, setProjects] = useState<Project[]>([]);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string>('');
-  const [activeFeature, setActiveFeature] = useState<'chat' | 'calendar'>('chat');
+  const [activeFeature, setActiveFeature] = useState<'chat' | 'calendar' | 'finance'>('chat');
   const [pendingPermission, setPendingPermission] = useState<{
     sessionId: string;
     assistantMessageId: string;
@@ -162,19 +167,46 @@ export const MainLayout: React.FC<{
   useEffect(() => {
     if (!activeSessionId) {
       setSubagentTasks([]);
+      setIsSubagentTasksLoading(false);
       return;
     }
-    void refreshSubagentTasks(activeSessionId);
-    const timer = window.setInterval(() => void refreshSubagentTasks(activeSessionId), 5_000);
-    return () => window.clearInterval(timer);
-  }, [activeSessionId, refreshSubagentTasks]);
+
+    const sessionId = activeSessionId;
+    setSubagentTasks([]);
+    setSubagentTaskError(null);
+    setIsSubagentTasksLoading(true);
+    return subscribeSubagentTaskEvents(sessionId, {
+      onSnapshot: (tasks) => {
+        if (sessionId !== activeSessionIdRef.current) return;
+        setSubagentTasks(tasks);
+        setSubagentTaskError(null);
+        setIsSubagentTasksLoading(false);
+      },
+      onTask: (task) => {
+        if (sessionId !== activeSessionIdRef.current) return;
+        setSubagentTasks((previous) => {
+          const index = previous.findIndex((current) => current.taskId === task.taskId);
+          if (index < 0) return [...previous, task];
+          const next = [...previous];
+          next[index] = task;
+          return next;
+        });
+        setSubagentTaskError(null);
+        setIsSubagentTasksLoading(false);
+      },
+      onError: () => {
+        if (sessionId !== activeSessionIdRef.current) return;
+        setIsSubagentTasksLoading(false);
+        setSubagentTaskError('子 Agent 任务实时连接暂时中断，正在自动重连。');
+      },
+    });
+  }, [activeSessionId]);
 
   const handleCancelSubagentTask = async (taskId: string) => {
     if (!activeSessionId || cancellingTaskId) return;
     setCancellingTaskId(taskId);
     try {
       await cancelSubagentTask(activeSessionId, taskId);
-      await refreshSubagentTasks(activeSessionId);
     } catch (error) {
       setSubagentTaskError(error instanceof Error ? error.message : '取消子 Agent 任务失败，请稍后重试');
     } finally {
@@ -623,7 +655,6 @@ export const MainLayout: React.FC<{
       },
       (progress) => {
         appendSubagentProgress(currentSessionId, assistantMsgId, progress);
-        void refreshSubagentTasks(currentSessionId);
       },
     );
   };
@@ -739,7 +770,9 @@ export const MainLayout: React.FC<{
             onOpenAccountSettings={() => { setSettingsTab('account'); setIsSettingsOpen(true); }}
           />
           {activeFeature === 'calendar' ? (
-            <CalendarView />
+            <CalendarView onOpenFinance={() => setActiveFeature('finance')} />
+          ) : activeFeature === 'finance' ? (
+            <FinancePage />
           ) : (
             <ChatWorkspace
               messages={activeMessages}

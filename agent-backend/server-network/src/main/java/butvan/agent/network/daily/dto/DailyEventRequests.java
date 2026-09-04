@@ -10,7 +10,7 @@ public final class DailyEventRequests {
     }
 
     /** 创建待办请求。 */
-    public record CreateTodoRequest(LocalDate eventDate, String title, String time, String priority) {
+    public record CreateTodoRequest(LocalDate eventDate, String title, String time, String priority, String recurrence) {
     }
 
     /** 创建日程请求。 */
@@ -28,6 +28,6 @@ public final class DailyEventRequests {
     }
 
     /** 修改待办完成状态请求。 */
-    public record TodoCompletionRequest(boolean completed, int expectedVersion) {
+    public record TodoCompletionRequest(boolean completed, int expectedVersion, LocalDate occurrenceDate) {
     }
 }

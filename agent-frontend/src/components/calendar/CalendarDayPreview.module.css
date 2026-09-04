@@ -84,15 +84,38 @@
   gap: 7px;
 }
 
-.item small {
+.tag {
   width: 28px;
   padding: 3px 0;
   border-radius: var(--radius-sm);
-  background: #eef1f5;
-  color: var(--text-secondary);
   font-size: 9px;
   font-weight: 600;
   text-align: center;
+}
+
+.tagSchedule {
+  background: #eef4ff;
+  color: #3d5f8f;
+}
+
+.tagTodo {
+  background: #f3f0fa;
+  color: #66527f;
+}
+
+.tagExpense {
+  background: #faf0ef;
+  color: #93443d;
+}
+
+.tagIncome {
+  background: #edf6f1;
+  color: #31725a;
+}
+
+.tagNeutral {
+  background: #eef1f5;
+  color: var(--text-secondary);
 }
 
 .item > span {

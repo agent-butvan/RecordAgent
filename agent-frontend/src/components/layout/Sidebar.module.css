@@ -96,7 +96,14 @@
   color: #111827;
 }
 
-/* 功能入口：日历 */
+.featureNav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+/* 功能入口 */
 .featureTab {
   display: inline-flex;
   align-items: center;
@@ -122,6 +129,7 @@
 }
 
 .featureTabActive {
+  background-color: #d8e4ec;
   color: #0f172a;
   font-weight: 600;
 }

@@ -152,6 +152,12 @@
   gap: 14px;
 }
 
+.fieldRowThree {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .field {
   min-width: 0;
   display: flex;
@@ -247,7 +253,8 @@
   }
 
   .optionGrid,
-  .fieldRow {
+  .fieldRow,
+  .fieldRowThree {
     grid-template-columns: 1fr;
   }
 }

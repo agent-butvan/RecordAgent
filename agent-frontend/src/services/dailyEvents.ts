@@ -5,6 +5,7 @@ import type {
   DailyEvent,
   DailyEventBase,
   ExpenseDailyEvent,
+  IncomeDailyEvent,
   JournalDailyEvent,
   ScheduleDailyEvent,
   TodoDailyEvent,
@@ -55,12 +56,15 @@ function parseEvent(raw: RawEvent): DailyEvent {
       time: typeof details.time === 'string' ? details.time : null,
       priority: details.priority === 'high' || details.priority === 'low' ? details.priority : 'medium',
       completed: details.completed === true,
+      recurrence: details.recurrence === 'daily' || details.recurrence === 'weekly' || details.recurrence === 'monthly'
+        ? details.recurrence
+        : 'none',
     } } satisfies TodoDailyEvent;
   }
   if (raw.eventType === 'schedule') {
     return { ...common, eventType: 'schedule', details: {
-      startTime: String(details.startTime ?? ''),
-      endTime: String(details.endTime ?? ''),
+      startTime: typeof details.startTime === 'string' ? details.startTime : null,
+      endTime: typeof details.endTime === 'string' ? details.endTime : null,
       location: typeof details.location === 'string' ? details.location : null,
       timezone: String(details.timezone ?? ''),
     } } satisfies ScheduleDailyEvent;
@@ -73,6 +77,15 @@ function parseEvent(raw: RawEvent): DailyEvent {
       time: String(details.time ?? ''),
       currency: String(details.currency ?? 'CNY'),
     } } satisfies ExpenseDailyEvent;
+  }
+  if (raw.eventType === 'income') {
+    return { ...common, eventType: 'income', details: {
+      category: String(details.category ?? ''),
+      note: String(details.note ?? ''),
+      amount: Number(details.amount ?? 0),
+      time: String(details.time ?? ''),
+      currency: String(details.currency ?? 'CNY'),
+    } } satisfies IncomeDailyEvent;
   }
   if (raw.eventType === 'journal') {
     return { ...common, eventType: 'journal', details: {
@@ -104,7 +117,13 @@ export async function createDailyRecord(date: Date, draft: CalendarRecordDraft):
   let body: object;
   if (draft.kind === 'todo') {
     path = '/agent/daily-events/todos';
-    body = { eventDate, title: draft.title, time: draft.time, priority: draft.priority };
+    body = {
+      eventDate,
+      title: draft.title,
+      time: draft.time,
+      priority: draft.priority,
+      recurrence: draft.recurrence,
+    };
   } else if (draft.kind === 'schedule') {
     path = '/agent/daily-events/schedules';
     body = { ...draft, eventDate, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone };
@@ -142,11 +161,16 @@ export async function updateDailyJournal(
 }
 
 /** 修改待办完成状态。 */
-export async function setDailyTodoCompleted(id: string, completed: boolean, expectedVersion: number): Promise<DailyEvent> {
+export async function setDailyTodoCompleted(
+  id: string,
+  completed: boolean,
+  expectedVersion: number,
+  occurrenceDate: Date,
+): Promise<DailyEvent> {
   const raw = await request<RawEvent>(`/agent/daily-events/${id}/todo-completion`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ completed, expectedVersion }),
+    body: JSON.stringify({ completed, expectedVersion, occurrenceDate: formatLocalDate(occurrenceDate) }),
   });
   return parseEvent(raw);
 }

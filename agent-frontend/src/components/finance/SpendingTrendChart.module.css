@@ -1,0 +1,80 @@
+.section { padding: 24px 32px 20px; border-bottom: 1px solid var(--border-subtle); }
+.heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.heading h2 { color: var(--text-primary); font-size: 13px; font-weight: 650; letter-spacing: -.01em; }
+.heading p { margin-top: 4px; color: var(--text-muted); font-size: 10px; }
+.rangeSwitch { display: inline-flex; gap: 2px; padding: 2px; border-radius: var(--radius-md); background: var(--bg-surface); }
+.rangeSwitch button { height: 26px; padding: 0 11px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-muted); font: 600 10px var(--font-sans); }
+.rangeSwitch button:hover { color: var(--text-primary); }
+.rangeSwitch button:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 1px; }
+.rangeSwitch .rangeActive { box-shadow: inset 0 0 0 1px var(--border-subtle); background: var(--bg-app); color: var(--text-primary); }
+.chartHost { position: relative; width: 100%; height: 252px; margin-top: 20px; overflow: hidden; contain: layout paint; }
+.chartHost svg { display: block; width: 100%; height: 252px; }
+.gridLine { stroke: var(--border-subtle); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.axisLabel { fill: var(--text-muted); font: 9px var(--font-sans); font-variant-numeric: tabular-nums; }
+.dataLayer { transform-box: fill-box; transform-origin: center; animation: chartReveal 180ms cubic-bezier(.16, 1, .3, 1); }
+.bar, .barDimmed { transition: opacity 180ms cubic-bezier(.16, 1, .3, 1); }
+.bar { opacity: .88; }
+.barDimmed { opacity: .3; }
+.expenseLine, .incomeLine { fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.expenseLine { stroke: #6686bd; }
+.incomeLine { stroke: #6f9b84; }
+.trendPoint { fill: var(--bg-app); stroke-width: 1.5; vector-effect: non-scaling-stroke; transition: r 180ms cubic-bezier(.16, 1, .3, 1); }
+.expensePoint { stroke: #6686bd; }
+.incomePoint { stroke: #6f9b84; }
+.hoverBand { fill: #f7f9fc; transition: transform 180ms cubic-bezier(.16, 1, .3, 1), width 180ms cubic-bezier(.16, 1, .3, 1); }
+.hoverLine { stroke: #9eabc0; stroke-width: 1; stroke-dasharray: 2 3; vector-effect: non-scaling-stroke; pointer-events: none; transition: transform 180ms cubic-bezier(.16, 1, .3, 1); }
+.hitArea { fill: transparent; cursor: crosshair; outline: none; }
+.hitArea:focus-visible { stroke: var(--accent-blue); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.tooltip { --tooltip-x: 0px; position: absolute; z-index: 2; top: 26px; left: 0; width: 208px; padding: 10px 11px; border: 1px solid var(--border-medium); border-radius: var(--radius-md); background: rgba(255, 255, 255, .97); color: var(--text-secondary); transform: translate3d(calc(var(--tooltip-x) - 50%), 0, 0); transition: transform 180ms cubic-bezier(.16, 1, .3, 1); pointer-events: none; }
+.tooltipContent { animation: tooltipContentIn 140ms cubic-bezier(.16, 1, .3, 1); }
+.tooltipHeading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-bottom: 7px; border-bottom: 1px solid var(--border-subtle); }
+.tooltipHeading span { font-size: 10px; }
+.tooltipTotals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border-subtle); }
+.tooltipTotals > span { display: grid; grid-template-columns: 7px 1fr; align-items: center; gap: 5px; color: var(--text-muted); font-size: 9px; }
+.tooltipTotals strong { grid-column: 1 / -1; color: var(--text-primary); font-size: 10.5px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.tooltipTotals i { width: 7px; height: 2px; border-radius: 1px; }
+.expenseSwatch { background: #6686bd; }
+.incomeSwatch { background: #6f9b84; }
+.tooltipRows { display: flex; flex-direction: column; gap: 6px; padding-top: 7px; }
+.tooltipRows > div { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.tooltipRows span { display: inline-flex; align-items: center; gap: 6px; font-size: 10px; }
+.tooltipRows i, .legend i { width: 7px; height: 7px; border-radius: 2px; }
+.tooltipRows b { color: var(--text-primary); font-size: 10px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.tooltip > p { padding-top: 8px; color: var(--text-muted); font-size: 10px; }
+.loadingState, .errorState { position: absolute; z-index: 3; right: 10px; top: 8px; display: flex; align-items: center; gap: 6px; padding: 5px 7px; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: rgba(255, 255, 255, .94); font-size: 9.5px; }
+.loadingState { color: var(--text-muted); }
+.loadingState > span { width: 7px; height: 7px; border: 1px solid var(--border-medium); border-top-color: var(--accent-blue); border-radius: 50%; animation: spin .7s linear infinite; }
+.errorState { border-color: #e6c8c4; color: #913d36; }
+.chartFooter { min-height: 26px; display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-top: 8px; }
+.periodTotals { flex: 0 0 auto; display: flex; gap: 14px; color: var(--text-muted); font-size: 10px; }
+.periodTotals strong { margin-left: 5px; color: var(--text-primary); font-size: 11px; font-variant-numeric: tabular-nums; }
+.legend { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px 14px; }
+.legend span { display: inline-flex; align-items: center; gap: 5px; color: var(--text-secondary); font-size: 9.5px; }
+.legend .expenseLineSwatch, .legend .incomeLineSwatch { width: 10px; height: 2px; border-radius: 1px; }
+.legend .expenseLineSwatch { background: #6686bd; }
+.legend .incomeLineSwatch { background: #6f9b84; }
+
+@keyframes chartReveal {
+  from { opacity: .72; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes tooltipContentIn {
+  from { opacity: .72; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 680px) {
+  .section { padding-right: 20px; padding-left: 20px; }
+  .heading { align-items: center; }
+  .heading p { display: none; }
+  .chartFooter { flex-direction: column; gap: 10px; }
+  .legend { justify-content: flex-start; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dataLayer, .tooltipContent, .loadingState > span { animation: none; }
+  .bar, .barDimmed, .trendPoint, .hoverBand, .hoverLine, .tooltip { transition: none; }
+}

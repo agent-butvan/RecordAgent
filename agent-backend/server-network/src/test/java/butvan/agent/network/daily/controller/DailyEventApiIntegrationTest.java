@@ -47,17 +47,36 @@ class DailyEventApiIntegrationTest {
                                   "eventDate": "2026-09-06",
                                   "title": "验证日记录接口",
                                   "time": "08:00",
-                                  "priority": "low"
+                                  "priority": "low",
+                                  "recurrence": "weekly"
                                 }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data.eventType").value("todo"));
+                .andExpect(jsonPath("$.data.eventType").value("todo"))
+                .andExpect(jsonPath("$.data.details.recurrence").value("weekly"));
 
         mockMvc.perform(get("/agent/daily-events/days/2026-09-06"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.events[0].title").value("验证日记录接口"))
                 .andExpect(jsonPath("$.data.events[0].details.completed").value(false));
+    }
+
+    @Test
+    void apiAcceptsScheduleWithoutTimes() throws Exception {
+        mockMvc.perform(post("/agent/daily-events/schedules")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "eventDate": "2026-09-08",
+                                  "title": "时间待定的会面",
+                                  "location": "线上",
+                                  "timezone": "Asia/Shanghai"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.details.startTime").doesNotExist())
+                .andExpect(jsonPath("$.data.details.endTime").doesNotExist());
     }
 
     private static Path createDatabasePath() {

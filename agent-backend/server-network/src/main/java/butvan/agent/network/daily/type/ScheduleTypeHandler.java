@@ -24,15 +24,9 @@ public class ScheduleTypeHandler implements DailyEventTypeHandler<ScheduleComman
     @Override
     public void validate(ScheduleCommand command) {
         if (command.title() == null || command.title().isBlank()) throw new IllegalArgumentException("日程名称不能为空");
-        java.time.LocalTime start;
-        java.time.LocalTime end;
-        try {
-            start = java.time.LocalTime.parse(command.startTime());
-            end = java.time.LocalTime.parse(command.endTime());
-        } catch (java.time.format.DateTimeParseException | NullPointerException exception) {
-            throw new IllegalArgumentException("日程时间不合法");
-        }
-        if (!start.isBefore(end)) {
+        java.time.LocalTime start = parseOptionalTime(command.startTime());
+        java.time.LocalTime end = parseOptionalTime(command.endTime());
+        if (start != null && end != null && !start.isBefore(end)) {
             throw new IllegalArgumentException("日程结束时间必须晚于开始时间");
         }
         if (command.timezone() == null) throw new IllegalArgumentException("日程时区不能为空");
@@ -41,7 +35,8 @@ public class ScheduleTypeHandler implements DailyEventTypeHandler<ScheduleComman
     @Override
     public void insert(String eventId, ScheduleCommand command) {
         jdbcTemplate.update("INSERT INTO schedule_detail (event_id, start_time, end_time, location, timezone) VALUES (?, ?, ?, ?, ?)",
-                eventId, command.startTime(), command.endTime(), blankToNull(command.location()), command.timezone().getId());
+                eventId, blankToNull(command.startTime()), blankToNull(command.endTime()),
+                blankToNull(command.location()), command.timezone().getId());
     }
 
     @Override
@@ -50,7 +45,7 @@ public class ScheduleTypeHandler implements DailyEventTypeHandler<ScheduleComman
                 UPDATE schedule_detail
                 SET start_time = ?, end_time = ?, location = ?, timezone = ?
                 WHERE event_id = ?
-                """, command.startTime(), command.endTime(), blankToNull(command.location()),
+                """, blankToNull(command.startTime()), blankToNull(command.endTime()), blankToNull(command.location()),
                 command.timezone().getId(), eventId);
         if (updated != 1) throw new IllegalArgumentException("日程不存在");
     }
@@ -69,4 +64,13 @@ public class ScheduleTypeHandler implements DailyEventTypeHandler<ScheduleComman
     }
 
     private String blankToNull(String value) { return value == null || value.isBlank() ? null : value.trim(); }
+
+    private java.time.LocalTime parseOptionalTime(String value) {
+        if (value == null || value.isBlank()) return null;
+        try {
+            return java.time.LocalTime.parse(value);
+        } catch (java.time.format.DateTimeParseException exception) {
+            throw new IllegalArgumentException("日程时间不合法");
+        }
+    }
 }

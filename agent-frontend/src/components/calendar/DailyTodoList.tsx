@@ -16,6 +16,12 @@ const priorityLabels = {
   low: '生活',
 } as const;
 
+const recurrenceLabels = {
+  daily: '每天',
+  weekly: '每周',
+  monthly: '每月',
+} as const;
+
 /** 带手绘划线反馈的当日待办清单。 */
 export const DailyTodoList: React.FC<DailyTodoListProps> = ({ todos, onToggle, onDelete }) => {
   if (todos.length === 0) {
@@ -61,6 +67,9 @@ export const DailyTodoList: React.FC<DailyTodoListProps> = ({ todos, onToggle, o
             </span>
             <span className={styles.meta}>
               <span className={`${styles.priority} ${styles[`priority${todo.priority[0].toUpperCase()}${todo.priority.slice(1)}`]}`}>{priorityLabels[todo.priority]}</span>
+              {todo.recurrence && todo.recurrence !== 'none' && (
+                <span className={styles.recurrence}>{recurrenceLabels[todo.recurrence]}</span>
+              )}
               {todo.time && <span>{todo.time}</span>}
             </span>
           </span>

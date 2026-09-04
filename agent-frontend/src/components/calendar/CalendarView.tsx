@@ -66,10 +66,15 @@ function totalExpense(entry: CalendarDayEntry): number {
   return entry.expenses.reduce((total, expense) => total + expense.amount, 0);
 }
 
+function totalIncome(entry: CalendarDayEntry): number {
+  return entry.incomes.reduce((total, income) => total + income.amount, 0);
+}
+
 function hasEntryContent(entry: CalendarDayEntry): boolean {
   return Boolean(
     entry.todos.length
     || entry.expenses.length
+    || entry.incomes.length
     || entry.schedules.length
     || entry.journal
     || entry.photos.length
@@ -77,10 +82,14 @@ function hasEntryContent(entry: CalendarDayEntry): boolean {
   );
 }
 
-const EMPTY_ENTRY: CalendarDayEntry = { todos: [], expenses: [], schedules: [], photos: [], otherRecords: [] };
+const EMPTY_ENTRY: CalendarDayEntry = { todos: [], expenses: [], incomes: [], schedules: [], photos: [], otherRecords: [] };
+
+interface CalendarViewProps {
+  onOpenFinance: () => void;
+}
 
 /** 日记录原型：月历负责浏览，每日详情聚合待办、花销、手记、图片和日程。 */
-export const CalendarView: React.FC = () => {
+export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenFinance }) => {
   const today = useMemo(() => startOfDay(new Date()), []);
   const [cursor, setCursor] = useState(today);
   const [selected, setSelected] = useState(today);
@@ -101,17 +110,24 @@ export const CalendarView: React.FC = () => {
   }, [cursor]);
 
   const monthRecords = useMemo(() => Object.values(summaries), [summaries]);
-  const monthTodoTotal = monthRecords.reduce((total, record) => total + record.todoCount, 0);
-  const monthTodoCompleted = monthRecords.reduce((total, record) => total + record.completedTodoCount, 0);
+  const todayKey = formatLocalDate(today);
+  const monthTodoRecords = monthRecords.filter((record) => record.date <= todayKey);
+  const monthTodoTotal = monthTodoRecords.reduce((total, record) => total + record.todoCount, 0);
+  const monthTodoCompleted = monthTodoRecords.reduce((total, record) => total + record.completedTodoCount, 0);
   const monthTodoRate = monthTodoTotal ? Math.round((monthTodoCompleted / monthTodoTotal) * 100) : 0;
   const monthExpenseTotal = monthRecords.reduce((total, record) => total + record.expenseTotal, 0);
 
   const selectedKey = formatLocalDate(selected);
   const selectedEntry = entries[selectedKey] ?? EMPTY_ENTRY;
   const completedCount = selectedEntry.todos.filter((todo) => todo.completed).length;
+  const selectedCashflows = [
+    ...selectedEntry.expenses.map((record) => ({ ...record, transactionType: 'expense' as const })),
+    ...selectedEntry.incomes.map((record) => ({ ...record, transactionType: 'income' as const })),
+  ].sort((left, right) => left.time.localeCompare(right.time));
   const hasDailyRecord = Boolean(
     selectedEntry.todos.length
     || selectedEntry.expenses.length
+    || selectedEntry.incomes.length
     || selectedEntry.schedules.length
     || selectedEntry.journal
     || selectedEntry.photos.length
@@ -180,7 +196,7 @@ export const CalendarView: React.FC = () => {
     if (!todo) return;
     try {
       setDataError(null);
-      await setDailyTodoCompleted(todo.id, !todo.completed, todo.version ?? 0);
+      await setDailyTodoCompleted(todo.id, !todo.completed, todo.version ?? 0, selected);
       await refreshSelectedAndMonth();
     } catch (error: unknown) {
       setDataError(error instanceof Error ? error.message : '修改待办失败');
@@ -282,6 +298,7 @@ export const CalendarView: React.FC = () => {
               selectedDate={selected}
               onCreate={createRecord}
               onWriteJournal={() => setJournalEditorDate(selected)}
+              onOpenFinance={onOpenFinance}
             />
             <button type="button" className={styles.todayBtn} onClick={goToday}>今天</button>
             <div className={styles.navGroup}>
@@ -412,9 +429,10 @@ export const CalendarView: React.FC = () => {
             </div>
 
             <div className={styles.summaryLine} aria-label="当天汇总">
-              <span><CheckCheck size={15} /><strong>{completedCount}/{selectedEntry.todos.length || 0}</strong> 待办完成</span>
-              <span><WalletCards size={15} /><strong>¥{totalExpense(selectedEntry).toFixed(2)}</strong> 今日支出</span>
-              <span><Clock3 size={15} /><strong>{selectedEntry.schedules.length}</strong> 个日程</span>
+              <span className={styles.todoSummary}><CheckCheck size={16} /><span><small>待办完成</small><strong>{completedCount}/{selectedEntry.todos.length || 0}</strong></span></span>
+              <span className={styles.expenseSummary}><WalletCards size={16} /><span><small>今日支出</small><strong>¥{totalExpense(selectedEntry).toFixed(2)}</strong></span></span>
+              <span className={styles.incomeSummary}><WalletCards size={16} /><span><small>今日收入</small><strong>¥{totalIncome(selectedEntry).toFixed(2)}</strong></span></span>
+              <span className={styles.scheduleSummary}><Clock3 size={16} /><span><small>日程</small><strong>{selectedEntry.schedules.length} 个</strong></span></span>
             </div>
 
             {isDayLoading ? <div className={styles.emptyDay}>
@@ -422,7 +440,7 @@ export const CalendarView: React.FC = () => {
               <strong>正在读取日记录</strong>
             </div> : hasDailyRecord ? <div className={styles.recordSections}>
               <section className={styles.recordSection}>
-                <div className={styles.sectionHeading}><CheckCheck size={15} aria-hidden="true" /><h3>今日待办</h3></div>
+                <div className={styles.sectionHeading}><CheckCheck size={15} aria-hidden="true" /><h3>待办事项</h3></div>
                 <DailyTodoList
                   todos={selectedEntry.todos}
                   onToggle={toggleTodo}
@@ -435,7 +453,11 @@ export const CalendarView: React.FC = () => {
                 {selectedEntry.schedules.length ? <div className={styles.scheduleList}>
                   {selectedEntry.schedules.map((schedule) => <div key={schedule.id} className={styles.scheduleItem}>
                     <span className={`${styles.scheduleDot} ${styles[`schedule${schedule.color[0].toUpperCase()}${schedule.color.slice(1)}`]}`} />
-                    <span className={styles.scheduleTime}>{schedule.startTime}<br />{schedule.endTime}</span>
+                    <span className={styles.scheduleTime}>
+                      {schedule.startTime || schedule.endTime
+                        ? <>{schedule.startTime ? `开始 ${schedule.startTime}` : '开始待定'}<br />{schedule.endTime ? `结束 ${schedule.endTime}` : '结束待定'}</>
+                        : '时间待定'}
+                    </span>
                     <span className={styles.scheduleBody}><strong>{schedule.title}</strong>{schedule.location && <small><MapPin size={11} />{schedule.location}</small>}</span>
                     <DailyRecordDeleteButton label={`日程“${schedule.title}”`} onDelete={() => requestDelete(schedule, '日程', schedule.title)} />
                   </div>)}
@@ -443,15 +465,23 @@ export const CalendarView: React.FC = () => {
               </section>
 
               <section className={styles.recordSection}>
-                <div className={styles.sectionHeading}><ReceiptText size={15} aria-hidden="true" /><h3>花销明细</h3><span className={styles.sectionTotal}>共 ¥{totalExpense(selectedEntry).toFixed(2)}</span></div>
-                {selectedEntry.expenses.length ? <div className={styles.expenseList}>
-                  {selectedEntry.expenses.map((expense) => <div key={expense.id} className={styles.expenseItem}>
-                    <span className={`${styles.expenseIcon} ${styles[`expense${expense.color[0].toUpperCase()}${expense.color.slice(1)}`]}`}>{expense.category.slice(0, 1)}</span>
-                    <span className={styles.expenseBody}><strong>{expense.category}</strong><small>{expense.note} · {expense.time}</small></span>
-                    <strong className={styles.expenseAmount}>-¥{expense.amount.toFixed(2)}</strong>
-                    <DailyRecordDeleteButton label={`花销“${expense.category}”`} onDelete={() => requestDelete(expense, '花销', expense.category)} />
-                  </div>)}
-                </div> : <p className={styles.emptyText}>没有记录花销。</p>}
+                <div className={styles.sectionHeading}><ReceiptText size={15} aria-hidden="true" /><h3>收支明细</h3>
+                  <span className={styles.cashflowTotals}>
+                    <b className={styles.expenseText}>支出 ¥{totalExpense(selectedEntry).toFixed(2)}</b>
+                    <b className={styles.incomeText}>收入 ¥{totalIncome(selectedEntry).toFixed(2)}</b>
+                  </span>
+                </div>
+                {selectedCashflows.length ? <div className={styles.cashflowList}>
+                  {selectedCashflows.map((record) => {
+                    const isExpense = record.transactionType === 'expense';
+                    return <div key={`${record.transactionType}-${record.id}`} className={styles.cashflowItem}>
+                      <span className={`${styles.cashflowIcon} ${isExpense ? styles.expenseIconTone : styles.incomeIconTone}`}>{record.category.slice(0, 1)}</span>
+                      <span className={styles.cashflowBody}><strong>{record.category}</strong><small>{record.note} · {record.time}</small></span>
+                      <strong className={isExpense ? styles.expenseAmount : styles.incomeAmount}>{isExpense ? '-' : '+'}¥{record.amount.toFixed(2)}</strong>
+                      {isExpense && record.source !== 'finance' && <DailyRecordDeleteButton label={`花销“${record.category}”`} onDelete={() => requestDelete(record, '花销', record.category)} />}
+                    </div>;
+                  })}
+                </div> : <p className={styles.emptyText}>没有收支记录。</p>}
               </section>
 
               {(selectedEntry.journal || selectedEntry.photos.length > 0) && <section className={styles.recordSection}>

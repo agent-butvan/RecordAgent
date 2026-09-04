@@ -1,4 +1,5 @@
 export type TodoPriority = 'high' | 'medium' | 'low';
+export type TodoRecurrence = 'none' | 'daily' | 'weekly' | 'monthly';
 
 export interface CalendarTodo {
   id: string;
@@ -6,12 +7,14 @@ export interface CalendarTodo {
   time?: string;
   priority: TodoPriority;
   completed: boolean;
+  recurrence?: TodoRecurrence;
   version?: number;
 }
 
 export interface CalendarExpense {
   id: string;
   version?: number;
+  source?: string;
   category: string;
   note: string;
   amount: number;
@@ -19,12 +22,21 @@ export interface CalendarExpense {
   color: 'orange' | 'blue' | 'violet';
 }
 
+export interface CalendarIncome {
+  id: string;
+  source: string;
+  category: string;
+  note: string;
+  amount: number;
+  time: string;
+}
+
 export interface CalendarSchedule {
   id: string;
   version?: number;
   title: string;
-  startTime: string;
-  endTime: string;
+  startTime?: string;
+  endTime?: string;
   location?: string;
   color: 'blue' | 'violet' | 'orange';
 }
@@ -53,6 +65,7 @@ export interface CalendarOtherRecord {
 export interface CalendarDayEntry {
   todos: CalendarTodo[];
   expenses: CalendarExpense[];
+  incomes: CalendarIncome[];
   schedules: CalendarSchedule[];
   journal?: CalendarJournal;
   photos: CalendarPhoto[];
@@ -60,7 +73,7 @@ export interface CalendarDayEntry {
 }
 
 export type CalendarRecordDraft =
-  | { kind: 'todo'; title: string; time?: string; priority: TodoPriority }
-  | { kind: 'schedule'; title: string; startTime: string; endTime: string; location?: string }
+  | { kind: 'todo'; title: string; time?: string; priority: TodoPriority; recurrence: TodoRecurrence }
+  | { kind: 'schedule'; title: string; startTime?: string; endTime?: string; location?: string }
   | { kind: 'expense'; category: string; note: string; amount: number; time: string }
   | { kind: 'journal'; title?: string; excerpt: string; mood: string };

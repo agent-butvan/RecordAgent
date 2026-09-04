@@ -5,6 +5,7 @@ import butvan.agent.network.daily.model.DailyEventModels.DailyDaySummary;
 import butvan.agent.network.daily.model.DailyEventModels.DailyEvent;
 import butvan.agent.network.daily.model.DailyEventModels.ExpenseDetails;
 import butvan.agent.network.daily.model.DailyEventModels.JournalDetails;
+import butvan.agent.network.daily.model.DailyEventModels.IncomeDetails;
 import butvan.agent.network.daily.model.DailyEventModels.ScheduleDetails;
 import butvan.agent.network.daily.model.DailyEventModels.TodoDetails;
 
@@ -49,7 +50,7 @@ public final class DailyEventResponses {
     }
 
     /** 待办详情响应。 */
-    public record TodoDetailResponse(String time, String priority, boolean completed) {
+    public record TodoDetailResponse(String time, String priority, boolean completed, String recurrence) {
     }
 
     /** 日程详情响应。 */
@@ -58,6 +59,11 @@ public final class DailyEventResponses {
 
     /** 花销详情响应。 */
     public record ExpenseDetailResponse(
+            String category, String note, BigDecimal amount, String time, String currency) {
+    }
+
+    /** 财务收入在日历中的只读详情响应。 */
+    public record IncomeDetailResponse(
             String category, String note, BigDecimal amount, String time, String currency) {
     }
 
@@ -86,7 +92,7 @@ public final class DailyEventResponses {
 
     private static Object mapDetails(Object details) {
         if (details instanceof TodoDetails todo) {
-            return new TodoDetailResponse(todo.time(), todo.priority(), todo.completed());
+            return new TodoDetailResponse(todo.time(), todo.priority(), todo.completed(), todo.recurrence());
         }
         if (details instanceof ScheduleDetails schedule) {
             return new ScheduleDetailResponse(
@@ -95,6 +101,10 @@ public final class DailyEventResponses {
         if (details instanceof ExpenseDetails expense) {
             return new ExpenseDetailResponse(
                     expense.category(), expense.note(), expense.amount(), expense.time(), expense.currency());
+        }
+        if (details instanceof IncomeDetails income) {
+            return new IncomeDetailResponse(
+                    income.category(), income.note(), income.amount(), income.time(), income.currency());
         }
         if (details instanceof JournalDetails journal) {
             return new JournalDetailResponse(journal.body(), journal.mood());

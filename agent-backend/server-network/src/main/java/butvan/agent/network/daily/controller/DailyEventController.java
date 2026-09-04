@@ -66,7 +66,7 @@ public class DailyEventController {
     @PostMapping("/todos")
     public Result<EventResponse> createTodo(@RequestBody CreateTodoRequest request) {
         return Result.success(DailyEventResponses.from(dailyEventService.create(currentUserId(),
-                new TodoCommand(request.eventDate(), request.title(), request.time(), request.priority()))));
+                new TodoCommand(request.eventDate(), request.title(), request.time(), request.priority(), request.recurrence()))));
     }
 
     /** 更新待办日记录。 */
@@ -75,7 +75,7 @@ public class DailyEventController {
     public Result<EventResponse> updateTodo(
             @PathVariable String eventId, @RequestParam int expectedVersion, @RequestBody CreateTodoRequest request) {
         return Result.success(DailyEventResponses.from(dailyEventService.update(currentUserId(), eventId, expectedVersion,
-                new TodoCommand(request.eventDate(), request.title(), request.time(), request.priority()))));
+                new TodoCommand(request.eventDate(), request.title(), request.time(), request.priority(), request.recurrence()))));
     }
 
     /** 创建日程日记录。 */
@@ -150,7 +150,7 @@ public class DailyEventController {
     public Result<EventResponse> setTodoCompleted(
             @PathVariable String eventId, @RequestBody TodoCompletionRequest request) {
         return Result.success(DailyEventResponses.from(dailyEventService.setTodoCompleted(
-                currentUserId(), eventId, request.completed(), request.expectedVersion())));
+                currentUserId(), eventId, request.completed(), request.expectedVersion(), request.occurrenceDate())));
     }
 
     /** 删除一条日记录。 */

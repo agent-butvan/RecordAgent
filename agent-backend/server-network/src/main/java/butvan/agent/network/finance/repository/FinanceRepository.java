@@ -1,0 +1,160 @@
+package butvan.agent.network.finance.repository;
+
+import butvan.agent.network.finance.model.FinanceModels.FinanceAccount;
+import butvan.agent.network.finance.model.FinanceModels.FinanceTransaction;
+import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Repository;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.List;
+import java.util.Optional;
+
+/** 财务域 SQLite 持久化适配器，金额统一以分保存。 */
+@Repository
+@RequiredArgsConstructor
+public class FinanceRepository {
+
+    /** 当月流水聚合结果。 */
+    public record MonthTotals(BigDecimal income, BigDecimal expense, BigDecimal yield) {
+    }
+
+    /** 某日收入（包含手工收入与自动收益）的聚合结果。 */
+    public record DailyIncomeTotal(LocalDate date, BigDecimal amount) {
+    }
+
+    private final JdbcTemplate jdbcTemplate;
+
+    /** 查询用户全部账户。 */
+    public List<FinanceAccount> findAccounts(String ownerId) {
+        return jdbcTemplate.query("""
+                SELECT id, name, account_type, currency, balance_minor, interest_enabled,
+                       annual_rate_percent, last_accrual_date, version, created_at, updated_at
+                FROM finance_account WHERE owner_id = ? ORDER BY created_at, id
+                """, (rs, rowNum) -> new FinanceAccount(
+                rs.getString("id"), rs.getString("name"), rs.getString("account_type"), rs.getString("currency"),
+                BigDecimal.valueOf(rs.getLong("balance_minor"), 2), rs.getBoolean("interest_enabled"),
+                new BigDecimal(rs.getString("annual_rate_percent")), LocalDate.parse(rs.getString("last_accrual_date")),
+                rs.getInt("version"), Instant.parse(rs.getString("created_at")), Instant.parse(rs.getString("updated_at"))), ownerId);
+    }
+
+    /** 按所有者查找账户。 */
+    public Optional<FinanceAccount> findAccount(String ownerId, String accountId) {
+        return findAccounts(ownerId).stream().filter(account -> account.id().equals(accountId)).findFirst();
+    }
+
+    /** 新建账户。 */
+    public void insertAccount(String id, String ownerId, String name, String type, String currency, long balanceMinor,
+                              boolean interestEnabled, BigDecimal annualRatePercent, LocalDate today, Instant now) {
+        jdbcTemplate.update("""
+                INSERT INTO finance_account (
+                    id, owner_id, name, account_type, currency, balance_minor, interest_enabled,
+                    annual_rate_percent, last_accrual_date, version, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+                """, id, ownerId, name, type, currency, balanceMinor, interestEnabled,
+                annualRatePercent.toPlainString(), today.toString(), now.toString(), now.toString());
+    }
+
+    /** 原子更新账户余额和结息日期。 */
+    public void updateBalanceAndAccrualDate(
+            String ownerId, String accountId, long balanceMinor, LocalDate accrualDate, Instant now) {
+        int updated = jdbcTemplate.update("""
+                UPDATE finance_account
+                SET balance_minor = ?, last_accrual_date = ?, version = version + 1, updated_at = ?
+                WHERE owner_id = ? AND id = ?
+                """, balanceMinor, accrualDate.toString(), now.toString(), ownerId, accountId);
+        if (updated != 1) throw new IllegalArgumentException("资产账户不存在");
+    }
+
+    /** 原子调整账户余额，余额不足时拒绝支出。 */
+    public boolean adjustBalance(String ownerId, String accountId, long deltaMinor, Instant now) {
+        return jdbcTemplate.update("""
+                UPDATE finance_account SET balance_minor = balance_minor + ?, version = version + 1, updated_at = ?
+                WHERE owner_id = ? AND id = ? AND balance_minor + ? >= 0
+                """, deltaMinor, now.toString(), ownerId, accountId, deltaMinor) == 1;
+    }
+
+    /** 保存流水。 */
+    public void insertTransaction(
+            String id, String ownerId, String accountId, LocalDate date, LocalTime time, String type,
+            String category, String note, long amountMinor, String currency, String source, Instant now) {
+        jdbcTemplate.update("""
+                INSERT INTO finance_transaction (
+                    id, owner_id, account_id, transaction_date, transaction_time, transaction_type,
+                    category, note, amount_minor, currency, source, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, id, ownerId, accountId, date.toString(), time.toString(), type, category, note,
+                amountMinor, currency, source, now.toString());
+    }
+
+    /** 查询最近流水。 */
+    public List<FinanceTransaction> findTransactions(String ownerId, int limit) {
+        return jdbcTemplate.query("""
+                SELECT t.id, t.account_id, a.name AS account_name, t.transaction_date, t.transaction_time,
+                       t.transaction_type, t.category, t.note, t.amount_minor, t.currency, t.source, t.created_at
+                FROM finance_transaction t
+                JOIN finance_account a ON a.id = t.account_id
+                WHERE t.owner_id = ?
+                ORDER BY t.transaction_date DESC, t.transaction_time DESC, t.created_at DESC
+                LIMIT ?
+                """, (rs, rowNum) -> new FinanceTransaction(
+                rs.getString("id"), rs.getString("account_id"), rs.getString("account_name"),
+                LocalDate.parse(rs.getString("transaction_date")), LocalTime.parse(rs.getString("transaction_time")),
+                rs.getString("transaction_type"), rs.getString("category"), rs.getString("note"),
+                BigDecimal.valueOf(rs.getLong("amount_minor"), 2), rs.getString("currency"),
+                rs.getString("source"), Instant.parse(rs.getString("created_at"))), ownerId, limit);
+    }
+
+    /** 查询用户全部财务流水，供完整流水视图按需加载。 */
+    public List<FinanceTransaction> findAllTransactions(String ownerId) {
+        return jdbcTemplate.query("""
+                SELECT t.id, t.account_id, a.name AS account_name, t.transaction_date, t.transaction_time,
+                       t.transaction_type, t.category, t.note, t.amount_minor, t.currency, t.source, t.created_at
+                FROM finance_transaction t
+                JOIN finance_account a ON a.id = t.account_id
+                WHERE t.owner_id = ?
+                ORDER BY t.transaction_date DESC, t.transaction_time DESC, t.created_at DESC
+                """, (rs, rowNum) -> new FinanceTransaction(
+                rs.getString("id"), rs.getString("account_id"), rs.getString("account_name"),
+                LocalDate.parse(rs.getString("transaction_date")), LocalTime.parse(rs.getString("transaction_time")),
+                rs.getString("transaction_type"), rs.getString("category"), rs.getString("note"),
+                BigDecimal.valueOf(rs.getLong("amount_minor"), 2), rs.getString("currency"),
+                rs.getString("source"), Instant.parse(rs.getString("created_at"))), ownerId);
+    }
+
+    /** 聚合指定月份的收入、支出与自动收益。 */
+    public MonthTotals summarizeMonth(String ownerId, LocalDate monthStart, LocalDate nextMonthStart) {
+        return jdbcTemplate.queryForObject("""
+                SELECT
+                    COALESCE(SUM(CASE WHEN transaction_type IN ('income', 'yield') THEN amount_minor ELSE 0 END), 0) income_minor,
+                    COALESCE(SUM(CASE WHEN transaction_type = 'expense' THEN amount_minor ELSE 0 END), 0) expense_minor,
+                    COALESCE(SUM(CASE WHEN transaction_type = 'yield' THEN amount_minor ELSE 0 END), 0) yield_minor
+                FROM finance_transaction
+                WHERE owner_id = ? AND transaction_date >= ? AND transaction_date < ?
+                """, (rs, rowNum) -> new MonthTotals(
+                BigDecimal.valueOf(rs.getLong("income_minor"), 2),
+                BigDecimal.valueOf(rs.getLong("expense_minor"), 2),
+                BigDecimal.valueOf(rs.getLong("yield_minor"), 2)),
+                ownerId, monthStart.toString(), nextMonthStart.toString());
+    }
+
+    /** 聚合指定闭开日期区间内的每日收入，自动收益按收入统计。 */
+    public List<DailyIncomeTotal> findDailyIncomeTotals(String ownerId, LocalDate from, LocalDate toExclusive) {
+        return jdbcTemplate.query("""
+                SELECT transaction_date,
+                       COALESCE(SUM(amount_minor), 0) AS income_minor
+                FROM finance_transaction
+                WHERE owner_id = ?
+                  AND transaction_type IN ('income', 'yield')
+                  AND transaction_date >= ? AND transaction_date < ?
+                GROUP BY transaction_date
+                ORDER BY transaction_date
+                """, (rs, rowNum) -> new DailyIncomeTotal(
+                LocalDate.parse(rs.getString("transaction_date")),
+                BigDecimal.valueOf(rs.getLong("income_minor"), 2)),
+                ownerId, from.toString(), toExclusive.toString());
+    }
+}

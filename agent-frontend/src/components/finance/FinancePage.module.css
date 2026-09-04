@@ -1,0 +1,120 @@
+.workspace { flex: 1; height: 100vh; min-width: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--bg-app); }
+.page { flex: 1; min-height: 0; overflow-y: auto; }
+.content { width: 100%; max-width: 1180px; min-height: 100%; margin: 0 auto; }
+
+.iconButton { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border: none; border-radius: var(--radius-md); background: transparent; color: var(--text-secondary); transition: background-color var(--transition-fast), color var(--transition-fast); }
+.iconButton:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
+
+.overview { min-height: 132px; display: grid; grid-template-columns: minmax(220px, 1.2fr) minmax(0, 2.8fr); align-items: center; padding: 24px 32px; }
+.balanceBlock, .monthStats > div { min-width: 0; display: flex; flex-direction: column; justify-content: center; padding: 8px 18px; }
+.balanceBlock { padding-left: 0; }
+.balanceBlock > span, .monthStats dt { font-size: 10px; font-weight: 600; }
+.balanceBlock > span { color: var(--text-secondary); }
+.balanceBlock strong { margin-top: 5px; color: var(--text-primary); font-size: 23px; font-weight: 650; letter-spacing: -.025em; font-variant-numeric: tabular-nums; }
+.balanceBlock small { margin-top: 4px; color: var(--text-muted); font-size: 10px; }
+.monthStats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.monthStats dd { overflow: hidden; margin-top: 6px; font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
+.incomeStat dt { color: #4f7664; }
+.incomeStat dd { color: #246247; }
+.expenseStat dt { color: #8a5b56; }
+.expenseStat dd { color: #913f38; }
+.yieldStat dt { color: #85662d; }
+.yieldStat dd { color: #725212; }
+
+.financeLayout { min-height: calc(100vh - 193px); display: grid; grid-template-columns: minmax(500px, 1.15fr) minmax(360px, .85fr); column-gap: 40px; }
+.historyPanel, .accountPanel { min-width: 0; padding: 28px 32px 36px; }
+.accountPanel { padding-left: 0; }
+.sectionHeading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.sectionHeading h2 { color: var(--text-primary); font-size: 13px; font-weight: 650; letter-spacing: -.01em; }
+.sectionHeading { align-items: baseline; margin-bottom: 8px; }
+.sectionHeading span { color: var(--text-muted); font-size: 10px; }
+.sectionMeta { display: inline-flex; align-items: center; gap: 8px; }
+.sectionMeta button { display: inline-flex; align-items: center; gap: 2px; padding: 4px 5px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-secondary); font: 600 10px var(--font-sans); }
+.sectionMeta button:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
+
+.typeSwitch { display: inline-flex; gap: 2px; padding: 2px; border-radius: var(--radius-md); background: var(--bg-surface); }
+.typeSwitch button { height: 26px; padding: 0 11px; border: none; border-radius: var(--radius-sm); background: transparent; color: var(--text-muted); font-family: var(--font-sans); font-size: 11px; font-weight: 600; }
+.typeSwitch button:hover { color: var(--text-secondary); }
+.typeSwitch .typeActive { outline: 1px solid var(--border-subtle); outline-offset: -1px; background: var(--bg-app); color: var(--text-primary); }
+
+.transactionForm, .accountForm { display: flex; flex-direction: column; gap: 14px; }
+.transactionForm .typeSwitch { align-self: flex-start; }
+.amountField { display: block; margin: 4px 0 6px; }
+.amountField > span, .transactionForm label > span, .accountForm label > span { display: block; margin-bottom: 6px; color: var(--text-secondary); font-size: 11px; font-weight: 550; }
+.amountField > div { display: flex; align-items: baseline; border-bottom: 1px solid var(--border-medium); }
+.amountField b { color: var(--text-muted); font-size: 17px; font-weight: 550; }
+.amountField input { min-width: 0; width: 100%; padding: 2px 8px 8px; border: 0; outline: 0; background: transparent; color: var(--text-primary); font: 650 26px var(--font-sans); letter-spacing: -.025em; font-variant-numeric: tabular-nums; }
+.amountField > div:focus-within { border-color: var(--accent-blue); }
+.amountField input::placeholder { color: #707b8c; }
+.formGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.wideField { grid-column: 1 / -1; }
+.transactionForm input:not([type='checkbox']):not(.amountField input), .transactionForm select, .accountForm input:not([type='checkbox']):not([type='radio']), .accountForm select { width: 100%; height: 36px; padding: 0 10px; border: 1px solid var(--border-medium); border-radius: var(--radius-md); outline: 0; background: var(--bg-app); color: var(--text-primary); font: 12px var(--font-sans); }
+.transactionForm input:focus, .transactionForm select:focus, .accountForm input:focus, .accountForm select:focus { border-color: var(--accent-blue); }
+
+.transactions { display: flex; flex-direction: column; }
+.transactionRow { display: grid; align-items: center; gap: 9px; padding: 10px 0; border-bottom: 1px solid var(--border-subtle); }
+.transactionRow { grid-template-columns: 22px minmax(0, 1fr) auto; }
+.transactionRow:last-child { border-bottom: none; }
+.transactionMark { display: inline-flex; align-items: center; justify-content: center; color: var(--text-secondary); }
+.transactionBody { min-width: 0; display: flex; flex-direction: column; }
+.transactionBody strong { overflow: hidden; color: var(--text-primary); font-size: 11.5px; font-weight: 600; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
+.transactionBody small { overflow: hidden; margin-top: 2px; color: var(--text-muted); font-size: 9.5px; text-overflow: ellipsis; white-space: nowrap; }
+.outAmount, .inAmount { font-size: 10.5px; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.outAmount { color: #a64b43; }
+.inAmount { color: #31725a; }
+.yieldNote { display: flex; gap: 6px; margin-top: 12px; color: var(--text-muted); font-size: 9.5px; line-height: 1.55; }
+.yieldNote svg { flex: 0 0 auto; margin-top: 1px; }
+
+.emptyState, .loading { display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); text-align: center; }
+.emptyState { min-height: 250px; gap: 6px; }
+.emptyState strong { margin-top: 4px; color: var(--text-primary); font-size: 12px; }
+.emptyState p, .emptyText { color: var(--text-muted); font-size: 10px; }
+.emptyState button { margin-top: 10px; }
+.emptyText { padding: 18px 0; }
+.loading { min-height: 300px; font-size: 11px; }
+
+.dataError { margin: 12px 32px 0; padding: 9px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid #e6c8c4; border-radius: var(--radius-md); background: #fff7f5; color: #9a4038; font-size: 12px; }
+.dataError button { border: 0; background: transparent; color: inherit; font: 600 11px var(--font-sans); }
+
+.modalDescription { margin-top: -6px; color: var(--text-muted); font-size: 11px; line-height: 1.55; }
+.modalError { padding: 8px 10px; border: 1px solid #e6c8c4; border-radius: var(--radius-md); background: #fff7f5; color: #9a4038; font-size: 11px; }
+.accountTypeField { min-width: 0; margin: 0; padding: 0; border: 0; }
+.accountTypeField legend { margin-bottom: 6px; color: var(--text-secondary); font-size: 11px; font-weight: 550; }
+.accountTypeGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.accountTypeGrid label { min-width: 0; height: 58px; display: grid; grid-template-columns: 26px minmax(0, 1fr); align-items: center; gap: 7px; padding: 0 9px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); color: var(--text-secondary); cursor: pointer; transition: border-color var(--transition-fast), background-color var(--transition-fast), color var(--transition-fast); }
+.accountTypeGrid label:hover { border-color: var(--border-medium); background: var(--bg-surface); color: var(--text-primary); }
+.accountTypeGrid input { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
+.accountTypeGrid label:focus-within { outline: 2px solid var(--accent-blue); outline-offset: 1px; }
+.accountTypeGrid label > span { width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; margin: 0; border-radius: var(--radius-sm); background: #f1f4f7; color: #52647e; }
+.accountTypeGrid label > b { overflow: hidden; font-size: 10px; font-weight: 600; line-height: 1.35; text-overflow: ellipsis; }
+.accountTypeGrid .accountTypeActive { border-color: #9cb4da; background: #f7f9fd; color: var(--text-primary); }
+.accountTypeGrid .accountTypeActive > span { background: #e9eff8; color: #315d9e; }
+.checkField { display: flex; align-items: center; gap: 8px; padding: 10px; border-radius: var(--radius-md); background: var(--bg-surface); }
+.checkField input { accent-color: var(--accent-blue); }
+.checkField input:disabled { opacity: .7; }
+.checkField > span { margin: 0 !important; color: var(--text-secondary) !important; font-weight: 500 !important; }
+.modalActions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.spinning { animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 980px) {
+  .financeLayout { grid-template-columns: 1fr; }
+  .accountPanel { padding: 0 32px 36px; }
+}
+
+@media (max-width: 680px) {
+  .overview { grid-template-columns: 1fr; gap: 14px; padding: 20px; }
+  .balanceBlock { padding-bottom: 16px; }
+  .monthStats > div:first-child { padding-left: 0; }
+  .historyPanel, .accountPanel { padding-right: 20px; padding-left: 20px; }
+  .formGrid { grid-template-columns: 1fr; }
+  .accountTypeGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .wideField { grid-column: auto; }
+}
+
+@media (max-width: 480px) {
+  .monthStats { grid-template-columns: 1fr; }
+  .monthStats > div { padding: 10px 0; }
+}
+
+@media (prefers-reduced-motion: reduce) { .spinning { animation: none; } }

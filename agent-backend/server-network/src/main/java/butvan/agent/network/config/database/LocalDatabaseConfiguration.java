@@ -21,6 +21,7 @@ import java.nio.file.Path;
 @Configuration
 @EnableTransactionManagement
 @EnableConfigurationProperties(LocalDatabaseProperties.class)
+
 public class LocalDatabaseConfiguration {
 
     /** 创建启用外键、WAL 和锁等待的 SQLite 数据源。 */

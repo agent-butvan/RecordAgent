@@ -11,6 +11,7 @@ const plusDays = (date: Date, amount: number): Date => {
 const emptyEntry = (): CalendarDayEntry => ({
   todos: [],
   expenses: [],
+  incomes: [],
   schedules: [],
   photos: [],
 });
@@ -28,6 +29,7 @@ export const createCalendarDemoData = (today: Date): Record<string, CalendarDayE
       { id: 'expense-2', category: '出行', note: '地铁通勤', amount: 6, time: '08:42', color: 'blue' },
       { id: 'expense-3', category: '学习', note: '设计类电子书', amount: 36, time: '21:08', color: 'violet' },
     ],
+    incomes: [],
     schedules: [
       { id: 'schedule-1', title: '产品方案同步', startTime: '09:30', endTime: '10:15', location: '线上会议', color: 'blue' },
       { id: 'schedule-2', title: '下班慢跑', startTime: '18:30', endTime: '19:15', location: '滨江步道', color: 'violet' },

@@ -1,0 +1,217 @@
+package butvan.agent.network.finance.service;
+
+import butvan.agent.network.daily.service.ExpenseAnalyticsService;
+import butvan.agent.network.finance.model.FinanceModels.ExpenseCategoryAmount;
+import butvan.agent.network.finance.model.FinanceModels.ExpenseChart;
+import butvan.agent.network.finance.model.FinanceModels.ExpenseChartDay;
+import butvan.agent.network.finance.model.FinanceModels.FinanceAccount;
+import butvan.agent.network.finance.model.FinanceModels.FinanceOverview;
+import butvan.agent.network.finance.model.FinanceModels.FinanceTransaction;
+import butvan.agent.network.finance.repository.FinanceRepository;
+import butvan.agent.network.finance.repository.FinanceRepository.DailyIncomeTotal;
+import butvan.agent.network.finance.repository.FinanceRepository.MonthTotals;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+/** 资产账户、手工流水与每日收益计提的领域服务。 */
+@Service
+@RequiredArgsConstructor
+public class FinanceService {
+
+    private static final Set<String> ACCOUNT_TYPES = Set.of(
+            "wechat_balance", "wechat_yield", "alipay_balance", "alipay_yuebao", "bank", "other",
+            "wechat", "alipay", "cash");
+    private static final Set<String> TRANSACTION_TYPES = Set.of("income", "expense");
+    private static final BigDecimal DAYS_PER_YEAR = new BigDecimal("36500");
+
+    private final FinanceRepository repository;
+    private final ExpenseAnalyticsService expenseAnalyticsService;
+
+    /** 查询财务总览；读取前先补齐所有生息账户截至今日的收益。 */
+    @Transactional
+    public FinanceOverview getOverview(String ownerId) {
+        requireOwner(ownerId);
+        LocalDate today = LocalDate.now();
+        settleYieldThrough(ownerId, today);
+        List<FinanceAccount> accounts = repository.findAccounts(ownerId);
+        BigDecimal totalAssets = accounts.stream()
+                .map(FinanceAccount::balance)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        LocalDate monthStart = today.withDayOfMonth(1);
+        MonthTotals totals = repository.summarizeMonth(ownerId, monthStart, monthStart.plusMonths(1));
+        BigDecimal monthExpense = expenseAnalyticsService
+                .analyze(ownerId, monthStart, monthStart.plusMonths(1).minusDays(1)).totalExpense();
+        return new FinanceOverview(totalAssets, totals.income(), monthExpense, totals.yield(),
+                accounts, findRecentTransactions(ownerId));
+    }
+
+    /** 按本周、本月或今年返回连续日期的收支趋势和支出分类堆叠数据。 */
+    @Transactional
+    public ExpenseChart getExpenseChart(String ownerId, String range) {
+        requireOwner(ownerId);
+        String normalizedRange = range == null || range.isBlank() ? "month" : range.trim().toLowerCase();
+        LocalDate today = LocalDate.now();
+        LocalDate from = switch (normalizedRange) {
+            case "week" -> today.minusDays(today.getDayOfWeek().getValue() - 1L);
+            case "month" -> today.withDayOfMonth(1);
+            case "year" -> today.withDayOfYear(1);
+            default -> throw new IllegalArgumentException("图表时间范围仅支持 week、month 或 year");
+        };
+        settleYieldThrough(ownerId, today);
+        var analysis = expenseAnalyticsService.analyze(ownerId, from, today);
+        Map<LocalDate, BigDecimal> incomeByDate = repository
+                .findDailyIncomeTotals(ownerId, from, today.plusDays(1)).stream()
+                .collect(Collectors.toMap(DailyIncomeTotal::date, DailyIncomeTotal::amount));
+        List<ExpenseChartDay> days = analysis.days().stream().map(day -> new ExpenseChartDay(
+                day.date(), day.total(), incomeByDate.getOrDefault(day.date(), BigDecimal.ZERO),
+                day.categories().entrySet().stream()
+                .map(item -> new ExpenseCategoryAmount(item.getKey(), item.getValue())).toList())).toList();
+        BigDecimal totalIncome = incomeByDate.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        return new ExpenseChart(normalizedRange, from, today, analysis.totalExpense(), totalIncome, days);
+    }
+
+    private List<FinanceTransaction> findRecentTransactions(String ownerId) {
+        List<FinanceTransaction> transactions = new ArrayList<>(repository.findTransactions(ownerId, 100));
+        expenseAnalyticsService.findRecentCalendarExpenses(ownerId, 100).forEach(expense -> transactions.add(
+                new FinanceTransaction("calendar-" + expense.id(), "", "日历记录", expense.date(), expense.time(),
+                        "expense", expense.category(), expense.note(), expense.amount(), expense.currency(),
+                        "calendar", expense.createdAt())));
+        Comparator<FinanceTransaction> newestFirst = Comparator.comparing(FinanceTransaction::date)
+                .thenComparing(FinanceTransaction::time)
+                .thenComparing(FinanceTransaction::createdAt)
+                .reversed();
+        return transactions.stream().sorted(newestFirst).limit(100).toList();
+    }
+
+    /** 查询完整流水，并合并仍由旧日历入口保存的花销记录。 */
+    @Transactional(readOnly = true)
+    public List<FinanceTransaction> getTransactions(String ownerId) {
+        requireOwner(ownerId);
+        List<FinanceTransaction> transactions = new ArrayList<>(repository.findAllTransactions(ownerId));
+        expenseAnalyticsService.findAllCalendarExpenses(ownerId).forEach(expense -> transactions.add(
+                new FinanceTransaction("calendar-" + expense.id(), "", "日历记录", expense.date(), expense.time(),
+                        "expense", expense.category(), expense.note(), expense.amount(), expense.currency(),
+                        "calendar", expense.createdAt())));
+        Comparator<FinanceTransaction> newestFirst = Comparator.comparing(FinanceTransaction::date)
+                .thenComparing(FinanceTransaction::time)
+                .thenComparing(FinanceTransaction::createdAt)
+                .reversed();
+        return transactions.stream().sorted(newestFirst).toList();
+    }
+
+    /** 创建资产账户；年化率使用百分数表达，例如 1.85 表示 1.85%。 */
+    @Transactional
+    public FinanceAccount createAccount(
+            String ownerId, String name, String accountType, String currency, BigDecimal initialBalance,
+            boolean interestEnabled, BigDecimal annualRatePercent) {
+        requireOwner(ownerId);
+        if (name == null || name.isBlank()) throw new IllegalArgumentException("账户名称不能为空");
+        if (!ACCOUNT_TYPES.contains(accountType)) throw new IllegalArgumentException("账户类型不合法");
+        String normalizedCurrency = normalizeCurrency(currency);
+        BigDecimal balance = requireMoney(initialBalance, true, "初始余额");
+        BigDecimal rate = annualRatePercent == null ? BigDecimal.ZERO : annualRatePercent;
+        if (rate.signum() < 0 || rate.compareTo(new BigDecimal("100")) > 0 || rate.scale() > 6) {
+            throw new IllegalArgumentException("年化收益率必须在 0% 到 100% 之间且最多六位小数");
+        }
+        if (!interestEnabled) rate = BigDecimal.ZERO;
+        String id = UUID.randomUUID().toString();
+        Instant now = Instant.now();
+        repository.insertAccount(id, ownerId, name.trim(), accountType, normalizedCurrency, toMinor(balance),
+                interestEnabled, rate.stripTrailingZeros(), LocalDate.now(), now);
+        return repository.findAccount(ownerId, id)
+                .orElseThrow(() -> new IllegalStateException("账户创建后无法读取"));
+    }
+
+    /** 创建收入或支出流水并同步调整所选账户余额。 */
+    @Transactional
+    public FinanceTransaction createTransaction(
+            String ownerId, String accountId, String transactionType, String category, String note,
+            BigDecimal amount, LocalDate date, LocalTime time) {
+        requireOwner(ownerId);
+        if (!TRANSACTION_TYPES.contains(transactionType)) throw new IllegalArgumentException("流水类型不合法");
+        if (category == null || category.isBlank()) throw new IllegalArgumentException("分类不能为空");
+        if (note == null || note.isBlank()) throw new IllegalArgumentException("说明不能为空");
+        if (date == null || time == null) throw new IllegalArgumentException("流水日期和时间不能为空");
+        BigDecimal normalizedAmount = requireMoney(amount, false, "流水金额");
+        FinanceAccount account = repository.findAccount(ownerId, accountId)
+                .orElseThrow(() -> new IllegalArgumentException("资产账户不存在"));
+        accrueYield(ownerId, account, LocalDate.now());
+        long amountMinor = toMinor(normalizedAmount);
+        long delta = "expense".equals(transactionType) ? -amountMinor : amountMinor;
+        Instant now = Instant.now();
+        if (!repository.adjustBalance(ownerId, accountId, delta, now)) {
+            throw new IllegalArgumentException("账户余额不足，无法记录这笔支出");
+        }
+        String id = UUID.randomUUID().toString();
+        repository.insertTransaction(id, ownerId, accountId, date, time, transactionType,
+                category.trim(), note.trim(), amountMinor, account.currency(), "manual", now);
+        return repository.findTransactions(ownerId, 100).stream()
+                .filter(transaction -> transaction.id().equals(id))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("流水创建后无法读取"));
+    }
+
+    /** 补齐指定日期前尚未计提的账户收益，供总览读取和未来定时任务复用。 */
+    @Transactional
+    public void settleYieldThrough(String ownerId, LocalDate throughDate) {
+        requireOwner(ownerId);
+        if (throughDate == null) throw new IllegalArgumentException("收益计提日期不能为空");
+        repository.findAccounts(ownerId).forEach(account -> accrueYield(ownerId, account, throughDate));
+    }
+
+    private void accrueYield(String ownerId, FinanceAccount account, LocalDate today) {
+        if (!account.interestEnabled() || account.annualRatePercent().signum() <= 0
+                || !account.lastAccrualDate().isBefore(today)) return;
+        BigDecimal runningBalance = account.balance();
+        LocalDate date = account.lastAccrualDate().plusDays(1);
+        Instant now = Instant.now();
+        while (!date.isAfter(today)) {
+            BigDecimal yield = runningBalance.multiply(account.annualRatePercent())
+                    .divide(DAYS_PER_YEAR, 2, RoundingMode.HALF_UP);
+            if (yield.signum() > 0) {
+                long yieldMinor = toMinor(yield);
+                repository.insertTransaction(UUID.randomUUID().toString(), ownerId, account.id(), date,
+                        LocalTime.of(0, 0), "yield", "理财收益", account.name() + " 每日收益",
+                        yieldMinor, account.currency(), "automatic", now);
+                runningBalance = runningBalance.add(yield);
+            }
+            date = date.plusDays(1);
+        }
+        repository.updateBalanceAndAccrualDate(ownerId, account.id(), toMinor(runningBalance), today, now);
+    }
+
+    private BigDecimal requireMoney(BigDecimal value, boolean allowZero, String field) {
+        if (value == null || value.scale() > 2 || (allowZero ? value.signum() < 0 : value.signum() <= 0)) {
+            throw new IllegalArgumentException(field + (allowZero ? "不能小于零且最多保留两位小数" : "必须大于零且最多保留两位小数"));
+        }
+        return value;
+    }
+
+    private long toMinor(BigDecimal value) {
+        return value.movePointRight(2).setScale(0, RoundingMode.UNNECESSARY).longValueExact();
+    }
+
+    private String normalizeCurrency(String currency) {
+        String result = currency == null || currency.isBlank() ? "CNY" : currency.trim().toUpperCase();
+        if (!result.matches("[A-Z]{3}")) throw new IllegalArgumentException("货币代码不合法");
+        return result;
+    }
+
+    private void requireOwner(String ownerId) {
+        if (ownerId == null || ownerId.isBlank()) throw new IllegalArgumentException("用户不能为空");
+    }
+}

@@ -11,16 +11,26 @@ export interface DailyEventBase {
 
 export interface TodoDailyEvent extends DailyEventBase {
   eventType: 'todo';
-  details: { time: string | null; priority: 'high' | 'medium' | 'low'; completed: boolean };
+  details: {
+    time: string | null;
+    priority: 'high' | 'medium' | 'low';
+    completed: boolean;
+    recurrence: 'none' | 'daily' | 'weekly' | 'monthly';
+  };
 }
 
 export interface ScheduleDailyEvent extends DailyEventBase {
   eventType: 'schedule';
-  details: { startTime: string; endTime: string; location: string | null; timezone: string };
+  details: { startTime: string | null; endTime: string | null; location: string | null; timezone: string };
 }
 
 export interface ExpenseDailyEvent extends DailyEventBase {
   eventType: 'expense';
+  details: { category: string; note: string; amount: number; time: string; currency: string };
+}
+
+export interface IncomeDailyEvent extends DailyEventBase {
+  eventType: 'income';
   details: { category: string; note: string; amount: number; time: string; currency: string };
 }
 
@@ -39,6 +49,7 @@ export type DailyEvent =
   | TodoDailyEvent
   | ScheduleDailyEvent
   | ExpenseDailyEvent
+  | IncomeDailyEvent
   | JournalDailyEvent
   | UnknownDailyEvent;
 

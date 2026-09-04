@@ -8,6 +8,7 @@ import io.agentscope.harness.agent.filesystem.AbstractFilesystem;
 import io.agentscope.harness.agent.filesystem.spec.LocalFilesystemSpec;
 import io.agentscope.harness.agent.subagent.task.WorkspaceTaskRepository;
 import io.agentscope.harness.agent.workspace.WorkspaceManager;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -38,8 +39,11 @@ public class SubagentRuntimeConfiguration {
      * @return
      */
     @Bean(destroyMethod = "shutdown")
-    public WorkspaceTaskRepository subagentTaskRepository(WorkspaceManager subagentWorkspaceManager) {
-        return new WorkspaceTaskRepository(subagentWorkspaceManager, "butvan_agent");
+    public WorkspaceTaskRepository subagentTaskRepository(
+            WorkspaceManager subagentWorkspaceManager,
+            ApplicationEventPublisher eventPublisher) {
+        return new PublishingWorkspaceTaskRepository(
+                subagentWorkspaceManager, "butvan_agent", eventPublisher);
     }
 
     @Bean(destroyMethod = "close")

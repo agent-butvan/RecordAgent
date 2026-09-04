@@ -16,6 +16,7 @@ import {
   User,
   Settings,
   CalendarDays,
+  WalletCards,
 } from 'lucide-react';
 import type { ChatSession, Project } from '../../types/chat';
 import { FormField } from '../common/FormField';
@@ -75,8 +76,8 @@ function sortByUpdatedDesc(a: ChatSession, b: ChatSession): number {
 }
 
 interface SidebarProps {
-  activeFeature: 'chat' | 'calendar';
-  onSelectFeature: (feature: 'chat' | 'calendar') => void;
+  activeFeature: 'chat' | 'calendar' | 'finance';
+  onSelectFeature: (feature: 'chat' | 'calendar' | 'finance') => void;
   /** 用户头像 URL；未配置时使用邮箱前两位作为默认头像 */
   avatarUrl?: string;
   projects: Project[];
@@ -412,17 +413,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
 
-        {/* 功能入口：日历（点击在日历与对话之间切换） */}
-        <button
-          type="button"
-          className={`${styles.featureTab} ${activeFeature === 'calendar' ? styles.featureTabActive : ''}`}
-          onClick={() => onSelectFeature(activeFeature === 'calendar' ? 'chat' : 'calendar')}
-          title={activeFeature === 'calendar' ? '返回对话' : '打开日历'}
-          aria-pressed={activeFeature === 'calendar'}
-        >
-          <CalendarDays size={14} />
-          <span>日历</span>
-        </button>
+        <nav className={styles.featureNav} aria-label="功能导航">
+          <button
+            type="button"
+            className={`${styles.featureTab} ${activeFeature === 'calendar' ? styles.featureTabActive : ''}`}
+            onClick={() => onSelectFeature('calendar')}
+            aria-current={activeFeature === 'calendar' ? 'page' : undefined}
+          >
+            <CalendarDays size={14} />
+            <span>日历</span>
+          </button>
+          <button
+            type="button"
+            className={`${styles.featureTab} ${activeFeature === 'finance' ? styles.featureTabActive : ''}`}
+            onClick={() => onSelectFeature('finance')}
+            aria-current={activeFeature === 'finance' ? 'page' : undefined}
+          >
+            <WalletCards size={14} />
+            <span>财务</span>
+          </button>
+        </nav>
 
         <div className={styles.scrollArea}>
           {isSearching ? (

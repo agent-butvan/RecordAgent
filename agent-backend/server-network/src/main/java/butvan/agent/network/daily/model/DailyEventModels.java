@@ -22,8 +22,12 @@ public final class DailyEventModels {
     }
 
     /** 创建待办的领域命令。 */
-    public record TodoCommand(LocalDate eventDate, String title, String time, String priority)
+    public record TodoCommand(LocalDate eventDate, String title, String time, String priority, String recurrence)
             implements DailyEventCommand {
+        public TodoCommand(LocalDate eventDate, String title, String time, String priority) {
+            this(eventDate, title, time, priority, "none");
+        }
+
         @Override
         public String eventType() {
             return "todo";
@@ -31,7 +35,7 @@ public final class DailyEventModels {
     }
 
     /** 待办类型的结构化详情。 */
-    public record TodoDetails(String time, String priority, boolean completed) {
+    public record TodoDetails(String time, String priority, boolean completed, String recurrence) {
     }
 
     /** 创建日程的领域命令。 */
@@ -77,6 +81,15 @@ public final class DailyEventModels {
 
     /** 花销类型的结构化详情。 */
     public record ExpenseDetails(
+            String category,
+            String note,
+            BigDecimal amount,
+            String time,
+            String currency) {
+    }
+
+    /** 财务模块收入在日历中的只读详情。 */
+    public record IncomeDetails(
             String category,
             String note,
             BigDecimal amount,
