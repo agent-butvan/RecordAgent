@@ -43,6 +43,8 @@ export function RecordPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [trashEntries, setTrashEntries] = useState<RecordEntry[] | null>(null);
+  const [clearingTrash, setClearingTrash] = useState(false);
+  const [confirmClearTrash, setConfirmClearTrash] = useState(false);
   const range = useMemo(() => { const from = new Date(today); from.setFullYear(from.getFullYear() - 1); const to = new Date(today); to.setFullYear(to.getFullYear() + 1); return { from: formatDate(from), to: formatDate(to) }; }, [today]);
 
   const load = useCallback(async () => {
@@ -79,6 +81,22 @@ export function RecordPage() {
     try { await trashRecord(entry.id, entry.version); setConfirmDeleteId(null); await load(); showMessage('success', '资料已移入回收站'); }
     catch (reason) { showMessage('error', reason instanceof Error ? reason.message : '删除失败'); }
     finally { setDeletingId(null); }
+  };
+
+  const clearTrash = async () => {
+    if (clearingTrash) return;
+    if (!confirmClearTrash) { setConfirmClearTrash(true); return; }
+    setClearingTrash(true);
+    try {
+      const count = await clearRecordTrash();
+      setTrashEntries([]);
+      showMessage('success', count ? `已永久删除 ${count} 条资料` : '回收站已经是空的');
+    } catch (reason) {
+      showMessage('error', reason instanceof Error ? reason.message : '清空回收站失败');
+    } finally {
+      setClearingTrash(false);
+      setConfirmClearTrash(false);
+    }
   };
 
   if (editing) return <RecordEditor date={editing.entry?.recordDate ?? todayKey} entry={editing.entry}
@@ -139,7 +157,7 @@ export function RecordPage() {
       </section>
     </div>
 
-    {trashEntries && <div className={styles.trashPage}><div className={styles.trashHeader}><div><h2>回收站</h2><span>{trashEntries.length} 条资料</span></div><div>{trashEntries.length > 0 && <button onClick={async () => { if (window.confirm('永久删除回收站中的全部资料？')) { await clearRecordTrash(); setTrashEntries([]); } }}>清空</button>}<button onClick={() => setTrashEntries(null)}><X size={16} /></button></div></div>
+    {trashEntries && <div className={styles.trashPage}><div className={styles.trashHeader}><div><h2>回收站</h2><span>{trashEntries.length} 条资料</span></div><div>{trashEntries.length > 0 && <button type="button" className={confirmClearTrash ? styles.confirmClear : ''} disabled={clearingTrash} onClick={() => void clearTrash()}>{clearingTrash ? '清空中…' : confirmClearTrash ? '确认清空' : '清空'}</button>}<button type="button" disabled={clearingTrash} onClick={() => { setConfirmClearTrash(false); setTrashEntries(null); }} aria-label="关闭回收站"><X size={16} /></button></div></div>
       <div className={styles.trashList}>{trashEntries.length ? trashEntries.map((entry) => <article key={entry.id}><div><strong>{displayTitle(entry)}</strong><span>{entry.recordDate}</span></div><button onClick={async () => { await restoreRecord(entry.id, entry.version); setTrashEntries(await fetchRecordTrash()); await load(); }}><RotateCcw size={14} />恢复</button></article>) : <div className={styles.empty}>回收站是空的</div>}</div></div>}
   </main>;
 }

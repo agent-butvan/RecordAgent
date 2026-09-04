@@ -34,7 +34,7 @@ public final class RecordModels {
     /** 一条可展示的记录。 */
     public record RecordEntry(String id, LocalDate recordDate, RecordType type, String title,
                               String contentHtml, String contentText, List<String> tags,
-                              String tabId,
+                              String tabId, String source, String sourceReference,
                               boolean pinned, boolean favorite, boolean archived, Instant trashedAt,
                               Integer weekYear, Integer weekNumber, int version,
                               Instant createdAt, Instant updatedAt) {

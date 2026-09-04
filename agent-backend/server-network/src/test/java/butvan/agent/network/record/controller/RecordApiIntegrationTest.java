@@ -10,6 +10,7 @@ import butvan.agent.network.record.service.RecordBackupService;
 import butvan.agent.network.record.service.RecordTabService;
 import butvan.agent.network.daily.DailyEventModuleConfiguration;
 import butvan.agent.network.daily.model.DailyEventModels.JournalDetails;
+import butvan.agent.network.daily.model.DailyEventModels.JournalCommand;
 import butvan.agent.network.daily.service.DailyEventService;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.SpringBootConfiguration;
@@ -88,6 +89,10 @@ class RecordApiIntegrationTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data").value(2));
         mockMvc.perform(get("/agent/records/trash"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data[0].type").value("weekly_review"));
+        mockMvc.perform(delete("/agent/records/trash"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data").value(1));
+        mockMvc.perform(get("/agent/records/trash"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(0));
     }
 
     @Test
@@ -99,6 +104,12 @@ class RecordApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         var node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(response).path("data");
+
+        mockMvc.perform(get("/agent/records").param("from", "2026-10-01").param("to", "2026-10-01")
+                        .param("type", "journal"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].title").value("十月手记"));
 
         var synced = dailyEventService.getDay("local-default", java.time.LocalDate.of(2026, 10, 1))
                 .events().stream().filter(event -> "record".equals(event.source())).findFirst().orElseThrow();
@@ -126,6 +137,34 @@ class RecordApiIntegrationTest {
                 .andExpect(status().isOk());
         org.junit.jupiter.api.Assertions.assertTrue(
                 dailyEventService.getDay("local-default", java.time.LocalDate.of(2026, 10, 2)).events().isEmpty());
+    }
+
+    @Test
+    void calendarJournalIsVisibleAndEditableInRecords() throws Exception {
+        var created = dailyEventService.create("local-default", new JournalCommand(
+                java.time.LocalDate.of(2026, 11, 1), "日历手记", "从日历写下的正文", "平静"));
+
+        String response = mockMvc.perform(get("/agent/records").param("from", "2026-11-01").param("to", "2026-11-01")
+                        .param("type", "journal"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].title").value("日历手记"))
+                .andExpect(jsonPath("$.data[0].source").value("calendar"))
+                .andReturn().getResponse().getContentAsString();
+        var record = new com.fasterxml.jackson.databind.ObjectMapper().readTree(response).path("data").get(0);
+
+        mockMvc.perform(put("/agent/records/" + record.path("id").asText())
+                        .param("expectedVersion", record.path("version").asText())
+                        .contentType("application/json").content("""
+                                {"recordDate":"2026-11-02","type":"journal","title":"记录页补充",
+                                 "contentHtml":"<p>双向同步后的正文</p>","contentText":"双向同步后的正文","tags":[]}
+                                """))
+                .andExpect(status().isOk());
+
+        var synced = dailyEventService.getDay("local-default", java.time.LocalDate.of(2026, 11, 2))
+                .events().stream().filter(event -> event.id().equals(created.id())).findFirst().orElseThrow();
+        org.junit.jupiter.api.Assertions.assertEquals("记录页补充", synced.title());
+        org.junit.jupiter.api.Assertions.assertEquals("双向同步后的正文", ((JournalDetails) synced.details()).body());
     }
 
     private static Path createDatabasePath() {

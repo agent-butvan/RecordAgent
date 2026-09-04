@@ -56,6 +56,13 @@ public class RecordRepository {
                 (rs, rowNum) -> map(rs, findTags(id)), ownerId, id).stream().findFirst();
     }
 
+    /** 通过来源领域的稳定引用查询记录投影。 */
+    public Optional<RecordEntry> findBySourceReference(String ownerId, String source, String sourceReference) {
+        return jdbcTemplate.query("SELECT * FROM record_entry WHERE owner_id = ? AND source = ? AND source_reference = ?",
+                (rs, rowNum) -> map(rs, findTags(rs.getString("id"))), ownerId, source, sourceReference)
+                .stream().findFirst();
+    }
+
     /** 插入记录主数据。 */
     public void insert(String id, String ownerId, LocalDate date, RecordType type, String title, String html,
                        String text, String tabId, Integer weekYear, Integer weekNumber, Instant now) {
@@ -64,6 +71,33 @@ public class RecordRepository {
                     tab_id, week_year, week_number, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, id, ownerId, date.toString(), type.value(), title, html, text, tabId, weekYear, weekNumber,
                 now.toString(), now.toString());
+    }
+
+    /** 创建由日历手记维护的记录投影。 */
+    public void insertCalendarJournal(String id, String ownerId, LocalDate date, String title, String text,
+                                      String tabId, String eventId, Instant now) {
+        jdbcTemplate.update("""
+                INSERT INTO record_entry (id, owner_id, record_date, record_type, title, content_html, content_text,
+                    tab_id, source, source_reference, created_at, updated_at)
+                VALUES (?, ?, ?, 'journal', ?, '', ?, ?, 'calendar', ?, ?, ?)
+                """, id, ownerId, date.toString(), title, text, tabId, eventId, now.toString(), now.toString());
+    }
+
+    /** 覆盖日历手记对应的记录投影，不使用前端版本号。 */
+    public boolean updateCalendarJournal(String ownerId, String eventId, LocalDate date, String title,
+                                         String text, String tabId, Instant now) {
+        return jdbcTemplate.update("""
+                UPDATE record_entry
+                SET record_date = ?, title = ?, content_html = '', content_text = ?, tab_id = ?,
+                    trashed_at = NULL, version = version + 1, updated_at = ?
+                WHERE owner_id = ? AND source = 'calendar' AND source_reference = ?
+                """, date.toString(), title, text, tabId, now.toString(), ownerId, eventId) == 1;
+    }
+
+    /** 删除日历端已经永久删除的手记投影。 */
+    public void deleteCalendarJournal(String ownerId, String eventId) {
+        jdbcTemplate.update("DELETE FROM record_entry WHERE owner_id = ? AND source = 'calendar' AND source_reference = ?",
+                ownerId, eventId);
     }
 
     /** 以乐观锁覆盖可编辑内容。 */
@@ -192,7 +226,8 @@ public class RecordRepository {
         String trashedAt = rs.getString("trashed_at");
         return new RecordEntry(rs.getString("id"), LocalDate.parse(rs.getString("record_date")),
                 RecordType.parse(rs.getString("record_type")), rs.getString("title"), rs.getString("content_html"),
-                rs.getString("content_text"), tags, rs.getString("tab_id"), rs.getBoolean("pinned"), rs.getBoolean("favorite"),
+                rs.getString("content_text"), tags, rs.getString("tab_id"), rs.getString("source"),
+                rs.getString("source_reference"), rs.getBoolean("pinned"), rs.getBoolean("favorite"),
                 rs.getBoolean("archived"), trashedAt == null ? null : Instant.parse(trashedAt),
                 (Integer) rs.getObject("week_year"), (Integer) rs.getObject("week_number"), rs.getInt("version"),
                 Instant.parse(rs.getString("created_at")), Instant.parse(rs.getString("updated_at")));

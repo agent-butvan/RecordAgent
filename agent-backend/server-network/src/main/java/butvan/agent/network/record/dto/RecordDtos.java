@@ -26,7 +26,7 @@ public final class RecordDtos {
     /** 记录响应。 */
     public record RecordResponse(String id, LocalDate recordDate, String type, String title,
                                  String contentHtml, String contentText, List<String> tags,
-                                 String tabId,
+                                 String tabId, String source, String sourceReference,
                                  boolean pinned, boolean favorite, boolean archived, Instant trashedAt,
                                  Integer weekYear, Integer weekNumber, int version,
                                  Instant createdAt, Instant updatedAt) {
@@ -42,7 +42,8 @@ public final class RecordDtos {
 
     public static RecordResponse from(RecordEntry entry) {
         return new RecordResponse(entry.id(), entry.recordDate(), entry.type().value(), entry.title(),
-                entry.contentHtml(), entry.contentText(), entry.tags(), entry.tabId(), entry.pinned(), entry.favorite(),
+                entry.contentHtml(), entry.contentText(), entry.tags(), entry.tabId(), entry.source(), entry.sourceReference(),
+                entry.pinned(), entry.favorite(),
                 entry.archived(), entry.trashedAt(), entry.weekYear(), entry.weekNumber(), entry.version(),
                 entry.createdAt(), entry.updatedAt());
     }

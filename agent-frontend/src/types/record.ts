@@ -9,6 +9,8 @@ export interface RecordEntry {
   contentText: string;
   tags: string[];
   tabId: string | null;
+  source: string;
+  sourceReference: string | null;
   pinned: boolean;
   favorite: boolean;
   archived: boolean;

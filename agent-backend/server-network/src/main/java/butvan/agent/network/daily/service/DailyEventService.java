@@ -9,8 +9,10 @@ import butvan.agent.network.daily.repository.DailyEventRepository.DailyEventRow;
 import butvan.agent.network.daily.type.DailyEventTypeRegistry;
 import butvan.agent.network.daily.type.TodoTypeHandler;
 import butvan.agent.network.daily.model.DailyEventModels.JournalCommand;
+import butvan.agent.network.daily.model.DailyEventModels.JournalDetails;
 import butvan.agent.network.daily.model.DailyEventModels.ExpenseDetails;
 import butvan.agent.network.daily.model.DailyEventModels.IncomeDetails;
+import butvan.agent.network.record.service.RecordJournalProjectionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +35,7 @@ public class DailyEventService {
     private final DailyEventTypeRegistry typeRegistry;
     private final TodoTypeHandler todoTypeHandler;
     private final ExpenseAnalyticsService expenseAnalyticsService;
+    private final RecordJournalProjectionService recordJournalProjectionService;
 
     /** 创建任意已注册类型的日记录。 */
     @Transactional
@@ -43,6 +46,9 @@ public class DailyEventService {
         String title = command.title() == null || command.title().isBlank() ? "无标题记录" : command.title().trim();
         repository.insertEvent(id, ownerId, command.eventDate(), command.eventType(), title, now);
         typeRegistry.insert(id, command);
+        if (command instanceof JournalCommand journal) {
+            recordJournalProjectionService.upsertFromCalendar(ownerId, id, journal.eventDate(), title, journal.body());
+        }
         return getDay(ownerId, command.eventDate()).events().stream()
                 .filter(event -> event.id().equals(id))
                 .findFirst()
@@ -77,6 +83,43 @@ public class DailyEventService {
     public void removeRecordJournal(String ownerId, String recordId) {
         repository.findBySourceReference(ownerId, "record", recordId).ifPresent(existing -> {
             if (!repository.delete(ownerId, existing.id(), existing.version())) {
+                throw new IllegalStateException("手记同步时已被其他操作修改，请重试");
+            }
+        });
+    }
+
+    /** 由记录页面更新原本创建于日历的手记，不产生新的同步投影。 */
+    @Transactional
+    public void syncCalendarJournalFromRecord(
+            String ownerId, String eventId, LocalDate date, String title, String body) {
+        if (eventId == null || eventId.isBlank()) throw new IllegalArgumentException("日记录 ID 不能为空");
+        DailyEventRow existing = repository.findById(ownerId, eventId).orElse(null);
+        String mood = existing == null ? "未标注心情" : typeRegistry
+                .loadDetails(Map.of("journal", List.of(eventId))).get(eventId) instanceof JournalDetails details
+                ? details.mood() : "未标注心情";
+        JournalCommand command = new JournalCommand(date, title, body == null ? "" : body, mood);
+        validate(ownerId, command);
+        String cleanTitle = title == null || title.isBlank() ? "无标题记录" : title.trim();
+        if (existing == null) {
+            Instant now = Instant.now();
+            repository.insertEvent(eventId, ownerId, date, "journal", cleanTitle, now);
+            typeRegistry.insert(eventId, command);
+            return;
+        }
+        if (!"journal".equals(existing.eventType())) throw new IllegalArgumentException("指定日记录不是手记");
+        typeRegistry.update(eventId, command);
+        if (!repository.updateEvent(ownerId, eventId, existing.version(), date, cleanTitle, Instant.now())) {
+            throw new IllegalStateException("手记同步时已被其他操作修改，请重试");
+        }
+    }
+
+    /** 由记录页面移除原本创建于日历的手记，保留记录侧的回收站条目。 */
+    @Transactional
+    public void removeCalendarJournalFromRecord(String ownerId, String eventId) {
+        if (eventId == null || eventId.isBlank()) return;
+        repository.findById(ownerId, eventId).ifPresent(existing -> {
+            if (!"journal".equals(existing.eventType())) throw new IllegalArgumentException("指定日记录不是手记");
+            if (!repository.delete(ownerId, eventId, existing.version())) {
                 throw new IllegalStateException("手记同步时已被其他操作修改，请重试");
             }
         });
@@ -167,9 +210,12 @@ public class DailyEventService {
     /** 使用乐观版本检查删除日记录。 */
     @Transactional
     public void delete(String ownerId, String eventId, int expectedVersion) {
-        requireEvent(ownerId, eventId);
+        DailyEventRow row = requireEvent(ownerId, eventId);
         if (!repository.delete(ownerId, eventId, expectedVersion)) {
             throw new IllegalStateException("日记录已被其他操作修改，请刷新后重试");
+        }
+        if ("journal".equals(row.eventType()) && "manual".equals(row.source())) {
+            recordJournalProjectionService.removeFromCalendar(ownerId, eventId);
         }
     }
 
@@ -191,6 +237,9 @@ public class DailyEventService {
         String title = command.title() == null || command.title().isBlank() ? "无标题记录" : command.title().trim();
         if (!repository.updateEvent(ownerId, eventId, expectedVersion, command.eventDate(), title, Instant.now())) {
             throw new IllegalStateException("日记录已被其他操作修改，请刷新后重试");
+        }
+        if (command instanceof JournalCommand journal && "manual".equals(row.source())) {
+            recordJournalProjectionService.upsertFromCalendar(ownerId, eventId, journal.eventDate(), title, journal.body());
         }
         return getDay(ownerId, command.eventDate()).events().stream()
                 .filter(event -> event.id().equals(eventId))

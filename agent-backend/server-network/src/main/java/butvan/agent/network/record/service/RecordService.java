@@ -72,8 +72,8 @@ public class RecordService {
             throw new IllegalArgumentException("记录已被修改或不存在，请刷新后重试");
         }
         repository.replaceTags(ownerId, id, normalizedTags(command.tags()), now);
-        if (command.type() == RecordType.JOURNAL) syncJournal(ownerId, id, command);
-        else if (current.type() == RecordType.JOURNAL) dailyEventService.removeRecordJournal(ownerId, id);
+        if (command.type() == RecordType.JOURNAL) syncJournal(ownerId, id, command, current);
+        else if (current.type() == RecordType.JOURNAL) removeLinkedJournal(ownerId, current);
         return get(ownerId, id);
     }
 
@@ -98,7 +98,7 @@ public class RecordService {
         if (!repository.setTrashed(ownerId, id, expectedVersion, Instant.now(), Instant.now())) {
             throw new IllegalArgumentException("记录已被修改或不存在，请刷新后重试");
         }
-        if (current.type() == RecordType.JOURNAL) dailyEventService.removeRecordJournal(ownerId, id);
+        if (current.type() == RecordType.JOURNAL) removeLinkedJournal(ownerId, current);
     }
 
     /** 从回收站恢复记录。 */
@@ -109,7 +109,8 @@ public class RecordService {
         }
         RecordEntry restored = get(ownerId, id);
         if (restored.type() == RecordType.JOURNAL) {
-            dailyEventService.syncRecordJournal(ownerId, id, restored.recordDate(), restored.title(), restored.contentText());
+            syncJournal(ownerId, id, new RecordCommand(restored.recordDate(), restored.type(), restored.title(),
+                    restored.contentHtml(), restored.contentText(), restored.tags(), restored.tabId()), restored);
         }
         return restored;
     }
@@ -118,7 +119,7 @@ public class RecordService {
     @Transactional
     public int clearTrash(String ownerId) {
         repository.findTrash(ownerId).stream().filter(record -> record.type() == RecordType.JOURNAL)
-                .forEach(record -> dailyEventService.removeRecordJournal(ownerId, record.id()));
+                .forEach(record -> removeLinkedJournal(ownerId, record));
         return repository.clearTrash(ownerId);
     }
 
@@ -126,7 +127,7 @@ public class RecordService {
     @Transactional
     public int clearAllForImport(String ownerId) {
         repository.findAll(ownerId).stream().filter(record -> record.type() == RecordType.JOURNAL)
-                .forEach(record -> dailyEventService.removeRecordJournal(ownerId, record.id()));
+                .forEach(record -> removeLinkedJournal(ownerId, record));
         return repository.clearAll(ownerId);
     }
 
@@ -174,6 +175,23 @@ public class RecordService {
             dailyEventService.syncRecordJournal(ownerId, recordId, command.recordDate(),
                     cleanTitle(command.title()), command.contentText());
         }
+    }
+
+    private void syncJournal(String ownerId, String recordId, RecordCommand command, RecordEntry current) {
+        if ("calendar".equals(current.source()) && current.sourceReference() != null) {
+            dailyEventService.syncCalendarJournalFromRecord(ownerId, current.sourceReference(), command.recordDate(),
+                    cleanTitle(command.title()), command.contentText());
+            return;
+        }
+        syncJournal(ownerId, recordId, command);
+    }
+
+    private void removeLinkedJournal(String ownerId, RecordEntry record) {
+        if ("calendar".equals(record.source()) && record.sourceReference() != null) {
+            dailyEventService.removeCalendarJournalFromRecord(ownerId, record.sourceReference());
+            return;
+        }
+        dailyEventService.removeRecordJournal(ownerId, record.id());
     }
 
     private record WeekBinding(Integer year, Integer number) { }
