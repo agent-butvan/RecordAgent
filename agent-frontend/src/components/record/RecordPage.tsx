@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { Check, Download, FileText, Heart, Plus, RotateCcw, Search, Trash2, Upload, X } from 'lucide-react';
 import { clearRecordTrash, createRecord, createRecordTab, deleteRecordTab, exportRecordBackup, fetchRecords,
   fetchRecordTabs, fetchRecordTrash, importRecordBackup, reorderRecordTabs, restoreRecord, trashRecord, updateRecord, updateRecordFlags } from '../../services/recordApi';
@@ -14,6 +14,8 @@ const TYPE_LABELS = Object.fromEntries(RECORD_TYPES.map((item) => [item.value, i
 type EditorTarget = { entry?: RecordEntry; tabId?: string; type: RecordType };
 const SUMMARY_COPY_KEY = 'butvan-record-summary-copy';
 const DEFAULT_SUMMARY_COPY = '持续积累八股文和面试题，把零散记忆变成可以表达的答案。';
+const IS_MAC = navigator.platform.toLowerCase().includes('mac');
+const TAB_SHORTCUT_LABEL = IS_MAC ? 'Command + 左右方向键' : 'Ctrl + 左右方向键';
 
 function formatDate(date: Date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
 function displayTitle(entry: RecordEntry) { return entry.title || entry.contentText.split('\n')[0] || '无标题记录'; }
@@ -48,6 +50,8 @@ export function RecordPage() {
   const [dragOverTabId, setDragOverTabId] = useState<string | null>(null);
   const [reorderingTabs, setReorderingTabs] = useState(false);
   const newTabInputRef = useRef<HTMLInputElement>(null);
+  const tabPointerDragRef = useRef<{ tabId: string; pointerId: number; startX: number; startY: number; dragging: boolean } | null>(null);
+  const suppressTabClickRef = useRef(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [trashEntries, setTrashEntries] = useState<RecordEntry[] | null>(null);
@@ -160,15 +164,55 @@ export function RecordPage() {
     void persistTabOrder(nextTabs, tabs);
   };
 
-  const handleTabDrop = (event: DragEvent<HTMLButtonElement>, targetId: string) => {
-    event.preventDefault();
-    if (draggedTabId) moveTab(draggedTabId, tabs.findIndex((tab) => tab.id === targetId));
+  const resetTabPointerDrag = () => {
+    tabPointerDragRef.current = null;
     setDraggedTabId(null);
     setDragOverTabId(null);
   };
 
+  const tabIdAtPoint = (clientX: number, clientY: number) => {
+    const target = document.elementFromPoint(clientX, clientY) as HTMLElement | null;
+    return target?.closest<HTMLElement>('[data-record-tab-id]')?.dataset.recordTabId ?? null;
+  };
+
+  const handleTabPointerDown = (event: ReactPointerEvent<HTMLButtonElement>, tabId: string) => {
+    if (event.button !== 0 || reorderingTabs) return;
+    tabPointerDragRef.current = {
+      tabId,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      dragging: false,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleTabPointerMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const drag = tabPointerDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (!drag.dragging && Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) < 4) return;
+    drag.dragging = true;
+    setDraggedTabId(drag.tabId);
+    setDragOverTabId(tabIdAtPoint(event.clientX, event.clientY));
+    event.preventDefault();
+  };
+
+  const handleTabPointerUp = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const drag = tabPointerDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    if (drag.dragging) {
+      const targetId = tabIdAtPoint(event.clientX, event.clientY);
+      if (targetId) moveTab(drag.tabId, tabs.findIndex((tab) => tab.id === targetId));
+      suppressTabClickRef.current = true;
+      window.setTimeout(() => { suppressTabClickRef.current = false; }, 0);
+    }
+    resetTabPointerDrag();
+  };
+
   const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, tabId: string) => {
-    if (!event.altKey || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return;
+    const platformModifierPressed = IS_MAC ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
+    if (!platformModifierPressed || event.altKey || event.shiftKey || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return;
     event.preventDefault();
     const currentIndex = tabs.findIndex((tab) => tab.id === tabId);
     moveTab(tabId, currentIndex + (event.key === 'ArrowLeft' ? -1 : 1));
@@ -212,13 +256,12 @@ export function RecordPage() {
         </div>
         <nav className={styles.tabs} aria-label="资料分类">
           <button className={activeTabId === 'all' ? styles.activeTab : ''} onClick={() => setActiveTabId('all')}>全部</button>
-          {tabs.map((tab) => <button key={tab.id} draggable={!reorderingTabs}
+          {tabs.map((tab) => <button key={tab.id} data-record-tab-id={tab.id}
             className={`${styles.tabButton} ${activeTabId === tab.id ? styles.activeTab : ''} ${draggedTabId === tab.id ? styles.draggingTab : ''} ${dragOverTabId === tab.id && draggedTabId !== tab.id ? styles.dragTarget : ''}`}
-            aria-label={`${tab.name}，可拖拽排序`} title="拖拽排序；也可按 Alt + 左右方向键调整"
-            onClick={() => setActiveTabId(tab.id)} onKeyDown={(event) => handleTabKeyDown(event, tab.id)}
-            onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', tab.id); setDraggedTabId(tab.id); }}
-            onDragEnter={() => setDragOverTabId(tab.id)} onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; }}
-            onDrop={(event) => handleTabDrop(event, tab.id)} onDragEnd={() => { setDraggedTabId(null); setDragOverTabId(null); }}>{tab.name}</button>)}
+            aria-label={`${tab.name}，可拖拽排序`} title={`拖拽排序；也可按 ${TAB_SHORTCUT_LABEL} 调整`}
+            onClick={() => { if (!suppressTabClickRef.current) setActiveTabId(tab.id); }} onKeyDown={(event) => handleTabKeyDown(event, tab.id)}
+            onPointerDown={(event) => handleTabPointerDown(event, tab.id)} onPointerMove={handleTabPointerMove}
+            onPointerUp={handleTabPointerUp} onPointerCancel={resetTabPointerDrag}>{tab.name}</button>)}
           <button className={styles.addTab} onClick={() => setIsNewTabModalOpen(true)}><Plus size={13} />新建 Tab</button>
         </nav>
 
