@@ -109,10 +109,11 @@ export const SpendingTrendChart: React.FC<SpendingTrendChartProps> = ({ chart, r
         tabIndex={interactive ? 0 : -1} aria-label="收支趋势图" aria-describedby={helpId}
         onPointerMove={selectFromPointer} onPointerDown={selectFromPointer} onKeyDown={selectFromKeyboard}
         onFocus={() => { if (interactive) setActiveIndex((current) => current ?? 0); }}>
-        <text x={margin.left - 10} y="9" textAnchor="end" className={styles.axisLabel}>元</text>
         {[0, .25, .5, .75, 1].map((ratio) => <g key={ratio} aria-hidden="true">
           <line x1={margin.left} x2={width - margin.right} y1={y(ceiling * ratio)} y2={y(ceiling * ratio)} className={ratio === 0 ? styles.baseline : styles.gridLine} />
-          <text x={margin.left - 10} y={y(ceiling * ratio) + 3} textAnchor="end" className={styles.axisLabel}>{compactMoney(ceiling * ratio)}</text>
+          <text x={margin.left - 10} y={y(ceiling * ratio) + 3} textAnchor="end" className={styles.axisLabel}>
+            {compactMoney(ceiling * ratio)}{ratio === 1 ? '元' : ''}
+          </text>
         </g>)}
         <g aria-hidden="true" className={loading ? styles.pendingData : undefined}>
           {interactive && activeDay && activeIndex !== null && <line x1={x(activeIndex)} x2={x(activeIndex)} y1={margin.top} y2={y(0)} className={styles.cursorLine} />}

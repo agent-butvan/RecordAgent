@@ -1,4 +1,4 @@
-.section { --expense-color: #913f38; --income-color: #246247; padding: 24px 32px 20px; border-bottom: 1px solid var(--border-subtle); }
+.section { --expense-color: #913f38; --income-color: #246247; padding: 24px 32px 20px; }
 .heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .heading h2 { color: var(--text-primary); font-size: 13px; font-weight: 650; }
 .heading p { margin-top: 5px; color: var(--text-secondary); font-size: 10px; font-variant-numeric: tabular-nums; }
