@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowDownLeft, ArrowUpRight, CalendarDays, Search, Sparkles, WalletCards } from 'lucide-react';
+import { CalendarDotsIcon, MagnifyingGlassIcon, WalletIcon } from '@phosphor-icons/react';
 import type { FinanceTransaction } from '../../types/finance';
 import { Drawer } from '../common/Drawer';
+import { TransactionTypeIcon } from './TransactionTypeIcon';
 import styles from './TransactionDrawer.module.css';
 
 interface TransactionDrawerProps {
@@ -37,7 +38,7 @@ export const TransactionDrawer: React.FC<TransactionDrawerProps> = ({
   >
     <div className={styles.filters} role="search" aria-label="筛选流水">
       <label><span>日期</span><input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label>
-      <label className={styles.searchField}><span>说明</span><div><Search size={14} aria-hidden="true" /><input type="search" value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="搜索说明" /></div></label>
+      <label className={styles.searchField}><span>说明</span><div><MagnifyingGlassIcon size={14} aria-hidden="true" /><input type="search" value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="搜索说明" /></div></label>
       {(date || keyword) && <button type="button" className={styles.clearButton} onClick={() => { setDate(''); setKeyword(''); }}>清除筛选</button>}
     </div>
 
@@ -46,16 +47,13 @@ export const TransactionDrawer: React.FC<TransactionDrawerProps> = ({
         : error ? <div className={styles.state}><strong>流水加载失败</strong><p>{error}</p><button type="button" onClick={onRetry}>重新加载</button></div>
           : filtered.length ? filtered.map((transaction) => {
             const isExpense = transaction.transactionType === 'expense';
-            const isYield = transaction.transactionType === 'yield';
             return <article className={styles.row} key={transaction.id}>
-              <span className={`${styles.mark} ${isExpense ? styles.expenseMark : styles.incomeMark}`}>
-                {isYield ? <Sparkles size={14} /> : isExpense ? <ArrowUpRight size={14} /> : <ArrowDownLeft size={14} />}
-              </span>
+              <TransactionTypeIcon type={transaction.transactionType} category={transaction.category} />
               <div className={styles.content}>
                 <div className={styles.primary}><strong>{transaction.note}</strong><b className={isExpense ? styles.expenseAmount : styles.incomeAmount}>{isExpense ? '-' : '+'}{money(transaction.amount)}</b></div>
                 <div className={styles.meta}>
-                  <span><CalendarDays size={12} />{transaction.date} {transaction.time.slice(0, 5)}</span>
-                  <span><WalletCards size={12} />{transaction.accountName}</span>
+                  <span><CalendarDotsIcon size={12} />{transaction.date} {transaction.time.slice(0, 5)}</span>
+                  <span><WalletIcon size={12} />{transaction.accountName}</span>
                   <span>{transaction.category}</span>
                   <span>{transaction.source === 'calendar' ? '日历记录' : transaction.source === 'automatic' ? '自动收益' : '手工记录'}</span>
                 </div>

@@ -1,0 +1,6 @@
+.icon { width: 16px; height: 16px; display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; color: var(--icon-ink); }
+.icon svg { display: block; flex: 0 0 auto; }
+.compact { width: 14px; height: 14px; }
+.expense { --icon-ink: #913f38; }
+.income { --icon-ink: #246247; }
+.yield { --icon-ink: #725212; }

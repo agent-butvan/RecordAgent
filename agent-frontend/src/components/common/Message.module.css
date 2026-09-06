@@ -11,6 +11,7 @@
 
 .viewport {
   left: 50%;
+  width: max-content;
   max-width: min(480px, calc(100vw - 32px));
   position: fixed;
   top: 18px;
@@ -18,7 +19,8 @@
   z-index: 1000;
 }
 
-.viewport .message { border: 1px solid currentColor; box-shadow: none; }
+.viewport .message { max-width: 100%; border: 1px solid currentColor; box-shadow: none; }
+.viewport .message span { min-width: 0; overflow-wrap: anywhere; }
 
 .success { background: #ecfdf5; color: #047857; }
 .error { background: #fef2f2; color: #b91c1c; }

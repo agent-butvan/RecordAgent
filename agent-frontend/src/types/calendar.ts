@@ -50,6 +50,7 @@ export interface CalendarPhoto {
 export interface CalendarJournal {
   id?: string;
   version?: number;
+  source?: string;
   title?: string;
   excerpt: string;
   mood: string;
@@ -68,6 +69,7 @@ export interface CalendarDayEntry {
   incomes: CalendarIncome[];
   schedules: CalendarSchedule[];
   journal?: CalendarJournal;
+  journals?: CalendarJournal[];
   photos: CalendarPhoto[];
   otherRecords?: CalendarOtherRecord[];
 }

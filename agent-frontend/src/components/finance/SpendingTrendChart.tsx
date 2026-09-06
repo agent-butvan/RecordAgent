@@ -1,56 +1,19 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { FinanceChartRange, FinanceExpenseChart } from '../../types/finance';
+import { trendBuckets, trendCeiling, trendTicks } from './spendingTrendData';
 import styles from './SpendingTrendChart.module.css';
 
 const RANGE_OPTIONS: Array<{ value: FinanceChartRange; label: string }> = [
-  { value: 'week', label: '本周' },
-  { value: 'month', label: '本月' },
-  { value: 'year', label: '今年' },
+  { value: 'week', label: '本周' }, { value: 'month', label: '本月' }, { value: 'year', label: '今年' },
 ];
 const CATEGORY_COLORS = ['#aabbd5', '#ddc0ae', '#afcbbf', '#c8b9d2', '#d9cca8', '#b5c9d2', '#dbb9bb', '#c1c9b6'];
-
-function categoryColor(category: string): string {
-  const index = [...category].reduce((total, character) => total + (character.codePointAt(0) ?? 0), 0);
-  return CATEGORY_COLORS[index % CATEGORY_COLORS.length];
-}
-
-function compactMoney(value: number): string {
-  if (value >= 10000) return `¥${(value / 10000).toFixed(value >= 100000 ? 0 : 1)}万`;
-  return `¥${Math.round(value)}`;
-}
-
-function dateLabel(date: string, range: FinanceChartRange): string {
-  const [, month, day] = date.split('-');
-  return range === 'year' ? `${Number(month)}月` : `${Number(month)}/${Number(day)}`;
-}
-
-function fullDateLabel(date: string): string {
-  const [year, month, day] = date.split('-');
-  return `${year}年${Number(month)}月${Number(day)}日`;
-}
-
-function smoothLinePath(points: Array<{ x: number; y: number }>): string {
-  if (points.length === 0) return '';
-  if (points.length === 1) return `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
-  const slopes = points.slice(1).map((point, index) =>
-    (point.y - points[index].y) / (point.x - points[index].x));
-  const tangents = points.map((_point, index) => {
-    if (index === 0) return slopes[0];
-    if (index === points.length - 1) return slopes.at(-1) ?? 0;
-    const previous = slopes[index - 1];
-    const next = slopes[index];
-    return previous * next <= 0 ? 0 : (2 * previous * next) / (previous + next);
-  });
-  return points.slice(1).reduce((path, point, index) => {
-    const previous = points[index];
-    const distance = point.x - previous.x;
-    const firstControlX = previous.x + distance / 3;
-    const secondControlX = point.x - distance / 3;
-    const firstControlY = previous.y + tangents[index] * distance / 3;
-    const secondControlY = point.y - tangents[index + 1] * distance / 3;
-    return `${path} C ${firstControlX.toFixed(2)} ${firstControlY.toFixed(2)}, ${secondControlX.toFixed(2)} ${secondControlY.toFixed(2)}, ${point.x.toFixed(2)} ${point.y.toFixed(2)}`;
-  }, `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`);
-}
+const money = (value: number) => new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY' }).format(value);
+const compactMoney = (value: number) => value >= 10000
+  ? `${Number((value / 10000).toFixed(2))}万` : `${Number(value.toFixed(2))}`;
+const dateLabel = (date: string, range: FinanceChartRange) => range === 'year'
+  ? `${Number(date.slice(5, 7))}月` : `${Number(date.slice(5, 7))}/${Number(date.slice(8))}`;
+const fullDateLabel = (date: string, range: FinanceChartRange) => range === 'year'
+  ? `${date.slice(0, 4)}年${Number(date.slice(5, 7))}月` : `${date.slice(0, 4)}年${Number(date.slice(5, 7))}月${Number(date.slice(8))}日`;
 
 interface SpendingTrendChartProps {
   chart: FinanceExpenseChart | null;
@@ -60,156 +23,140 @@ interface SpendingTrendChartProps {
   onRangeChange: (range: FinanceChartRange) => void;
 }
 
-interface HoverState {
-  index: number;
-  left: number;
-}
-
-/** 同一时间轴上叠加每日收支折线与按支出分类构成的堆叠柱。 */
+/** 收支折线叠加分类堆叠柱，悬浮明细随选中日期定位，支持键盘逐期浏览。 */
 export const SpendingTrendChart: React.FC<SpendingTrendChartProps> = ({ chart, range, loading, error, onRangeChange }) => {
   const hostRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  const helpId = useId();
   const [width, setWidth] = useState(0);
-  const [hover, setHover] = useState<HoverState | null>(null);
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const barClipId = useId();
+  const displayedRange = chart?.range ?? range;
+  const days = useMemo(() => trendBuckets(chart?.days ?? [], displayedRange), [chart, displayedRange]);
 
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
-    const update = () => setWidth(Math.max(520, Math.floor(host.clientWidth)));
+    const update = () => setWidth(Math.floor(host.clientWidth));
     update();
     const observer = new ResizeObserver(update);
     observer.observe(host);
     return () => observer.disconnect();
   }, []);
-
-  useEffect(() => setHover(null), [chart]);
+  useEffect(() => setActiveIndex(null), [chart, range]);
 
   const categories = useMemo(() => {
     const totals = new Map<string, number>();
-    chart?.days.forEach((day) => day.categories.forEach((item) => totals.set(item.category, (totals.get(item.category) ?? 0) + item.amount)));
-    return [...totals.entries()].sort((left, right) => right[1] - left[1]).map(([category]) => category);
-  }, [chart]);
-
-  const days = chart?.days ?? [];
-  const displayedRange = chart?.range ?? range;
-  const activeDay = hover ? days[hover.index] : null;
-  const height = 252;
-  const margin = { top: 16, right: 14, bottom: 30, left: 48 };
+    days.forEach((day) => day.categories.forEach((item) => totals.set(item.category, (totals.get(item.category) ?? 0) + item.amount)));
+    return [...totals.keys()].sort();
+  }, [days]);
+  const categoryColor = (category: string) => CATEGORY_COLORS[Math.max(0, categories.indexOf(category)) % CATEGORY_COLORS.length];
+  const hasData = days.some((day) => day.total > 0 || day.income > 0);
+  const activeDay = activeIndex === null ? null : days[activeIndex];
+  const height = 248;
+  const margin = { top: 18, right: 16, bottom: 30, left: 58 };
   const plotWidth = Math.max(1, width - margin.left - margin.right);
   const plotHeight = height - margin.top - margin.bottom;
-  const maxValue = Math.max(1, ...days.flatMap((day) => [day.total, day.income]));
-  const dataInset = days.length > 1 ? Math.min(22, plotWidth / 4) : 0;
-  const dataWidth = Math.max(1, plotWidth - dataInset * 2);
-  const step = days.length > 1 ? dataWidth / (days.length - 1) : dataWidth;
-  const barWidth = Math.max(2.5, Math.min(24, step * 0.7));
-  const x = (index: number) => days.length > 1
-    ? margin.left + dataInset + step * index
-    : margin.left + plotWidth / 2;
-  const y = (value: number) => margin.top + plotHeight - (value / maxValue) * plotHeight;
-  const cellBounds = (index: number) => ({
-    start: index === 0 ? margin.left : (x(index - 1) + x(index)) / 2,
-    end: index === days.length - 1 ? width - margin.right : (x(index) + x(index + 1)) / 2,
-  });
-  const expenseLine = smoothLinePath(days.map((day, index) => ({ x: x(index), y: y(day.total) })));
-  const incomeLine = smoothLinePath(days.map((day, index) => ({ x: x(index), y: y(day.income) })));
-  const tickIndexes = days.reduce<number[]>((result, _day, index) => {
-    const isYearTick = displayedRange === 'year' && (index === 0 || days[index - 1]?.date.slice(5, 7) !== days[index].date.slice(5, 7));
-    const interval = Math.max(1, Math.ceil(days.length / (displayedRange === 'week' ? 7 : 6)));
-    if (isYearTick || (displayedRange !== 'year' && (index % interval === 0 || index === days.length - 1))) result.push(index);
-    return result;
-  }, []);
+  const ceiling = trendCeiling(Math.max(0, ...days.flatMap((day) => [day.total, day.income])));
+  const step = plotWidth / Math.max(1, days.length);
+  const x = (index: number) => margin.left + step * (index + .5);
+  const y = (amount: number) => margin.top + plotHeight * (1 - amount / ceiling);
+  const line = (field: 'total' | 'income') => days.map((day, index) => `${index ? 'L' : 'M'} ${x(index)} ${y(day[field])}`).join(' ');
+  const interactive = !loading && !error && hasData;
+  const barWidth = Math.min(36, step * .62);
+  const tooltipWidth = Math.min(236, Math.max(0, width - 16));
+  const activeX = activeIndex === null ? 0 : x(activeIndex);
+  const tooltipLeft = Math.max(8, Math.min(width - tooltipWidth - 8,
+    activeX + tooltipWidth + 24 < width ? activeX + 18 : activeX - tooltipWidth - 18));
 
-  const showHover = (index: number) => {
-    const host = hostRef.current;
-    if (!host || width <= 0) return;
-    const bounds = host.getBoundingClientRect();
-    const naturalLeft = (x(index) / width) * bounds.width;
-    const left = Math.min(bounds.width - 100, Math.max(100, naturalLeft));
-    setHover((current) => current?.index === index && current.left === left ? current : { index, left });
+  const selectFromPointer = (event: React.PointerEvent<SVGSVGElement>) => {
+    if (!interactive) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const localX = (event.clientX - bounds.left) * width / bounds.width;
+    setActiveIndex(Math.max(0, Math.min(days.length - 1, Math.floor((localX - margin.left) / step))));
+  };
+  const selectFromKeyboard = (event: React.KeyboardEvent<SVGSVGElement>) => {
+    if (!interactive) return;
+    let next = activeIndex ?? 0;
+    if (event.key === 'ArrowRight') next += 1;
+    else if (event.key === 'ArrowLeft') next -= 1;
+    else if (event.key === 'Home') next = 0;
+    else if (event.key === 'End') next = days.length - 1;
+    else if (event.key === 'Escape') { setActiveIndex(null); return; }
+    else return;
+    event.preventDefault();
+    setActiveIndex(Math.max(0, Math.min(days.length - 1, next)));
   };
 
-  return <section className={styles.section} aria-labelledby="spending-trend-title">
+  return <section className={styles.section} aria-labelledby={titleId} aria-busy={loading}>
     <div className={styles.heading}>
-      <div><h2 id="spending-trend-title">收支趋势</h2><p>双折线展示每日收支，柱体展示支出分类构成</p></div>
-      <div className={styles.rangeSwitch} aria-label="收支趋势时间范围">
+      <div><h2 id={titleId}>收支趋势</h2><p>{chart ? `${chart.from.replaceAll('-', '/')} — ${chart.to.replaceAll('-', '/')}` : '查看收支变化'} · {displayedRange === 'year' ? '按月汇总' : '按日统计'}</p></div>
+      <div className={styles.rangeSwitch} role="group" aria-label="收支趋势时间范围">
         {RANGE_OPTIONS.map((option) => <button type="button" key={option.value} aria-pressed={range === option.value}
           className={range === option.value ? styles.rangeActive : ''} onClick={() => onRangeChange(option.value)}>{option.label}</button>)}
       </div>
     </div>
-
-    <div className={styles.chartHost} ref={hostRef} onMouseLeave={() => setHover(null)}>
-      {width > 0 && <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-labelledby="expense-chart-title expense-chart-description">
-        <title id="expense-chart-title">每日收支趋势与支出分类堆叠图</title>
-        <desc id="expense-chart-description">每日支出和收入分别以折线连接，每根柱子由当天不同支出分类堆叠组成，可悬停查看明细。</desc>
-        {[0, .5, 1].map((ratio) => {
-          const gridY = margin.top + plotHeight * (1 - ratio);
-          return <g key={ratio}><line x1={margin.left} x2={width - margin.right} y1={gridY} y2={gridY} className={styles.gridLine} />
-            <text x={margin.left - 9} y={gridY + 3} textAnchor="end" className={styles.axisLabel}>{compactMoney(maxValue * ratio)}</text></g>;
-        })}
-        {hover && <rect x="0" y={margin.top}
-          width={cellBounds(hover.index).end - cellBounds(hover.index).start} height={plotHeight} className={styles.hoverBand}
-          style={{ transform: `translateX(${cellBounds(hover.index).start}px)` }} />}
-        <g key={`${chart?.range}-${chart?.from}`} className={styles.dataLayer}>
+    <div className={styles.summary}>
+      <dl className={styles.periodTotals}>
+        <div><dt><i className={styles.expenseSwatch} />区间支出</dt><dd className={styles.expenseText}>{chart ? money(chart.totalExpense) : '—'}</dd></div>
+        <div><dt><i className={styles.incomeSwatch} />区间收入</dt><dd className={styles.incomeText}>{chart ? money(chart.totalIncome) : '—'}</dd></div>
+        <div><dt>区间结余</dt><dd>{chart ? money(chart.totalIncome - chart.totalExpense) : '—'}</dd></div>
+      </dl>
+    </div>
+    <div className={styles.chartHost} ref={hostRef} onPointerLeave={() => setActiveIndex(null)}
+      onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setActiveIndex(null); }}>
+      {width > 0 && <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} role="group"
+        tabIndex={interactive ? 0 : -1} aria-label="收支趋势图" aria-describedby={helpId}
+        onPointerMove={selectFromPointer} onPointerDown={selectFromPointer} onKeyDown={selectFromKeyboard}
+        onFocus={() => { if (interactive) setActiveIndex((current) => current ?? 0); }}>
+        {[0, .25, .5, .75, 1].map((ratio) => <g key={ratio} aria-hidden="true">
+          <line x1={margin.left} x2={width - margin.right} y1={y(ceiling * ratio)} y2={y(ceiling * ratio)} className={ratio === 0 ? styles.baseline : styles.gridLine} />
+          <text x={margin.left - 10} y={y(ceiling * ratio) + 3} textAnchor="end" className={styles.axisLabel}>
+            {compactMoney(ceiling * ratio)}{ratio === 1 ? '元' : ''}
+          </text>
+        </g>)}
+        <g aria-hidden="true" className={loading ? styles.pendingData : undefined}>
+          {interactive && activeDay && activeIndex !== null && <line x1={x(activeIndex)} x2={x(activeIndex)} y1={margin.top} y2={y(0)} className={styles.cursorLine} />}
           {days.map((day, index) => {
             let accumulated = 0;
-            return <g key={day.date}>{day.categories.map((item) => {
-              const segmentHeight = (item.amount / maxValue) * plotHeight;
-              accumulated += item.amount;
-              const isDimmed = hover !== null && hover.index !== index;
-              return <rect key={item.category} x={x(index) - barWidth / 2} y={y(accumulated)} width={barWidth}
-                height={Math.max(.5, segmentHeight)} rx="1.5" fill={categoryColor(item.category)} className={isDimmed ? styles.barDimmed : styles.bar} />;
-            })}</g>;
+            const segments = [...day.categories].filter((item) => item.amount > 0)
+              .sort((a, b) => categories.indexOf(a.category) - categories.indexOf(b.category));
+            const total = segments.reduce((sum, item) => sum + item.amount, 0);
+            return <g key={day.date} className={activeIndex !== null && activeIndex !== index ? styles.barDimmed : styles.bar}>
+              <defs><clipPath id={`${barClipId}-${index}`}><rect x={x(index) - barWidth / 2} y={y(total)}
+                width={barWidth} height={total / ceiling * plotHeight} rx={Math.min(4, barWidth / 4)} /></clipPath></defs>
+              <g clipPath={`url(#${barClipId}-${index})`}>{segments.map((item) => {
+                accumulated += item.amount;
+                return <rect key={item.category} x={x(index) - barWidth / 2} y={y(accumulated)}
+                  width={barWidth} height={item.amount / ceiling * plotHeight} fill={categoryColor(item.category)}
+                  stroke="var(--bg-app)" strokeWidth={.6} />;
+              })}</g>
+            </g>;
           })}
-          {expenseLine && <path d={expenseLine} className={styles.expenseLine} />}
-          {incomeLine && <path d={incomeLine} className={styles.incomeLine} />}
-          {days.filter((day) => day.total > 0).map((day) => {
-            const index = days.indexOf(day);
-            return <circle key={`expense-${day.date}`} cx={x(index)} cy={y(day.total)}
-              r={hover?.index === index ? 3.6 : 2.4} className={`${styles.trendPoint} ${styles.expensePoint}`} />;
-          })}
-          {days.filter((day) => day.income > 0).map((day) => {
-            const index = days.indexOf(day);
-            return <circle key={`income-${day.date}`} cx={x(index)} cy={y(day.income)}
-              r={hover?.index === index ? 3.6 : 2.4} className={`${styles.trendPoint} ${styles.incomePoint}`} />;
-          })}
+          {hasData && <><path d={line('total')} className={styles.expenseLine} /><path d={line('income')} className={styles.incomeLine} /></>}
+          {hasData && days.map((day, index) => (days.length <= 12 || activeIndex === index) && <g key={day.date}>
+            <circle cx={x(index)} cy={y(day.total)} r={activeIndex === index ? 4 : 2.5} className={styles.expensePoint} />
+            <rect x={x(index) - (activeIndex === index ? 3.5 : 2)} y={y(day.income) - (activeIndex === index ? 3.5 : 2)}
+              width={activeIndex === index ? 7 : 4} height={activeIndex === index ? 7 : 4} className={styles.incomePoint} />
+          </g>)}
         </g>
-        {hover && <line x1="0" x2="0" y1={margin.top} y2={margin.top + plotHeight} className={styles.hoverLine}
-          style={{ transform: `translateX(${x(hover.index)}px)` }} />}
-        {tickIndexes.map((index) => <text key={days[index].date} x={x(index)} y={height - 8} textAnchor="middle" className={styles.axisLabel}>{dateLabel(days[index].date, displayedRange)}</text>)}
-        {days.map((day, index) => <rect key={`hit-${day.date}`} x={cellBounds(index).start} y={margin.top}
-          width={cellBounds(index).end - cellBounds(index).start} height={plotHeight}
-          className={styles.hitArea} tabIndex={day.total > 0 || day.income > 0 ? 0 : -1} role="img"
-          aria-label={`${fullDateLabel(day.date)}，支出 ¥${day.total.toFixed(2)}，收入 ¥${day.income.toFixed(2)}`}
-          onMouseEnter={() => showHover(index)}
-          onFocus={() => showHover(index)} onBlur={() => setHover(null)} />)}
+        {trendTicks(days.length, plotWidth).map((index) => <text key={days[index].date} x={x(index)} y={height - 9} textAnchor="middle" className={styles.axisLabel}>{dateLabel(days[index].date, displayedRange)}</text>)}
       </svg>}
-
-      {activeDay && <div className={styles.tooltip}
-        style={{ '--tooltip-x': `${hover?.left ?? 0}px` } as React.CSSProperties} role="status">
-        <div key={activeDay.date} className={styles.tooltipContent}>
-          <div className={styles.tooltipHeading}><span>{fullDateLabel(activeDay.date)}</span></div>
-          <div className={styles.tooltipTotals}>
-            <span><i className={styles.expenseSwatch} />支出<strong>¥{activeDay.total.toFixed(2)}</strong></span>
-            <span><i className={styles.incomeSwatch} />收入<strong>¥{activeDay.income.toFixed(2)}</strong></span>
-          </div>
-          {activeDay.categories.length ? <div className={styles.tooltipRows}>{activeDay.categories.map((item) => <div key={item.category}>
-            <span><i style={{ backgroundColor: categoryColor(item.category) }} />{item.category}</span><b>¥{item.amount.toFixed(2)}</b>
-          </div>)}</div> : <p>当天暂无支出分类</p>}
+      {loading ? <div className={styles.state} role="status">正在更新收支趋势…</div>
+        : error ? <div className={`${styles.state} ${styles.error}`} role="alert">{error}</div>
+          : !hasData && <div className={styles.state}><strong>这个区间还没有收支记录</strong><span>记一笔后，趋势会显示在这里。</span></div>}
+      {interactive && activeDay && <div className={styles.tooltip} role="status" aria-live="polite" aria-atomic="true"
+        style={{ left: tooltipLeft, width: tooltipWidth }}>
+        <strong className={styles.tooltipDate}>{fullDateLabel(activeDay.date, displayedRange)}</strong>
+        <div className={styles.tooltipTotals}>
+          <span>支出 <b className={styles.expenseText}>{money(activeDay.total)}</b></span>
+          <span>收入 <b className={styles.incomeText}>{money(activeDay.income)}</b></span>
         </div>
+        <div className={styles.tooltipCategories}>{activeDay.categories.length ? [...activeDay.categories]
+          .sort((a, b) => categories.indexOf(a.category) - categories.indexOf(b.category))
+          .map((item) => <div key={item.category}><span><i style={{ backgroundColor: categoryColor(item.category) }} />{item.category}</span><b>{money(item.amount)}</b></div>) : <p>暂无支出分类</p>}</div>
       </div>}
-      {loading && <div className={styles.loadingState} aria-live="polite"><span />正在更新…</div>}
-      {error && <div className={styles.errorState} role="alert">{error}</div>}
     </div>
-
-    <div className={styles.chartFooter}>
-      <div className={styles.periodTotals}>
-        <span>区间支出 <strong>¥{(chart?.totalExpense ?? 0).toFixed(2)}</strong></span>
-        <span>区间收入 <strong>¥{(chart?.totalIncome ?? 0).toFixed(2)}</strong></span>
-      </div>
-      <div className={styles.legend}>
-        <span><i className={styles.expenseLineSwatch} />支出</span>
-        <span><i className={styles.incomeLineSwatch} />收入</span>
-        {categories.map((category) => <span key={category}><i style={{ backgroundColor: categoryColor(category) }} />{category}</span>)}
-      </div>
-    </div>
+    <p className={styles.visuallyHidden} id={helpId}>实线圆点为支出，虚线方点为收入，柱体显示支出分类。聚焦图表后，可用左右方向键切换日期，Home 和 End 跳至首尾，Escape 关闭明细。</p>
   </section>;
 };

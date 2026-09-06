@@ -1,4 +1,4 @@
-import { Trash2 } from 'lucide-react';
+import { TrashIcon } from '@phosphor-icons/react';
 import styles from './DailyRecordDeleteButton.module.css';
 
 interface DailyRecordDeleteButtonProps {
@@ -15,6 +15,6 @@ export const DailyRecordDeleteButton: React.FC<DailyRecordDeleteButtonProps> = (
     title={`删除${label}`}
     aria-label={`删除${label}`}
   >
-    <Trash2 size={13} strokeWidth={1.8} aria-hidden="true" />
+    <TrashIcon size={13} aria-hidden="true" />
   </button>
 );

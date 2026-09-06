@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Check } from 'lucide-react';
+import { CheckIcon } from '@phosphor-icons/react';
 import type { CalendarTodo } from '../../types/calendar';
 import { DailyRecordDeleteButton } from './DailyRecordDeleteButton';
 import styles from './DailyTodoList.module.css';
@@ -41,7 +41,7 @@ export const DailyTodoList: React.FC<DailyTodoListProps> = ({ todos, onToggle, o
               aria-label={`标记“${todo.title}”完成`}
             />
             <span className={styles.checkbox} aria-hidden="true">
-              {todo.completed && <Check size={13} strokeWidth={2.6} />}
+              {todo.completed && <CheckIcon size={13} weight="bold" />}
             </span>
           </label>
           <span className={styles.todoContent}>
