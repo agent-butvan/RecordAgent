@@ -26,6 +26,11 @@ export function fetchActiveStudySession(): Promise<StudySession | null> {
   return studyRequest<StudySession | null>('/agent/study-sessions/active');
 }
 
+/** 查询用户使用过的学习分类。 */
+export function fetchStudyCategories(): Promise<string[]> {
+  return studyRequest<string[]>('/agent/study-sessions/categories');
+}
+
 /** 立即开始一段项目内学习。 */
 export function startStudySession(content: string, category: string, timezone: string): Promise<StudySession> {
   return studyRequest<StudySession>('/agent/study-sessions/start', jsonInit('POST', { content, category, timezone }));

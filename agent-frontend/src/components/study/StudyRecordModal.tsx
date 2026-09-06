@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import type { SaveStudySessionInput, StudySession } from '../../types/study';
 import { Button } from '../common/Button';
+import { CategoryPicker } from '../common/CategoryPicker';
 import { Modal } from '../common/Modal';
-import { STUDY_CATEGORIES } from './studyCategories';
 import styles from './StudyRecordModal.module.css';
 
 interface StudyRecordModalProps {
@@ -10,6 +10,7 @@ interface StudyRecordModalProps {
   session?: StudySession | null;
   saving: boolean;
   error?: string | null;
+  categories: readonly string[];
   onClose: () => void;
   onSave: (input: SaveStudySessionInput) => Promise<void>;
 }
@@ -21,7 +22,7 @@ function toLocalInput(instant?: string | null, fallbackOffsetHours = 0): string 
 }
 
 /** 补卡与已完成记录编辑共用的受控表单。 */
-export function StudyRecordModal({ open, session, saving, error, onClose, onSave }: StudyRecordModalProps) {
+export function StudyRecordModal({ open, session, saving, error, categories, onClose, onSave }: StudyRecordModalProps) {
   const defaults = useMemo(() => ({
     content: session?.content ?? '',
     category: session?.category ?? '项目',
@@ -56,10 +57,6 @@ export function StudyRecordModal({ open, session, saving, error, onClose, onSave
     });
   };
 
-  const categories = STUDY_CATEGORIES.includes(category as typeof STUDY_CATEGORIES[number])
-    ? STUDY_CATEGORIES
-    : [category, ...STUDY_CATEGORIES];
-
   return <Modal open={open} title={session ? '编辑学习记录' : '补一段学习记录'} onClose={onClose} width={480} centered>
     <form className={styles.form} onSubmit={(event) => void submit(event)}>
       <p className={styles.description}>时间按当前设备时区保存，学习时长将由系统自动计算。</p>
@@ -69,12 +66,7 @@ export function StudyRecordModal({ open, session, saving, error, onClose, onSave
         <textarea value={content} onChange={(event) => setContent(event.target.value)} maxLength={200}
           placeholder="例如：复习 Java 并发八股文" required autoFocus />
       </label>
-      <label>
-        <span>学习分类</span>
-        <select value={category} onChange={(event) => setCategory(event.target.value)}>
-          {categories.map((item) => <option key={item} value={item}>{item}</option>)}
-        </select>
-      </label>
+      <CategoryPicker options={categories} value={category} onChange={setCategory} label="学习分类" disabled={saving} />
       <div className={styles.timeFields}>
         <label><span>开始时间</span><input type="datetime-local" value={startedAt}
           onChange={(event) => setStartedAt(event.target.value)} required /></label>
@@ -84,7 +76,7 @@ export function StudyRecordModal({ open, session, saving, error, onClose, onSave
       <label><span>地点（可选）</span><input value={location} onChange={(event) => setLocation(event.target.value)} maxLength={200} placeholder="例如：学校图书馆" /></label>
       <div className={styles.actions}>
         <Button type="button" variant="outline" onClick={onClose} disabled={saving}>取消</Button>
-        <Button type="submit" variant="primary" disabled={saving || !content.trim() || !startedAt || !endedAt}>
+        <Button type="submit" variant="primary" disabled={saving || !content.trim() || !category.trim() || !startedAt || !endedAt}>
           {saving ? '保存中…' : session ? '保存修改' : '完成补卡'}
         </Button>
       </div>

@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BookOpenIcon, ClockCounterClockwiseIcon, DesktopIcon, DeviceMobileIcon, PencilSimpleIcon, PlayIcon, TrashIcon } from '@phosphor-icons/react';
-import { createManualStudySession, deleteStudySession, fetchActiveStudySession, fetchStudySessions, fetchStudyStatistics, finishStudySession, startStudySession, updateStudySession } from '../../services/studyApi';
+import { createManualStudySession, deleteStudySession, fetchActiveStudySession, fetchStudyCategories, fetchStudySessions, fetchStudyStatistics, finishStudySession, startStudySession, updateStudySession } from '../../services/studyApi';
 import { formatLocalDate } from '../../services/dailyEvents';
 import type { SaveStudySessionInput, StudySession, StudyStatistics } from '../../types/study';
 import { Button } from '../common/Button';
+import { mergeCategoryOptions } from '../common/categoryOptions';
 import { useMessage } from '../common/Message';
 import { TopBar } from '../common/TopBar';
 import { StudyRecordModal } from './StudyRecordModal';
 import { StudyStartModal } from './StudyStartModal';
+import { STUDY_CATEGORIES } from './studyCategories';
 import styles from './StudyPage.module.css';
 
 const TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -43,6 +45,7 @@ export function StudyPage() {
   const [weekStats, setWeekStats] = useState<StudyStatistics | null>(null);
   const [previousWeekStats, setPreviousWeekStats] = useState<StudyStatistics | null>(null);
   const [monthStats, setMonthStats] = useState<StudyStatistics | null>(null);
+  const [rememberedCategories, setRememberedCategories] = useState<string[]>([]);
   const [now, setNow] = useState(Date.now()); const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false);
   const [showAll, setShowAll] = useState(false); const [error, setError] = useState<string | null>(null); const [recordError, setRecordError] = useState<string | null>(null);
   const [startModalOpen, setStartModalOpen] = useState(false); const [startError, setStartError] = useState<string | null>(null);
@@ -51,13 +54,14 @@ export function StudyPage() {
   const reload = useCallback(async () => {
     setError(null); const today = formatLocalDate(new Date());
     try {
-      const [nextActive, recent, nextWeek, previousWeek, nextMonth] = await Promise.all([
+      const [nextActive, recent, nextWeek, previousWeek, nextMonth, categories] = await Promise.all([
         fetchActiveStudySession(), fetchStudySessions(formatLocalDate(shiftedDate(-30)), today, TIMEZONE),
         fetchStudyStatistics(formatLocalDate(shiftedDate(-6)), today, TIMEZONE),
         fetchStudyStatistics(formatLocalDate(shiftedDate(-13)), formatLocalDate(shiftedDate(-7)), TIMEZONE),
         fetchStudyStatistics(formatLocalDate(startOfMonth()), today, TIMEZONE),
+        fetchStudyCategories(),
       ]);
-      setActive(nextActive); setSessions(recent); setWeekStats(nextWeek); setPreviousWeekStats(previousWeek); setMonthStats(nextMonth);
+      setActive(nextActive); setSessions(recent); setWeekStats(nextWeek); setPreviousWeekStats(previousWeek); setMonthStats(nextMonth); setRememberedCategories(categories);
     } catch (cause) { setError(cause instanceof Error ? cause.message : '学习记录加载失败，请稍后重试。'); }
     finally { setLoading(false); }
   }, []);
@@ -79,6 +83,7 @@ export function StudyPage() {
     const totals = new Map<string, number>(); completedSessions.forEach((session) => totals.set(session.category, (totals.get(session.category) ?? 0) + session.durationSeconds));
     return [...totals.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
   }, [completedSessions]);
+  const categoryOptions = mergeCategoryOptions(STUDY_CATEGORIES, rememberedCategories);
 
   const begin = async (content: string, category: string) => {
     setSaving(true); setStartError(null);
@@ -131,9 +136,9 @@ export function StudyPage() {
         <section className={styles.sideSection}><Heading title="本周观察" /><p className={styles.insight}>这周已经学习 <em>{weekStats?.studyDays ?? 0} 天</em>{weekChange !== null && <>，相比上周{weekChange >= 0 ? '增加' : '减少'}了 <em>{formatDuration(Math.abs((weekStats?.totalDurationSeconds ?? 0) - previousTotal))}</em></>}。{topCategory ? <>最近投入最多的是“<em>{topCategory}</em>”。</> : '完成第一段学习后，这里会生成观察。'}</p></section>
       </aside></div>
     </div></div>
-    <StudyStartModal open={startModalOpen} saving={saving} error={startError}
+    <StudyStartModal open={startModalOpen} saving={saving} error={startError} categories={categoryOptions}
       onClose={() => { if (!saving) { setStartModalOpen(false); setStartError(null); } }} onStart={begin} />
-    <StudyRecordModal open={modalOpen} session={editing} saving={saving} error={recordError} onClose={() => { if (!saving) { setModalOpen(false); setEditing(null); setRecordError(null); } }} onSave={saveRecord} />
+    <StudyRecordModal open={modalOpen} session={editing} saving={saving} error={recordError} categories={categoryOptions} onClose={() => { if (!saving) { setModalOpen(false); setEditing(null); setRecordError(null); } }} onSave={saveRecord} />
   </main>;
 }
 

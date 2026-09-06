@@ -13,7 +13,7 @@ import {
 } from '@phosphor-icons/react';
 import type { CalendarDayEntry, CalendarJournal, CalendarRecordDraft } from '../../types/calendar';
 import type { DailyDaySummary } from '../../types/dailyEvent';
-import { createFinanceTransaction, fetchFinanceOverview } from '../../services/financeApi';
+import { createFinanceTransaction, fetchFinanceCategories, fetchFinanceOverview } from '../../services/financeApi';
 import {
   createDailyRecord,
   deleteDailyEvent,
@@ -23,7 +23,7 @@ import {
   setDailyTodoCompleted,
   updateDailyJournal,
 } from '../../services/dailyEvents';
-import type { CreateFinanceTransactionInput, FinanceAccount } from '../../types/finance';
+import type { CreateFinanceTransactionInput, FinanceAccount, FinanceCategoryOptions } from '../../types/finance';
 import { Button } from '../common/Button';
 import { Message } from '../common/Message';
 import { Modal } from '../common/Modal';
@@ -106,6 +106,7 @@ export const CalendarView: React.FC = () => {
   const [isCashflowModalOpen, setIsCashflowModalOpen] = useState(false);
   const [isFinanceTransactionModalOpen, setIsFinanceTransactionModalOpen] = useState(false);
   const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
+  const [financeCategories, setFinanceCategories] = useState<FinanceCategoryOptions>({ expense: [], income: [] });
 
   const days = useMemo(() => {
     const firstOfMonth = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
@@ -197,12 +198,13 @@ export const CalendarView: React.FC = () => {
   const openFinanceTransactionModal = async () => {
     try {
       setDataError(null);
-      const overview = await fetchFinanceOverview();
+      const [overview, categories] = await Promise.all([fetchFinanceOverview(), fetchFinanceCategories()]);
       if (!overview.accounts.length) {
         setDataError('暂无资产账户，请先添加一个账户后再记账。');
         return;
       }
       setFinanceAccounts(overview.accounts);
+      setFinanceCategories(categories);
       setIsFinanceTransactionModalOpen(true);
     } catch (error: unknown) {
       setDataError(error instanceof Error ? error.message : '读取财务账户失败，请稍后重试');
@@ -561,6 +563,7 @@ export const CalendarView: React.FC = () => {
       <TransactionModal
         open={isFinanceTransactionModalOpen}
         accounts={financeAccounts}
+        categories={financeCategories}
         defaultDate={selectedKey}
         onClose={() => setIsFinanceTransactionModalOpen(false)}
         onSubmit={saveFinanceTransaction}

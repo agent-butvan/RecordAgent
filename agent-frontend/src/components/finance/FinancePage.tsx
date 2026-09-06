@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowClockwiseIcon, CaretRightIcon, PlusIcon, SparkleIcon, WalletIcon } from '@phosphor-icons/react';
-import { createFinanceAccount, createFinanceTransaction, fetchFinanceExpenseChart, fetchFinanceOverview, fetchFinanceTransactions } from '../../services/financeApi';
-import type { CreateFinanceTransactionInput, FinanceAccountType, FinanceChartRange, FinanceExpenseChart, FinanceOverview, FinanceTransaction } from '../../types/finance';
+import { createFinanceAccount, createFinanceTransaction, fetchFinanceCategories, fetchFinanceExpenseChart, fetchFinanceOverview, fetchFinanceTransactions } from '../../services/financeApi';
+import type { CreateFinanceTransactionInput, FinanceAccountType, FinanceCategoryOptions, FinanceChartRange, FinanceExpenseChart, FinanceOverview, FinanceTransaction } from '../../types/finance';
 import { Button } from '../common/Button';
 import { Modal } from '../common/Modal';
 import { TopBar } from '../common/TopBar';
@@ -28,6 +28,7 @@ function money(value: number): string {
 /** 独立财务工作台：统一完成资产建档、收支记账和自动收益查看。 */
 export const FinancePage: React.FC = () => {
   const [overview, setOverview] = useState<FinanceOverview | null>(null);
+  const [categoryOptions, setCategoryOptions] = useState<FinanceCategoryOptions>({ expense: [], income: [] });
   const [chart, setChart] = useState<FinanceExpenseChart | null>(null);
   const [chartRange, setChartRange] = useState<FinanceChartRange>('month');
   const [isLoading, setIsLoading] = useState(true);
@@ -49,7 +50,11 @@ export const FinancePage: React.FC = () => {
   const load = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    try { setOverview(await fetchFinanceOverview()); }
+    try {
+      const [nextOverview, nextCategories] = await Promise.all([fetchFinanceOverview(), fetchFinanceCategories()]);
+      setOverview(nextOverview);
+      setCategoryOptions(nextCategories);
+    }
     catch (cause) { setError(cause instanceof Error ? cause.message : '财务数据加载失败，请稍后重试。'); }
     finally { setIsLoading(false); }
   }, []);
@@ -190,6 +195,7 @@ export const FinancePage: React.FC = () => {
     <TransactionModal
       open={isTransactionModalOpen}
       accounts={overview?.accounts ?? []}
+      categories={categoryOptions}
       onClose={() => setIsTransactionModalOpen(false)}
       onSubmit={submitTransaction}
     />

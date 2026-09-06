@@ -3,6 +3,7 @@ import type {
   CreateFinanceTransactionInput,
   FinanceAccount,
   FinanceChartRange,
+  FinanceCategoryOptions,
   FinanceExpenseChart,
   FinanceOverview,
   FinanceTransaction,
@@ -42,6 +43,11 @@ export function fetchFinanceOverview(): Promise<FinanceOverview> {
 /** 按需查询完整流水列表，避免财务首页承担全部历史数据的渲染成本。 */
 export function fetchFinanceTransactions(): Promise<FinanceTransaction[]> {
   return financeRequest<FinanceTransaction[]>('/agent/finance/transactions');
+}
+
+/** 查询用户使用过的收入与支出分类。 */
+export function fetchFinanceCategories(): Promise<FinanceCategoryOptions> {
+  return financeRequest<FinanceCategoryOptions>('/agent/finance/categories');
 }
 
 /** 为尚未提供收入字段的旧版后端响应补齐安全默认值。 */

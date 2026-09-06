@@ -81,6 +81,13 @@ public class StudyController {
         return Result.success(studyService.getActive(currentUserId()));
     }
 
+    /** 查询用户使用过的学习分类。 */
+    @ApiLog("查询学习分类")
+    @GetMapping("/categories")
+    public Result<List<String>> categories() {
+        return Result.success(studyService.getCategories(currentUserId()));
+    }
+
     /** 查询日期范围内的学习记录。 */
     @ApiLog("查询学习记录")
     @GetMapping

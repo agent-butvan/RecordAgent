@@ -30,6 +30,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.hamcrest.Matchers.hasItem;
 
 /** 通过 HTTP seam 验证学习打卡、补卡、统计与并发版本。 */
 @SpringBootTest(classes = StudyApiIntegrationTest.TestApplication.class)
@@ -50,7 +51,7 @@ class StudyApiIntegrationTest {
     @Test
     void startAndFinishMaintainsSingleActiveSession() throws Exception {
         JsonNode started = data(postJson("/agent/study-sessions/start", """
-                {"content":"学习八股文","category":"八股文","timezone":"Asia/Shanghai"}
+                {"content":"学习八股文","category":"系统设计","timezone":"Asia/Shanghai"}
                 """));
 
         mockMvc.perform(post("/agent/study-sessions/start")
@@ -70,6 +71,10 @@ class StudyApiIntegrationTest {
         mockMvc.perform(get("/agent/study-sessions/active"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").doesNotExist());
+
+        mockMvc.perform(get("/agent/study-sessions/categories"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data", hasItem("系统设计")));
     }
 
     @Test

@@ -18,6 +18,23 @@ import java.util.Optional;
 public class StudyRepository {
     private final JdbcTemplate jdbcTemplate;
 
+    /** 按首次使用顺序查询用户使用过的学习分类。 */
+    public List<String> findCategories(String ownerId) {
+        return jdbcTemplate.queryForList("""
+                SELECT name FROM study_category
+                WHERE owner_id = ?
+                ORDER BY created_at, name
+                """, String.class, ownerId);
+    }
+
+    /** 记住用户首次使用的学习分类，重复使用时保持原顺序。 */
+    public void rememberCategory(String ownerId, String category, Instant now) {
+        jdbcTemplate.update("""
+                INSERT OR IGNORE INTO study_category (owner_id, name, created_at)
+                VALUES (?, ?, ?)
+                """, ownerId, category, now.toString());
+    }
+
     /** 查询当前进行中的学习时段。 */
     public Optional<StudySession> findActive(String ownerId, Instant now) {
         return query("""

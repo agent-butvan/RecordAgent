@@ -40,6 +40,11 @@ export interface FinanceOverview {
   transactions: FinanceTransaction[];
 }
 
+export interface FinanceCategoryOptions {
+  expense: string[];
+  income: string[];
+}
+
 export interface FinanceExpenseCategory {
   category: string;
   amount: number;

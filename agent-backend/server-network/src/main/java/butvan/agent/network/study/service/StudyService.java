@@ -42,6 +42,7 @@ public class StudyService {
             throw new IllegalArgumentException("已有进行中的学习，请先结束后再开始");
         }
         StudyCommand command = command(content, category, now, null, timezone, null);
+        studyRepository.rememberCategory(ownerId, command.category(), now);
         String id = UUID.randomUUID().toString();
         try {
             dailyEventRepository.insertEvent(id, ownerId, command.eventDate(), "study", cleanContent(content),
@@ -88,6 +89,7 @@ public class StudyService {
             throw new IllegalArgumentException("补卡时间与已有学习记录重叠");
         }
         String id = UUID.randomUUID().toString();
+        studyRepository.rememberCategory(ownerId, command.category(), now);
         dailyEventRepository.insertEvent(id, ownerId, command.eventDate(), "study", cleanContent(content),
                 "manual", null, "completed", now);
         typeRegistry.insert(id, command);
@@ -108,6 +110,7 @@ public class StudyService {
         if (studyRepository.hasOverlap(ownerId, startedAt, endedAt, eventId, now)) {
             throw new IllegalArgumentException("修改后的时间与已有学习记录重叠");
         }
+        studyRepository.rememberCategory(ownerId, command.category(), now);
         typeRegistry.update(eventId, command);
         if (!dailyEventRepository.updateEvent(ownerId, eventId, expectedVersion, command.eventDate(),
                 cleanContent(content), "completed", now)) {
@@ -133,6 +136,13 @@ public class StudyService {
     public StudySession getActive(String ownerId) {
         validateOwner(ownerId);
         return studyRepository.findActive(ownerId, Instant.now()).orElse(null);
+    }
+
+    /** 查询用户使用过的学习分类。 */
+    @Transactional(readOnly = true)
+    public List<String> getCategories(String ownerId) {
+        validateOwner(ownerId);
+        return studyRepository.findCategories(ownerId);
     }
 
     /** 查询与自然日期范围相交的学习时段。 */

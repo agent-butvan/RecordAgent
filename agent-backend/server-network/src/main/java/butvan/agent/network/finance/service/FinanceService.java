@@ -113,6 +113,15 @@ public class FinanceService {
         return transactions.stream().sorted(newestFirst).toList();
     }
 
+    /** 查询用户使用过的收入与支出分类。 */
+    @Transactional(readOnly = true)
+    public Map<String, List<String>> getTransactionCategories(String ownerId) {
+        requireOwner(ownerId);
+        return Map.of(
+                "expense", repository.findTransactionCategories(ownerId, "expense"),
+                "income", repository.findTransactionCategories(ownerId, "income"));
+    }
+
     /** 创建资产账户；年化率使用百分数表达，例如 1.85 表示 1.85%。 */
     @Transactional
     public FinanceAccount createAccount(
@@ -144,6 +153,8 @@ public class FinanceService {
         requireOwner(ownerId);
         if (!TRANSACTION_TYPES.contains(transactionType)) throw new IllegalArgumentException("流水类型不合法");
         if (category == null || category.isBlank()) throw new IllegalArgumentException("分类不能为空");
+        String normalizedCategory = category.trim();
+        if (normalizedCategory.length() > 40) throw new IllegalArgumentException("分类不能超过 40 个字符");
         if (note == null || note.isBlank()) throw new IllegalArgumentException("说明不能为空");
         if (date == null || time == null) throw new IllegalArgumentException("流水日期和时间不能为空");
         BigDecimal normalizedAmount = requireMoney(amount, false, "流水金额");
@@ -157,8 +168,9 @@ public class FinanceService {
             throw new IllegalArgumentException("账户余额不足，无法记录这笔支出");
         }
         String id = UUID.randomUUID().toString();
+        repository.rememberTransactionCategory(ownerId, transactionType, normalizedCategory, now);
         repository.insertTransaction(id, ownerId, accountId, date, time, transactionType,
-                category.trim(), note.trim(), amountMinor, account.currency(), "manual", now);
+                normalizedCategory, note.trim(), amountMinor, account.currency(), "manual", now);
         return repository.findTransactions(ownerId, 100).stream()
                 .filter(transaction -> transaction.id().equals(id))
                 .findFirst()
