@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import type { CalendarDayEntry, CalendarJournal, CalendarRecordDraft } from '../../types/calendar';
 import type { DailyDaySummary } from '../../types/dailyEvent';
+import { createFinanceTransaction, fetchFinanceOverview } from '../../services/financeApi';
 import {
   createDailyRecord,
   deleteDailyEvent,
@@ -22,6 +23,7 @@ import {
   setDailyTodoCompleted,
   updateDailyJournal,
 } from '../../services/dailyEvents';
+import type { CreateFinanceTransactionInput, FinanceAccount } from '../../types/finance';
 import { Button } from '../common/Button';
 import { Message } from '../common/Message';
 import { Modal } from '../common/Modal';
@@ -32,6 +34,7 @@ import { DailyCashflowList } from './DailyCashflowList';
 import { DailyRecordDeleteButton } from './DailyRecordDeleteButton';
 import { DailyTodoList } from './DailyTodoList';
 import { JournalEditorPage } from './JournalEditorPage';
+import { TransactionModal } from '../finance/TransactionModal';
 import { toCalendarDayEntry } from './dailyEventViewModel';
 import styles from './CalendarView.module.css';
 
@@ -86,12 +89,8 @@ function hasEntryContent(entry: CalendarDayEntry): boolean {
 
 const EMPTY_ENTRY: CalendarDayEntry = { todos: [], expenses: [], incomes: [], schedules: [], journals: [], photos: [], otherRecords: [] };
 
-interface CalendarViewProps {
-  onOpenFinance: () => void;
-}
-
 /** 日记录原型：月历负责浏览，每日详情聚合待办、花销、手记、图片和日程。 */
-export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenFinance }) => {
+export const CalendarView: React.FC = () => {
   const today = useMemo(() => startOfDay(new Date()), []);
   const [cursor, setCursor] = useState(today);
   const [selected, setSelected] = useState(today);
@@ -105,6 +104,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenFinance }) => 
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isCashflowModalOpen, setIsCashflowModalOpen] = useState(false);
+  const [isFinanceTransactionModalOpen, setIsFinanceTransactionModalOpen] = useState(false);
+  const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
 
   const days = useMemo(() => {
     const firstOfMonth = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
@@ -191,6 +192,31 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenFinance }) => 
 
   const refreshSelectedAndMonth = async () => {
     await Promise.all([loadDay(selected), loadMonth()]);
+  };
+
+  const openFinanceTransactionModal = async () => {
+    try {
+      setDataError(null);
+      const overview = await fetchFinanceOverview();
+      if (!overview.accounts.length) {
+        setDataError('暂无资产账户，请先添加一个账户后再记账。');
+        return;
+      }
+      setFinanceAccounts(overview.accounts);
+      setIsFinanceTransactionModalOpen(true);
+    } catch (error: unknown) {
+      setDataError(error instanceof Error ? error.message : '读取财务账户失败，请稍后重试');
+    }
+  };
+
+  const saveFinanceTransaction = async (input: CreateFinanceTransactionInput) => {
+    await createFinanceTransaction(input);
+    setIsFinanceTransactionModalOpen(false);
+    try {
+      await refreshSelectedAndMonth();
+    } catch (error: unknown) {
+      setDataError(error instanceof Error ? `流水已保存，但日历刷新失败：${error.message}` : '流水已保存，但日历刷新失败');
+    }
   };
 
   const toggleTodo = async (todoId: string) => {
@@ -308,7 +334,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenFinance }) => 
                 setJournalEditorId(selectedJournals.find((journal) => journal.source !== 'record')?.id ?? null);
                 setJournalEditorDate(selected);
               }}
-              onOpenFinance={onOpenFinance}
+              onCreateFinance={() => { void openFinanceTransactionModal(); }}
             />
             <button type="button" className={styles.todayBtn} onClick={goToday}>今天</button>
             <div className={styles.navGroup}>
@@ -532,6 +558,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ onOpenFinance }) => 
           </div>
         </div>
       </div>
+      <TransactionModal
+        open={isFinanceTransactionModalOpen}
+        accounts={financeAccounts}
+        defaultDate={selectedKey}
+        onClose={() => setIsFinanceTransactionModalOpen(false)}
+        onSubmit={saveFinanceTransaction}
+      />
       <Modal
         open={isCashflowModalOpen}
         title="当日收支明细"

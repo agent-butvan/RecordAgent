@@ -1,8 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowDownLeft, ArrowUpRight, ChevronRight, Plus, RefreshCw, Sparkles, WalletCards } from 'lucide-react';
 import { createFinanceAccount, createFinanceTransaction, fetchFinanceExpenseChart, fetchFinanceOverview, fetchFinanceTransactions } from '../../services/financeApi';
-import { formatLocalDate } from '../../services/dailyEvents';
-import type { FinanceAccountType, FinanceChartRange, FinanceExpenseChart, FinanceOverview, FinanceTransaction } from '../../types/finance';
+import type { CreateFinanceTransactionInput, FinanceAccountType, FinanceChartRange, FinanceExpenseChart, FinanceOverview, FinanceTransaction } from '../../types/finance';
 import { Button } from '../common/Button';
 import { Modal } from '../common/Modal';
 import { TopBar } from '../common/TopBar';
@@ -11,6 +10,7 @@ import { AccountTypeIcon } from './AccountTypeIcon';
 import { AssetAccountDeck } from './AssetAccountDeck';
 import { SpendingTrendChart } from './SpendingTrendChart';
 import { TransactionDrawer } from './TransactionDrawer';
+import { TransactionModal } from './TransactionModal';
 
 const ACCOUNT_TYPES: Array<{ value: FinanceAccountType; label: string; interest: boolean }> = [
   { value: 'wechat_balance', label: '微信余额', interest: false },
@@ -20,14 +20,6 @@ const ACCOUNT_TYPES: Array<{ value: FinanceAccountType; label: string; interest:
   { value: 'bank', label: '银行卡', interest: false },
   { value: 'other', label: '其他', interest: false },
 ];
-const EXPENSE_CATEGORIES = ['餐饮', '交通', '购物', '居住', '娱乐', '学习', '医疗', '其他'];
-const INCOME_CATEGORIES = ['工资', '奖金', '报销', '转入', '兼职', '其他'];
-
-function nowTime(): string {
-  const now = new Date();
-  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-}
-
 function money(value: number): string {
   return new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY' }).format(value);
 }
@@ -42,9 +34,7 @@ export const FinancePage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [accountError, setAccountError] = useState<string | null>(null);
-  const [transactionError, setTransactionError] = useState<string | null>(null);
   const [chartError, setChartError] = useState<string | null>(null);
-  const [entryType, setEntryType] = useState<'expense' | 'income'>('expense');
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [isTransactionDrawerOpen, setIsTransactionDrawerOpen] = useState(false);
@@ -81,7 +71,6 @@ export const FinancePage: React.FC = () => {
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { void loadChart(chartRange); }, [chartRange, loadChart]);
-  const categories = useMemo(() => entryType === 'expense' ? EXPENSE_CATEGORIES : INCOME_CATEGORIES, [entryType]);
   const isYieldAccountType = accountType === 'wechat_yield' || accountType === 'alipay_yuebao';
   const recentTransactions = overview?.transactions.slice(0, 5) ?? [];
 
@@ -113,15 +102,7 @@ export const FinancePage: React.FC = () => {
 
   const openTransactionModal = () => {
     if (!overview?.accounts.length) return;
-    setEntryType('expense');
-    setTransactionError(null);
     setIsTransactionModalOpen(true);
-  };
-
-  const closeTransactionModal = () => {
-    if (isSaving) return;
-    setTransactionError(null);
-    setIsTransactionModalOpen(false);
   };
 
   const submitAccount = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -146,24 +127,14 @@ export const FinancePage: React.FC = () => {
     } finally { setIsSaving(false); }
   };
 
-  const submitTransaction = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const data = new FormData(form);
-    setIsSaving(true);
-    setTransactionError(null);
+  const submitTransaction = async (input: CreateFinanceTransactionInput) => {
+    await createFinanceTransaction(input);
+    setIsTransactionModalOpen(false);
     try {
-      await createFinanceTransaction({
-        accountId: String(data.get('accountId')), transactionType: entryType,
-        category: String(data.get('category')), note: String(data.get('note') ?? '').trim(),
-        amount: Number(data.get('amount')), date: String(data.get('date')), time: String(data.get('time')),
-      });
-      form.reset();
-      setIsTransactionModalOpen(false);
       await Promise.all([load(), loadChart(chartRange), ...(isTransactionDrawerOpen ? [loadAllTransactions()] : [])]);
     } catch (cause) {
-      setTransactionError(cause instanceof Error ? cause.message : '流水保存失败，请检查填写内容。');
-    } finally { setIsSaving(false); }
+      setError(cause instanceof Error ? `流水已保存，但财务数据刷新失败：${cause.message}` : '流水已保存，但财务数据刷新失败');
+    }
   };
 
   return <main className={styles.workspace}>
@@ -216,24 +187,12 @@ export const FinancePage: React.FC = () => {
       </>}
     </div></div>
 
-    <Modal open={isTransactionModalOpen} title="记一笔" onClose={closeTransactionModal} width={600} centered>
-      <form className={styles.transactionForm} onSubmit={submitTransaction}>
-        <div className={styles.typeSwitch} aria-label="流水类型">
-          <button type="button" className={entryType === 'expense' ? styles.typeActive : ''} onClick={() => setEntryType('expense')}>支出</button>
-          <button type="button" className={entryType === 'income' ? styles.typeActive : ''} onClick={() => setEntryType('income')}>收入</button>
-        </div>
-        {transactionError && <div className={styles.modalError} role="alert">{transactionError}</div>}
-        <label className={styles.amountField}><span>金额</span><div><b>¥</b><input name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required autoFocus /></div></label>
-        <div className={styles.formGrid}>
-          <label><span>资产账户</span><select name="accountId" required>{overview?.accounts.map((account) => <option value={account.id} key={account.id}>{account.name} · {money(account.balance)}</option>)}</select></label>
-          <label><span>分类</span><select name="category" key={entryType}>{categories.map((category) => <option key={category}>{category}</option>)}</select></label>
-          <label className={styles.wideField}><span>说明</span><input name="note" required placeholder={entryType === 'expense' ? '例如：午餐' : '例如：九月工资'} /></label>
-          <label><span>日期</span><input name="date" type="date" defaultValue={formatLocalDate(new Date())} required /></label>
-          <label><span>时间</span><input name="time" type="time" defaultValue={nowTime()} required /></label>
-        </div>
-        <div className={styles.modalActions}><Button type="button" variant="outline" onClick={closeTransactionModal} disabled={isSaving}>取消</Button><Button type="submit" variant="primary" disabled={isSaving}>{isSaving ? '保存中…' : `保存${entryType === 'expense' ? '支出' : '收入'}`}</Button></div>
-      </form>
-    </Modal>
+    <TransactionModal
+      open={isTransactionModalOpen}
+      accounts={overview?.accounts ?? []}
+      onClose={() => setIsTransactionModalOpen(false)}
+      onSubmit={submitTransaction}
+    />
 
     <Modal open={isAccountModalOpen} title="添加资产账户" onClose={closeAccountModal} width={500} centered>
       <form className={styles.accountForm} onSubmit={submitAccount}>

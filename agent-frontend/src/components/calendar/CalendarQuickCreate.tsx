@@ -19,13 +19,13 @@ interface CalendarQuickCreateProps {
   selectedDate: Date;
   onCreate: (draft: CalendarRecordDraft) => void;
   onWriteJournal: () => void;
-  onOpenFinance: () => void;
+  onCreateFinance: () => void;
 }
 
 const RECORD_OPTIONS = [
   { kind: 'todo', label: '新建待办', description: '记录要完成的事项', icon: CheckSquare2 },
   { kind: 'schedule', label: '添加日程', description: '安排时间与地点', icon: CalendarClock },
-  { kind: 'finance', label: '记一笔', description: '前往财务页记录收支', icon: WalletCards },
+  { kind: 'finance', label: '记一笔', description: '在当前页面记录收支', icon: WalletCards },
   { kind: 'journal', label: '写手记', description: '留下当天的想法', icon: NotebookPen },
 ] satisfies Array<{ kind: RecordKind | 'finance'; label: string; description: string; icon: typeof CheckSquare2 }>;
 
@@ -37,7 +37,7 @@ const FORM_TITLES: Record<ModalRecordKind, string> = {
 const valueOf = (formData: FormData, key: string): string => String(formData.get(key) ?? '').trim();
 
 /** 日历顶栏快捷记录入口：在当前选中日期内创建四类日记录。 */
-export const CalendarQuickCreate: React.FC<CalendarQuickCreateProps> = ({ selectedDate, onCreate, onWriteJournal, onOpenFinance }) => {
+export const CalendarQuickCreate: React.FC<CalendarQuickCreateProps> = ({ selectedDate, onCreate, onWriteJournal, onCreateFinance }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [activeKind, setActiveKind] = useState<ModalRecordKind | null>(null);
   const selectedDateLabel = `${selectedDate.getMonth() + 1}月${selectedDate.getDate()}日`;
@@ -144,7 +144,7 @@ export const CalendarQuickCreate: React.FC<CalendarQuickCreateProps> = ({ select
                     }
                     if (kind === 'finance') {
                       closeModal();
-                      onOpenFinance();
+                      onCreateFinance();
                       return;
                     }
                     setActiveKind(kind);

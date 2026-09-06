@@ -771,7 +771,7 @@ export const MainLayout: React.FC<{
             onOpenAccountSettings={() => { setSettingsTab('account'); setIsSettingsOpen(true); }}
           />
           {activeFeature === 'calendar' ? (
-            <CalendarView onOpenFinance={() => setActiveFeature('finance')} />
+            <CalendarView />
           ) : activeFeature === 'finance' ? (
             <FinancePage />
           ) : activeFeature === 'record' ? (
