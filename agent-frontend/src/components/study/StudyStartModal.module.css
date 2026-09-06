@@ -1,0 +1,19 @@
+.form { display: flex; flex-direction: column; gap: 18px; }
+.description { margin: -6px 0 0; color: var(--text-muted); font-size: 11px; line-height: 1.55; }
+.error { padding: 8px 10px; border: 1px solid #e6c8c4; border-radius: var(--radius-md); background: #fff7f5; color: #9a4038; font-size: 11px; }
+.contentField > span, .categories legend { display: block; margin-bottom: 7px; color: var(--text-secondary); font-size: 11px; font-weight: 550; }
+.contentField textarea { width: 100%; min-height: 112px; padding: 10px 11px; resize: vertical; border: 1px solid var(--border-medium); border-radius: var(--radius-lg); outline: none; background: var(--bg-app); color: var(--text-primary); font: 12px/1.6 var(--font-sans); user-select: text; }
+.contentField textarea:focus { border-color: var(--accent-blue); }
+.contentField textarea::placeholder { color: var(--text-muted); }
+.categories { min-width: 0; margin: 0; padding: 0; border: 0; }
+.categories > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.categories button { min-height: 32px; padding: 0 11px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--bg-app); color: var(--text-secondary); font: 500 11px var(--font-sans); }
+.categories button:hover { border-color: var(--border-medium); background: var(--bg-surface-hover); }
+.categories .categoryActive { border-color: var(--accent-blue); background: #edf4ff; color: var(--accent-blue); font-weight: 650; }
+.categories button:focus-visible { outline: 1px solid var(--accent-blue); outline-offset: 2px; }
+.actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 2px; }
+
+@media (max-width: 560px) {
+  .categories button { flex: 1 0 calc(33.333% - 8px); }
+  .actions > button { flex: 1; }
+}

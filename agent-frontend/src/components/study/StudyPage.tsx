@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
-import { BookOpenIcon, ClockCounterClockwiseIcon, DesktopIcon, DeviceMobileIcon, PencilSimpleIcon, PlayIcon, PlusIcon, TrashIcon } from '@phosphor-icons/react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { BookOpenIcon, ClockCounterClockwiseIcon, DesktopIcon, DeviceMobileIcon, PencilSimpleIcon, PlayIcon, TrashIcon } from '@phosphor-icons/react';
 import { createManualStudySession, deleteStudySession, fetchActiveStudySession, fetchStudySessions, fetchStudyStatistics, finishStudySession, startStudySession, updateStudySession } from '../../services/studyApi';
 import { formatLocalDate } from '../../services/dailyEvents';
 import type { SaveStudySessionInput, StudySession, StudyStatistics } from '../../types/study';
@@ -7,7 +7,7 @@ import { Button } from '../common/Button';
 import { useMessage } from '../common/Message';
 import { TopBar } from '../common/TopBar';
 import { StudyRecordModal } from './StudyRecordModal';
-import { STUDY_CATEGORIES } from './studyCategories';
+import { StudyStartModal } from './StudyStartModal';
 import styles from './StudyPage.module.css';
 
 const TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -43,9 +43,9 @@ export function StudyPage() {
   const [weekStats, setWeekStats] = useState<StudyStatistics | null>(null);
   const [previousWeekStats, setPreviousWeekStats] = useState<StudyStatistics | null>(null);
   const [monthStats, setMonthStats] = useState<StudyStatistics | null>(null);
-  const [content, setContent] = useState(''); const [category, setCategory] = useState<string>('项目');
   const [now, setNow] = useState(Date.now()); const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false);
   const [showAll, setShowAll] = useState(false); const [error, setError] = useState<string | null>(null); const [recordError, setRecordError] = useState<string | null>(null);
+  const [startModalOpen, setStartModalOpen] = useState(false); const [startError, setStartError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false); const [editing, setEditing] = useState<StudySession | null>(null); const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
@@ -80,10 +80,10 @@ export function StudyPage() {
     return [...totals.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
   }, [completedSessions]);
 
-  const begin = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault(); if (!content.trim()) return; setSaving(true);
-    try { await startStudySession(content.trim(), category, TIMEZONE); setContent(''); await reload(); showMessage('success', '学习已开始'); }
-    catch (cause) { showMessage('error', cause instanceof Error ? cause.message : '开始学习失败'); } finally { setSaving(false); }
+  const begin = async (content: string, category: string) => {
+    setSaving(true); setStartError(null);
+    try { await startStudySession(content, category, TIMEZONE); setStartModalOpen(false); await reload(); showMessage('success', '学习已开始'); }
+    catch (cause) { setStartError(cause instanceof Error ? cause.message : '开始学习失败'); } finally { setSaving(false); }
   };
   const finish = async () => {
     if (!active) return; setSaving(true);
@@ -103,27 +103,22 @@ export function StudyPage() {
     catch (cause) { showMessage('error', cause instanceof Error ? cause.message : '删除失败'); } finally { setSaving(false); }
   };
 
-  const dateParts = new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }).formatToParts(new Date());
-  const todayDate = dateParts.filter((part) => part.type !== 'weekday').map((part) => part.value).join('');
-  const todayWeekday = dateParts.find((part) => part.type === 'weekday')?.value;
-
   return <main className={styles.workspace}>
     <TopBar title="学习记录" subtitle="本地数据" icon={<BookOpenIcon size={15} />} actions={<div className={styles.topActions}>
       <button type="button" className={styles.textAction} onClick={openManual}>补卡</button>
-      <Button type="button" variant="primary" size="sm" icon={<PlusIcon size={13} />} onClick={() => document.getElementById('study-content')?.focus()} disabled={Boolean(active)}>{active ? '学习中' : '开始学习'}</Button>
+      <Button type="button" variant="primary" size="sm" icon={<PlayIcon size={13} weight="fill" />}
+        onClick={() => { setStartError(null); setStartModalOpen(true); }} disabled={Boolean(active)}>{active ? '学习中' : '开始学习'}</Button>
     </div>} />
     <div className={styles.page}><div className={styles.content}>
       {error && <div className={styles.dataError} role="alert"><span>{error}</span><button onClick={() => void reload()}>重新加载</button></div>}
-      <header className={styles.pageIntro}><div><h1>学习记录</h1><p>记录真实发生的学习时间，而不是制造“连续打卡”的压力。</p></div><time dateTime={todayKey}>{todayDate}<strong>{todayWeekday}</strong></time></header>
       <section className={styles.overview} aria-label="学习概览">
         <div className={styles.todayBlock}><span>今天已学习</span><strong>{formatDuration(todaySeconds)}</strong><small>{todayStat?.sessionCount ?? 0} 段已完成记录</small></div>
         <dl className={styles.periodStats}><div><dt>近 7 天</dt><dd>{formatDuration(weekStats?.totalDurationSeconds ?? 0)}</dd></div><div><dt>本月累计</dt><dd>{formatDuration(monthStats?.totalDurationSeconds ?? 0)}</dd></div><div><dt>学习天数</dt><dd>{monthStats?.studyDays ?? 0} 天</dd></div></dl>
       </section>
       <div className={styles.mainLayout}><div className={styles.primaryColumn}>
-        <section className={styles.section}><Heading title={active ? '正在学习' : '开始一段学习'} subtitle={active ? '这段时间会持续计入今天的学习记录' : '写下这段时间准备做什么'} />
-          {active ? <div className={styles.activeSession}><div className={styles.runningLabel}><i />正在学习</div><strong>{active.content}</strong><div className={styles.timer}>{formatTimer(elapsed)}</div><small>开始于 {formatClock(active.startedAt)} · 当前应用</small><button type="button" onClick={() => void finish()} disabled={saving}>{saving ? '正在结束…' : '结束这段学习'}</button></div>
-            : <form className={styles.startForm} onSubmit={(event) => void begin(event)}><label className={styles.contentField}><span>学习内容</span><textarea id="study-content" value={content} onChange={(event) => setContent(event.target.value)} maxLength={200} required placeholder="例如：整理 Spring Boot 自动装配的完整链路" /></label><div className={styles.startActions}><div className={styles.categoryList} aria-label="学习分类">{STUDY_CATEGORIES.slice(0, 4).map((item) => <button type="button" key={item} className={category === item ? styles.categoryActive : ''} aria-pressed={category === item} onClick={() => setCategory(item)}>{item}</button>)}</div><Button type="submit" variant="primary" icon={<PlayIcon size={14} weight="fill" />} disabled={saving || !content.trim()}>{saving ? '正在开始…' : '开始学习'}</Button></div></form>}
-        </section>
+        {active && <section className={styles.section}><Heading title="正在学习" subtitle="这段时间会持续计入今天的学习记录" />
+          <div className={styles.activeSession}><div className={styles.runningLabel}><i />正在学习</div><strong>{active.content}</strong><div className={styles.timer}>{formatTimer(elapsed)}</div><small>开始于 {formatClock(active.startedAt)} · 当前应用</small><button type="button" onClick={() => void finish()} disabled={saving}>{saving ? '正在结束…' : '结束这段学习'}</button></div>
+        </section>}
         <section className={styles.section}><Heading title="今天的学习轨迹" subtitle="用时间轴看今天的学习是怎样发生的" side="08:00 — 22:00" />
           {todaySessions.length ? <div className={styles.timeline}><div className={styles.timelineHours}>{Array.from({ length: 8 }, (_, index) => <span key={index}>{String(START_HOUR + index * 2).padStart(2, '0')}</span>)}</div>{todaySessions.map((session) => { const position = timelinePosition(session, now, todayKey); return <div className={styles.timelineRow} key={session.id}><strong>{session.category}</strong><div className={styles.timelineTrack}><i className={session.status === 'active' ? styles.timelineActive : ''} style={{ left: `${position.left}%`, width: `${position.width}%` }} title={`${session.content} · ${formatDuration(session.durationSeconds)}`}><span>{session.content}</span></i></div></div>; })}<div className={styles.timelineSummary}>{todaySessions.map((session) => <span key={session.id}><b>{formatClock(session.startedAt)}</b> {session.content}</span>)}</div></div> : <div className={styles.compactEmpty}>今天还没有学习轨迹，开始后会在这里出现。</div>}
         </section>
@@ -136,6 +131,8 @@ export function StudyPage() {
         <section className={styles.sideSection}><Heading title="本周观察" /><p className={styles.insight}>这周已经学习 <em>{weekStats?.studyDays ?? 0} 天</em>{weekChange !== null && <>，相比上周{weekChange >= 0 ? '增加' : '减少'}了 <em>{formatDuration(Math.abs((weekStats?.totalDurationSeconds ?? 0) - previousTotal))}</em></>}。{topCategory ? <>最近投入最多的是“<em>{topCategory}</em>”。</> : '完成第一段学习后，这里会生成观察。'}</p></section>
       </aside></div>
     </div></div>
+    <StudyStartModal open={startModalOpen} saving={saving} error={startError}
+      onClose={() => { if (!saving) { setStartModalOpen(false); setStartError(null); } }} onStart={begin} />
     <StudyRecordModal open={modalOpen} session={editing} saving={saving} error={recordError} onClose={() => { if (!saving) { setModalOpen(false); setEditing(null); setRecordError(null); } }} onSave={saveRecord} />
   </main>;
 }
