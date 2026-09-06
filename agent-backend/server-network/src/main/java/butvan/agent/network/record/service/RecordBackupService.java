@@ -48,10 +48,10 @@ public class RecordBackupService {
                 }
             }
             zip.finish(); return output.toByteArray();
-        } catch (IOException exception) { throw new IllegalStateException("记录备份导出失败", exception); }
+        } catch (IOException exception) { throw new IllegalStateException("资料备份导出失败", exception); }
     }
 
-    /** 校验备份后用其替换当前用户的记录资料库。 */
+    /** 校验备份后用其替换当前用户的资料库。 */
     @Transactional
     public int importBackup(String ownerId, MultipartFile file) {
         if (file == null || file.isEmpty()) throw new IllegalArgumentException("请选择备份文件");
@@ -63,7 +63,7 @@ public class RecordBackupService {
             BackupManifest manifest = objectMapper.readValue(manifestBytes, BackupManifest.class);
             if ((manifest.formatVersion() != 1 && manifest.formatVersion() != 2) || manifest.items() == null) throw new IllegalArgumentException("不支持的备份格式");
             for (BackupItem item : manifest.items()) {
-                if (item == null || item.record() == null) throw new IllegalArgumentException("备份记录结构不完整");
+                if (item == null || item.record() == null) throw new IllegalArgumentException("备份资料结构不完整");
                 for (RecordAttachment attachment : item.attachments() == null ? List.<RecordAttachment>of() : item.attachments()) {
                     if (!entries.containsKey("attachments/" + item.record().id() + "/" + attachment.id())) {
                         throw new IllegalArgumentException("备份中的附件不完整");

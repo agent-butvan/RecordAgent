@@ -525,7 +525,7 @@ export const CalendarView: React.FC = () => {
                 </div>
                 {selectedJournals.length > 0 && <div className={styles.journalList}>{selectedJournals.map((journal) => <div className={styles.journal} key={journal.id ?? `${journal.updatedAt}-${journal.title}`}>
                   <div className={styles.journalHeading}>{journal.title && <strong>{journal.title}</strong>}
-                    {journal.source === 'record' ? <span className={styles.syncedLabel}>来自记录</span> : <div className={styles.sectionActions}>
+                    {journal.source === 'record' ? <span className={styles.syncedLabel}>来自资料</span> : <div className={styles.sectionActions}>
                       <button type="button" className={styles.journalEditButton} onClick={() => { setJournalEditorId(journal.id ?? null); setJournalEditorDate(selected); }}>编辑</button>
                       <DailyRecordDeleteButton label="手记" onDelete={() => requestDelete(journal, '手记', journal.title || '无标题手记')} />
                     </div>}

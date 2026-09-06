@@ -72,7 +72,7 @@ public class RecordTabService {
         List<RecordTab> tabs = list(ownerId);
         if (requestedTabId != null && !requestedTabId.isBlank()) {
             return tabs.stream().filter(tab -> tab.id().equals(requestedTabId)).findFirst()
-                    .orElseThrow(() -> new IllegalArgumentException("记录分类不存在")).id();
+                    .orElseThrow(() -> new IllegalArgumentException("资料分类不存在")).id();
         }
         String key = switch (type) {
             case WEEKLY_REVIEW -> "weekly_review";

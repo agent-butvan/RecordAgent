@@ -22,7 +22,7 @@ public final class RecordModels {
         /** 将接口值转换为受控类型。 */
         public static RecordType parse(String value) {
             for (RecordType type : values()) if (type.value.equals(value)) return type;
-            throw new IllegalArgumentException("不支持的记录类型");
+            throw new IllegalArgumentException("不支持的资料类型");
         }
     }
 

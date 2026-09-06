@@ -30,7 +30,7 @@ function typeForSystemTab(tab?: RecordTab): RecordType | null {
   return null;
 }
 
-/** 使用全项目统一写作界面，为资料记录补充分类、标签和附件能力。 */
+/** 使用全项目统一写作界面，为个人资料补充分类、标签和附件能力。 */
 export function RecordEditor({ date, entry, initialType = 'quick', initialTabId, tabs, saving, onSave, onBack }: Props) {
   const [type, setType] = useState<RecordType>(entry?.type ?? initialType);
   const [recordDate, setRecordDate] = useState(entry?.recordDate ?? date);
@@ -43,17 +43,17 @@ export function RecordEditor({ date, entry, initialType = 'quick', initialTabId,
   useEffect(() => { if (entry) void fetchRecordAttachments(entry.id).then(setAttachments).catch(() => setAttachmentError('附件加载失败')); }, [entry]);
 
   const tabName = tabs.find((tab) => tab.id === tabId)?.name ?? '全部';
-  return <WritingEditorPage backLabel="记录" identity={entry ? '编辑资料' : '新增资料'} detail={`${recordDate} · ${tabName}`}
+  return <WritingEditorPage backLabel="资料" identity={entry ? '编辑资料' : '新增资料'} detail={`${recordDate} · ${tabName}`}
     initialTitle={entry?.title ?? ''} initialBody={entry?.contentText ?? ''} saving={saving} error={attachmentError}
     bodyPlaceholder="开始整理知识、问题与思考……" onBack={onBack}
     meta={<div className={styles.metaControls}>
       <select value={tabId} onChange={(event) => { const nextId = event.target.value; setTabId(nextId); const nextType = typeForSystemTab(tabs.find((tab) => tab.id === nextId)); if (nextType) setType(nextType); }} aria-label="所属 Tab">
         <option value="" disabled>选择分类</option>{tabs.map((tab) => <option key={tab.id} value={tab.id}>{tab.name}</option>)}
       </select>
-      <input type="date" value={recordDate} onChange={(event) => setRecordDate(event.target.value)} aria-label="记录日期" />
+      <input type="date" value={recordDate} onChange={(event) => setRecordDate(event.target.value)} aria-label="资料日期" />
     </div>}
     footer={<div className={styles.details}>
-      <input className={styles.tagsInput} value={tags} onChange={(event) => setTags(event.target.value)} placeholder="添加标签，用逗号分隔" aria-label="记录标签" />
+      <input className={styles.tagsInput} value={tags} onChange={(event) => setTags(event.target.value)} placeholder="添加标签，用逗号分隔" aria-label="资料标签" />
       {entry && <div className={styles.attachments}>{attachments.map((attachment) => <a key={attachment.id} href={attachmentContentUrl(entry.id, attachment.id)} target="_blank" rel="noreferrer">
         {attachment.mediaType.startsWith('image/') ? <img src={attachmentContentUrl(entry.id, attachment.id)} alt={attachment.originalName} /> : <PaperclipIcon size={13} />}<span>{attachment.originalName}</span>
       </a>)}<label><FileArrowUpIcon size={13} />{uploading ? '上传中…' : '添加附件'}<input type="file" disabled={uploading} onChange={async (event) => {

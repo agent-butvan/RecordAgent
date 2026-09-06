@@ -29,7 +29,7 @@ const IS_MAC = navigator.platform.toLowerCase().includes('mac');
 const TAB_SHORTCUT_LABEL = IS_MAC ? 'Command + 左右方向键' : 'Ctrl + 左右方向键';
 
 function formatDate(date: Date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
-function displayTitle(entry: RecordEntry) { return entry.title || entry.contentText.split('\n')[0] || '无标题记录'; }
+function displayTitle(entry: RecordEntry) { return entry.title || entry.contentText.split('\n')[0] || '无标题资料'; }
 function mondayOf(date: Date) { const result = new Date(date); result.setDate(result.getDate() - ((result.getDay() + 6) % 7)); return result; }
 function typeForTab(tab?: RecordTab): RecordType {
   if (tab?.systemKey === 'weekly_review') return 'weekly_review';
@@ -88,9 +88,8 @@ export function RecordPage() {
   const activeTab = tabs.find((tab) => tab.id === activeTabId);
   const visibleRecords = activeTabId === 'all' ? records : records.filter((entry) => entry.tabId === activeTabId);
   const startOfWeek = formatDate(mondayOf(today));
-  const weekLearning = records.filter((entry) => entry.type === 'learning' && entry.recordDate >= startOfWeek && entry.recordDate <= todayKey);
+  const weekRecords = records.filter((entry) => entry.recordDate >= startOfWeek && entry.recordDate <= todayKey);
   const weekReviews = records.filter((entry) => entry.type === 'weekly_review' && entry.recordDate >= startOfWeek && entry.recordDate <= todayKey);
-  const learningDays = new Set(weekLearning.map((entry) => entry.recordDate)).size;
 
   const save = async (input: SaveRecordInput) => {
     if (!input.tabId) throw new Error('请选择这篇资料所属的 Tab');
@@ -248,9 +247,8 @@ export function RecordPage() {
       </div>
     </div>
     <div className={styles.dashboard}>
-      <section className={styles.summary} aria-label="本周学习情况">
-        <div><strong>{learningDays}<small>/ 7</small></strong><span>本周学习天数</span></div>
-        <div><strong>{weekLearning.length}</strong><span>本周新增资料</span></div>
+      <section className={styles.summary} aria-label="本周资料概况">
+        <div><strong>{weekRecords.length}</strong><span>本周新增资料</span></div>
         <div><strong>{weekReviews.length ? <CheckIcon size={20} weight="bold" /> : '—'}</strong><span>{weekReviews.length ? `已完成 ${weekReviews.length} 次复盘` : '本周尚未复盘'}</span></div>
         {editingSummaryCopy ? <input className={styles.summaryCopyInput} value={summaryDraft} autoFocus maxLength={120}
           aria-label="学习提示文案" onChange={(event) => setSummaryDraft(event.target.value)} onBlur={() => {

@@ -16,7 +16,7 @@ import java.time.temporal.WeekFields;
 import java.util.List;
 import java.util.UUID;
 
-/** 记录资料库的领域入口，集中维护类型、自然周、标签和乐观锁规则。 */
+/** 资料库的领域入口，集中维护类型、自然周、标签和乐观锁规则。 */
 @Service
 @RequiredArgsConstructor
 public class RecordService {
@@ -41,7 +41,7 @@ public class RecordService {
 
     /** 查询一条记录。 */
     public RecordEntry get(String ownerId, String id) {
-        return repository.find(ownerId, id).orElseThrow(() -> new IllegalArgumentException("记录不存在"));
+        return repository.find(ownerId, id).orElseThrow(() -> new IllegalArgumentException("资料不存在"));
     }
 
     /** 创建记录并原子写入标签。 */
@@ -69,7 +69,7 @@ public class RecordService {
         Instant now = Instant.now();
         if (!repository.update(ownerId, id, expectedVersion, command.recordDate(), command.type(),
                 cleanTitle(command.title()), command.contentHtml(), command.contentText(), tabId, week.year(), week.number(), now)) {
-            throw new IllegalArgumentException("记录已被修改或不存在，请刷新后重试");
+            throw new IllegalArgumentException("资料已被修改或不存在，请刷新后重试");
         }
         repository.replaceTags(ownerId, id, normalizedTags(command.tags()), now);
         if (command.type() == RecordType.JOURNAL) syncJournal(ownerId, id, command, current);
@@ -86,7 +86,7 @@ public class RecordService {
         boolean nextFavorite = favorite == null ? current.favorite() : favorite;
         boolean nextArchived = archived == null ? current.archived() : archived;
         if (!repository.updateFlags(ownerId, id, expectedVersion, nextPinned, nextFavorite, nextArchived, Instant.now())) {
-            throw new IllegalArgumentException("记录已被修改，请刷新后重试");
+            throw new IllegalArgumentException("资料已被修改，请刷新后重试");
         }
         return get(ownerId, id);
     }
@@ -96,7 +96,7 @@ public class RecordService {
     public void trash(String ownerId, String id, int expectedVersion) {
         RecordEntry current = get(ownerId, id);
         if (!repository.setTrashed(ownerId, id, expectedVersion, Instant.now(), Instant.now())) {
-            throw new IllegalArgumentException("记录已被修改或不存在，请刷新后重试");
+            throw new IllegalArgumentException("资料已被修改或不存在，请刷新后重试");
         }
         if (current.type() == RecordType.JOURNAL) removeLinkedJournal(ownerId, current);
     }
@@ -105,7 +105,7 @@ public class RecordService {
     @Transactional
     public RecordEntry restore(String ownerId, String id, int expectedVersion) {
         if (!repository.setTrashed(ownerId, id, expectedVersion, null, Instant.now())) {
-            throw new IllegalArgumentException("记录已被修改或不存在，请刷新后重试");
+            throw new IllegalArgumentException("资料已被修改或不存在，请刷新后重试");
         }
         RecordEntry restored = get(ownerId, id);
         if (restored.type() == RecordType.JOURNAL) {
@@ -123,7 +123,7 @@ public class RecordService {
         return repository.clearTrash(ownerId);
     }
 
-    /** 导入备份前清除记录及其日历同步投影。 */
+    /** 导入备份前清除资料及其日历同步投影。 */
     @Transactional
     public int clearAllForImport(String ownerId) {
         repository.findAll(ownerId).stream().filter(record -> record.type() == RecordType.JOURNAL)
@@ -133,17 +133,17 @@ public class RecordService {
 
     private void validate(RecordCommand command) {
         if (command == null || command.recordDate() == null || command.type() == null) {
-            throw new IllegalArgumentException("记录日期和类型不能为空");
+            throw new IllegalArgumentException("资料日期和类型不能为空");
         }
         String html = command.contentHtml() == null ? "" : command.contentHtml();
         String text = command.contentText() == null ? "" : command.contentText();
         if (html.length() > MAX_CONTENT_LENGTH || text.length() > MAX_CONTENT_LENGTH) {
-            throw new IllegalArgumentException("记录正文过长");
+            throw new IllegalArgumentException("资料正文过长");
         }
         if ((command.title() == null || command.title().isBlank()) && text.isBlank()) {
             throw new IllegalArgumentException("标题和正文不能同时为空");
         }
-        if (command.tags() != null && command.tags().size() > 30) throw new IllegalArgumentException("每条记录最多添加 30 个标签");
+        if (command.tags() != null && command.tags().size() > 30) throw new IllegalArgumentException("每条资料最多添加 30 个标签");
     }
 
     private void requireRange(LocalDate from, LocalDate to) {

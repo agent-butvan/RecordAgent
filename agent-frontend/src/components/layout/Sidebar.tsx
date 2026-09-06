@@ -438,7 +438,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             aria-current={activeFeature === 'record' ? 'page' : undefined}
           >
             <BooksIcon size={14} />
-            <span>记录</span>
+            <span>资料</span>
           </button>
         </nav>
 

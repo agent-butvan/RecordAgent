@@ -26,7 +26,7 @@ public class RecordAttachmentService {
 
     /** 上传单个附件；图片、PDF 和普通文件均保留原始 MIME 类型。 */
     public RecordAttachment upload(String ownerId, String recordId, MultipartFile file) {
-        repository.find(ownerId, recordId).orElseThrow(() -> new IllegalArgumentException("记录不存在"));
+        repository.find(ownerId, recordId).orElseThrow(() -> new IllegalArgumentException("资料不存在"));
         if (file == null || file.isEmpty()) throw new IllegalArgumentException("附件不能为空");
         if (file.getSize() > MAX_FILE_SIZE) throw new IllegalArgumentException("单个附件不能超过 25 MB");
         String id = UUID.randomUUID().toString();
@@ -71,7 +71,7 @@ public class RecordAttachmentService {
 
     /** 从可信备份内容恢复附件，并重新生成本地存储名。 */
     public RecordAttachment restore(String ownerId, String recordId, String originalName, String mediaType, byte[] bytes) {
-        repository.find(ownerId, recordId).orElseThrow(() -> new IllegalArgumentException("记录不存在"));
+        repository.find(ownerId, recordId).orElseThrow(() -> new IllegalArgumentException("资料不存在"));
         String id = UUID.randomUUID().toString();
         String safeName = Path.of(originalName == null ? "附件" : originalName).getFileName().toString();
         String storedName = id + extension(safeName);

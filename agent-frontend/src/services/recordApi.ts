@@ -4,7 +4,7 @@ import type { RecordAttachment, RecordDaySummary, RecordEntry, RecordTab, SaveRe
 async function recordRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${getApiBaseUrl()}${path}`, init);
   const payload = await response.json() as ApiResponse<T>;
-  if (!response.ok || payload.code !== 200) throw new Error(payload.message || '记录请求失败');
+  if (!response.ok || payload.code !== 200) throw new Error(payload.message || '资料请求失败');
   return payload.data;
 }
 
@@ -81,7 +81,7 @@ export async function exportRecordBackup() {
   link.click(); URL.revokeObjectURL(url);
 }
 
-/** 导入备份会由后端校验格式并完整替换当前记录资料库。 */
+/** 导入备份会由后端校验格式并完整替换当前资料库。 */
 export async function importRecordBackup(file: File) {
   const body = new FormData(); body.append('file', file);
   return recordRequest<number>('/agent/records/backup', { method: 'POST', body });

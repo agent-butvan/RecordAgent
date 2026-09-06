@@ -10,14 +10,14 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.LocalDate;
 
-/** 维护日历手记在记录资料库中的可检索投影，避免两个入口出现内容断层。 */
+/** 维护日历手记在资料库中的可检索投影，避免两个入口出现内容断层。 */
 @Service
 @RequiredArgsConstructor
 public class RecordJournalProjectionService {
     private final RecordRepository repository;
     private final RecordTabService tabService;
 
-    /** 创建或更新一条日历手记对应的记录投影。 */
+    /** 创建或更新一条日历手记对应的资料投影。 */
     @Transactional
     public void upsertFromCalendar(String ownerId, String eventId, LocalDate date, String title, String body) {
         String cleanTitle = title == null || title.isBlank() ? null : title.trim();
