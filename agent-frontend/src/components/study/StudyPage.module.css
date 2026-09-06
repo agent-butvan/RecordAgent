@@ -26,6 +26,16 @@
 
 .textAction:focus-visible, .linkButton:focus-visible { outline: 1px solid var(--accent-blue); outline-offset: 3px; }
 
+.dateNavigation { display: flex; align-items: center; gap: 2px; margin-top: -4px; }
+.dateArrow, .todayAction, .datePicker { height: 28px; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--text-secondary); transition: background-color var(--transition-fast), color var(--transition-fast); }
+.dateArrow { width: 28px; display: grid; place-items: center; padding: 0; }
+.todayAction { padding: 0 8px; font: 550 10px var(--font-sans); }
+.datePicker { position: relative; min-width: 54px; display: grid; place-items: center; overflow: hidden; font-size: 9px; font-variant-numeric: tabular-nums; }
+.datePicker input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.dateArrow:hover:not(:disabled), .todayAction:hover, .datePicker:hover, .datePicker:focus-within { background: var(--bg-surface-hover); color: var(--text-primary); }
+.dateArrow:focus-visible, .todayAction:focus-visible, .datePicker:focus-within { outline: 1px solid var(--accent-blue); outline-offset: 1px; }
+.dateArrow:disabled { color: var(--border-medium); opacity: 1; cursor: default; }
+
 .activeSession { min-height: 150px; padding-top: 4px; }
 .runningLabel { display: flex; align-items: center; gap: 7px; margin-bottom: 12px; color: #54806e; font-size: 10px; }
 .runningLabel i { width: 7px; height: 7px; border-radius: 50%; background: #6fa88f; }
@@ -58,6 +68,8 @@
 @keyframes timelinePulse { 50% { transform: scale(.72); opacity: .72; } }
 @media (prefers-reduced-motion: reduce) { .timelineTrack > .timelineActive::after { animation: none; } }
 .compactEmpty { min-height: 78px; display: flex; align-items: center; color: var(--text-muted); font-size: 10px; }
+.timelineError { min-height: 78px; display: flex; align-items: center; justify-content: space-between; gap: 16px; color: #9a4038; font-size: 10px; }
+.timelineError button { border: 0; background: transparent; color: inherit; font: 600 10px var(--font-sans); }
 
 .sessionList { margin-top: 3px; }
 .sessionRow { min-height: 76px; display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; align-items: center; gap: 13px; padding: 10px 0; }

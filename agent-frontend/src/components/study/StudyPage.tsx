@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BookOpenIcon, ClockCounterClockwiseIcon, PencilSimpleIcon, PlayIcon, TrashIcon } from '@phosphor-icons/react';
+import { BookOpenIcon, CaretLeftIcon, CaretRightIcon, ClockCounterClockwiseIcon, PencilSimpleIcon, PlayIcon, TrashIcon } from '@phosphor-icons/react';
 import { createManualStudySession, deleteStudySession, fetchActiveStudySession, fetchStudyCategories, fetchStudySessions, fetchStudyStatistics, finishStudySession, startStudySession, updateStudySession } from '../../services/studyApi';
 import { formatLocalDate } from '../../services/dailyEvents';
 import type { SaveStudySessionInput, StudySession, StudyStatistics } from '../../types/study';
@@ -16,6 +16,11 @@ const TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const MIN_TIMELINE_HOURS = 8;
 
 function shiftedDate(days: number): Date { const date = new Date(); date.setHours(12, 0, 0, 0); date.setDate(date.getDate() + days); return date; }
+function shiftDateKey(dateKey: string, days: number): string {
+  const date = new Date(`${dateKey}T12:00:00`);
+  date.setDate(date.getDate() + days);
+  return formatLocalDate(date);
+}
 function startOfMonth(): Date { const date = new Date(); date.setDate(1); date.setHours(12, 0, 0, 0); return date; }
 function formatDuration(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
@@ -26,6 +31,14 @@ function formatDuration(seconds: number): string {
 function formatTimer(seconds: number): string { return [Math.floor(seconds / 3600), Math.floor(seconds % 3600 / 60), seconds % 60].map((value) => String(Math.max(0, Math.floor(value))).padStart(2, '0')).join(':'); }
 function formatClock(instant: string): string { return new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' }).format(new Date(instant)); }
 function weekday(date: string): string { return new Intl.DateTimeFormat('zh-CN', { weekday: 'short' }).format(new Date(`${date}T12:00:00`)).replace('周', ''); }
+function formatTimelineDate(dateKey: string, todayKey: string): string {
+  const date = new Date(`${dateKey}T12:00:00`);
+  const formatted = new Intl.DateTimeFormat('zh-CN', {
+    ...(date.getFullYear() === new Date().getFullYear() ? {} : { year: 'numeric' as const }),
+    month: 'long', day: 'numeric', weekday: 'short',
+  }).format(date);
+  return dateKey === todayKey ? `今天 · ${formatted}` : formatted;
+}
 function createTimelineRange(sessions: StudySession[], now: number, todayKey: string) {
   const dayStart = new Date(`${todayKey}T00:00:00`).getTime();
   const points = sessions.flatMap((session) => [
@@ -70,6 +83,9 @@ export function StudyPage() {
   const [monthStats, setMonthStats] = useState<StudyStatistics | null>(null);
   const [rememberedCategories, setRememberedCategories] = useState<string[]>([]);
   const [now, setNow] = useState(Date.now()); const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false);
+  const todayKey = formatLocalDate(new Date());
+  const [timelineDate, setTimelineDate] = useState(todayKey); const [timelineSessions, setTimelineSessions] = useState<StudySession[]>([]);
+  const [timelineLoading, setTimelineLoading] = useState(true); const [timelineError, setTimelineError] = useState<string | null>(null); const [timelineRefresh, setTimelineRefresh] = useState(0);
   const [showAll, setShowAll] = useState(false); const [error, setError] = useState<string | null>(null); const [recordError, setRecordError] = useState<string | null>(null);
   const [startModalOpen, setStartModalOpen] = useState(false); const [startError, setStartError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false); const [editing, setEditing] = useState<StudySession | null>(null); const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -90,17 +106,26 @@ export function StudyPage() {
   }, []);
   useEffect(() => { void reload(); }, [reload]);
   useEffect(() => { if (!active) return; setNow(Date.now()); const timer = window.setInterval(() => setNow(Date.now()), 1_000); return () => window.clearInterval(timer); }, [active]);
+  useEffect(() => {
+    let current = true;
+    setTimelineLoading(true); setTimelineError(null);
+    fetchStudySessions(timelineDate, timelineDate, TIMEZONE)
+      .then((records) => { if (current) setTimelineSessions(records); })
+      .catch((cause: unknown) => { if (current) setTimelineError(cause instanceof Error ? cause.message : '轨迹加载失败，请稍后重试。'); })
+      .finally(() => { if (current) setTimelineLoading(false); });
+    return () => { current = false; };
+  }, [timelineDate, timelineRefresh]);
 
   const elapsed = active ? Math.max(0, Math.floor((now - new Date(active.startedAt).getTime()) / 1_000)) : 0;
-  const todayKey = formatLocalDate(new Date()); const todayStat = weekStats?.days.find((day) => day.date === todayKey);
+  const todayStat = weekStats?.days.find((day) => day.date === todayKey);
   const todaySeconds = (todayStat?.durationSeconds ?? 0) + (active ? Math.max(0, elapsed - active.durationSeconds) : 0);
   const completedSessions = sessions.filter((session) => session.endedAt !== null);
-  const todayStart = new Date(`${todayKey}T00:00:00`).getTime();
-  const todayEnd = new Date(`${todayKey}T24:00:00`).getTime();
-  const todaySessions = sessions.filter((session) => new Date(session.startedAt).getTime() < todayEnd
-    && (!session.endedAt || new Date(session.endedAt).getTime() > todayStart))
+  const timelineStart = new Date(`${timelineDate}T00:00:00`).getTime();
+  const timelineEnd = new Date(`${timelineDate}T24:00:00`).getTime();
+  const timelineDaySessions = timelineSessions.filter((session) => new Date(session.startedAt).getTime() < timelineEnd
+    && (!session.endedAt || new Date(session.endedAt).getTime() > timelineStart))
     .sort((first, second) => new Date(first.startedAt).getTime() - new Date(second.startedAt).getTime());
-  const timelineRange = todaySessions.length ? createTimelineRange(todaySessions, now, todayKey) : null;
+  const timelineRange = timelineDaySessions.length ? createTimelineRange(timelineDaySessions, now, timelineDate) : null;
   const chartMax = Math.max(1, ...(weekStats?.days.map((day) => day.durationSeconds) ?? [1]));
   const previousTotal = previousWeekStats?.totalDurationSeconds ?? 0;
   const weekChange = previousTotal > 0 ? Math.round(((weekStats?.totalDurationSeconds ?? 0) - previousTotal) / previousTotal * 100) : null;
@@ -112,24 +137,24 @@ export function StudyPage() {
 
   const begin = async (content: string, category: string) => {
     setSaving(true); setStartError(null);
-    try { await startStudySession(content, category, TIMEZONE); setStartModalOpen(false); await reload(); showMessage('success', '学习已开始'); }
+    try { await startStudySession(content, category, TIMEZONE); setStartModalOpen(false); await reload(); setTimelineRefresh((value) => value + 1); showMessage('success', '学习已开始'); }
     catch (cause) { setStartError(cause instanceof Error ? cause.message : '开始学习失败'); } finally { setSaving(false); }
   };
   const finish = async () => {
     if (!active) return; setSaving(true);
-    try { await finishStudySession(active.id, active.version); await reload(); showMessage('success', '本次学习已记录'); }
+    try { await finishStudySession(active.id, active.version); await reload(); setTimelineRefresh((value) => value + 1); showMessage('success', '本次学习已记录'); }
     catch (cause) { showMessage('error', cause instanceof Error ? cause.message : '结束学习失败'); } finally { setSaving(false); }
   };
   const openManual = () => { setEditing(null); setRecordError(null); setModalOpen(true); };
   const openEdit = (session: StudySession) => { setEditing(session); setRecordError(null); setModalOpen(true); };
   const saveRecord = async (input: SaveStudySessionInput) => {
     setSaving(true); setRecordError(null);
-    try { if (editing) await updateStudySession(editing.id, editing.version, input); else await createManualStudySession(input); setModalOpen(false); setEditing(null); await reload(); showMessage('success', editing ? '学习记录已更新' : '补卡完成'); }
+    try { if (editing) await updateStudySession(editing.id, editing.version, input); else await createManualStudySession(input); setModalOpen(false); setEditing(null); await reload(); setTimelineRefresh((value) => value + 1); showMessage('success', editing ? '学习记录已更新' : '补卡完成'); }
     catch (cause) { setRecordError(cause instanceof Error ? cause.message : '学习记录保存失败'); } finally { setSaving(false); }
   };
   const remove = async (session: StudySession) => {
     if (confirmDeleteId !== session.id) { setConfirmDeleteId(session.id); return; } setSaving(true);
-    try { await deleteStudySession(session.id, session.version); setConfirmDeleteId(null); await reload(); showMessage('success', '学习记录已删除'); }
+    try { await deleteStudySession(session.id, session.version); setConfirmDeleteId(null); await reload(); setTimelineRefresh((value) => value + 1); showMessage('success', '学习记录已删除'); }
     catch (cause) { showMessage('error', cause instanceof Error ? cause.message : '删除失败'); } finally { setSaving(false); }
   };
 
@@ -149,14 +174,19 @@ export function StudyPage() {
         {active && <section className={styles.section}><Heading title="正在学习" subtitle="这段时间会持续计入今天的学习记录" />
           <div className={styles.activeSession}><div className={styles.runningLabel}><i />正在学习</div><strong>{active.content}</strong><div className={styles.timer}>{formatTimer(elapsed)}</div><small>开始于 {formatClock(active.startedAt)}</small><button type="button" onClick={() => void finish()} disabled={saving}>{saving ? '正在结束…' : '结束这段学习'}</button></div>
         </section>}
-        <section className={styles.section}><Heading title="今日轨迹" subtitle="每一段专注，都落在它发生的时刻" side={timelineRange ? `${String(timelineRange.startHour).padStart(2, '0')}:00 — ${String(timelineRange.endHour).padStart(2, '0')}:00` : undefined} />
-          {timelineRange ? <div className={styles.timeline}>
+        <section className={styles.section}><Heading title="学习轨迹" subtitle={formatTimelineDate(timelineDate, todayKey)} side={<div className={styles.dateNavigation}>
+          {timelineDate !== todayKey && <button type="button" className={styles.todayAction} onClick={() => setTimelineDate(todayKey)}>今天</button>}
+          <button type="button" className={styles.dateArrow} aria-label="前一天" title="前一天" onClick={() => setTimelineDate((date) => shiftDateKey(date, -1))}><CaretLeftIcon size={13} /></button>
+          <label className={styles.datePicker} title="选择日期"><span>{timelineDate.slice(5).replace('-', '.')}</span><input type="date" value={timelineDate} max={todayKey} aria-label="选择轨迹日期" onChange={(event) => { if (event.target.value) setTimelineDate(event.target.value); }} /></label>
+          <button type="button" className={styles.dateArrow} aria-label="后一天" title="后一天" disabled={timelineDate >= todayKey} onClick={() => setTimelineDate((date) => shiftDateKey(date, 1))}><CaretRightIcon size={13} /></button>
+        </div>} />
+          {timelineLoading ? <div className={styles.compactEmpty}>正在读取这一天的轨迹…</div> : timelineError ? <div className={styles.timelineError} role="alert"><span>{timelineError}</span><button type="button" onClick={() => setTimelineRefresh((value) => value + 1)}>重试</button></div> : timelineRange ? <div className={styles.timeline}>
             <div className={styles.timelineCanvas}>
               <div className={styles.timelineHours} aria-hidden="true"><span />
                 <div>{timelineRange.ticks.map((hour, index) => <time key={hour} style={{ left: `${(hour - timelineRange.startHour) / (timelineRange.endHour - timelineRange.startHour) * 100}%` }} className={index === 0 ? styles.firstTick : index === timelineRange.ticks.length - 1 ? styles.lastTick : ''}>{String(hour).padStart(2, '0')}</time>)}</div>
               </div>
-              {todaySessions.map((session) => {
-                const position = timelinePosition(session, now, todayKey, timelineRange.startHour, timelineRange.endHour);
+              {timelineDaySessions.map((session) => {
+                const position = timelinePosition(session, now, timelineDate, timelineRange.startHour, timelineRange.endHour);
                 const endTime = session.endedAt ? formatClock(session.endedAt) : '现在';
                 return <div className={styles.timelineRow} key={session.id}>
                   <div className={styles.timelineLabel}><strong>{session.content}</strong><span>{formatClock(session.startedAt)} — {endTime}</span></div>
@@ -166,7 +196,7 @@ export function StudyPage() {
                 </div>;
               })}
             </div>
-          </div> : <div className={styles.compactEmpty}>今天还没有轨迹。开始学习后，时间会在这里留下痕迹。</div>}
+          </div> : <div className={styles.compactEmpty}>{timelineDate === todayKey ? '今天还没有轨迹。开始学习后，时间会在这里留下痕迹。' : '这一天没有学习轨迹。'}</div>}
         </section>
         <section className={styles.section}><Heading title="最近记录" subtitle="近 30 天完成的学习" side={completedSessions.length > 3 ? <button className={styles.linkButton} type="button" onClick={() => setShowAll((value) => !value)}>{showAll ? '收起' : '查看全部 →'}</button> : undefined} />
           {loading ? <div className={styles.loading}>正在读取学习记录…</div> : completedSessions.length ? <div className={styles.sessionList}>{completedSessions.slice(0, showAll ? completedSessions.length : 3).map((session) => <article className={styles.sessionRow} key={session.id}><time dateTime={session.startedAt}><strong>{String(new Date(session.startedAt).getDate()).padStart(2, '0')}</strong><span>{new Intl.DateTimeFormat('en-US', { month: 'short' }).format(new Date(session.startedAt)).toUpperCase()}</span></time><div className={styles.sessionBody}><div><strong>{session.content}</strong><span>{session.category}</span></div><p>{formatClock(session.startedAt)} — {session.endedAt ? formatClock(session.endedAt) : ''} · {formatDuration(session.durationSeconds)}{session.location ? ` · ${session.location}` : ''}</p></div><div className={styles.rowActions}><button type="button" title="编辑" aria-label={`编辑“${session.content}”`} onClick={() => openEdit(session)}><PencilSimpleIcon size={13} /></button><button type="button" className={confirmDeleteId === session.id ? styles.confirmDelete : ''} title={confirmDeleteId === session.id ? '再次点击确认删除' : '删除'} aria-label={`删除“${session.content}”`} onClick={() => void remove(session)}>{confirmDeleteId === session.id ? '确认' : <TrashIcon size={13} />}</button></div></article>)}</div> : <div className={styles.empty}><ClockCounterClockwiseIcon size={19} /><strong>还没有学习记录</strong><span>开始一次学习，或使用右上角补卡。</span></div>}
