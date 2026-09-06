@@ -14,30 +14,6 @@
   padding-bottom: 0;
 }
 
-.icon {
-  width: 24px;
-  height: 24px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  border-radius: var(--radius-sm);
-  background: #eef1f5;
-  color: var(--text-secondary);
-  font-size: 10px;
-  font-weight: 650;
-}
-
-.expenseIconTone {
-  background: #faf0ef;
-  color: #93443d;
-}
-
-.incomeIconTone {
-  background: #edf6f1;
-  color: #31725a;
-}
-
 .body {
   min-width: 0;
   flex: 1;

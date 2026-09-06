@@ -3,10 +3,8 @@ import type { CreateFinanceTransactionInput, FinanceAccount } from '../../types/
 import { formatLocalDate } from '../../services/dailyEvents';
 import { Button } from '../common/Button';
 import { Modal } from '../common/Modal';
+import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from './financeCategories';
 import styles from './TransactionModal.module.css';
-
-const EXPENSE_CATEGORIES = ['餐饮', '交通', '购物', '居住', '娱乐', '学习', '医疗', '其他'];
-const INCOME_CATEGORIES = ['工资', '奖金', '报销', '转入', '兼职', '其他'];
 
 function nowTime(): string {
   const now = new Date();

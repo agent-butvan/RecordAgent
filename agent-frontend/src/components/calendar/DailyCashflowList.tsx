@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { CaretRightIcon } from '@phosphor-icons/react';
 import type { CalendarExpense, CalendarIncome } from '../../types/calendar';
+import { TransactionTypeIcon } from '../finance/TransactionTypeIcon';
 import { DailyRecordDeleteButton } from './DailyRecordDeleteButton';
 import styles from './DailyCashflowList.module.css';
 
@@ -33,9 +34,7 @@ export const DailyCashflowList: React.FC<DailyCashflowListProps> = ({
         const isExpense = record.transactionType === 'expense';
         return (
           <div key={`${record.transactionType}-${record.id}`} className={styles.item}>
-            <span className={`${styles.icon} ${isExpense ? styles.expenseIconTone : styles.incomeIconTone}`}>
-              {record.category.slice(0, 1)}
-            </span>
+            <TransactionTypeIcon type={record.transactionType} category={record.category} compact />
             <span className={styles.body}>
               <strong>{record.category}</strong>
               <small>{record.note} · {record.time}</small>
