@@ -44,7 +44,7 @@ export const AssetAccountDeck: React.FC<AssetAccountDeckProps> = ({ accounts }) 
       <span className={`${styles.backCard} ${styles.backCardNear}`} aria-hidden="true" />
       <article key={account.id} className={`${styles.accountCard} ${tone(account.accountType)}`} aria-live="polite">
         <header>
-          <span className={styles.cardIcon}><AccountTypeIcon type={account.accountType} size={22} /></span>
+          <AccountTypeIcon type={account.accountType} size={22} variant="tile" />
           <span className={styles.cardIdentity}><strong>{account.name}</strong><small>{ACCOUNT_LABELS[account.accountType]}</small></span>
           <span className={styles.cardCount}>{activeIndex + 1} / {accounts.length}</span>
         </header>

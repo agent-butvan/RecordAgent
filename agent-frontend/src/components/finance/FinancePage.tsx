@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowDownLeft, ArrowUpRight, ChevronRight, Plus, RefreshCw, Sparkles, WalletCards } from 'lucide-react';
+import { ChevronRight, Plus, RefreshCw, Sparkles, WalletCards } from 'lucide-react';
 import { createFinanceAccount, createFinanceTransaction, fetchFinanceExpenseChart, fetchFinanceOverview, fetchFinanceTransactions } from '../../services/financeApi';
 import type { CreateFinanceTransactionInput, FinanceAccountType, FinanceChartRange, FinanceExpenseChart, FinanceOverview, FinanceTransaction } from '../../types/finance';
 import { Button } from '../common/Button';
@@ -9,6 +9,7 @@ import styles from './FinancePage.module.css';
 import { AccountTypeIcon } from './AccountTypeIcon';
 import { AssetAccountDeck } from './AssetAccountDeck';
 import { SpendingTrendChart } from './SpendingTrendChart';
+import { TransactionTypeIcon } from './TransactionTypeIcon';
 import { TransactionDrawer } from './TransactionDrawer';
 import { TransactionModal } from './TransactionModal';
 
@@ -167,9 +168,8 @@ export const FinancePage: React.FC = () => {
             <div className={styles.sectionHeading}><h2>最近流水</h2><div className={styles.sectionMeta}><span>最近 {recentTransactions.length} 笔</span>{overview?.transactions.length ? <button type="button" onClick={openTransactionDrawer}>查看全部<ChevronRight size={12} /></button> : null}</div></div>
             {recentTransactions.length ? <div className={styles.transactions}>{recentTransactions.map((transaction) => {
               const isExpense = transaction.transactionType === 'expense';
-              const isYield = transaction.transactionType === 'yield';
               return <div className={styles.transactionRow} key={transaction.id}>
-                <span className={styles.transactionMark}>{isYield ? <Sparkles size={13} /> : isExpense ? <ArrowUpRight size={13} /> : <ArrowDownLeft size={13} />}</span>
+                <TransactionTypeIcon type={transaction.transactionType} category={transaction.category} />
                 <span className={styles.transactionBody}><strong>{transaction.note}</strong><small>{transaction.accountName} · {transaction.category} · {transaction.date.slice(5)} {transaction.time.slice(0, 5)}</small></span>
                 <strong className={isExpense ? styles.outAmount : styles.inAmount}>{isExpense ? '-' : '+'}{money(transaction.amount)}</strong>
               </div>;
@@ -205,7 +205,7 @@ export const FinancePage: React.FC = () => {
               setAccountType(type.value);
               setInterestEnabled(type.interest);
             }} />
-            <span><AccountTypeIcon type={type.value} size={19} /></span><b>{type.label}</b>
+            <AccountTypeIcon type={type.value} size={20} variant="tile" /><b>{type.label}</b>
           </label>)}
         </div></fieldset>
         <label><span>当前余额</span><input name="initialBalance" type="number" min="0" step="0.01" defaultValue="0" required /></label>

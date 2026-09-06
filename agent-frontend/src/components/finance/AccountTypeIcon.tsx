@@ -1,26 +1,39 @@
 import React from 'react';
 import type { FinanceAccountType } from '../../types/finance';
+import styles from './AccountTypeIcon.module.css';
 
 interface AccountTypeIconProps {
   type: FinanceAccountType;
   size?: number;
+  variant?: 'plain' | 'tile';
 }
 
+/** 统一账户图标的尺寸、底色与描边；紧凑导航保留无底色版本。 */
+export const AccountTypeIcon: React.FC<AccountTypeIconProps> = ({ type, size = 18, variant = 'plain' }) => {
+  const glyph = <AccountGlyph type={type} size={size} />;
+  if (variant === 'plain') return glyph;
+  const tone = type.startsWith('wechat') ? styles.wechat
+    : type.startsWith('alipay') ? styles.alipay
+      : type === 'bank' ? styles.bank : styles.other;
+  return <span className={`${styles.tile} ${tone}`} aria-hidden="true"
+    style={{ width: size + 12, height: size + 12 }}>{glyph}</span>;
+};
+
 /** 六类资产账户的轻量线性图标，并兼容历史账户类型。 */
-export const AccountTypeIcon: React.FC<AccountTypeIconProps> = ({ type, size = 18 }) => {
+const AccountGlyph: React.FC<Pick<AccountTypeIconProps, 'type' | 'size'>> = ({ type, size }) => {
   const resolvedType = type === 'wechat' ? 'wechat_balance'
     : type === 'alipay' ? 'alipay_balance'
       : type === 'cash' ? 'other' : type;
   const common = {
-    width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
-    strokeWidth: 1.55, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const,
+    className: styles.glyph, width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
+    strokeWidth: 1.75, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const,
     'aria-hidden': true,
   };
 
   if (resolvedType === 'wechat_balance') return <svg {...common}>
     <path d="M4.2 6.4c0-2.1 2.1-3.8 4.7-3.8s4.7 1.7 4.7 3.8-2.1 3.8-4.7 3.8c-.6 0-1.1-.1-1.6-.2L4.7 11l.8-2a3.5 3.5 0 0 1-1.3-2.6Z" />
     <path d="M10.3 12.7c0-2.4 2.3-4.3 5.1-4.3s5.1 1.9 5.1 4.3c0 1.1-.5 2.1-1.4 2.9l.8 2.4-2.7-1.2c-.6.2-1.2.3-1.8.3-2.8 0-5.1-2-5.1-4.4Z" />
-    <path d="M7.1 6.1h.1M10.5 6.1h.1M13.9 12.3h.1M17.3 12.3h.1" />
+    <g fill="currentColor" stroke="none"><circle cx="7.1" cy="6.1" r=".8" /><circle cx="10.5" cy="6.1" r=".8" /><circle cx="13.9" cy="12.3" r=".8" /><circle cx="17.3" cy="12.3" r=".8" /></g>
   </svg>;
   if (resolvedType === 'wechat_yield') return <svg {...common}>
     <path d="M3.7 7.1c0-2.5 2.4-4.5 5.4-4.5s5.4 2 5.4 4.5-2.4 4.5-5.4 4.5c-.7 0-1.3-.1-1.9-.3L4.3 12.5l.8-2.4a4 4 0 0 1-1.4-3Z" />

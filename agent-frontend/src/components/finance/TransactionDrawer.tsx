@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowDownLeft, ArrowUpRight, CalendarDays, Search, Sparkles, WalletCards } from 'lucide-react';
+import { CalendarDays, Search, WalletCards } from 'lucide-react';
 import type { FinanceTransaction } from '../../types/finance';
 import { Drawer } from '../common/Drawer';
+import { TransactionTypeIcon } from './TransactionTypeIcon';
 import styles from './TransactionDrawer.module.css';
 
 interface TransactionDrawerProps {
@@ -46,11 +47,8 @@ export const TransactionDrawer: React.FC<TransactionDrawerProps> = ({
         : error ? <div className={styles.state}><strong>流水加载失败</strong><p>{error}</p><button type="button" onClick={onRetry}>重新加载</button></div>
           : filtered.length ? filtered.map((transaction) => {
             const isExpense = transaction.transactionType === 'expense';
-            const isYield = transaction.transactionType === 'yield';
             return <article className={styles.row} key={transaction.id}>
-              <span className={`${styles.mark} ${isExpense ? styles.expenseMark : styles.incomeMark}`}>
-                {isYield ? <Sparkles size={14} /> : isExpense ? <ArrowUpRight size={14} /> : <ArrowDownLeft size={14} />}
-              </span>
+              <TransactionTypeIcon type={transaction.transactionType} category={transaction.category} />
               <div className={styles.content}>
                 <div className={styles.primary}><strong>{transaction.note}</strong><b className={isExpense ? styles.expenseAmount : styles.incomeAmount}>{isExpense ? '-' : '+'}{money(transaction.amount)}</b></div>
                 <div className={styles.meta}>
