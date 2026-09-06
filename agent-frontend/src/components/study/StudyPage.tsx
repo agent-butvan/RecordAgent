@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BookOpenIcon, ClockCounterClockwiseIcon, DesktopIcon, DeviceMobileIcon, PencilSimpleIcon, PlayIcon, TrashIcon } from '@phosphor-icons/react';
+import { BookOpenIcon, ClockCounterClockwiseIcon, PencilSimpleIcon, PlayIcon, TrashIcon } from '@phosphor-icons/react';
 import { createManualStudySession, deleteStudySession, fetchActiveStudySession, fetchStudyCategories, fetchStudySessions, fetchStudyStatistics, finishStudySession, startStudySession, updateStudySession } from '../../services/studyApi';
 import { formatLocalDate } from '../../services/dailyEvents';
 import type { SaveStudySessionInput, StudySession, StudyStatistics } from '../../types/study';
@@ -13,8 +13,7 @@ import { STUDY_CATEGORIES } from './studyCategories';
 import styles from './StudyPage.module.css';
 
 const TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
-const START_HOUR = 8;
-const END_HOUR = 22;
+const MIN_TIMELINE_HOURS = 8;
 
 function shiftedDate(days: number): Date { const date = new Date(); date.setHours(12, 0, 0, 0); date.setDate(date.getDate() + days); return date; }
 function startOfMonth(): Date { const date = new Date(); date.setDate(1); date.setHours(12, 0, 0, 0); return date; }
@@ -27,14 +26,38 @@ function formatDuration(seconds: number): string {
 function formatTimer(seconds: number): string { return [Math.floor(seconds / 3600), Math.floor(seconds % 3600 / 60), seconds % 60].map((value) => String(Math.max(0, Math.floor(value))).padStart(2, '0')).join(':'); }
 function formatClock(instant: string): string { return new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' }).format(new Date(instant)); }
 function weekday(date: string): string { return new Intl.DateTimeFormat('zh-CN', { weekday: 'short' }).format(new Date(`${date}T12:00:00`)).replace('周', ''); }
-function sourceLabel(source: StudySession['source']): string { return source === 'shortcut' ? '快捷指令' : source === 'manual' ? '手动' : '当前应用'; }
-function timelinePosition(session: StudySession, now: number, todayKey: string) {
+function createTimelineRange(sessions: StudySession[], now: number, todayKey: string) {
+  const dayStart = new Date(`${todayKey}T00:00:00`).getTime();
+  const points = sessions.flatMap((session) => [
+    new Date(session.startedAt).getTime(),
+    session.endedAt ? new Date(session.endedAt).getTime() : now,
+  ]);
+  const earliestHour = Math.min(...points.map((point) => (point - dayStart) / 3_600_000));
+  const latestHour = Math.max(...points.map((point) => (point - dayStart) / 3_600_000));
+  let startHour = Math.max(0, Math.floor((earliestHour - 1) / 2) * 2);
+  let endHour = Math.min(24, Math.ceil((latestHour + 1) / 2) * 2);
+
+  if (endHour - startHour < MIN_TIMELINE_HOURS) {
+    const missingHours = MIN_TIMELINE_HOURS - (endHour - startHour);
+    startHour = Math.max(0, startHour - Math.ceil(missingHours / 4) * 2);
+    endHour = Math.min(24, Math.max(endHour, startHour + MIN_TIMELINE_HOURS));
+    startHour = Math.max(0, endHour - MIN_TIMELINE_HOURS);
+  }
+
+  const step = endHour - startHour > 14 ? 4 : 2;
+  const ticks = Array.from({ length: Math.floor((endHour - startHour) / step) + 1 }, (_, index) => startHour + index * step);
+  if (ticks.at(-1) !== endHour) ticks.push(endHour);
+  return { startHour, endHour, ticks };
+}
+
+function timelinePosition(session: StudySession, now: number, todayKey: string, startHour: number, endHour: number) {
   const start = new Date(session.startedAt); const end = session.endedAt ? new Date(session.endedAt) : new Date(now);
-  const dayStart = new Date(`${todayKey}T${String(START_HOUR).padStart(2, '0')}:00:00`);
-  const total = (END_HOUR - START_HOUR) * 3_600_000;
-  const left = Math.max(0, Math.min(100, (start.getTime() - dayStart.getTime()) / total * 100));
-  const right = Math.max(0, Math.min(100, (end.getTime() - dayStart.getTime()) / total * 100));
-  return { left, width: Math.max(1.5, right - left) };
+  const dayStart = new Date(`${todayKey}T00:00:00`);
+  const rangeStart = dayStart.getTime() + startHour * 3_600_000;
+  const total = (endHour - startHour) * 3_600_000;
+  const left = Math.max(0, Math.min(100, (start.getTime() - rangeStart) / total * 100));
+  const right = Math.max(0, Math.min(100, (end.getTime() - rangeStart) / total * 100));
+  return { left, width: Math.max(0, right - left) };
 }
 
 /** 学习记录工作台：将即时打卡、时间轴、历史维护和统计集中在单一页面。 */
@@ -75,7 +98,9 @@ export function StudyPage() {
   const todayStart = new Date(`${todayKey}T00:00:00`).getTime();
   const todayEnd = new Date(`${todayKey}T24:00:00`).getTime();
   const todaySessions = sessions.filter((session) => new Date(session.startedAt).getTime() < todayEnd
-    && (!session.endedAt || new Date(session.endedAt).getTime() > todayStart));
+    && (!session.endedAt || new Date(session.endedAt).getTime() > todayStart))
+    .sort((first, second) => new Date(first.startedAt).getTime() - new Date(second.startedAt).getTime());
+  const timelineRange = todaySessions.length ? createTimelineRange(todaySessions, now, todayKey) : null;
   const chartMax = Math.max(1, ...(weekStats?.days.map((day) => day.durationSeconds) ?? [1]));
   const previousTotal = previousWeekStats?.totalDurationSeconds ?? 0;
   const weekChange = previousTotal > 0 ? Math.round(((weekStats?.totalDurationSeconds ?? 0) - previousTotal) / previousTotal * 100) : null;
@@ -109,7 +134,7 @@ export function StudyPage() {
   };
 
   return <main className={styles.workspace}>
-    <TopBar title="学习记录" subtitle="本地数据" icon={<BookOpenIcon size={15} />} actions={<div className={styles.topActions}>
+    <TopBar title="记录" subtitle="本地数据" icon={<BookOpenIcon size={15} />} actions={<div className={styles.topActions}>
       <button type="button" className={styles.textAction} onClick={openManual}>补卡</button>
       <Button type="button" variant="primary" size="sm" icon={<PlayIcon size={13} weight="fill" />}
         onClick={() => { setStartError(null); setStartModalOpen(true); }} disabled={Boolean(active)}>{active ? '学习中' : '开始学习'}</Button>
@@ -122,17 +147,32 @@ export function StudyPage() {
       </section>
       <div className={styles.mainLayout}><div className={styles.primaryColumn}>
         {active && <section className={styles.section}><Heading title="正在学习" subtitle="这段时间会持续计入今天的学习记录" />
-          <div className={styles.activeSession}><div className={styles.runningLabel}><i />正在学习</div><strong>{active.content}</strong><div className={styles.timer}>{formatTimer(elapsed)}</div><small>开始于 {formatClock(active.startedAt)} · 当前应用</small><button type="button" onClick={() => void finish()} disabled={saving}>{saving ? '正在结束…' : '结束这段学习'}</button></div>
+          <div className={styles.activeSession}><div className={styles.runningLabel}><i />正在学习</div><strong>{active.content}</strong><div className={styles.timer}>{formatTimer(elapsed)}</div><small>开始于 {formatClock(active.startedAt)}</small><button type="button" onClick={() => void finish()} disabled={saving}>{saving ? '正在结束…' : '结束这段学习'}</button></div>
         </section>}
-        <section className={styles.section}><Heading title="今天的学习轨迹" subtitle="用时间轴看今天的学习是怎样发生的" side="08:00 — 22:00" />
-          {todaySessions.length ? <div className={styles.timeline}><div className={styles.timelineHours}>{Array.from({ length: 8 }, (_, index) => <span key={index}>{String(START_HOUR + index * 2).padStart(2, '0')}</span>)}</div>{todaySessions.map((session) => { const position = timelinePosition(session, now, todayKey); return <div className={styles.timelineRow} key={session.id}><strong>{session.category}</strong><div className={styles.timelineTrack}><i className={session.status === 'active' ? styles.timelineActive : ''} style={{ left: `${position.left}%`, width: `${position.width}%` }} title={`${session.content} · ${formatDuration(session.durationSeconds)}`}><span>{session.content}</span></i></div></div>; })}<div className={styles.timelineSummary}>{todaySessions.map((session) => <span key={session.id}><b>{formatClock(session.startedAt)}</b> {session.content}</span>)}</div></div> : <div className={styles.compactEmpty}>今天还没有学习轨迹，开始后会在这里出现。</div>}
+        <section className={styles.section}><Heading title="今日轨迹" subtitle="每一段专注，都落在它发生的时刻" side={timelineRange ? `${String(timelineRange.startHour).padStart(2, '0')}:00 — ${String(timelineRange.endHour).padStart(2, '0')}:00` : undefined} />
+          {timelineRange ? <div className={styles.timeline}>
+            <div className={styles.timelineCanvas}>
+              <div className={styles.timelineHours} aria-hidden="true"><span />
+                <div>{timelineRange.ticks.map((hour, index) => <time key={hour} style={{ left: `${(hour - timelineRange.startHour) / (timelineRange.endHour - timelineRange.startHour) * 100}%` }} className={index === 0 ? styles.firstTick : index === timelineRange.ticks.length - 1 ? styles.lastTick : ''}>{String(hour).padStart(2, '0')}</time>)}</div>
+              </div>
+              {todaySessions.map((session) => {
+                const position = timelinePosition(session, now, todayKey, timelineRange.startHour, timelineRange.endHour);
+                const endTime = session.endedAt ? formatClock(session.endedAt) : '现在';
+                return <div className={styles.timelineRow} key={session.id}>
+                  <div className={styles.timelineLabel}><strong>{session.content}</strong><span>{formatClock(session.startedAt)} — {endTime}</span></div>
+                  <div className={styles.timelineTrack} style={{ '--timeline-columns': timelineRange.ticks.length - 1 } as React.CSSProperties}>
+                    <i className={session.status === 'active' ? styles.timelineActive : ''} style={{ left: `${position.left}%`, width: `${position.width}%` }} title={`${session.content} · ${formatDuration(session.status === 'active' ? elapsed : session.durationSeconds)}`} aria-label={`${session.content}，${formatClock(session.startedAt)}至${endTime}`}><span>{session.category}</span></i>
+                  </div>
+                </div>;
+              })}
+            </div>
+          </div> : <div className={styles.compactEmpty}>今天还没有轨迹。开始学习后，时间会在这里留下痕迹。</div>}
         </section>
         <section className={styles.section}><Heading title="最近记录" subtitle="近 30 天完成的学习" side={completedSessions.length > 3 ? <button className={styles.linkButton} type="button" onClick={() => setShowAll((value) => !value)}>{showAll ? '收起' : '查看全部 →'}</button> : undefined} />
-          {loading ? <div className={styles.loading}>正在读取学习记录…</div> : completedSessions.length ? <div className={styles.sessionList}>{completedSessions.slice(0, showAll ? completedSessions.length : 3).map((session) => <article className={styles.sessionRow} key={session.id}><time dateTime={session.startedAt}><strong>{String(new Date(session.startedAt).getDate()).padStart(2, '0')}</strong><span>{new Intl.DateTimeFormat('en-US', { month: 'short' }).format(new Date(session.startedAt)).toUpperCase()}</span></time><div className={styles.sessionBody}><div><strong>{session.content}</strong><span>{session.category}</span></div><p>{formatClock(session.startedAt)} — {session.endedAt ? formatClock(session.endedAt) : ''} · {formatDuration(session.durationSeconds)}{session.location ? ` · ${session.location}` : ''}</p></div><span className={styles.source}>{sourceLabel(session.source)}</span><div className={styles.rowActions}><button type="button" title="编辑" aria-label={`编辑“${session.content}”`} onClick={() => openEdit(session)}><PencilSimpleIcon size={13} /></button><button type="button" className={confirmDeleteId === session.id ? styles.confirmDelete : ''} title={confirmDeleteId === session.id ? '再次点击确认删除' : '删除'} aria-label={`删除“${session.content}”`} onClick={() => void remove(session)}>{confirmDeleteId === session.id ? '确认' : <TrashIcon size={13} />}</button></div></article>)}</div> : <div className={styles.empty}><ClockCounterClockwiseIcon size={19} /><strong>还没有学习记录</strong><span>开始一次学习，或使用右上角补卡。</span></div>}
+          {loading ? <div className={styles.loading}>正在读取学习记录…</div> : completedSessions.length ? <div className={styles.sessionList}>{completedSessions.slice(0, showAll ? completedSessions.length : 3).map((session) => <article className={styles.sessionRow} key={session.id}><time dateTime={session.startedAt}><strong>{String(new Date(session.startedAt).getDate()).padStart(2, '0')}</strong><span>{new Intl.DateTimeFormat('en-US', { month: 'short' }).format(new Date(session.startedAt)).toUpperCase()}</span></time><div className={styles.sessionBody}><div><strong>{session.content}</strong><span>{session.category}</span></div><p>{formatClock(session.startedAt)} — {session.endedAt ? formatClock(session.endedAt) : ''} · {formatDuration(session.durationSeconds)}{session.location ? ` · ${session.location}` : ''}</p></div><div className={styles.rowActions}><button type="button" title="编辑" aria-label={`编辑“${session.content}”`} onClick={() => openEdit(session)}><PencilSimpleIcon size={13} /></button><button type="button" className={confirmDeleteId === session.id ? styles.confirmDelete : ''} title={confirmDeleteId === session.id ? '再次点击确认删除' : '删除'} aria-label={`删除“${session.content}”`} onClick={() => void remove(session)}>{confirmDeleteId === session.id ? '确认' : <TrashIcon size={13} />}</button></div></article>)}</div> : <div className={styles.empty}><ClockCounterClockwiseIcon size={19} /><strong>还没有学习记录</strong><span>开始一次学习，或使用右上角补卡。</span></div>}
         </section>
       </div><aside className={styles.insightColumn}>
         <section className={styles.sideSection}><Heading title="近 7 天节奏" subtitle="每天的有效学习时长" /><div className={styles.chart}>{weekStats?.days.map((day) => <div className={styles.chartDay} key={day.date}><strong>{day.durationSeconds ? Math.round(day.durationSeconds / 60) : '—'}</strong><div className={styles.barArea}><i className={day.date === todayKey ? styles.todayBar : ''} style={{ height: `${Math.max(day.durationSeconds ? 7 : 0, day.durationSeconds / chartMax * 100)}%` }} /></div><span>{weekday(day.date)}</span></div>)}</div><dl className={styles.smallStats}><div><dt>日均时长</dt><dd>{formatDuration(weekStats?.averageDailySeconds ?? 0)}</dd></div><div><dt>学习天数</dt><dd>{weekStats?.studyDays ?? 0} / 7 天</dd></div><div><dt>较上周</dt><dd>{weekChange === null ? '暂无对比' : `${weekChange >= 0 ? '↑' : '↓'} ${Math.abs(weekChange)}%`}</dd></div><div><dt>完成次数</dt><dd>{weekStats?.sessionCount ?? 0} 次</dd></div></dl></section>
-        <section className={styles.sideSection}><Heading title="记录来源" subtitle="多端学习记录汇总" /><div className={styles.deviceList}><div><i><DesktopIcon size={15} /></i><span><b>当前应用</b><small>可直接开始与结束</small></span><em>在线</em></div><div><i><DeviceMobileIcon size={15} /></i><span><b>Apple 快捷指令</b><small>等待快捷指令接入</small></span><em className={styles.pending}>未连接</em></div></div></section>
         <section className={styles.sideSection}><Heading title="本周观察" /><p className={styles.insight}>这周已经学习 <em>{weekStats?.studyDays ?? 0} 天</em>{weekChange !== null && <>，相比上周{weekChange >= 0 ? '增加' : '减少'}了 <em>{formatDuration(Math.abs((weekStats?.totalDurationSeconds ?? 0) - previousTotal))}</em></>}。{topCategory ? <>最近投入最多的是“<em>{topCategory}</em>”。</> : '完成第一段学习后，这里会生成观察。'}</p></section>
       </aside></div>
     </div></div>

@@ -447,7 +447,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             aria-current={activeFeature === 'study' ? 'page' : undefined}
           >
             <StudentIcon size={14} />
-            <span>学习记录</span>
+            <span>记录</span>
           </button>
         </nav>
 
