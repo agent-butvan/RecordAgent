@@ -39,21 +39,21 @@ public class StudyTypeHandler implements DailyEventTypeHandler<StudyCommand> {
     @Override
     public void insert(String eventId, StudyCommand command) {
         jdbcTemplate.update("""
-                INSERT INTO study_session_detail (event_id, started_at, ended_at, category, timezone)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO study_session_detail (event_id, started_at, ended_at, category, timezone, location)
+                VALUES (?, ?, ?, ?, ?, ?)
                 """, eventId, command.startedAt().toString(),
                 command.endedAt() == null ? null : command.endedAt().toString(),
-                command.category().trim(), command.timezone().getId());
+                command.category().trim(), command.timezone().getId(), command.location());
     }
 
     @Override
     public void update(String eventId, StudyCommand command) {
         int updated = jdbcTemplate.update("""
                 UPDATE study_session_detail
-                SET started_at = ?, ended_at = ?, category = ?, timezone = ?
+                SET started_at = ?, ended_at = ?, category = ?, timezone = ?, location = ?
                 WHERE event_id = ?
                 """, command.startedAt().toString(), command.endedAt() == null ? null : command.endedAt().toString(),
-                command.category().trim(), command.timezone().getId(), eventId);
+                command.category().trim(), command.timezone().getId(), command.location(), eventId);
         if (updated != 1) throw new IllegalArgumentException("学习时段不存在");
     }
 
@@ -61,13 +61,13 @@ public class StudyTypeHandler implements DailyEventTypeHandler<StudyCommand> {
     public Map<String, Object> loadDetails(List<String> eventIds) {
         if (eventIds.isEmpty()) return Map.of();
         return namedJdbcTemplate.query("""
-                SELECT event_id, started_at, ended_at, category, timezone
+                SELECT event_id, started_at, ended_at, category, timezone, location
                 FROM study_session_detail WHERE event_id IN (:ids)
                 """, Map.of("ids", eventIds), resultSet -> {
                     Map<String, Object> result = new LinkedHashMap<>();
                     while (resultSet.next()) result.put(resultSet.getString("event_id"), new StudyDetails(
                             resultSet.getString("started_at"), resultSet.getString("ended_at"),
-                            resultSet.getString("category"), resultSet.getString("timezone")));
+                            resultSet.getString("category"), resultSet.getString("timezone"), resultSet.getString("location")));
                     return result;
                 });
     }

@@ -41,7 +41,7 @@ public class StudyService {
         if (studyRepository.findActive(ownerId, now).isPresent()) {
             throw new IllegalArgumentException("已有进行中的学习，请先结束后再开始");
         }
-        StudyCommand command = command(content, category, now, null, timezone);
+        StudyCommand command = command(content, category, now, null, timezone, null);
         String id = UUID.randomUUID().toString();
         try {
             dailyEventRepository.insertEvent(id, ownerId, command.eventDate(), "study", cleanContent(content),
@@ -67,7 +67,7 @@ public class StudyService {
             throw new IllegalArgumentException("该学习时段与其他记录重叠，请先调整补卡记录");
         }
         StudyCommand command = command(existing.content(), existing.category(), existing.startedAt(), now,
-                ZoneId.of(existing.timezone()));
+                ZoneId.of(existing.timezone()), existing.location());
         typeRegistry.update(eventId, command);
         if (!dailyEventRepository.updateEvent(ownerId, eventId, expectedVersion, command.eventDate(),
                 cleanContent(existing.content()), "completed", now)) {
@@ -79,10 +79,10 @@ public class StudyService {
     /** 补录一段已结束的学习。 */
     @Transactional
     public StudySession createManual(
-            String ownerId, String content, String category, Instant startedAt, Instant endedAt, ZoneId timezone) {
+            String ownerId, String content, String category, Instant startedAt, Instant endedAt, ZoneId timezone, String location) {
         validateOwner(ownerId);
         Instant now = Instant.now();
-        StudyCommand command = command(content, category, startedAt, endedAt, timezone);
+        StudyCommand command = command(content, category, startedAt, endedAt, timezone, cleanLocation(location));
         validateCompletedTime(endedAt, now);
         if (studyRepository.hasOverlap(ownerId, startedAt, endedAt, null, now)) {
             throw new IllegalArgumentException("补卡时间与已有学习记录重叠");
@@ -98,12 +98,12 @@ public class StudyService {
     @Transactional
     public StudySession update(
             String ownerId, String eventId, int expectedVersion, String content, String category,
-            Instant startedAt, Instant endedAt, ZoneId timezone) {
+            Instant startedAt, Instant endedAt, ZoneId timezone, String location) {
         validateOwner(ownerId);
         Instant now = Instant.now();
         StudySession existing = requireSession(ownerId, eventId, now);
         if (existing.endedAt() == null) throw new IllegalArgumentException("进行中的学习请先结束再修改");
-        StudyCommand command = command(content, category, startedAt, endedAt, timezone);
+        StudyCommand command = command(content, category, startedAt, endedAt, timezone, cleanLocation(location));
         validateCompletedTime(endedAt, now);
         if (studyRepository.hasOverlap(ownerId, startedAt, endedAt, eventId, now)) {
             throw new IllegalArgumentException("修改后的时间与已有学习记录重叠");
@@ -188,10 +188,10 @@ public class StudyService {
     }
 
     private StudyCommand command(
-            String content, String category, Instant startedAt, Instant endedAt, ZoneId timezone) {
+            String content, String category, Instant startedAt, Instant endedAt, ZoneId timezone, String location) {
         if (startedAt == null || timezone == null) throw new IllegalArgumentException("学习时间与时区不能为空");
         StudyCommand command = new StudyCommand(startedAt.atZone(timezone).toLocalDate(), cleanContent(content),
-                cleanCategory(category), startedAt, endedAt, timezone);
+                cleanCategory(category), startedAt, endedAt, timezone, cleanLocation(location));
         // 复用类型处理器的规则，实际写入时会再次校验并保持 seam 一致。
         if (endedAt != null && !startedAt.isBefore(endedAt)) {
             throw new IllegalArgumentException("学习结束时间必须晚于开始时间");
@@ -226,6 +226,13 @@ public class StudyService {
         if (value.isBlank()) throw new IllegalArgumentException("学习内容不能为空");
         if (value.length() > 200) throw new IllegalArgumentException("学习内容不能超过 200 个字符");
         return value;
+    }
+
+    /** 地点为可选文本，只保存用户明确填写的信息。 */
+    private String cleanLocation(String location) {
+        String value = location == null ? "" : location.trim();
+        if (value.length() > 200) throw new IllegalArgumentException("学习地点不能超过 200 个字符");
+        return value.isEmpty() ? null : value;
     }
 
     private String cleanCategory(String category) {

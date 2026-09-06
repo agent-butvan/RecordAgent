@@ -22,7 +22,7 @@ public class StudyRepository {
     public Optional<StudySession> findActive(String ownerId, Instant now) {
         return query("""
                 SELECT e.id, e.title, e.source, e.status, e.version,
-                       s.category, s.started_at, s.ended_at, s.timezone
+                       s.category, s.started_at, s.ended_at, s.timezone, s.location
                 FROM daily_event e
                 JOIN study_session_detail s ON s.event_id = e.id
                 WHERE e.owner_id = ? AND e.event_type = 'study' AND e.status = 'active'
@@ -34,7 +34,7 @@ public class StudyRepository {
     public Optional<StudySession> findById(String ownerId, String eventId, Instant now) {
         return query("""
                 SELECT e.id, e.title, e.source, e.status, e.version,
-                       s.category, s.started_at, s.ended_at, s.timezone
+                       s.category, s.started_at, s.ended_at, s.timezone, s.location
                 FROM daily_event e
                 JOIN study_session_detail s ON s.event_id = e.id
                 WHERE e.owner_id = ? AND e.event_type = 'study' AND e.id = ?
@@ -45,7 +45,7 @@ public class StudyRepository {
     public List<StudySession> findRange(String ownerId, Instant from, Instant toExclusive, Instant now) {
         return query("""
                 SELECT e.id, e.title, e.source, e.status, e.version,
-                       s.category, s.started_at, s.ended_at, s.timezone
+                       s.category, s.started_at, s.ended_at, s.timezone, s.location
                 FROM daily_event e
                 JOIN study_session_detail s ON s.event_id = e.id
                 WHERE e.owner_id = ? AND e.event_type = 'study'
@@ -82,6 +82,6 @@ public class StudyRepository {
                 resultSet.getString("id"), resultSet.getString("title"), resultSet.getString("category"),
                 startedAt, endedAt, resultSet.getString("timezone"), resultSet.getString("source"),
                 resultSet.getString("status"), Math.max(0, Duration.between(startedAt, durationEnd).getSeconds()),
-                resultSet.getInt("version"));
+                resultSet.getInt("version"), resultSet.getString("location"));
     }
 }

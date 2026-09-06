@@ -20,13 +20,13 @@ public final class StudyModels {
             String category,
             Instant startedAt,
             Instant endedAt,
-            ZoneId timezone) implements DailyEventCommand {
+            ZoneId timezone, String location) implements DailyEventCommand {
         @Override public String title() { return content; }
         @Override public String eventType() { return "study"; }
     }
 
     /** 日历等调用者可读取的学习类型详情。 */
-    public record StudyDetails(String startedAt, String endedAt, String category, String timezone) {
+    public record StudyDetails(String startedAt, String endedAt, String category, String timezone, String location) {
     }
 
     /** 一段完整或进行中的学习时段。 */
@@ -40,7 +40,7 @@ public final class StudyModels {
             String source,
             String status,
             long durationSeconds,
-            int version) {
+            int version, String location) {
     }
 
     /** 单个自然日的学习汇总。 */

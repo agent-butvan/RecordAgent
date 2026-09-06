@@ -4,6 +4,7 @@ export type StudySource = 'project' | 'manual' | 'shortcut';
 export interface StudySession {
   id: string;
   content: string;
+  location?: string | null;
   category: string;
   startedAt: string;
   endedAt: string | null;
@@ -32,6 +33,7 @@ export interface StudyStatistics {
 
 export interface SaveStudySessionInput {
   content: string;
+  location?: string | null;
   category: string;
   startedAt: string;
   endedAt: string;

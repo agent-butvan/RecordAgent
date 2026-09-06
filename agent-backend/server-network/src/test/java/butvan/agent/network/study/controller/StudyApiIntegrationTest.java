@@ -80,9 +80,17 @@ class StudyApiIntegrationTest {
                   "category":"算法",
                   "startedAt":"2026-09-05T15:30:00Z",
                   "endedAt":"2026-09-05T17:30:00Z",
-                  "timezone":"Asia/Shanghai"
+                  "timezone":"Asia/Shanghai",
+                  "location":"学校图书馆"
                 }
                 """);
+
+        mockMvc.perform(get("/agent/study-sessions")
+                        .param("from", "2026-09-05")
+                        .param("to", "2026-09-05")
+                        .param("timezone", "Asia/Shanghai"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].location").value("学校图书馆"));
 
         mockMvc.perform(get("/agent/study-sessions/statistics")
                         .param("from", "2026-09-05")

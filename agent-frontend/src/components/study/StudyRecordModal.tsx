@@ -24,11 +24,13 @@ function toLocalInput(instant?: string | null, fallbackOffsetHours = 0): string 
 export function StudyRecordModal({ open, session, saving, error, onClose, onSave }: StudyRecordModalProps) {
   const defaults = useMemo(() => ({
     content: session?.content ?? '',
-    category: session?.category ?? '八股文',
+    category: session?.category ?? '项目',
+    location: session?.location ?? '',
     startedAt: toLocalInput(session?.startedAt, -1),
     endedAt: toLocalInput(session?.endedAt),
   }), [session]);
   const [content, setContent] = useState(defaults.content);
+  const [location, setLocation] = useState(defaults.location);
   const [category, setCategory] = useState(defaults.category);
   const [startedAt, setStartedAt] = useState(defaults.startedAt);
   const [endedAt, setEndedAt] = useState(defaults.endedAt);
@@ -36,6 +38,7 @@ export function StudyRecordModal({ open, session, saving, error, onClose, onSave
   useEffect(() => {
     if (!open) return;
     setContent(defaults.content);
+    setLocation(defaults.location);
     setCategory(defaults.category);
     setStartedAt(defaults.startedAt);
     setEndedAt(defaults.endedAt);
@@ -46,6 +49,7 @@ export function StudyRecordModal({ open, session, saving, error, onClose, onSave
     await onSave({
       content: content.trim(),
       category,
+      location: location.trim() || null,
       startedAt: new Date(startedAt).toISOString(),
       endedAt: new Date(endedAt).toISOString(),
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -77,6 +81,7 @@ export function StudyRecordModal({ open, session, saving, error, onClose, onSave
         <label><span>结束时间</span><input type="datetime-local" value={endedAt}
           min={startedAt} onChange={(event) => setEndedAt(event.target.value)} required /></label>
       </div>
+      <label><span>地点（可选）</span><input value={location} onChange={(event) => setLocation(event.target.value)} maxLength={200} placeholder="例如：学校图书馆" /></label>
       <div className={styles.actions}>
         <Button type="button" variant="outline" onClick={onClose} disabled={saving}>取消</Button>
         <Button type="submit" variant="primary" disabled={saving || !content.trim() || !startedAt || !endedAt}>

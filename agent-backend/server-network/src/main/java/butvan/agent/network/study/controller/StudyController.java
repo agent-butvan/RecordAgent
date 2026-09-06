@@ -53,7 +53,7 @@ public class StudyController {
     @PostMapping("/manual")
     public Result<StudySession> createManual(@RequestBody ManualStudyRequest request) {
         return Result.success(studyService.createManual(currentUserId(), request.content(), request.category(),
-                request.startedAt(), request.endedAt(), parseTimezone(request.timezone())));
+                request.startedAt(), request.endedAt(), parseTimezone(request.timezone()), request.location()));
     }
 
     /** 修改一段已结束学习。 */
@@ -63,7 +63,7 @@ public class StudyController {
             @PathVariable String eventId, @RequestParam int expectedVersion, @RequestBody UpdateStudyRequest request) {
         return Result.success(studyService.update(currentUserId(), eventId, expectedVersion,
                 request.content(), request.category(), request.startedAt(), request.endedAt(),
-                parseTimezone(request.timezone())));
+                parseTimezone(request.timezone()), request.location()));
     }
 
     /** 删除一段学习记录。 */

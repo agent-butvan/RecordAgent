@@ -13,11 +13,11 @@ public final class StudyDtos {
 
     /** 补卡请求。 */
     public record ManualStudyRequest(
-            String content, String category, Instant startedAt, Instant endedAt, String timezone) {
+            String content, String category, Instant startedAt, Instant endedAt, String timezone, String location) {
     }
 
     /** 修改学习记录请求。 */
     public record UpdateStudyRequest(
-            String content, String category, Instant startedAt, Instant endedAt, String timezone) {
+            String content, String category, Instant startedAt, Instant endedAt, String timezone, String location) {
     }
 }
