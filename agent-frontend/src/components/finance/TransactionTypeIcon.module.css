@@ -1,6 +1,6 @@
-.icon { width: 30px; height: 30px; display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; border: 1px solid var(--icon-border); border-radius: var(--radius-md); background: var(--icon-surface); color: var(--icon-ink); }
+.icon { width: 16px; height: 16px; display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; color: var(--icon-ink); }
 .icon svg { display: block; flex: 0 0 auto; }
-.compact { width: 24px; height: 24px; border-radius: var(--radius-sm); }
-.expense { --icon-ink: #913f38; --icon-surface: #faf2f1; --icon-border: #eedbd8; }
-.income { --icon-ink: #246247; --icon-surface: #eff6f2; --icon-border: #d5e6dc; }
-.yield { --icon-ink: #725212; --icon-surface: #faf6eb; --icon-border: #e9dfc5; }
+.compact { width: 14px; height: 14px; }
+.expense { --icon-ink: #913f38; }
+.income { --icon-ink: #246247; }
+.yield { --icon-ink: #725212; }

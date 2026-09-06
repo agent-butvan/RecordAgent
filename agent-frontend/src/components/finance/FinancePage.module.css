@@ -39,7 +39,7 @@
 
 .transactions { display: flex; flex-direction: column; }
 .transactionRow { display: grid; align-items: center; gap: 9px; padding: 10px 0; border-bottom: 1px solid var(--border-subtle); }
-.transactionRow { grid-template-columns: 30px minmax(0, 1fr) auto; }
+.transactionRow { grid-template-columns: 16px minmax(0, 1fr) auto; }
 .transactionRow:last-child { border-bottom: none; }
 .transactionBody { min-width: 0; display: flex; flex-direction: column; }
 .transactionBody strong { overflow: hidden; color: var(--text-primary); font-size: 11.5px; font-weight: 600; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
