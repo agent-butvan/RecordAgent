@@ -39,6 +39,11 @@ export interface JournalDailyEvent extends DailyEventBase {
   details: { body: string; mood: string };
 }
 
+export interface StudyDailyEvent extends DailyEventBase {
+  eventType: 'study';
+  details: { startedAt: string; endedAt: string | null; category: string; timezone: string };
+}
+
 export interface UnknownDailyEvent extends DailyEventBase {
   eventType: 'unknown';
   originalEventType: string;
@@ -51,6 +56,7 @@ export type DailyEvent =
   | ExpenseDailyEvent
   | IncomeDailyEvent
   | JournalDailyEvent
+  | StudyDailyEvent
   | UnknownDailyEvent;
 
 export interface DailyDay {

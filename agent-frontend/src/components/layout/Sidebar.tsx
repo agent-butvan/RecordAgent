@@ -16,7 +16,7 @@ import {
   User,
   Settings,
 } from 'lucide-react';
-import { BooksIcon, CalendarDotsIcon, WalletIcon } from '@phosphor-icons/react';
+import { BooksIcon, CalendarDotsIcon, StudentIcon, WalletIcon } from '@phosphor-icons/react';
 import type { ChatSession, Project } from '../../types/chat';
 import { FormField } from '../common/FormField';
 import { TextInput } from '../common/TextInput';
@@ -75,8 +75,8 @@ function sortByUpdatedDesc(a: ChatSession, b: ChatSession): number {
 }
 
 interface SidebarProps {
-  activeFeature: 'chat' | 'calendar' | 'finance' | 'record';
-  onSelectFeature: (feature: 'chat' | 'calendar' | 'finance' | 'record') => void;
+  activeFeature: 'chat' | 'calendar' | 'finance' | 'record' | 'study';
+  onSelectFeature: (feature: 'chat' | 'calendar' | 'finance' | 'record' | 'study') => void;
   /** 用户头像 URL；未配置时使用邮箱前两位作为默认头像 */
   avatarUrl?: string;
   projects: Project[];
@@ -439,6 +439,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <BooksIcon size={14} />
             <span>资料</span>
+          </button>
+          <button
+            type="button"
+            className={`${styles.featureTab} ${activeFeature === 'study' ? styles.featureTabActive : ''}`}
+            onClick={() => onSelectFeature('study')}
+            aria-current={activeFeature === 'study' ? 'page' : undefined}
+          >
+            <StudentIcon size={14} />
+            <span>学习记录</span>
           </button>
         </nav>
 
