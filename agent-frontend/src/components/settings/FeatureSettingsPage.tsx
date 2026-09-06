@@ -1,4 +1,3 @@
-import { CalendarDays, Library, NotebookPen, WalletCards } from 'lucide-react';
 import type { StudyWindowMode } from '../../types/preferences';
 import { Select } from '../common/Select';
 import styles from './FeatureSettingsPage.module.css';
@@ -9,25 +8,21 @@ const FEATURE_CONTENT: Record<Exclude<FeatureSettingsTab, 'record'>, {
   title: string;
   description: string;
   detail: string;
-  icon: typeof CalendarDays;
 }> = {
   calendar: {
     title: '日历',
     description: '管理日程、待办和每日信息的展示方式。',
     detail: '当前日历功能使用默认配置。后续新增的提醒、周起始日和日历同步选项会集中在这里。',
-    icon: CalendarDays,
   },
   finance: {
     title: '财务',
     description: '管理账户、收支记录和统计展示偏好。',
     detail: '当前财务功能使用默认配置。后续新增的本位币、预算周期和分类规则会集中在这里。',
-    icon: WalletCards,
   },
   library: {
     title: '资料',
     description: '管理资料库的编辑、分类和阅读偏好。',
     detail: '当前资料功能使用默认配置。后续新增的默认分类、编辑器和归档选项会集中在这里。',
-    icon: Library,
   },
 };
 
@@ -47,7 +42,6 @@ export function FeatureSettingsPage({
     return (
       <section className={styles.page} aria-labelledby="record-settings-title">
         <header className={styles.header}>
-          <span className={styles.icon}><NotebookPen size={18} /></span>
           <div>
             <h1 id="record-settings-title">记录</h1>
             <p>配置学习计时进行中时的展示位置。</p>
@@ -73,18 +67,16 @@ export function FeatureSettingsPage({
         </div>
 
         <p className={styles.note}>
-          应用内小窗和系统小窗均可拖动。关闭或隐藏小窗不会结束当前学习。
+          应用内小窗和系统小窗均可在非按钮区域拖动，并可从右下角调整大小。关闭或隐藏小窗不会结束当前学习。
         </p>
       </section>
     );
   }
 
   const content = FEATURE_CONTENT[tab];
-  const Icon = content.icon;
   return (
     <section className={styles.page} aria-labelledby={`${tab}-settings-title`}>
       <header className={styles.header}>
-        <span className={styles.icon}><Icon size={18} /></span>
         <div>
           <h1 id={`${tab}-settings-title`}>{content.title}</h1>
           <p>{content.description}</p>

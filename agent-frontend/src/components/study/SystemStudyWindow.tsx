@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { fetchActiveStudySession, finishStudySession } from '../../services/studyApi';
 import { notifyStudySessionChanged } from '../../services/studySessionEvents';
@@ -44,8 +44,13 @@ export function SystemStudyWindow() {
 
   if (!session) return <div className={styles.loading}>正在读取学习状态…</div>;
   const elapsed = Math.max(0, Math.floor((now - new Date(session.startedAt).getTime()) / 1_000));
+  const windowHandle = getCurrentWindow();
+  const startDragging = (event: ReactPointerEvent<HTMLElement>) => {
+    if ((event.target as HTMLElement).closest('button')) return;
+    void windowHandle.startDragging();
+  };
   return (
-    <main className={styles.window}>
+    <main className={styles.window} onPointerDown={startDragging}>
       <ActiveStudyCard
         session={session}
         elapsedSeconds={elapsed}
@@ -54,7 +59,11 @@ export function SystemStudyWindow() {
         saving={saving}
         error={finishError}
         onFinish={() => void finish()}
-        onHide={() => void getCurrentWindow().hide()}
+        onHide={() => void windowHandle.hide()}
+        onResizeStart={(event) => {
+          event.stopPropagation();
+          void windowHandle.startResizeDragging('SouthEast');
+        }}
       />
     </main>
   );

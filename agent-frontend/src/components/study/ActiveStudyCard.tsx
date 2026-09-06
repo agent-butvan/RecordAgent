@@ -1,4 +1,5 @@
-import { DotsSixVertical, X } from '@phosphor-icons/react';
+import { ArrowsOutSimple, X } from '@phosphor-icons/react';
+import type { PointerEvent as ReactPointerEvent } from 'react';
 import type { StudySession } from '../../types/study';
 import styles from './ActiveStudyCard.module.css';
 
@@ -21,6 +22,7 @@ interface ActiveStudyCardProps {
   onFinish: () => void;
   onHide?: () => void;
   error?: string | null;
+  onResizeStart?: (event: ReactPointerEvent<HTMLButtonElement>) => void;
 }
 
 /** 在记录页面、应用内浮窗和系统小窗之间复用的活动学习状态。 */
@@ -33,11 +35,11 @@ export function ActiveStudyCard({
   onFinish,
   onHide,
   error,
+  onResizeStart,
 }: ActiveStudyCardProps) {
   return (
-    <article className={`${styles.card} ${compact ? styles.compact : ''}`} aria-label="正在学习">
-      <header className={styles.header} data-tauri-drag-region={draggable ? true : undefined}>
-        {draggable && <DotsSixVertical size={16} className={styles.dragIcon} aria-hidden="true" />}
+    <article className={`${styles.card} ${compact ? styles.compact : ''} ${draggable ? styles.draggable : ''}`} aria-label="正在学习">
+      <header className={styles.header}>
         <span className={styles.status}><i />正在学习</span>
         {onHide && (
           <button type="button" className={styles.hideButton} onClick={onHide} aria-label="隐藏学习小窗" title="隐藏小窗">
@@ -52,6 +54,17 @@ export function ActiveStudyCard({
       <button type="button" className={styles.finishButton} onClick={onFinish} disabled={saving}>
         {saving ? '正在结束…' : '结束这段学习'}
       </button>
+      {onResizeStart && (
+        <button
+          type="button"
+          className={styles.resizeHandle}
+          onPointerDown={onResizeStart}
+          aria-label="调整学习小窗大小"
+          title="拖动调整大小"
+        >
+          <ArrowsOutSimple size={13} />
+        </button>
+      )}
     </article>
   );
 }

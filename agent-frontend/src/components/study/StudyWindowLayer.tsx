@@ -10,32 +10,57 @@ import { useMessage } from '../common/Message';
 import styles from './StudyWindowLayer.module.css';
 
 const POSITION_KEY = 'butvan.studyWidgetPosition';
-const WIDGET_WIDTH = 336;
-const WIDGET_HEIGHT = 224;
+const DEFAULT_WIDGET_WIDTH = 336;
+const DEFAULT_WIDGET_HEIGHT = 224;
+const MIN_WIDGET_WIDTH = 280;
+const MIN_WIDGET_HEIGHT = 190;
 const VIEWPORT_MARGIN = 18;
 
-function defaultPosition() {
+interface WidgetGeometry {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+function defaultGeometry(): WidgetGeometry {
   return {
-    x: Math.max(VIEWPORT_MARGIN, window.innerWidth - WIDGET_WIDTH - VIEWPORT_MARGIN),
-    y: Math.max(VIEWPORT_MARGIN, window.innerHeight - WIDGET_HEIGHT - VIEWPORT_MARGIN),
+    x: Math.max(VIEWPORT_MARGIN, window.innerWidth - DEFAULT_WIDGET_WIDTH - VIEWPORT_MARGIN),
+    y: Math.max(VIEWPORT_MARGIN, window.innerHeight - DEFAULT_WIDGET_HEIGHT - VIEWPORT_MARGIN),
+    width: DEFAULT_WIDGET_WIDTH,
+    height: DEFAULT_WIDGET_HEIGHT,
   };
 }
 
-function readPosition() {
+function clampGeometry(geometry: WidgetGeometry): WidgetGeometry {
+  const maxViewportWidth = Math.max(MIN_WIDGET_WIDTH, window.innerWidth - VIEWPORT_MARGIN * 2);
+  const maxViewportHeight = Math.max(MIN_WIDGET_HEIGHT, window.innerHeight - VIEWPORT_MARGIN * 2);
+  const width = Math.min(Math.max(MIN_WIDGET_WIDTH, geometry.width), maxViewportWidth);
+  const height = Math.min(Math.max(MIN_WIDGET_HEIGHT, geometry.height), maxViewportHeight);
+  return {
+    width,
+    height,
+    x: Math.min(Math.max(VIEWPORT_MARGIN, geometry.x), Math.max(VIEWPORT_MARGIN, window.innerWidth - width - VIEWPORT_MARGIN)),
+    y: Math.min(Math.max(VIEWPORT_MARGIN, geometry.y), Math.max(VIEWPORT_MARGIN, window.innerHeight - height - VIEWPORT_MARGIN)),
+  };
+}
+
+function readGeometry(): WidgetGeometry {
+  const defaults = defaultGeometry();
   try {
-    const saved = JSON.parse(localStorage.getItem(POSITION_KEY) ?? '{}') as { x?: number; y?: number };
-    if (Number.isFinite(saved.x) && Number.isFinite(saved.y)) return { x: saved.x!, y: saved.y! };
+    const saved = JSON.parse(localStorage.getItem(POSITION_KEY) ?? '{}') as Partial<WidgetGeometry>;
+    if (Number.isFinite(saved.x) && Number.isFinite(saved.y)) {
+      return clampGeometry({
+        x: saved.x!,
+        y: saved.y!,
+        width: Number.isFinite(saved.width) ? saved.width! : defaults.width,
+        height: Number.isFinite(saved.height) ? saved.height! : defaults.height,
+      });
+    }
   } catch {
     // 使用右下角默认位置。
   }
-  return defaultPosition();
-}
-
-function clampPosition(position: { x: number; y: number }) {
-  return {
-    x: Math.min(Math.max(VIEWPORT_MARGIN, position.x), Math.max(VIEWPORT_MARGIN, window.innerWidth - WIDGET_WIDTH - VIEWPORT_MARGIN)),
-    y: Math.min(Math.max(VIEWPORT_MARGIN, position.y), Math.max(VIEWPORT_MARGIN, window.innerHeight - WIDGET_HEIGHT - VIEWPORT_MARGIN)),
-  };
+  return defaults;
 }
 
 /** 主应用中的学习小窗协调层，负责模式切换、会话同步和应用内拖动。 */
@@ -47,10 +72,17 @@ export function StudyWindowLayer() {
   const [saving, setSaving] = useState(false);
   const [finishError, setFinishError] = useState<string | null>(null);
   const [hiddenSessionId, setHiddenSessionId] = useState<string | null>(null);
-  const [position, setPosition] = useState(readPosition);
-  const positionRef = useRef(position);
-  positionRef.current = position;
-  const dragRef = useRef<{ pointerId: number; offsetX: number; offsetY: number } | null>(null);
+  const [geometry, setGeometry] = useState(readGeometry);
+  const geometryRef = useRef(geometry);
+  geometryRef.current = geometry;
+  const interactionRef = useRef<{
+    kind: 'move' | 'resize';
+    pointerId: number;
+    captureElement: HTMLElement;
+    startX: number;
+    startY: number;
+    startGeometry: WidgetGeometry;
+  } | null>(null);
   const activeSessionId = session?.id;
 
   const reload = useCallback(() => {
@@ -90,26 +122,64 @@ export function StudyWindowLayer() {
   }, [mode, activeSessionId, showMessage]);
 
   useEffect(() => {
-    const onResize = () => setPosition((current) => clampPosition(current));
+    const onResize = () => setGeometry((current) => clampGeometry(current));
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if ((event.target as HTMLElement).closest('button')) return;
-    dragRef.current = { pointerId: event.pointerId, offsetX: event.clientX - position.x, offsetY: event.clientY - position.y };
+    interactionRef.current = {
+      kind: 'move',
+      pointerId: event.pointerId,
+      captureElement: event.currentTarget,
+      startX: event.clientX,
+      startY: event.clientY,
+      startGeometry: geometryRef.current,
+    };
     event.currentTarget.setPointerCapture(event.pointerId);
   };
   const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const drag = dragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
-    setPosition(clampPosition({ x: event.clientX - drag.offsetX, y: event.clientY - drag.offsetY }));
+    const interaction = interactionRef.current;
+    if (!interaction || interaction.pointerId !== event.pointerId) return;
+    const deltaX = event.clientX - interaction.startX;
+    const deltaY = event.clientY - interaction.startY;
+    if (interaction.kind === 'move') {
+      setGeometry(clampGeometry({
+        ...interaction.startGeometry,
+        x: interaction.startGeometry.x + deltaX,
+        y: interaction.startGeometry.y + deltaY,
+      }));
+      return;
+    }
+    const maxWidth = Math.max(MIN_WIDGET_WIDTH, window.innerWidth - interaction.startGeometry.x - VIEWPORT_MARGIN);
+    const maxHeight = Math.max(MIN_WIDGET_HEIGHT, window.innerHeight - interaction.startGeometry.y - VIEWPORT_MARGIN);
+    setGeometry({
+      ...interaction.startGeometry,
+      width: Math.min(maxWidth, Math.max(MIN_WIDGET_WIDTH, interaction.startGeometry.width + deltaX)),
+      height: Math.min(maxHeight, Math.max(MIN_WIDGET_HEIGHT, interaction.startGeometry.height + deltaY)),
+    });
   };
   const onPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (dragRef.current?.pointerId !== event.pointerId) return;
-    dragRef.current = null;
-    localStorage.setItem(POSITION_KEY, JSON.stringify(positionRef.current));
-    event.currentTarget.releasePointerCapture(event.pointerId);
+    const interaction = interactionRef.current;
+    if (!interaction || interaction.pointerId !== event.pointerId) return;
+    interactionRef.current = null;
+    localStorage.setItem(POSITION_KEY, JSON.stringify(geometryRef.current));
+    if (interaction.captureElement.hasPointerCapture(event.pointerId)) {
+      interaction.captureElement.releasePointerCapture(event.pointerId);
+    }
+  };
+  const onResizeStart = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    interactionRef.current = {
+      kind: 'resize',
+      pointerId: event.pointerId,
+      captureElement: event.currentTarget,
+      startX: event.clientX,
+      startY: event.clientY,
+      startGeometry: geometryRef.current,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
   };
   const finish = async () => {
     if (!session) return;
@@ -131,7 +201,11 @@ export function StudyWindowLayer() {
   return (
     <div
       className={styles.widget}
-      style={{ transform: `translate3d(${position.x}px, ${position.y}px, 0)` }}
+      style={{
+        width: geometry.width,
+        height: geometry.height,
+        transform: `translate3d(${geometry.x}px, ${geometry.y}px, 0)`,
+      }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -146,6 +220,7 @@ export function StudyWindowLayer() {
         error={finishError}
         onFinish={() => void finish()}
         onHide={() => setHiddenSessionId(session.id)}
+        onResizeStart={onResizeStart}
       />
     </div>
   );

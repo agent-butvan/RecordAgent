@@ -1,6 +1,5 @@
 .page { width: 100%; max-width: 760px; }
-.header { display: flex; align-items: flex-start; gap: 12px; padding-bottom: 24px; border-bottom: 1px solid var(--border-subtle); }
-.icon { width: 34px; height: 34px; flex: none; display: grid; place-items: center; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--bg-surface); color: var(--text-secondary); }
+.header { padding-bottom: 24px; border-bottom: 1px solid var(--border-subtle); }
 .header h1 { color: var(--text-primary); font-size: 24px; line-height: 1.25; }
 .header p { margin-top: 5px; color: var(--text-secondary); font-size: 13px; }
 .settingGroup { display: flex; align-items: center; justify-content: space-between; gap: 32px; padding: 24px 0; border-bottom: 1px solid var(--border-subtle); }

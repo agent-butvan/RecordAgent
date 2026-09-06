@@ -1,6 +1,8 @@
 import { primaryMonitor } from '@tauri-apps/api/window';
 
 const STUDY_WINDOW_LABEL = 'study-widget';
+const MIN_WIDGET_WIDTH = 280;
+const MIN_WIDGET_HEIGHT = 190;
 
 function isTauriRuntime(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
@@ -29,6 +31,8 @@ export async function showDesktopStudyWindow(): Promise<boolean> {
     title: '正在学习',
     width,
     height,
+    minWidth: MIN_WIDGET_WIDTH,
+    minHeight: MIN_WIDGET_HEIGHT,
     x: workAreaPosition && workAreaSize
       ? workAreaPosition.x + workAreaSize.width - width - margin
       : fallbackX,
@@ -37,7 +41,7 @@ export async function showDesktopStudyWindow(): Promise<boolean> {
       : fallbackY,
     alwaysOnTop: true,
     decorations: false,
-    resizable: false,
+    resizable: true,
     skipTaskbar: true,
     visible: true,
     focus: false,
