@@ -6,6 +6,8 @@ import { CalendarView } from './components/calendar/CalendarView';
 import { FinancePage } from './components/finance/FinancePage';
 import { RecordPage } from './components/record/RecordPage';
 import { StudyPage } from './components/study/StudyPage';
+import { StudyWindowLayer } from './components/study/StudyWindowLayer';
+import { SystemStudyWindow } from './components/study/SystemStudyWindow';
 import { ModelSettingsPage } from './components/model/ModelSettingsPage';
 import { ModelInitPage } from './components/model/ModelInitPage';
 import { MessageProvider } from './components/common/Message';
@@ -812,12 +814,13 @@ export const MainLayout: React.FC<{
           )}
         </>
       )}
+      <StudyWindowLayer />
     </div>
   );
 };
 
 
-export const App: React.FC = () => {
+const PrimaryApp: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('config');
   const [needsInit, setNeedsInit] = useState<boolean>(false);
@@ -891,5 +894,11 @@ export const App: React.FC = () => {
     </MessageProvider>
   );
 };
+
+export const App: React.FC = () => (
+  new URLSearchParams(window.location.search).get('view') === 'study-widget'
+    ? <SystemStudyWindow />
+    : <PrimaryApp />
+);
 
 export default App;

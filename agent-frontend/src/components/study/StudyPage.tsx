@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BookOpenIcon, CaretLeftIcon, CaretRightIcon, ClockCounterClockwiseIcon, PencilSimpleIcon, PlayIcon, TrashIcon } from '@phosphor-icons/react';
 import { createManualStudySession, deleteStudySession, fetchActiveStudySession, fetchStudyCategories, fetchStudySessions, fetchStudyStatistics, finishStudySession, startStudySession, updateStudySession } from '../../services/studyApi';
 import { formatLocalDate } from '../../services/dailyEvents';
+import { notifyStudySessionChanged, subscribeStudySessionChanges } from '../../services/studySessionEvents';
 import type { SaveStudySessionInput, StudySession, StudyStatistics } from '../../types/study';
 import { Button } from '../common/Button';
 import { mergeCategoryOptions } from '../common/categoryOptions';
@@ -9,6 +10,7 @@ import { useMessage } from '../common/Message';
 import { TopBar } from '../common/TopBar';
 import { StudyRecordModal } from './StudyRecordModal';
 import { StudyStartModal } from './StudyStartModal';
+import { ActiveStudyCard } from './ActiveStudyCard';
 import { STUDY_CATEGORIES } from './studyCategories';
 import styles from './StudyPage.module.css';
 
@@ -28,7 +30,6 @@ function formatDuration(seconds: number): string {
   const hours = Math.floor(minutes / 60); const rest = minutes % 60;
   return hours ? `${hours} 小时${rest ? ` ${rest} 分钟` : ''}` : `${minutes} 分钟`;
 }
-function formatTimer(seconds: number): string { return [Math.floor(seconds / 3600), Math.floor(seconds % 3600 / 60), seconds % 60].map((value) => String(Math.max(0, Math.floor(value))).padStart(2, '0')).join(':'); }
 function formatClock(instant: string): string { return new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' }).format(new Date(instant)); }
 function weekday(date: string): string { return new Intl.DateTimeFormat('zh-CN', { weekday: 'short' }).format(new Date(`${date}T12:00:00`)).replace('周', ''); }
 function formatTimelineDate(dateKey: string, todayKey: string): string {
@@ -105,6 +106,7 @@ export function StudyPage() {
     finally { setLoading(false); }
   }, []);
   useEffect(() => { void reload(); }, [reload]);
+  useEffect(() => subscribeStudySessionChanges(() => void reload()), [reload]);
   useEffect(() => { if (!active) return; setNow(Date.now()); const timer = window.setInterval(() => setNow(Date.now()), 1_000); return () => window.clearInterval(timer); }, [active]);
   useEffect(() => {
     let current = true;
@@ -137,12 +139,12 @@ export function StudyPage() {
 
   const begin = async (content: string, category: string) => {
     setSaving(true); setStartError(null);
-    try { await startStudySession(content, category, TIMEZONE); setStartModalOpen(false); await reload(); setTimelineRefresh((value) => value + 1); showMessage('success', '学习已开始'); }
+    try { await startStudySession(content, category, TIMEZONE); setStartModalOpen(false); await reload(); notifyStudySessionChanged(); setTimelineRefresh((value) => value + 1); showMessage('success', '学习已开始'); }
     catch (cause) { setStartError(cause instanceof Error ? cause.message : '开始学习失败'); } finally { setSaving(false); }
   };
   const finish = async () => {
     if (!active) return; setSaving(true);
-    try { await finishStudySession(active.id, active.version); await reload(); setTimelineRefresh((value) => value + 1); showMessage('success', '本次学习已记录'); }
+    try { await finishStudySession(active.id, active.version); await reload(); notifyStudySessionChanged(); setTimelineRefresh((value) => value + 1); showMessage('success', '本次学习已记录'); }
     catch (cause) { showMessage('error', cause instanceof Error ? cause.message : '结束学习失败'); } finally { setSaving(false); }
   };
   const openManual = () => { setEditing(null); setRecordError(null); setModalOpen(true); };
@@ -172,7 +174,7 @@ export function StudyPage() {
       </section>
       <div className={styles.mainLayout}><div className={styles.primaryColumn}>
         {active && <section className={styles.section}><Heading title="正在学习" subtitle="这段时间会持续计入今天的学习记录" />
-          <div className={styles.activeSession}><div className={styles.runningLabel}><i />正在学习</div><strong>{active.content}</strong><div className={styles.timer}>{formatTimer(elapsed)}</div><small>开始于 {formatClock(active.startedAt)}</small><button type="button" onClick={() => void finish()} disabled={saving}>{saving ? '正在结束…' : '结束这段学习'}</button></div>
+          <ActiveStudyCard session={active} elapsedSeconds={elapsed} saving={saving} onFinish={() => void finish()} />
         </section>}
         <section className={styles.section}><Heading title="学习轨迹" subtitle={formatTimelineDate(timelineDate, todayKey)} side={<div className={styles.dateNavigation}>
           {timelineDate !== todayKey && <button type="button" className={styles.todayAction} onClick={() => setTimelineDate(todayKey)}>今天</button>}
