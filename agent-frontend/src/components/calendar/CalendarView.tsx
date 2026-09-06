@@ -1,16 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  CalendarDays,
-  CheckCheck,
-  ChevronLeft,
-  ChevronRight,
-  Clock3,
-  Image,
-  MapPin,
-  NotebookPen,
-  ReceiptText,
-  WalletCards,
-} from 'lucide-react';
+  CalendarDotsIcon,
+  CaretLeftIcon,
+  CaretRightIcon,
+  ChecksIcon,
+  ClockIcon,
+  ImageIcon,
+  MapPinIcon,
+  NotePencilIcon,
+  ReceiptIcon,
+  WalletIcon,
+} from '@phosphor-icons/react';
 import type { CalendarDayEntry, CalendarJournal, CalendarRecordDraft } from '../../types/calendar';
 import type { DailyDaySummary } from '../../types/dailyEvent';
 import { createFinanceTransaction, fetchFinanceOverview } from '../../services/financeApi';
@@ -322,7 +322,7 @@ export const CalendarView: React.FC = () => {
   return (
     <main className={styles.workspace}>
       <TopBar
-        icon={<CalendarDays size={16} strokeWidth={1.8} />}
+        icon={<CalendarDotsIcon size={16} />}
         title="日历"
         subtitle="本地数据"
         actions={(
@@ -338,8 +338,8 @@ export const CalendarView: React.FC = () => {
             />
             <button type="button" className={styles.todayBtn} onClick={goToday}>今天</button>
             <div className={styles.navGroup}>
-              <button type="button" className={styles.navBtn} title="上个月" aria-label="上个月" onClick={() => moveMonth(-1)}><ChevronLeft size={17} /></button>
-              <button type="button" className={styles.navBtn} title="下个月" aria-label="下个月" onClick={() => moveMonth(1)}><ChevronRight size={17} /></button>
+              <button type="button" className={styles.navBtn} title="上个月" aria-label="上个月" onClick={() => moveMonth(-1)}><CaretLeftIcon size={17} /></button>
+              <button type="button" className={styles.navBtn} title="下个月" aria-label="下个月" onClick={() => moveMonth(1)}><CaretRightIcon size={17} /></button>
             </div>
           </div>
         )}
@@ -446,7 +446,7 @@ export const CalendarView: React.FC = () => {
                           >
                             <span className={styles.highlightDate}>{String(recordDate.getDate()).padStart(2, '0')}</span>
                             <span className={styles.highlightText}>{record.headline}</span>
-                            <ChevronRight size={13} aria-hidden="true" />
+                            <CaretRightIcon size={13} aria-hidden="true" />
                           </button>
                         );
                       })}
@@ -465,18 +465,18 @@ export const CalendarView: React.FC = () => {
             </div>
 
             <div className={styles.summaryLine} aria-label="当天汇总">
-              <span className={styles.todoSummary}><CheckCheck size={16} /><span><small>待办完成</small><strong>{completedCount}/{selectedEntry.todos.length || 0}</strong></span></span>
-              <span className={styles.expenseSummary}><WalletCards size={16} /><span><small>今日支出</small><strong>¥{totalExpense(selectedEntry).toFixed(2)}</strong></span></span>
-              <span className={styles.incomeSummary}><WalletCards size={16} /><span><small>今日收入</small><strong>¥{totalIncome(selectedEntry).toFixed(2)}</strong></span></span>
-              <span className={styles.scheduleSummary}><Clock3 size={16} /><span><small>日程</small><strong>{selectedEntry.schedules.length} 个</strong></span></span>
+              <span className={styles.todoSummary}><ChecksIcon size={16} /><span><small>待办完成</small><strong>{completedCount}/{selectedEntry.todos.length || 0}</strong></span></span>
+              <span className={styles.expenseSummary}><WalletIcon size={16} /><span><small>今日支出</small><strong>¥{totalExpense(selectedEntry).toFixed(2)}</strong></span></span>
+              <span className={styles.incomeSummary}><WalletIcon size={16} /><span><small>今日收入</small><strong>¥{totalIncome(selectedEntry).toFixed(2)}</strong></span></span>
+              <span className={styles.scheduleSummary}><ClockIcon size={16} /><span><small>日程</small><strong>{selectedEntry.schedules.length} 个</strong></span></span>
             </div>
 
             {isDayLoading ? <div className={styles.emptyDay}>
-              <CalendarDays size={20} aria-hidden="true" />
+              <CalendarDotsIcon size={20} aria-hidden="true" />
               <strong>正在读取日记录</strong>
             </div> : hasDailyRecord ? <div className={styles.recordSections}>
               <section className={styles.recordSection}>
-                <div className={styles.sectionHeading}><CheckCheck size={15} aria-hidden="true" /><h3>待办事项</h3></div>
+                <div className={styles.sectionHeading}><ChecksIcon size={15} aria-hidden="true" /><h3>待办事项</h3></div>
                 <DailyTodoList
                   todos={selectedEntry.todos}
                   onToggle={toggleTodo}
@@ -485,7 +485,7 @@ export const CalendarView: React.FC = () => {
               </section>
 
               <section className={styles.recordSection}>
-                <div className={styles.sectionHeading}><Clock3 size={15} aria-hidden="true" /><h3>日程</h3></div>
+                <div className={styles.sectionHeading}><ClockIcon size={15} aria-hidden="true" /><h3>日程</h3></div>
                 {selectedEntry.schedules.length ? <div className={styles.scheduleList}>
                   {selectedEntry.schedules.map((schedule) => <div key={schedule.id} className={styles.scheduleItem}>
                     <span className={`${styles.scheduleDot} ${styles[`schedule${schedule.color[0].toUpperCase()}${schedule.color.slice(1)}`]}`} />
@@ -494,14 +494,14 @@ export const CalendarView: React.FC = () => {
                         ? <>{schedule.startTime ? `开始 ${schedule.startTime}` : '开始待定'}<br />{schedule.endTime ? `结束 ${schedule.endTime}` : '结束待定'}</>
                         : '时间待定'}
                     </span>
-                    <span className={styles.scheduleBody}><strong>{schedule.title}</strong>{schedule.location && <small><MapPin size={11} />{schedule.location}</small>}</span>
+                    <span className={styles.scheduleBody}><strong>{schedule.title}</strong>{schedule.location && <small><MapPinIcon size={11} />{schedule.location}</small>}</span>
                     <DailyRecordDeleteButton label={`日程“${schedule.title}”`} onDelete={() => requestDelete(schedule, '日程', schedule.title)} />
                   </div>)}
                 </div> : <p className={styles.emptyText}>今天没有日程安排。</p>}
               </section>
 
               <section className={`${styles.recordSection} ${styles.cashflowSection}`}>
-                <div className={styles.sectionHeading}><ReceiptText size={15} aria-hidden="true" /><h3>收支明细</h3>
+                <div className={styles.sectionHeading}><ReceiptIcon size={15} aria-hidden="true" /><h3>收支明细</h3>
                   <span className={styles.cashflowTotals}>
                     <b className={styles.expenseText}>支出 ¥{totalExpense(selectedEntry).toFixed(2)}</b>
                     <b className={styles.incomeText}>收入 ¥{totalIncome(selectedEntry).toFixed(2)}</b>
@@ -520,7 +520,7 @@ export const CalendarView: React.FC = () => {
 
               {(selectedJournals.length > 0 || selectedEntry.photos.length > 0) && <section className={styles.recordSection}>
                 <div className={styles.sectionHeading}>
-                  <NotebookPen size={15} aria-hidden="true" />
+                  <NotePencilIcon size={15} aria-hidden="true" />
                   <h3>手记与图片</h3>
                 </div>
                 {selectedJournals.length > 0 && <div className={styles.journalList}>{selectedJournals.map((journal) => <div className={styles.journal} key={journal.id ?? `${journal.updatedAt}-${journal.title}`}>
@@ -535,12 +535,12 @@ export const CalendarView: React.FC = () => {
                 </div>)}</div>}
                 {selectedEntry.photos.length > 0 && <div className={styles.photoGrid}>
                   {selectedEntry.photos.map((photo) => <img key={photo.id} src={photo.url} alt={photo.alt} />)}
-                  <span className={styles.photoCount}><Image size={13} />{selectedEntry.photos.length} 张</span>
+                  <span className={styles.photoCount}><ImageIcon size={13} />{selectedEntry.photos.length} 张</span>
                 </div>}
               </section>}
 
               {Boolean(selectedEntry.otherRecords?.length) && <section className={styles.recordSection}>
-                <div className={styles.sectionHeading}><NotebookPen size={15} aria-hidden="true" /><h3>其他记录</h3></div>
+                <div className={styles.sectionHeading}><NotePencilIcon size={15} aria-hidden="true" /><h3>其他记录</h3></div>
                 <div className={styles.scheduleList}>
                   {selectedEntry.otherRecords?.map((record) => <div key={record.id} className={styles.scheduleItem}>
                     <span className={`${styles.scheduleDot} ${styles.scheduleViolet}`} />
@@ -550,7 +550,7 @@ export const CalendarView: React.FC = () => {
                 </div>
               </section>}
             </div> : <div className={styles.emptyDay}>
-              <CalendarDays size={20} aria-hidden="true" />
+              <CalendarDotsIcon size={20} aria-hidden="true" />
               <strong>给这一天留下一点什么</strong>
               <p>待办、日程、花销、手记和图片都会在这里汇总。</p>
             </div>}

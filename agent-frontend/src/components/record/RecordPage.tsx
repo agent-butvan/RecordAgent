@@ -1,5 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
-import { Check, Download, FileText, Heart, Plus, RotateCcw, Search, Trash2, Upload, X } from 'lucide-react';
+import {
+  ArrowCounterClockwiseIcon,
+  CheckIcon,
+  DownloadSimpleIcon,
+  FileTextIcon,
+  HeartIcon,
+  MagnifyingGlassIcon,
+  PlusIcon,
+  TrashIcon,
+  UploadSimpleIcon,
+  XIcon,
+} from '@phosphor-icons/react';
 import { clearRecordTrash, createRecord, createRecordTab, deleteRecordTab, exportRecordBackup, fetchRecords,
   fetchRecordTabs, fetchRecordTrash, importRecordBackup, reorderRecordTabs, restoreRecord, trashRecord, updateRecord, updateRecordFlags } from '../../services/recordApi';
 import type { RecordEntry, RecordTab, RecordType, SaveRecordInput } from '../../types/record';
@@ -224,23 +235,23 @@ export function RecordPage() {
 
   return <main className={styles.workspace}>
     <div className={styles.commandBar}>
-      <div className={styles.search}><Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索资料" /></div>
+      <div className={styles.search}><MagnifyingGlassIcon size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索资料" /></div>
       <div className={styles.actions}>
-        <button className={styles.iconButton} onClick={() => void exportRecordBackup()} title="导出备份"><Download size={14} /></button>
-        <label className={styles.iconButton} title="导入备份"><Upload size={14} /><input type="file" accept=".zip,application/zip" onChange={async (event) => {
+        <button className={styles.iconButton} onClick={() => void exportRecordBackup()} title="导出备份"><DownloadSimpleIcon size={14} /></button>
+        <label className={styles.iconButton} title="导入备份"><UploadSimpleIcon size={14} /><input type="file" accept=".zip,application/zip" onChange={async (event) => {
           const file = event.target.files?.[0]; if (!file) return;
           if (window.confirm('导入会替换当前全部资料，确定继续吗？')) try { const count = await importRecordBackup(file); await load(); showMessage('success', `已恢复 ${count} 条资料`); } catch (reason) { showMessage('error', reason instanceof Error ? reason.message : '导入失败'); }
           event.target.value = '';
         }} /></label>
-        <button className={styles.iconButton} onClick={() => void fetchRecordTrash().then(setTrashEntries)} title="回收站"><Trash2 size={14} /></button>
-        <button className={styles.primaryButton} onClick={beginCreate}><Plus size={15} />新增资料</button>
+        <button className={styles.iconButton} onClick={() => void fetchRecordTrash().then(setTrashEntries)} title="回收站"><TrashIcon size={14} /></button>
+        <button className={styles.primaryButton} onClick={beginCreate}><PlusIcon size={15} weight="bold" />新增资料</button>
       </div>
     </div>
     <div className={styles.dashboard}>
       <section className={styles.summary} aria-label="本周学习情况">
         <div><strong>{learningDays}<small>/ 7</small></strong><span>本周学习天数</span></div>
         <div><strong>{weekLearning.length}</strong><span>本周新增资料</span></div>
-        <div><strong>{weekReviews.length ? <Check size={20} /> : '—'}</strong><span>{weekReviews.length ? `已完成 ${weekReviews.length} 次复盘` : '本周尚未复盘'}</span></div>
+        <div><strong>{weekReviews.length ? <CheckIcon size={20} weight="bold" /> : '—'}</strong><span>{weekReviews.length ? `已完成 ${weekReviews.length} 次复盘` : '本周尚未复盘'}</span></div>
         {editingSummaryCopy ? <input className={styles.summaryCopyInput} value={summaryDraft} autoFocus maxLength={120}
           aria-label="学习提示文案" onChange={(event) => setSummaryDraft(event.target.value)} onBlur={() => {
             const nextCopy = summaryDraft.trim() || DEFAULT_SUMMARY_COPY;
@@ -262,7 +273,7 @@ export function RecordPage() {
             onClick={() => { if (!suppressTabClickRef.current) setActiveTabId(tab.id); }} onKeyDown={(event) => handleTabKeyDown(event, tab.id)}
             onPointerDown={(event) => handleTabPointerDown(event, tab.id)} onPointerMove={handleTabPointerMove}
             onPointerUp={handleTabPointerUp} onPointerCancel={resetTabPointerDrag}>{tab.name}</button>)}
-          <button className={styles.addTab} onClick={() => setIsNewTabModalOpen(true)}><Plus size={13} />新建 Tab</button>
+          <button className={styles.addTab} onClick={() => setIsNewTabModalOpen(true)}><PlusIcon size={13} weight="bold" />新建 Tab</button>
         </nav>
 
         <div className={styles.recordList}>{loading ? <div className={styles.empty}>正在加载…</div> : visibleRecords.length ? visibleRecords.map((entry) => <article key={entry.id} className={styles.recordRow} onClick={() => setEditing({ entry, type: entry.type })} tabIndex={0}>
@@ -270,15 +281,15 @@ export function RecordPage() {
           <div className={styles.recordContent}><div><strong>{displayTitle(entry)}</strong>{entry.pinned && <span>置顶</span>}</div><p>{entry.contentText || '暂无正文'}</p>
             <footer><span>{TYPE_LABELS[entry.type]}</span>{entry.tags.map((tag) => <span key={tag}>#{tag}</span>)}</footer></div>
           <div className={styles.rowActions}>
-            <button onClick={async (event) => { event.stopPropagation(); try { await updateRecordFlags(entry.id, entry.version, { favorite: !entry.favorite }); await load(); } catch (reason) { showMessage('error', reason instanceof Error ? reason.message : '收藏失败'); } }} aria-label="收藏"><Heart size={14} fill={entry.favorite ? 'currentColor' : 'none'} /></button>
-            <button className={confirmDeleteId === entry.id ? styles.confirmDelete : ''} disabled={deletingId === entry.id} onClick={(event) => { event.stopPropagation(); void remove(entry); }}>{confirmDeleteId === entry.id ? (deletingId === entry.id ? '删除中…' : '确认删除') : <Trash2 size={14} />}</button>
+            <button onClick={async (event) => { event.stopPropagation(); try { await updateRecordFlags(entry.id, entry.version, { favorite: !entry.favorite }); await load(); } catch (reason) { showMessage('error', reason instanceof Error ? reason.message : '收藏失败'); } }} aria-label="收藏"><HeartIcon size={14} weight={entry.favorite ? 'fill' : 'regular'} /></button>
+            <button className={confirmDeleteId === entry.id ? styles.confirmDelete : ''} disabled={deletingId === entry.id} onClick={(event) => { event.stopPropagation(); void remove(entry); }}>{confirmDeleteId === entry.id ? (deletingId === entry.id ? '删除中…' : '确认删除') : <TrashIcon size={14} />}</button>
           </div>
-        </article>) : <div className={styles.empty}><FileText size={20} /><strong>这个 Tab 还没有资料</strong><span>点击“新增资料”，内容会直接归入当前 Tab。</span><button onClick={beginCreate}>新增第一篇资料</button></div>}</div>
+        </article>) : <div className={styles.empty}><FileTextIcon size={20} /><strong>这个 Tab 还没有资料</strong><span>点击“新增资料”，内容会直接归入当前 Tab。</span><button onClick={beginCreate}>新增第一篇资料</button></div>}</div>
       </section>
     </div>
 
-    {trashEntries && <div className={styles.trashPage}><div className={styles.trashHeader}><div><h2>回收站</h2><span>{trashEntries.length} 条资料</span></div><div>{trashEntries.length > 0 && <button type="button" className={confirmClearTrash ? styles.confirmClear : ''} disabled={clearingTrash} onClick={() => void clearTrash()}>{clearingTrash ? '清空中…' : confirmClearTrash ? '确认清空' : '清空'}</button>}<button type="button" disabled={clearingTrash} onClick={() => { setConfirmClearTrash(false); setTrashEntries(null); }} aria-label="关闭回收站"><X size={16} /></button></div></div>
-      <div className={styles.trashList}>{trashEntries.length ? trashEntries.map((entry) => <article key={entry.id}><div><strong>{displayTitle(entry)}</strong><span>{entry.recordDate}</span></div><button onClick={async () => { await restoreRecord(entry.id, entry.version); setTrashEntries(await fetchRecordTrash()); await load(); }}><RotateCcw size={14} />恢复</button></article>) : <div className={styles.empty}>回收站是空的</div>}</div></div>}
+    {trashEntries && <div className={styles.trashPage}><div className={styles.trashHeader}><div><h2>回收站</h2><span>{trashEntries.length} 条资料</span></div><div>{trashEntries.length > 0 && <button type="button" className={confirmClearTrash ? styles.confirmClear : ''} disabled={clearingTrash} onClick={() => void clearTrash()}>{clearingTrash ? '清空中…' : confirmClearTrash ? '确认清空' : '清空'}</button>}<button type="button" disabled={clearingTrash} onClick={() => { setConfirmClearTrash(false); setTrashEntries(null); }} aria-label="关闭回收站"><XIcon size={16} /></button></div></div>
+      <div className={styles.trashList}>{trashEntries.length ? trashEntries.map((entry) => <article key={entry.id}><div><strong>{displayTitle(entry)}</strong><span>{entry.recordDate}</span></div><button onClick={async () => { await restoreRecord(entry.id, entry.version); setTrashEntries(await fetchRecordTrash()); await load(); }}><ArrowCounterClockwiseIcon size={14} />恢复</button></article>) : <div className={styles.empty}>回收站是空的</div>}</div></div>}
     <Modal open={isNewTabModalOpen} title="新建 Tab" onClose={closeNewTabModal} width={420} centered>
       <form className={styles.newTabDialog} onSubmit={submitNewTab}>
         <label htmlFor="new-record-tab">Tab 名称</label>

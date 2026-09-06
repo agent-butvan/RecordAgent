@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { CaretRightIcon } from '@phosphor-icons/react';
 import type { CalendarExpense, CalendarIncome } from '../../types/calendar';
 import { DailyRecordDeleteButton } from './DailyRecordDeleteButton';
 import styles from './DailyCashflowList.module.css';
@@ -60,7 +60,7 @@ export const DailyCashflowList: React.FC<DailyCashflowListProps> = ({
           aria-label={`查看当日全部 ${records.length} 条收支明细`}
         >
           <span>查看全部</span>
-          <ChevronRight size={13} aria-hidden="true" />
+          <CaretRightIcon size={13} aria-hidden="true" />
         </button>
       )}
     </div>

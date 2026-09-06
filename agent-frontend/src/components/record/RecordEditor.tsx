@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { FileUp, Paperclip } from 'lucide-react';
+import { FileArrowUpIcon, PaperclipIcon } from '@phosphor-icons/react';
 import { attachmentContentUrl, fetchRecordAttachments, uploadRecordAttachment } from '../../services/recordApi';
 import type { RecordEntry, RecordTab, RecordType, SaveRecordInput } from '../../types/record';
 import { WritingEditorPage } from '../common/WritingEditorPage';
@@ -55,8 +55,8 @@ export function RecordEditor({ date, entry, initialType = 'quick', initialTabId,
     footer={<div className={styles.details}>
       <input className={styles.tagsInput} value={tags} onChange={(event) => setTags(event.target.value)} placeholder="添加标签，用逗号分隔" aria-label="记录标签" />
       {entry && <div className={styles.attachments}>{attachments.map((attachment) => <a key={attachment.id} href={attachmentContentUrl(entry.id, attachment.id)} target="_blank" rel="noreferrer">
-        {attachment.mediaType.startsWith('image/') ? <img src={attachmentContentUrl(entry.id, attachment.id)} alt={attachment.originalName} /> : <Paperclip size={13} />}<span>{attachment.originalName}</span>
-      </a>)}<label><FileUp size={13} />{uploading ? '上传中…' : '添加附件'}<input type="file" disabled={uploading} onChange={async (event) => {
+        {attachment.mediaType.startsWith('image/') ? <img src={attachmentContentUrl(entry.id, attachment.id)} alt={attachment.originalName} /> : <PaperclipIcon size={13} />}<span>{attachment.originalName}</span>
+      </a>)}<label><FileArrowUpIcon size={13} />{uploading ? '上传中…' : '添加附件'}<input type="file" disabled={uploading} onChange={async (event) => {
         const file = event.target.files?.[0]; if (!file) return; setUploading(true); setAttachmentError(null);
         try { const uploaded = await uploadRecordAttachment(entry.id, file); setAttachments((items) => [...items, uploaded]); }
         catch (reason) { setAttachmentError(reason instanceof Error ? reason.message : '附件上传失败'); }

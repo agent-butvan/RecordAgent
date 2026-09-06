@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronRight, Plus, RefreshCw, Sparkles, WalletCards } from 'lucide-react';
+import { ArrowClockwiseIcon, CaretRightIcon, PlusIcon, SparkleIcon, WalletIcon } from '@phosphor-icons/react';
 import { createFinanceAccount, createFinanceTransaction, fetchFinanceExpenseChart, fetchFinanceOverview, fetchFinanceTransactions } from '../../services/financeApi';
 import type { CreateFinanceTransactionInput, FinanceAccountType, FinanceChartRange, FinanceExpenseChart, FinanceOverview, FinanceTransaction } from '../../types/finance';
 import { Button } from '../common/Button';
@@ -139,12 +139,12 @@ export const FinancePage: React.FC = () => {
   };
 
   return <main className={styles.workspace}>
-    <TopBar icon={<WalletCards size={16} strokeWidth={1.8} />} title="财务" subtitle="本地数据" actions={<>
+    <TopBar icon={<WalletIcon size={16} />} title="财务" subtitle="本地数据" actions={<>
       <button type="button" className={styles.iconButton} title="刷新财务数据" aria-label="刷新财务数据"
         onClick={() => void Promise.all([load(), loadChart(chartRange)])} disabled={isLoading || isChartLoading}>
-        <RefreshCw size={14} className={isLoading || isChartLoading ? styles.spinning : ''} />
+        <ArrowClockwiseIcon size={14} className={isLoading || isChartLoading ? styles.spinning : ''} />
       </button>
-      <Button type="button" variant="outline" size="sm" icon={<Plus size={13} />} onClick={openAccountModal}>添加账户</Button>
+      <Button type="button" variant="outline" size="sm" icon={<PlusIcon size={13} weight="bold" />} onClick={openAccountModal}>添加账户</Button>
       <Button type="button" variant="primary" size="sm" onClick={openTransactionModal} disabled={!overview?.accounts.length}>记一笔</Button>
     </>} />
 
@@ -165,7 +165,7 @@ export const FinancePage: React.FC = () => {
 
         <div className={styles.financeLayout}>
           <section className={styles.historyPanel}>
-            <div className={styles.sectionHeading}><h2>最近流水</h2><div className={styles.sectionMeta}><span>最近 {recentTransactions.length} 笔</span>{overview?.transactions.length ? <button type="button" onClick={openTransactionDrawer}>查看全部<ChevronRight size={12} /></button> : null}</div></div>
+            <div className={styles.sectionHeading}><h2>最近流水</h2><div className={styles.sectionMeta}><span>最近 {recentTransactions.length} 笔</span>{overview?.transactions.length ? <button type="button" onClick={openTransactionDrawer}>查看全部<CaretRightIcon size={12} /></button> : null}</div></div>
             {recentTransactions.length ? <div className={styles.transactions}>{recentTransactions.map((transaction) => {
               const isExpense = transaction.transactionType === 'expense';
               return <div className={styles.transactionRow} key={transaction.id}>
@@ -173,14 +173,14 @@ export const FinancePage: React.FC = () => {
                 <span className={styles.transactionBody}><strong>{transaction.note}</strong><small>{transaction.accountName} · {transaction.category} · {transaction.date.slice(5)} {transaction.time.slice(0, 5)}</small></span>
                 <strong className={isExpense ? styles.outAmount : styles.inAmount}>{isExpense ? '-' : '+'}{money(transaction.amount)}</strong>
               </div>;
-            })}</div> : <div className={styles.emptyState}><WalletCards size={20} /><strong>还没有流水记录</strong><p>{overview?.accounts.length ? '点击右上角“记一笔”开始记录。' : '先添加资产账户，再记录收入或支出。'}</p>{!overview?.accounts.length && <Button type="button" variant="outline" size="sm" onClick={openAccountModal}>添加第一个账户</Button>}</div>}
+            })}</div> : <div className={styles.emptyState}><WalletIcon size={20} /><strong>还没有流水记录</strong><p>{overview?.accounts.length ? '点击右上角“记一笔”开始记录。' : '先添加资产账户，再记录收入或支出。'}</p>{!overview?.accounts.length && <Button type="button" variant="outline" size="sm" onClick={openAccountModal}>添加第一个账户</Button>}</div>}
           </section>
 
           <aside className={styles.accountPanel}>
             <section>
               <div className={styles.sectionHeading}><h2>资产账户</h2><span>{overview?.accounts.length ?? 0} 个</span></div>
               {overview?.accounts.length ? <AssetAccountDeck accounts={overview.accounts} /> : <p className={styles.emptyText}>暂无账户</p>}
-              {overview?.accounts.some((account) => account.interestEnabled) && <p className={styles.yieldNote}><Sparkles size={13} />生息账户按年化率逐日计提，收益自动计入收入。</p>}
+              {overview?.accounts.some((account) => account.interestEnabled) && <p className={styles.yieldNote}><SparkleIcon size={13} />生息账户按年化率逐日计提，收益自动计入收入。</p>}
             </section>
           </aside>
         </div>

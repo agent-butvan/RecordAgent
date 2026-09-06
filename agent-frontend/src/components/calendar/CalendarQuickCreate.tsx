@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import {
-  ArrowLeft,
-  CalendarClock,
-  CheckSquare2,
-  NotebookPen,
-  Plus,
-  WalletCards,
-} from 'lucide-react';
+  ArrowLeftIcon,
+  CalendarDotsIcon,
+  CheckSquareIcon,
+  NotePencilIcon,
+  PlusIcon,
+  WalletIcon,
+} from '@phosphor-icons/react';
 import type { CalendarRecordDraft, TodoPriority, TodoRecurrence } from '../../types/calendar';
 import { Modal } from '../common/Modal';
 import { TimeWheelPicker } from './TimeWheelPicker';
@@ -23,11 +23,11 @@ interface CalendarQuickCreateProps {
 }
 
 const RECORD_OPTIONS = [
-  { kind: 'todo', label: '新建待办', description: '记录要完成的事项', icon: CheckSquare2 },
-  { kind: 'schedule', label: '添加日程', description: '安排时间与地点', icon: CalendarClock },
-  { kind: 'finance', label: '记一笔', description: '在当前页面记录收支', icon: WalletCards },
-  { kind: 'journal', label: '写手记', description: '留下当天的想法', icon: NotebookPen },
-] satisfies Array<{ kind: RecordKind | 'finance'; label: string; description: string; icon: typeof CheckSquare2 }>;
+  { kind: 'todo', label: '新建待办', description: '记录要完成的事项', icon: CheckSquareIcon },
+  { kind: 'schedule', label: '添加日程', description: '安排时间与地点', icon: CalendarDotsIcon },
+  { kind: 'finance', label: '记一笔', description: '在当前页面记录收支', icon: WalletIcon },
+  { kind: 'journal', label: '写手记', description: '留下当天的想法', icon: NotePencilIcon },
+] satisfies Array<{ kind: RecordKind | 'finance'; label: string; description: string; icon: typeof CheckSquareIcon }>;
 
 const FORM_TITLES: Record<ModalRecordKind, string> = {
   todo: '新建待办',
@@ -84,7 +84,7 @@ export const CalendarQuickCreate: React.FC<CalendarQuickCreateProps> = ({ select
         aria-haspopup="dialog"
         onClick={() => setIsOpen(true)}
       >
-        <Plus size={14} strokeWidth={2} />
+        <PlusIcon size={14} weight="bold" />
         新建记录
       </button>
 
@@ -100,7 +100,7 @@ export const CalendarQuickCreate: React.FC<CalendarQuickCreateProps> = ({ select
           <form className={styles.form} onSubmit={submitRecord}>
             <div className={styles.formHeading}>
               <button type="button" className={styles.backButton} aria-label="返回记录类型" onClick={() => setActiveKind(null)}>
-                <ArrowLeft size={15} />
+                <ArrowLeftIcon size={15} />
               </button>
               <span>记录到 {selectedDateLabel}</span>
             </div>
@@ -150,7 +150,7 @@ export const CalendarQuickCreate: React.FC<CalendarQuickCreateProps> = ({ select
                     setActiveKind(kind);
                   }}
                 >
-                  <span className={styles.optionIcon}><Icon size={17} strokeWidth={1.8} /></span>
+                  <span className={styles.optionIcon}><Icon size={17} /></span>
                   <span><strong>{label}</strong><small>{description}</small></span>
                 </button>
               ))}

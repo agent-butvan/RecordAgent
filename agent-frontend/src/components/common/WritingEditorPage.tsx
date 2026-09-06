@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Check, ChevronLeft, NotebookPen } from 'lucide-react';
+import { CaretLeftIcon, CheckIcon, NotePencilIcon } from '@phosphor-icons/react';
 import styles from './WritingEditorPage.module.css';
 
 interface WritingEditorPageProps {
@@ -81,9 +81,9 @@ export function WritingEditorPage({ backLabel, identity, detail, initialTitle = 
 
   return <main className={styles.workspace}>
     <header className={styles.topBar}>
-      <button type="button" className={styles.backButton} onClick={onBack}><ChevronLeft size={17} />{backLabel}</button>
-      <div className={styles.pageIdentity}><NotebookPen size={15} /><span>{identity}</span><small>{detail}</small></div>
-      <button type="button" className={styles.saveButton} disabled={!canSave} onClick={() => void save()}><Check size={15} />{saving ? '保存中…' : '保存'}</button>
+      <button type="button" className={styles.backButton} onClick={onBack}><CaretLeftIcon size={17} />{backLabel}</button>
+      <div className={styles.pageIdentity}><NotePencilIcon size={15} /><span>{identity}</span><small>{detail}</small></div>
+      <button type="button" className={styles.saveButton} disabled={!canSave} onClick={() => void save()}><CheckIcon size={15} weight="bold" />{saving ? '保存中…' : '保存'}</button>
     </header>
     <div ref={scrollAreaRef} className={styles.scrollArea}><div className={styles.editorLayout}><article className={styles.editor}>
         {(error || localError) && <div className={styles.saveError} role="alert">{error || localError}</div>}

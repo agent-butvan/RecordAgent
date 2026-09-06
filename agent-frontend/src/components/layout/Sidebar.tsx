@@ -15,10 +15,8 @@ import {
   Pencil,
   User,
   Settings,
-  CalendarDays,
-  WalletCards,
-  LibraryBig,
 } from 'lucide-react';
+import { BooksIcon, CalendarDotsIcon, WalletIcon } from '@phosphor-icons/react';
 import type { ChatSession, Project } from '../../types/chat';
 import { FormField } from '../common/FormField';
 import { TextInput } from '../common/TextInput';
@@ -421,7 +419,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             onClick={() => onSelectFeature('calendar')}
             aria-current={activeFeature === 'calendar' ? 'page' : undefined}
           >
-            <CalendarDays size={14} />
+            <CalendarDotsIcon size={14} />
             <span>日历</span>
           </button>
           <button
@@ -430,7 +428,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             onClick={() => onSelectFeature('finance')}
             aria-current={activeFeature === 'finance' ? 'page' : undefined}
           >
-            <WalletCards size={14} />
+            <WalletIcon size={14} />
             <span>财务</span>
           </button>
           <button
@@ -439,7 +437,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             onClick={() => onSelectFeature('record')}
             aria-current={activeFeature === 'record' ? 'page' : undefined}
           >
-            <LibraryBig size={14} />
+            <BooksIcon size={14} />
             <span>记录</span>
           </button>
         </nav>
