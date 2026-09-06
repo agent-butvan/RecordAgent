@@ -28,9 +28,9 @@
   width: 100%;
   min-width: 0;
   appearance: none;
-  border: 1px solid var(--border-medium);
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
-  background-color: var(--bg-app);
+  background-color: transparent;
   color: var(--text-primary);
   font-family: var(--font-sans);
   font-size: 12px;
@@ -39,6 +39,11 @@
   outline: none;
   cursor: pointer;
   transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.outline {
+  border-color: var(--border-medium);
+  background-color: var(--bg-app);
 }
 
 .sm {
@@ -62,13 +67,18 @@
   padding-left: 34px;
 }
 
-.select:hover:not(:disabled) {
+.outline:hover:not(:disabled) {
   border-color: #94a3b8;
   background-color: var(--bg-surface);
 }
 
-.select:focus-visible {
+.outline:focus-visible {
   border-color: var(--accent-blue);
+}
+
+.ghost:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: -2px;
 }
 
 .select[aria-invalid='true'] {

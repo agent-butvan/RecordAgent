@@ -52,6 +52,7 @@ export function RecordEditor({ date, entry, initialType = 'quick', initialTabId,
         value={tabId}
         placeholder="选择分类"
         options={tabs.map((tab) => ({ value: tab.id, label: tab.name }))}
+        appearance="ghost"
         onChange={(event) => { const nextId = event.target.value; setTabId(nextId); const nextType = typeForSystemTab(tabs.find((tab) => tab.id === nextId)); if (nextType) setType(nextType); }}
         aria-label="所属 Tab"
       />

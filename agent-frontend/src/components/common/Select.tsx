@@ -16,6 +16,7 @@ export interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement
   placeholder?: string;
   icon?: ReactNode;
   fieldSize?: 'sm' | 'md' | 'lg';
+  appearance?: 'outline' | 'ghost';
   fullWidth?: boolean;
   containerClassName?: string;
 }
@@ -29,6 +30,7 @@ export function Select({
   placeholder,
   icon,
   fieldSize = 'sm',
+  appearance = 'outline',
   fullWidth = false,
   containerClassName = '',
   className = '',
@@ -47,7 +49,7 @@ export function Select({
   const rootClassName = [styles.field, fullWidth ? styles.fullWidth : '', containerClassName]
     .filter(Boolean)
     .join(' ');
-  const selectClassName = [styles.select, styles[fieldSize], icon ? styles.withIcon : '', className]
+  const selectClassName = [styles.select, styles[fieldSize], styles[appearance], icon ? styles.withIcon : '', className]
     .filter(Boolean)
     .join(' ');
 
