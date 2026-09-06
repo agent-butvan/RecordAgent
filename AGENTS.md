@@ -45,6 +45,21 @@
 - 桌面端打包采用 Tauri sidecar 方案：统一入口为 `scripts/build-app.sh`（内部执行 `pnpm tauri build`，由 beforeBuildCommand 调用 `agent-backend/scripts/package-sidecar.sh` 生成后端 sidecar）；`pnpm tauri dev` 不打包、不拉起 sidecar，开发时后端在 IDEA 等本机环境启动（默认 8081）。打包模式下 Tauri（`src-tauri/src/backend.rs`）负责启动、健康检查与退出清理，端口动态分配；前端 API 地址由 `services/api.ts` 统一获取，禁止在组件中硬编码后端地址或端口。
 - 发布采用完整 SemVer git tag（`v<major>.<minor>.<patch>`）驱动：根目录 `VERSION` 是桌面端版本唯一来源，必须先同步到前端包与 Tauri 配置；GitHub Actions 先校验版本、构建并验证 sidecar，再上传 macOS / Linux / Windows 安装包至草稿 Release。PR 与 `develop` 推送只执行构建验证，不创建 Release；Windows 的 sidecar 由 Rust 原生启动器（`scripts/backend-launcher/`）支持。
 
+### 分支管理策略
+
+本项目采用三层分支模型，分支流向为：`feature/*` → `main` → `develop`。
+
+| 分支 | 定位与约束 |
+| --- | --- |
+| `feature/*`（或 `codex/*` 等命名前缀） | 功能开发分支；每个新功能从 `main` 创建独立分支，功能完成后合并回 `main`。 |
+| `main` | 本地集成分支；用于汇聚已完成的功能分支，在本地执行完整测试与验证。验证通过后合并到 `develop`。不直接向远程推送，仅作为本地集成测试的中间层。 |
+| `develop` | 生产推送分支；`main` 验证通过后合并到此分支并推送到远程仓库。CI/CD 构建验证和 Release 发布均基于此分支。 |
+
+- 新功能开发必须从 `main` 创建独立的功能分支，禁止直接在 `main` 或 `develop` 上提交业务代码。
+- 功能分支完成后，先合并到 `main` 进行本地集成测试；测试通过后再从 `main` 合并到 `develop` 推送。
+- 合并到 `main` 和 `develop` 时，优先使用 `--no-ff`（非快进合并）以保留合并记录。
+- 功能分支合并完毕且确认无需保留后，应及时删除已合并的功能分支，保持分支列表清洁。
+
 ## 三、后端工程规范
 
 ### 分层与接口
