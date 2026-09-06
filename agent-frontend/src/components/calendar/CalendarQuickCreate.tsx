@@ -9,6 +9,7 @@ import {
 } from '@phosphor-icons/react';
 import type { CalendarRecordDraft, TodoPriority, TodoRecurrence } from '../../types/calendar';
 import { Modal } from '../common/Modal';
+import { Select } from '../common/Select';
 import { TimeWheelPicker } from './TimeWheelPicker';
 import styles from './CalendarQuickCreate.module.css';
 
@@ -33,6 +34,19 @@ const FORM_TITLES: Record<ModalRecordKind, string> = {
   todo: '新建待办',
   schedule: '添加日程',
 };
+
+const PRIORITY_OPTIONS = [
+  { value: 'high', label: '重要' },
+  { value: 'medium', label: '计划' },
+  { value: 'low', label: '生活' },
+] as const;
+
+const RECURRENCE_OPTIONS = [
+  { value: 'none', label: '不重复' },
+  { value: 'daily', label: '每天' },
+  { value: 'weekly', label: '每周' },
+  { value: 'monthly', label: '每月' },
+] as const;
 
 const valueOf = (formData: FormData, key: string): string => String(formData.get(key) ?? '').trim();
 
@@ -109,8 +123,8 @@ export const CalendarQuickCreate: React.FC<CalendarQuickCreateProps> = ({ select
               <label className={styles.field}>待办内容<input name="title" required autoFocus placeholder="例如：整理项目笔记" /></label>
               <div className={styles.fieldRowThree}>
                 <div className={styles.field}><span>时间（选填）</span><TimeWheelPicker name="time" ariaLabel="待办时间" /></div>
-                <label className={styles.field}>优先级<select name="priority" defaultValue="medium"><option value="high">重要</option><option value="medium">计划</option><option value="low">生活</option></select></label>
-                <label className={styles.field}>重复<select name="recurrence" defaultValue="none"><option value="none">不重复</option><option value="daily">每天</option><option value="weekly">每周</option><option value="monthly">每月</option></select></label>
+                <Select name="priority" label="优先级" options={PRIORITY_OPTIONS} defaultValue="medium" fieldSize="md" fullWidth />
+                <Select name="recurrence" label="重复" options={RECURRENCE_OPTIONS} defaultValue="none" fieldSize="md" fullWidth />
               </div>
             </>}
 

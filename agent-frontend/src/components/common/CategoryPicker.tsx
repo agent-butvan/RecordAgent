@@ -1,4 +1,5 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { Select } from './Select';
 import styles from './CategoryPicker.module.css';
 
 const CUSTOM_VALUE = '__custom_category__';
@@ -13,7 +14,6 @@ interface CategoryPickerProps {
 
 /** 支持选择已知分类或输入新分类的统一控件。 */
 export function CategoryPicker({ options, value, onChange, label = '分类', disabled = false }: CategoryPickerProps) {
-  const selectId = useId();
   const [customMode, setCustomMode] = useState(Boolean(value && !options.includes(value)));
 
   useEffect(() => {
@@ -23,11 +23,16 @@ export function CategoryPicker({ options, value, onChange, label = '分类', dis
   const selectValue = customMode ? CUSTOM_VALUE : value;
 
   return <div className={styles.field}>
-    <label htmlFor={selectId}>{label}</label>
-    <select
-      id={selectId}
+    <Select
+      label={label}
+      options={[
+        ...options.map((option) => ({ label: option, value: option })),
+        { label: '＋ 自定义分类', value: CUSTOM_VALUE },
+      ]}
       value={selectValue}
       disabled={disabled}
+      fieldSize="md"
+      fullWidth
       onChange={(event) => {
         if (event.target.value === CUSTOM_VALUE) {
           setCustomMode(true);
@@ -37,10 +42,7 @@ export function CategoryPicker({ options, value, onChange, label = '分类', dis
           onChange(event.target.value);
         }
       }}
-    >
-      {options.map((option) => <option key={option} value={option}>{option}</option>)}
-      <option value={CUSTOM_VALUE}>＋ 自定义分类</option>
-    </select>
+    />
     {customMode && <input
       value={value}
       onChange={(event) => onChange(event.target.value)}

@@ -5,6 +5,7 @@ import { Button } from '../common/Button';
 import { CategoryPicker } from '../common/CategoryPicker';
 import { mergeCategoryOptions } from '../common/categoryOptions';
 import { Modal } from '../common/Modal';
+import { Select } from '../common/Select';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from './financeCategories';
 import styles from './TransactionModal.module.css';
 
@@ -87,7 +88,14 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
         {error && <div className={styles.modalError} role="alert">{error}</div>}
         <label className={styles.amountField}><span>金额</span><div><b>¥</b><input name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required autoFocus /></div></label>
         <div className={styles.formGrid}>
-          <label><span>资产账户</span><select name="accountId" required>{accounts.map((account) => <option value={account.id} key={account.id}>{account.name} · {money(account.balance)}</option>)}</select></label>
+          <Select
+            name="accountId"
+            label="资产账户"
+            options={accounts.map((account) => ({ value: account.id, label: `${account.name} · ${money(account.balance)}` }))}
+            fieldSize="md"
+            fullWidth
+            required
+          />
           <CategoryPicker options={availableCategories} value={category} onChange={setCategory} disabled={isSaving} />
           <label className={styles.wideField}><span>说明</span><input name="note" required placeholder={entryType === 'expense' ? '例如：午餐' : '例如：九月工资'} /></label>
           <label><span>日期</span><input name="date" type="date" defaultValue={defaultDate ?? formatLocalDate(new Date())} required /></label>

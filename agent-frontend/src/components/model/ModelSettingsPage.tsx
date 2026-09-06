@@ -182,7 +182,7 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
                     <Select
                       id="model-vendor"
                       fieldSize="md"
-                      className={styles.fullWidth}
+                      fullWidth
                       value={formVendor}
                       onChange={(e) => handleVendorChange(e.target.value)}
                       options={supportedVendors.map((v) => ({

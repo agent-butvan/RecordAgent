@@ -2,10 +2,10 @@
 .description { margin-top: -6px; color: var(--text-muted); font-size: 11px; line-height: 1.55; }
 .error { padding: 8px 10px; border: 1px solid #e6c8c4; border-radius: var(--radius-md); background: #fff7f5; color: #9a4038; font-size: 11px; }
 .form label > span { display: block; margin-bottom: 6px; color: var(--text-secondary); font-size: 11px; font-weight: 550; }
-.form textarea, .form input, .form select { width: 100%; border: 1px solid var(--border-medium); border-radius: var(--radius-md); outline: none; background: var(--bg-app); color: var(--text-primary); font: 12px var(--font-sans); user-select: text; }
+.form textarea, .form input { width: 100%; border: 1px solid var(--border-medium); border-radius: var(--radius-md); outline: none; background: var(--bg-app); color: var(--text-primary); font: 12px var(--font-sans); user-select: text; }
 .form textarea { min-height: 82px; resize: vertical; padding: 9px 10px; line-height: 1.55; }
-.form input, .form select { height: 36px; padding: 0 10px; }
-.form textarea:focus, .form input:focus, .form select:focus { border-color: var(--accent-blue); }
+.form input { height: 36px; padding: 0 10px; }
+.form textarea:focus, .form input:focus { border-color: var(--accent-blue); }
 .timeFields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
 @media (max-width: 560px) { .timeFields { grid-template-columns: 1fr; } }

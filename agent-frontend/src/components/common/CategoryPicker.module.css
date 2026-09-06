@@ -1,7 +1,6 @@
 .field { min-width: 0; }
-.field > label { display: block; margin-bottom: 6px; color: var(--text-secondary); font-size: 11px; font-weight: 550; }
-.field select, .field input { width: 100%; height: 36px; padding: 0 10px; border: 1px solid var(--border-medium); border-radius: var(--radius-md); outline: 0; background: var(--bg-app); color: var(--text-primary); font: 12px var(--font-sans); user-select: text; }
+.field input { width: 100%; height: 36px; padding: 0 10px; border: 1px solid var(--border-medium); border-radius: var(--radius-md); outline: 0; background: var(--bg-app); color: var(--text-primary); font: 12px var(--font-sans); user-select: text; }
 .field input { margin-top: 8px; }
-.field select:focus, .field input:focus { border-color: var(--accent-blue); }
+.field input:focus { border-color: var(--accent-blue); }
 .field input::placeholder { color: var(--text-muted); }
-.field select:disabled, .field input:disabled { cursor: not-allowed; opacity: .6; }
+.field input:disabled { cursor: not-allowed; opacity: .6; }
