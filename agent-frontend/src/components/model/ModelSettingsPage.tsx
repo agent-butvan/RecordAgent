@@ -10,6 +10,7 @@ import { Modal } from '../common/Modal';
 import { Badge } from '../common/Badge';
 import { ModelCard, type ModelCardItem } from './ModelCard';
 import { FeatureSettingsPage, type FeatureSettingsTab } from '../settings/FeatureSettingsPage';
+import { SettingsPageLayout } from '../settings/SettingsPageLayout';
 import { getFeaturePreferences, setStudyWindowMode } from '../../services/featurePreferences';
 import type { StudyWindowMode } from '../../types/preferences';
 import {
@@ -188,22 +189,18 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
       <div className={styles.settingsContent}>
         {/* 模型配置 */}
         {activeTab === 'config' && (
-          <div className={styles.configPage}>
-            <div className={styles.topHeader}>
-              <div>
-                <h1 className={styles.title}>模型配置</h1>
-                <p className={styles.configSubtitle}>
-                  管理本地保存的模型，可随时测试连接并切换当前模型。
-                </p>
-              </div>
-
-              <div className={styles.headerActions}>
+          <SettingsPageLayout
+            title="模型配置"
+            description="管理本地保存的模型，可随时测试连接并切换当前模型。"
+            actions={(
+              <>
                 <Badge variant="default">{allModels.length} 个模型</Badge>
                 <Button variant="primary" icon={<Plus size={15} />} onClick={() => setShowAddForm(true)}>
                   添加模型
                 </Button>
-              </div>
-            </div>
+              </>
+            )}
+          >
 
             {/* 新增模型配置弹框 */}
             <Modal
@@ -300,14 +297,13 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
                 })}
               </div>
             )}
-          </div>
+          </SettingsPageLayout>
         )}
 
         {activeTab === 'account' && (
-          <div className={styles.sectionContainer}>
-            <h1 className={styles.pageTitle}>账户</h1>
+          <SettingsPageLayout title="账户" description="管理账户绑定与通知接收方式。">
             <div className={styles.sectionHeader}>邮箱账户</div>
-            <Card variant="flat" className={styles.settingsCard}>
+            <Card variant="bordered" className={styles.settingsCard}>
               <div className={styles.settingRow}>
                 <div className={styles.rowInfo}>
                   <div className={styles.rowTitle}>{accountStatus?.maskedEmail || '暂未绑定邮箱'}</div>
@@ -317,7 +313,7 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
                 </div>
               </div>
             </Card>
-          </div>
+          </SettingsPageLayout>
         )}
 
         {isFeatureTab(activeTab) && (

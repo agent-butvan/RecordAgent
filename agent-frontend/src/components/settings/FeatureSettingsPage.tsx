@@ -1,5 +1,6 @@
 import type { StudyWindowMode } from '../../types/preferences';
 import { Select } from '../common/Select';
+import { SettingsPageLayout } from './SettingsPageLayout';
 import styles from './FeatureSettingsPage.module.css';
 
 export type FeatureSettingsTab = 'calendar' | 'finance' | 'library' | 'record';
@@ -40,14 +41,7 @@ export function FeatureSettingsPage({
 }: FeatureSettingsPageProps) {
   if (tab === 'record') {
     return (
-      <section className={styles.page} aria-labelledby="record-settings-title">
-        <header className={styles.header}>
-          <div>
-            <h1 id="record-settings-title">记录</h1>
-            <p>配置学习计时进行中时的展示位置。</p>
-          </div>
-        </header>
-
+      <SettingsPageLayout title="记录" description="配置学习计时进行中时的展示位置。">
         <div className={styles.settingGroup}>
           <div className={styles.settingCopy}>
             <label htmlFor="study-window-mode">学习小窗</label>
@@ -69,23 +63,17 @@ export function FeatureSettingsPage({
         <p className={styles.note}>
           应用内小窗和系统小窗均可在非按钮区域拖动，并可从右下角调整大小。关闭或隐藏小窗不会结束当前学习。
         </p>
-      </section>
+      </SettingsPageLayout>
     );
   }
 
   const content = FEATURE_CONTENT[tab];
   return (
-    <section className={styles.page} aria-labelledby={`${tab}-settings-title`}>
-      <header className={styles.header}>
-        <div>
-          <h1 id={`${tab}-settings-title`}>{content.title}</h1>
-          <p>{content.description}</p>
-        </div>
-      </header>
+    <SettingsPageLayout title={content.title} description={content.description}>
       <div className={styles.emptyState}>
         <strong>当前无需额外配置</strong>
         <p>{content.detail}</p>
       </div>
-    </section>
+    </SettingsPageLayout>
   );
 }

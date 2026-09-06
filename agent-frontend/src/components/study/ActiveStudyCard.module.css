@@ -1,4 +1,4 @@
-.card { position: relative; padding: 17px 18px 16px; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background: #fbfcfd; }
+.card { position: relative; min-height: 150px; padding-top: 4px; background: transparent; }
 .header { min-height: 22px; display: flex; align-items: center; gap: 6px; }
 .status { display: inline-flex; align-items: center; gap: 7px; color: #4b806d; font-size: 10px; font-weight: 600; }
 .status i { width: 7px; height: 7px; border-radius: 50%; background: #6eaa93; }
@@ -12,7 +12,7 @@
 .finishButton:hover { color: var(--text-primary); }
 .resizeHandle { position: absolute; right: 3px; bottom: 3px; width: 24px; height: 24px; display: grid; place-items: center; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-muted); cursor: nwse-resize; }
 .resizeHandle:hover { background: var(--bg-surface-hover); color: var(--text-secondary); }
-.compact { height: 100%; display: flex; flex-direction: column; padding: 14px 16px; background: #fff; }
+.compact { height: 100%; min-height: 0; display: flex; flex-direction: column; padding: 14px 16px; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background: #fff; }
 .draggable { cursor: grab; }
 .draggable:active { cursor: grabbing; }
 .draggable button { cursor: pointer; }

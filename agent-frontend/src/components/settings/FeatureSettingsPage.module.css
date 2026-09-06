@@ -1,14 +1,10 @@
-.page { width: 100%; max-width: 760px; }
-.header { padding-bottom: 24px; border-bottom: 1px solid var(--border-subtle); }
-.header h1 { color: var(--text-primary); font-size: 24px; line-height: 1.25; }
-.header p { margin-top: 5px; color: var(--text-secondary); font-size: 13px; }
-.settingGroup { display: flex; align-items: center; justify-content: space-between; gap: 32px; padding: 24px 0; border-bottom: 1px solid var(--border-subtle); }
+.settingGroup { display: flex; align-items: center; justify-content: space-between; gap: 32px; padding: 20px 0; border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); }
 .settingCopy { max-width: 480px; }
 .settingCopy label { color: var(--text-primary); font-size: 14px; font-weight: 600; }
 .settingCopy p, .note, .emptyState p { color: var(--text-secondary); font-size: 12px; line-height: 1.65; }
 .settingCopy p { margin-top: 4px; }
 .note { margin-top: 14px; }
-.emptyState { margin-top: 24px; padding: 18px 20px; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--bg-surface); }
+.emptyState { padding: 4px 0; }
 .emptyState strong { color: var(--text-primary); font-size: 13px; }
 .emptyState p { max-width: 62ch; margin-top: 5px; }
 
