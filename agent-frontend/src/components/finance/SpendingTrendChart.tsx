@@ -23,14 +23,14 @@ interface SpendingTrendChartProps {
   onRangeChange: (range: FinanceChartRange) => void;
 }
 
-/** 收支折线为主，分类柱按需展开；明细独立展示，支持键盘逐期浏览。 */
+/** 收支折线叠加分类堆叠柱，悬浮明细随选中日期定位，支持键盘逐期浏览。 */
 export const SpendingTrendChart: React.FC<SpendingTrendChartProps> = ({ chart, range, loading, error, onRangeChange }) => {
   const hostRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const helpId = useId();
   const [width, setWidth] = useState(0);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
-  const [showCategories, setShowCategories] = useState(false);
+  const barClipId = useId();
   const displayedRange = chart?.range ?? range;
   const days = useMemo(() => trendBuckets(chart?.days ?? [], displayedRange), [chart, displayedRange]);
 
@@ -63,6 +63,11 @@ export const SpendingTrendChart: React.FC<SpendingTrendChartProps> = ({ chart, r
   const y = (amount: number) => margin.top + plotHeight * (1 - amount / ceiling);
   const line = (field: 'total' | 'income') => days.map((day, index) => `${index ? 'L' : 'M'} ${x(index)} ${y(day[field])}`).join(' ');
   const interactive = !loading && !error && hasData;
+  const barWidth = Math.min(36, step * .62);
+  const tooltipWidth = Math.min(236, Math.max(0, width - 16));
+  const activeX = activeIndex === null ? 0 : x(activeIndex);
+  const tooltipLeft = Math.max(8, Math.min(width - tooltipWidth - 8,
+    activeX + tooltipWidth + 24 < width ? activeX + 18 : activeX - tooltipWidth - 18));
 
   const selectFromPointer = (event: React.PointerEvent<SVGSVGElement>) => {
     if (!interactive) return;
@@ -97,9 +102,9 @@ export const SpendingTrendChart: React.FC<SpendingTrendChartProps> = ({ chart, r
         <div><dt><i className={styles.incomeSwatch} />区间收入</dt><dd className={styles.incomeText}>{chart ? money(chart.totalIncome) : '—'}</dd></div>
         <div><dt>区间结余</dt><dd>{chart ? money(chart.totalIncome - chart.totalExpense) : '—'}</dd></div>
       </dl>
-      <button type="button" className={styles.categoryToggle} aria-pressed={showCategories} onClick={() => setShowCategories((current) => !current)}>支出构成</button>
     </div>
-    <div className={styles.chartHost} ref={hostRef}>
+    <div className={styles.chartHost} ref={hostRef} onPointerLeave={() => setActiveIndex(null)}
+      onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setActiveIndex(null); }}>
       {width > 0 && <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} role="group"
         tabIndex={interactive ? 0 : -1} aria-label="收支趋势图" aria-describedby={helpId}
         onPointerMove={selectFromPointer} onPointerDown={selectFromPointer} onKeyDown={selectFromKeyboard}
@@ -111,13 +116,21 @@ export const SpendingTrendChart: React.FC<SpendingTrendChartProps> = ({ chart, r
         </g>)}
         <g aria-hidden="true" className={loading ? styles.pendingData : undefined}>
           {interactive && activeDay && activeIndex !== null && <line x1={x(activeIndex)} x2={x(activeIndex)} y1={margin.top} y2={y(0)} className={styles.cursorLine} />}
-          {showCategories && days.map((day, index) => {
+          {days.map((day, index) => {
             let accumulated = 0;
-            return <g key={day.date}>{day.categories.filter((item) => item.amount > 0).map((item) => {
-              accumulated += item.amount;
-              return <rect key={item.category} x={x(index) - Math.min(20, step * .55) / 2} y={y(accumulated)}
-                width={Math.min(20, step * .55)} height={item.amount / ceiling * plotHeight} fill={categoryColor(item.category)} className={styles.bar} />;
-            })}</g>;
+            const segments = [...day.categories].filter((item) => item.amount > 0)
+              .sort((a, b) => categories.indexOf(a.category) - categories.indexOf(b.category));
+            const total = segments.reduce((sum, item) => sum + item.amount, 0);
+            return <g key={day.date} className={activeIndex !== null && activeIndex !== index ? styles.barDimmed : styles.bar}>
+              <defs><clipPath id={`${barClipId}-${index}`}><rect x={x(index) - barWidth / 2} y={y(total)}
+                width={barWidth} height={total / ceiling * plotHeight} rx={Math.min(4, barWidth / 4)} /></clipPath></defs>
+              <g clipPath={`url(#${barClipId}-${index})`}>{segments.map((item) => {
+                accumulated += item.amount;
+                return <rect key={item.category} x={x(index) - barWidth / 2} y={y(accumulated)}
+                  width={barWidth} height={item.amount / ceiling * plotHeight} fill={categoryColor(item.category)}
+                  stroke="var(--bg-app)" strokeWidth={.6} />;
+              })}</g>
+            </g>;
           })}
           {hasData && <><path d={line('total')} className={styles.expenseLine} /><path d={line('income')} className={styles.incomeLine} /></>}
           {hasData && days.map((day, index) => (days.length <= 12 || activeIndex === index) && <g key={day.date}>
@@ -131,13 +144,18 @@ export const SpendingTrendChart: React.FC<SpendingTrendChartProps> = ({ chart, r
       {loading ? <div className={styles.state} role="status">正在更新收支趋势…</div>
         : error ? <div className={`${styles.state} ${styles.error}`} role="alert">{error}</div>
           : !hasData && <div className={styles.state}><strong>这个区间还没有收支记录</strong><span>记一笔后，趋势会显示在这里。</span></div>}
+      {interactive && activeDay && <div className={styles.tooltip} role="status" aria-live="polite" aria-atomic="true"
+        style={{ left: tooltipLeft, width: tooltipWidth }}>
+        <strong className={styles.tooltipDate}>{fullDateLabel(activeDay.date, displayedRange)}</strong>
+        <div className={styles.tooltipTotals}>
+          <span>支出 <b className={styles.expenseText}>{money(activeDay.total)}</b></span>
+          <span>收入 <b className={styles.incomeText}>{money(activeDay.income)}</b></span>
+        </div>
+        <div className={styles.tooltipCategories}>{activeDay.categories.length ? [...activeDay.categories]
+          .sort((a, b) => categories.indexOf(a.category) - categories.indexOf(b.category))
+          .map((item) => <div key={item.category}><span><i style={{ backgroundColor: categoryColor(item.category) }} />{item.category}</span><b>{money(item.amount)}</b></div>) : <p>暂无支出分类</p>}</div>
+      </div>}
     </div>
-    <div className={styles.details} aria-live="polite" aria-atomic="true">
-      {interactive && activeDay ? <>
-        <div className={styles.detailTotals}><strong>{fullDateLabel(activeDay.date, displayedRange)}</strong><span>支出 <b className={styles.expenseText}>{money(activeDay.total)}</b></span><span>收入 <b className={styles.incomeText}>{money(activeDay.income)}</b></span></div>
-        <div className={styles.categories}>{activeDay.categories.length ? activeDay.categories.map((item) => <span key={item.category}><i style={{ backgroundColor: categoryColor(item.category) }} />{item.category}<b>{money(item.amount)}</b></span>) : <span>暂无支出分类</span>}</div>
-      </> : <p>{loading ? '正在读取所选区间的数据' : error ? '可通过右上角刷新重新加载' : '指向图表查看收支和分类明细'}</p>}
-    </div>
-    <p className={styles.help} id={helpId}>实线圆点为支出，虚线方点为收入。聚焦图表后，可用 ← → 切换日期，Home / End 跳至首尾。</p>
+    <p className={styles.visuallyHidden} id={helpId}>实线圆点为支出，虚线方点为收入，柱体显示支出分类。聚焦图表后，可用左右方向键切换日期，Home 和 End 跳至首尾，Escape 关闭明细。</p>
   </section>;
 };

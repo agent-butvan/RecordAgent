@@ -2,11 +2,13 @@
 .heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .heading h2 { color: var(--text-primary); font-size: 13px; font-weight: 650; }
 .heading p { margin-top: 5px; color: var(--text-secondary); font-size: 10px; font-variant-numeric: tabular-nums; }
-.rangeSwitch { display: inline-flex; flex-shrink: 0; gap: 2px; padding: 2px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--bg-surface); }
-.rangeSwitch button { height: 28px; padding: 0 11px; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--text-secondary); font: 600 11px var(--font-sans); }
-.rangeSwitch button:hover { color: var(--text-primary); background: var(--bg-surface-hover); }
-.rangeSwitch .rangeActive { border-color: var(--border-medium); background: var(--bg-app); color: var(--text-primary); }
-.rangeSwitch button:focus-visible, .categoryToggle:focus-visible, .chartHost svg:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 2px; }
+.rangeSwitch { display: inline-flex; flex-shrink: 0; gap: 4px; padding: 0; border-bottom: 1px solid var(--border-subtle); }
+.rangeSwitch button { position: relative; min-width: 48px; height: 32px; padding: 0 12px; border: 0; border-radius: var(--radius-sm) var(--radius-sm) 0 0; background: transparent; color: var(--text-secondary); font: 500 11px var(--font-sans); transition: background-color var(--transition-fast), color var(--transition-fast); }
+.rangeSwitch button::after { content: ''; position: absolute; right: 10px; bottom: -1px; left: 10px; height: 2px; background: transparent; }
+.rangeSwitch button:hover { color: var(--text-primary); background: var(--bg-surface); }
+.rangeSwitch .rangeActive { color: var(--accent-blue); font-weight: 650; }
+.rangeSwitch .rangeActive::after { background: var(--accent-blue); }
+.rangeSwitch button:focus-visible, .chartHost svg:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 2px; }
 .summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 24px; }
 .periodTotals { display: flex; flex-wrap: wrap; gap: 16px 32px; min-width: 0; }
 .periodTotals dt { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 10px; }
@@ -15,9 +17,6 @@
 .incomeSwatch { border-top: 2px dashed var(--income-color); }
 .section .expenseText { color: var(--expense-color); }
 .section .incomeText { color: var(--income-color); }
-.categoryToggle { flex-shrink: 0; padding: 6px 10px; border: 1px solid var(--border-medium); border-radius: var(--radius-md); background: var(--bg-app); color: var(--text-secondary); font: 500 11px var(--font-sans); }
-.categoryToggle:hover { background: var(--bg-surface); }
-.categoryToggle[aria-pressed='true'] { border-color: var(--accent-blue); color: var(--accent-blue); background: var(--bg-surface); }
 .chartHost { position: relative; width: 100%; height: 248px; margin-top: 22px; }
 .chartHost svg { display: block; border-radius: var(--radius-sm); }
 .chartHost svg[tabindex='0'] { cursor: crosshair; }
@@ -26,7 +25,9 @@
 .baseline { stroke: var(--border-medium); }
 .axisLabel { fill: var(--text-secondary); font: 10px var(--font-sans); font-variant-numeric: tabular-nums; }
 .pendingData { opacity: .3; }
-.bar { opacity: .55; }
+.bar, .barDimmed { transition: opacity var(--transition-fast); }
+.bar { opacity: .92; }
+.barDimmed { opacity: .42; }
 .expenseLine, .incomeLine { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .expenseLine { stroke: var(--expense-color); }
 .incomeLine { stroke: var(--income-color); stroke-dasharray: 5 4; }
@@ -37,15 +38,20 @@
 .state { position: absolute; inset: 35px 12px 44px 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 14px; background: var(--bg-app); color: var(--text-secondary); font-size: 11px; text-align: center; overflow-wrap: anywhere; }
 .state strong { color: var(--text-primary); font-weight: 600; }
 .error { color: var(--expense-color); }
-.details { min-height: 76px; margin-top: 12px; padding: 12px 14px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--bg-surface); color: var(--text-secondary); font-size: 11px; }
-.details > p { padding-top: 13px; }
-.detailTotals { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: baseline; }
-.detailTotals > strong { color: var(--text-primary); font-weight: 600; }
-.detailTotals b, .categories b { font-weight: 600; font-variant-numeric: tabular-nums; }
-.categories { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 9px; }
-.categories span { display: inline-flex; align-items: center; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
-.categories i { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 2px; }
-.help { margin-top: 9px; color: var(--text-secondary); font-size: 10px; line-height: 1.6; }
+.tooltip { position: absolute; z-index: 2; top: 10px; max-height: 224px; overflow-y: auto; overscroll-behavior: contain; padding: 12px; border: 1px solid var(--border-medium); border-radius: var(--radius-md); background: var(--bg-app); color: var(--text-secondary); font-size: 11px; transition: left 100ms ease-out; }
+.tooltipDate { display: block; padding-bottom: 9px; color: var(--text-primary); font-size: 11px; font-weight: 600; }
+.tooltipTotals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border-subtle); }
+.tooltipTotals span { display: flex; flex-direction: column; gap: 4px; font-size: 10px; }
+.tooltipTotals b { font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.tooltipCategories { display: flex; flex-direction: column; gap: 7px; padding-top: 10px; }
+.tooltipCategories > div { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.tooltipCategories span { display: inline-flex; align-items: center; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
+.tooltipCategories i { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 2px; }
+.tooltipCategories b { flex-shrink: 0; color: var(--text-primary); font-weight: 500; font-variant-numeric: tabular-nums; }
+.visuallyHidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) {
+  .rangeSwitch button, .bar, .barDimmed, .tooltip { transition: none; }
+}
 @media (max-width: 680px) {
   .section { padding-right: 20px; padding-left: 20px; }
   .heading { flex-wrap: wrap; }
