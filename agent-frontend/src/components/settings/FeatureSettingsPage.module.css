@@ -1,4 +1,4 @@
-.settingGroup { display: flex; align-items: center; justify-content: space-between; gap: 32px; padding: 20px 0; border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); }
+.settingGroup { display: flex; align-items: center; justify-content: space-between; gap: 32px; padding: 4px 0 20px; }
 .settingCopy { max-width: 480px; }
 .settingCopy label { color: var(--text-primary); font-size: 14px; font-weight: 600; }
 .settingCopy p, .note, .emptyState p { color: var(--text-secondary); font-size: 12px; line-height: 1.65; }
