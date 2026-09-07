@@ -170,20 +170,11 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
 
   const tokenUsageTurns = useMemo<TokenUsageTurnOption[]>(() => {
     const turns: TokenUsageTurnOption[] = [];
-    let latestUserPrompt = '';
-    let roundNumber = 0;
 
     messages.forEach((message) => {
-      if (message.role === 'user') {
-        latestUserPrompt = message.content;
-        return;
-      }
-
-      roundNumber += 1;
-      if (!message.usage) return;
+      if (message.role !== 'assistant' || !message.usage) return;
       turns.push({
         messageId: message.id,
-        label: formatTurnLabel(roundNumber, latestUserPrompt),
         usage: message.usage,
       });
     });
@@ -247,12 +238,19 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     setRightPanelOpen(true);
   };
 
+  const changePanelTab = (tabId: string) => {
+    if (tabId === 'tokens') setTokenUsageMessageId(null);
+    setRightPanelTab(tabId);
+  };
+
   const closePanelTab = (tabId: string) => {
     const closedIndex = rightPanelTabs.indexOf(tabId);
     const nextTabs = rightPanelTabs.filter((openTabId) => openTabId !== tabId);
     setRightPanelTabs(nextTabs);
     if (rightPanelTab === tabId) {
-      setRightPanelTab(nextTabs[closedIndex] ?? nextTabs[closedIndex - 1] ?? null);
+      const nextTab = nextTabs[closedIndex] ?? nextTabs[closedIndex - 1] ?? null;
+      if (nextTab === 'tokens') setTokenUsageMessageId(null);
+      setRightPanelTab(nextTab);
     }
     if (tabId === 'tokens') setTokenUsageMessageId(null);
   };
@@ -475,7 +473,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
           availableTabs={availablePanelTabs}
           tabs={openedPanelTabs}
           activeTab={rightPanelTab}
-          onTabChange={setRightPanelTab}
+          onTabChange={changePanelTab}
           onOpenTab={openPanelTab}
           onCloseTab={closePanelTab}
         >
@@ -493,7 +491,6 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
               turns={tokenUsageTurns}
               sessionUsageSummary={sessionUsageSummary}
               selectedMessageId={tokenUsageMessageId}
-              onSelectionChange={setTokenUsageMessageId}
             />
           ) : projectPath ? (
             <ProjectFileTree projectPath={projectPath} />
@@ -503,12 +500,5 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     </div>
   );
 };
-
-function formatTurnLabel(roundNumber: number, userPrompt: string): string {
-  const normalizedPrompt = userPrompt.replace(/\s+/g, ' ').trim();
-  if (!normalizedPrompt) return `第 ${roundNumber} 轮`;
-  const preview = normalizedPrompt.length > 20 ? `${normalizedPrompt.slice(0, 20)}…` : normalizedPrompt;
-  return `第 ${roundNumber} 轮 · ${preview}`;
-}
 
 export default ChatWorkspace;

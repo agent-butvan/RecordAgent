@@ -1,0 +1,67 @@
+.chart {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+}
+
+.pie {
+  display: block;
+  width: 112px;
+  height: 112px;
+}
+
+.legend {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.legend li {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr);
+  align-items: center;
+  gap: 2px 7px;
+  min-width: 0;
+}
+
+.swatch {
+  grid-row: 1 / span 2;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.legendLabel {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.legendValue {
+  color: var(--text-muted);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+@media (max-width: 1080px) {
+  .chart {
+    grid-template-columns: 96px minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .pie {
+    width: 96px;
+    height: 96px;
+  }
+}

@@ -1,13 +1,12 @@
 import React from 'react';
 import { ChartNoAxesColumnIncreasing, ChevronRight } from 'lucide-react';
 import type { InputTokenBreakdown, TokenUsageSummary, ToolTokenUsage, TurnTokenUsage } from '../../types/chat';
-import { Select, type SelectOption } from '../common/Select';
 import { formatTokenCount } from './tokenUsageFormat';
+import { TokenBreakdownPieChart } from './TokenBreakdownPieChart';
 import styles from './TokenUsagePanel.module.css';
 
 export interface TokenUsageTurnOption {
   messageId: string;
-  label: string;
   usage: TurnTokenUsage;
 }
 
@@ -15,33 +14,23 @@ interface TokenUsagePanelProps {
   turns: TokenUsageTurnOption[];
   sessionUsageSummary?: TokenUsageSummary;
   selectedMessageId: string | null;
-  onSelectionChange: (messageId: string | null) => void;
 }
 
-/** 在聊天右侧面板切换展示整个会话或单轮对话的完整 Token 用量。 */
+/** 根据入口上下文展示整个会话或单轮对话的完整 Token 用量。 */
 export const TokenUsagePanel: React.FC<TokenUsagePanelProps> = ({
   turns,
   sessionUsageSummary,
   selectedMessageId,
-  onSelectionChange,
 }) => {
   const selectedTurn = turns.find((turn) => turn.messageId === selectedMessageId);
   const usage = selectedTurn?.usage ?? aggregateSessionUsage(turns, sessionUsageSummary);
-  const scopeOptions: SelectOption[] = [
-    {
-      value: '',
-      label: `整个会话（${sessionUsageSummary?.turnCount ?? turns.length} 轮）`,
-    },
-    ...turns.map((turn) => ({ value: turn.messageId, label: turn.label })),
-  ];
 
   if (!usage) {
     return (
       <section className={styles.content} aria-label="Token 用量详情">
         <TokenPanelHeader title="Token 用量" summary="当前会话还没有可统计的 Token 用量" />
         <div className={styles.body}>
-          <ScopeSelect options={scopeOptions} value="" onChange={onSelectionChange} />
-          <p className={styles.empty}>完成一轮模型对话后，可在这里查看整个会话或单轮的 Token 明细。</p>
+          <p className={styles.empty}>完成一轮模型对话后，可在这里查看整个会话的 Token 明细。</p>
         </div>
       </section>
     );
@@ -61,12 +50,6 @@ export const TokenUsagePanel: React.FC<TokenUsagePanelProps> = ({
       />
 
       <div className={styles.body}>
-        <ScopeSelect
-          options={scopeOptions}
-          value={selectedTurn?.messageId ?? ''}
-          onChange={onSelectionChange}
-        />
-
         {hasReportedUsage ? (
           <section className={styles.section} aria-labelledby="token-overview-title">
             <h3 id="token-overview-title" className={styles.sectionTitle}>总览</h3>
@@ -97,16 +80,8 @@ export const TokenUsagePanel: React.FC<TokenUsagePanelProps> = ({
 
         {hasBreakdown && (
           <section className={styles.section} aria-labelledby="token-input-title">
-            <h3 id="token-input-title" className={styles.sectionTitle}>输入构成（估算）</h3>
-            <dl className={styles.metrics}>
-              <MetricRow label="System Prompt" value={usage.breakdown.systemPromptTokens} />
-              <MetricRow label="History" value={usage.breakdown.historyTokens} />
-              <MetricRow label="Current User" value={usage.breakdown.currentUserTokens} />
-              <MetricRow label="Tool Schema" value={usage.breakdown.toolSchemaTokens} />
-              <MetricRow label="Tool Result" value={usage.breakdown.toolResultTokens} />
-              <MetricRow label="RAG Context" value={usage.breakdown.ragContextTokens} />
-              <MetricRow label="Other / Protocol" value={usage.breakdown.otherTokens} />
-            </dl>
+            <h3 id="token-input-title" className={styles.sectionTitle}>输入构成占比（估算）</h3>
+            <TokenBreakdownPieChart breakdown={usage.breakdown} />
             <p className={styles.note}>分类由本地 tokenizer 估算；Input/Output 以模型供应商为准。</p>
           </section>
         )}
@@ -167,20 +142,6 @@ const TokenPanelHeader: React.FC<{ title: string; summary: string }> = ({ title,
     </div>
     <p className={styles.summary}>{summary}</p>
   </header>
-);
-
-const ScopeSelect: React.FC<{
-  options: SelectOption[];
-  value: string;
-  onChange: (messageId: string | null) => void;
-}> = ({ options, value, onChange }) => (
-  <Select
-    label="查看范围"
-    options={options}
-    value={value}
-    fullWidth
-    onChange={(event) => onChange(event.target.value || null)}
-  />
 );
 
 const MetricRow: React.FC<{ label: string; value: number; emphasized?: boolean }> = ({
