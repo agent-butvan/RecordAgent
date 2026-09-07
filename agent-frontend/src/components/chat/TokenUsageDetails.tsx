@@ -1,4 +1,5 @@
-import React, { useEffect, useId, useRef, useState } from 'react';
+import React, { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown } from 'lucide-react';
 import type { TurnTokenUsage } from '../../types/chat';
 import { formatTokenCount } from './tokenUsageFormat';
@@ -8,20 +9,81 @@ interface TokenUsageDetailsProps {
   usage?: TurnTokenUsage | null;
 }
 
+interface PopoverPosition {
+  insetBlockStart?: number;
+  insetBlockEnd?: number;
+  insetInlineStart: number;
+  maxHeight: number;
+  width: number;
+}
+
+const POPOVER_GAP = 8;
+const POPOVER_MAX_HEIGHT = 560;
+const POPOVER_MAX_WIDTH = 380;
+const VIEWPORT_MARGIN = 16;
+
 /** 一条 assistant 消息的低噪声 Token 用量与完整性详情。 */
 export const TokenUsageDetails: React.FC<TokenUsageDetailsProps> = ({ usage }) => {
   const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState<PopoverPosition | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setPosition(null);
+      return;
+    }
+
+    const updatePosition = () => {
+      const trigger = triggerRef.current;
+      if (!trigger) return;
+
+      const rect = trigger.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const width = Math.min(POPOVER_MAX_WIDTH, viewportWidth - VIEWPORT_MARGIN * 2);
+      const spaceAbove = rect.top - POPOVER_GAP - VIEWPORT_MARGIN;
+      const spaceBelow = viewportHeight - rect.bottom - POPOVER_GAP - VIEWPORT_MARGIN;
+      const openAbove = spaceAbove >= spaceBelow;
+      const maxHeight = Math.max(0, Math.min(POPOVER_MAX_HEIGHT, openAbove ? spaceAbove : spaceBelow));
+      const left = Math.min(
+        Math.max(VIEWPORT_MARGIN, rect.left),
+        Math.max(VIEWPORT_MARGIN, viewportWidth - width - VIEWPORT_MARGIN),
+      );
+
+      setPosition(openAbove
+        ? {
+            insetBlockEnd: viewportHeight - rect.top + POPOVER_GAP,
+            insetInlineStart: left,
+            maxHeight,
+            width,
+          }
+        : {
+            insetBlockStart: rect.bottom + POPOVER_GAP,
+            insetInlineStart: left,
+            maxHeight,
+            width,
+          });
+    };
+
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
 
     const handlePointerDown = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
+      const target = event.target as Node;
+      if (triggerRef.current?.contains(target) || popoverRef.current?.contains(target)) return;
+      setOpen(false);
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -49,7 +111,7 @@ export const TokenUsageDetails: React.FC<TokenUsageDetailsProps> = ({ usage }) =
     : 'Token 统计不可用';
 
   return (
-    <div ref={rootRef} className={styles.root}>
+    <div className={styles.root}>
       <button
         ref={triggerRef}
         type="button"
@@ -61,8 +123,15 @@ export const TokenUsageDetails: React.FC<TokenUsageDetailsProps> = ({ usage }) =
         <ChevronDown className={styles.chevron} size={13} aria-hidden="true" />
         <span>{summary}</span>
       </button>
-      {open && (
-        <div id={panelId} className={styles.popover} role="group" aria-label="本轮 Token 用量详情">
+      {open && position && createPortal(
+        <div
+          ref={popoverRef}
+          id={panelId}
+          className={styles.popover}
+          role="group"
+          aria-label="本轮 Token 用量详情"
+          style={position}
+        >
           <div className={styles.popoverTitle}>本轮 Token 用量</div>
           {hasReportedUsage ? (
             <dl className={styles.metrics}>
@@ -138,7 +207,8 @@ export const TokenUsageDetails: React.FC<TokenUsageDetailsProps> = ({ usage }) =
               </div>
             </section>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
