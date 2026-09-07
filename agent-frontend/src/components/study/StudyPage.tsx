@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BookOpenIcon, CaretLeftIcon, CaretRightIcon, ClockCounterClockwiseIcon, PencilSimpleIcon, PlayIcon, TrashIcon } from '@phosphor-icons/react';
+import { ArrowRightIcon, BookOpenIcon, CaretLeftIcon, CaretRightIcon, ClockCounterClockwiseIcon, PlayIcon } from '@phosphor-icons/react';
 import { createManualStudySession, deleteStudySession, fetchActiveStudySession, fetchStudyCategories, fetchStudySessions, fetchStudyStatistics, finishStudySession, startStudySession, updateStudySession } from '../../services/studyApi';
 import { formatLocalDate } from '../../services/dailyEvents';
 import { notifyStudySessionChanged, subscribeStudySessionChanges } from '../../services/studySessionEvents';
@@ -10,6 +10,7 @@ import { useMessage } from '../common/Message';
 import { TopBar } from '../common/TopBar';
 import { StudyRecordModal } from './StudyRecordModal';
 import { StudyStartModal } from './StudyStartModal';
+import { StudyHistoryDrawer } from './StudyHistoryDrawer';
 import { ActiveStudyCard } from './ActiveStudyCard';
 import { STUDY_CATEGORIES } from './studyCategories';
 import styles from './StudyPage.module.css';
@@ -87,7 +88,7 @@ export function StudyPage() {
   const todayKey = formatLocalDate(new Date());
   const [timelineDate, setTimelineDate] = useState(todayKey); const [timelineSessions, setTimelineSessions] = useState<StudySession[]>([]);
   const [timelineLoading, setTimelineLoading] = useState(true); const [timelineError, setTimelineError] = useState<string | null>(null); const [timelineRefresh, setTimelineRefresh] = useState(0);
-  const [showAll, setShowAll] = useState(false); const [error, setError] = useState<string | null>(null); const [recordError, setRecordError] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false); const [error, setError] = useState<string | null>(null); const [recordError, setRecordError] = useState<string | null>(null);
   const [startModalOpen, setStartModalOpen] = useState(false); const [startError, setStartError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false); const [editing, setEditing] = useState<StudySession | null>(null); const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
@@ -200,8 +201,8 @@ export function StudyPage() {
             </div>
           </div> : <div className={styles.compactEmpty}>{timelineDate === todayKey ? '今天还没有轨迹。开始学习后，时间会在这里留下痕迹。' : '这一天没有学习轨迹。'}</div>}
         </section>
-        <section className={styles.section}><Heading title="最近记录" subtitle="近 30 天完成的学习" side={completedSessions.length > 3 ? <button className={styles.linkButton} type="button" onClick={() => setShowAll((value) => !value)}>{showAll ? '收起' : '查看全部 →'}</button> : undefined} />
-          {loading ? <div className={styles.loading}>正在读取学习记录…</div> : completedSessions.length ? <div className={styles.sessionList}>{completedSessions.slice(0, showAll ? completedSessions.length : 3).map((session) => <article className={styles.sessionRow} key={session.id}><time dateTime={session.startedAt}><strong>{String(new Date(session.startedAt).getDate()).padStart(2, '0')}</strong><span>{new Intl.DateTimeFormat('en-US', { month: 'short' }).format(new Date(session.startedAt)).toUpperCase()}</span></time><div className={styles.sessionBody}><div><strong>{session.content}</strong><span>{session.category}</span></div><p>{formatClock(session.startedAt)} — {session.endedAt ? formatClock(session.endedAt) : ''} · {formatDuration(session.durationSeconds)}{session.location ? ` · ${session.location}` : ''}</p></div><div className={styles.rowActions}><button type="button" title="编辑" aria-label={`编辑“${session.content}”`} onClick={() => openEdit(session)}><PencilSimpleIcon size={13} /></button><button type="button" className={confirmDeleteId === session.id ? styles.confirmDelete : ''} title={confirmDeleteId === session.id ? '再次点击确认删除' : '删除'} aria-label={`删除“${session.content}”`} onClick={() => void remove(session)}>{confirmDeleteId === session.id ? '确认' : <TrashIcon size={13} />}</button></div></article>)}</div> : <div className={styles.empty}><ClockCounterClockwiseIcon size={19} /><strong>还没有学习记录</strong><span>开始一次学习，或使用右上角补卡。</span></div>}
+        <section className={styles.section}><Heading title="最近记录" subtitle="最近完成的学习片段" side={completedSessions.length > 0 ? <button className={styles.linkButton} type="button" onClick={() => setHistoryOpen(true)}>查看全部<ArrowRightIcon size={12} /></button> : undefined} />
+          {loading ? <div className={styles.loading}>正在读取学习记录…</div> : completedSessions.length ? <RecentSessions sessions={completedSessions.slice(0, 3)} onSelect={openEdit} /> : <div className={styles.empty}><ClockCounterClockwiseIcon size={19} /><strong>还没有学习记录</strong><span>开始一次学习，或使用右上角补卡。</span></div>}
         </section>
       </div><aside className={styles.insightColumn}>
         <section className={styles.sideSection}><Heading title="近 7 天节奏" subtitle="每天的有效学习时长" /><div className={styles.chart}>{weekStats?.days.map((day) => <div className={styles.chartDay} key={day.date}><strong>{day.durationSeconds ? Math.round(day.durationSeconds / 60) : '—'}</strong><div className={styles.barArea}><i className={day.date === todayKey ? styles.todayBar : ''} style={{ height: `${Math.max(day.durationSeconds ? 7 : 0, day.durationSeconds / chartMax * 100)}%` }} /></div><span>{weekday(day.date)}</span></div>)}</div><dl className={styles.smallStats}><div><dt>日均时长</dt><dd>{formatDuration(weekStats?.averageDailySeconds ?? 0)}</dd></div><div><dt>学习天数</dt><dd>{weekStats?.studyDays ?? 0} / 7 天</dd></div><div><dt>较上周</dt><dd>{weekChange === null ? '暂无对比' : `${weekChange >= 0 ? '↑' : '↓'} ${Math.abs(weekChange)}%`}</dd></div><div><dt>完成次数</dt><dd>{weekStats?.sessionCount ?? 0} 次</dd></div></dl></section>
@@ -211,7 +212,26 @@ export function StudyPage() {
     <StudyStartModal open={startModalOpen} saving={saving} error={startError} categories={categoryOptions}
       onClose={() => { if (!saving) { setStartModalOpen(false); setStartError(null); } }} onStart={begin} />
     <StudyRecordModal open={modalOpen} session={editing} saving={saving} error={recordError} categories={categoryOptions} onClose={() => { if (!saving) { setModalOpen(false); setEditing(null); setRecordError(null); } }} onSave={saveRecord} />
+    <StudyHistoryDrawer open={historyOpen} sessions={completedSessions} loading={loading} saving={saving} confirmDeleteId={confirmDeleteId}
+      onClose={() => { setHistoryOpen(false); setConfirmDeleteId(null); }} onEdit={(session) => { setHistoryOpen(false); openEdit(session); }} onDelete={(session) => void remove(session)} />
   </main>;
+}
+
+function RecentSessions({ sessions, onSelect }: { sessions: StudySession[]; onSelect: (session: StudySession) => void }) {
+  const [latest, ...previous] = sessions;
+  return <div className={styles.recentPreview}>
+    <button type="button" className={styles.latestSession} onClick={() => onSelect(latest)}>
+      <span className={styles.latestDate}>{new Intl.DateTimeFormat('zh-CN', { month: 'short', day: 'numeric' }).format(new Date(latest.startedAt))}</span>
+      <strong>{latest.content}</strong>
+      <span className={styles.latestMeta}>{latest.category} · {formatClock(latest.startedAt)} — {latest.endedAt ? formatClock(latest.endedAt) : ''}</span>
+      <b>{formatDuration(latest.durationSeconds)}</b>
+    </button>
+    {previous.length > 0 && <div className={styles.previousSessions}>{previous.map((session) => <button type="button" key={session.id} onClick={() => onSelect(session)}>
+      <span><time dateTime={session.startedAt}>{new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric' }).format(new Date(session.startedAt))}</time><em>{session.category}</em></span>
+      <strong>{session.content}</strong>
+      <b>{formatDuration(session.durationSeconds)}</b>
+    </button>)}</div>}
+  </div>;
 }
 
 function Heading({ title, subtitle, side }: { title: string; subtitle?: string; side?: React.ReactNode }) {

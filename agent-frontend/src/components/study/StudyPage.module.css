@@ -3,6 +3,7 @@
 .content { width: 100%; max-width: 1240px; min-height: 100%; margin: 0 auto; padding: 38px 42px 56px; }
 .topActions { display: flex; align-items: center; gap: 14px; }
 .textAction, .linkButton { border: 0; background: transparent; color: var(--text-secondary); font: 500 11px var(--font-sans); }
+.linkButton { display: inline-flex; align-items: center; gap: 4px; }
 .textAction:hover, .linkButton:hover { color: var(--accent-blue); }
 .dataError { margin-bottom: 24px; padding: 9px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid #e6c8c4; border-radius: var(--radius-md); background: #fff7f5; color: #9a4038; font-size: 12px; }
 .dataError button { border: 0; background: transparent; color: inherit; font: 600 11px var(--font-sans); }
@@ -62,21 +63,21 @@
 .timelineError { min-height: 78px; display: flex; align-items: center; justify-content: space-between; gap: 16px; color: #9a4038; font-size: 10px; }
 .timelineError button { border: 0; background: transparent; color: inherit; font: 600 10px var(--font-sans); }
 
-.sessionList { margin-top: 3px; }
-.sessionRow { min-height: 76px; display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; align-items: center; gap: 13px; padding: 10px 0; }
-.sessionRow > time { color: var(--text-muted); text-align: left; }
-.sessionRow > time strong { display: block; color: var(--text-secondary); font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.sessionRow > time span { display: block; font-size: 8px; }
-.sessionBody { min-width: 0; }
-.sessionBody > div { display: flex; align-items: center; gap: 7px; min-width: 0; }
-.sessionBody strong { overflow: hidden; color: var(--text-primary); font-size: 11px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-.sessionBody span { flex: none; color: #587da8; font-size: 8px; }
-.sessionBody p { margin: 5px 0 0; color: var(--text-muted); font-size: 9.5px; font-variant-numeric: tabular-nums; }
-.rowActions { display: flex; gap: 2px; opacity: 0; transition: opacity var(--transition-fast); }
-.sessionRow:hover .rowActions, .sessionRow:focus-within .rowActions { opacity: 1; }
-.rowActions button { min-width: 28px; height: 28px; display: grid; place-items: center; padding: 0 7px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-muted); font: 10px var(--font-sans); }
-.rowActions button:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
-.rowActions .confirmDelete { background: #fff0ee; color: #a33d35; }
+.recentPreview { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); min-height: 144px; border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); }
+.latestSession { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-content: center; gap: 6px 16px; padding: 20px 24px 20px 0; border: 0; border-right: 1px solid var(--border-subtle); background: transparent; color: var(--text-primary); text-align: left; }
+.latestSession:hover, .latestSession:focus-visible, .previousSessions button:hover, .previousSessions button:focus-visible { background: var(--bg-surface-hover); }
+.latestSession:focus-visible, .previousSessions button:focus-visible { outline: 1px solid var(--accent-blue); outline-offset: -1px; }
+.latestDate { grid-column: 1 / -1; color: var(--text-muted); font-size: 9px; font-variant-numeric: tabular-nums; }
+.latestSession > strong { min-width: 0; overflow: hidden; font-size: 13px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.latestSession > b { grid-column: 2; grid-row: 2 / span 2; align-self: center; color: #416f9f; font-size: 15px; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.latestMeta { overflow: hidden; color: var(--text-muted); font-size: 9.5px; text-overflow: ellipsis; white-space: nowrap; }
+.previousSessions { min-width: 0; display: grid; grid-template-rows: repeat(2, 1fr); }
+.previousSessions button { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-content: center; gap: 5px 12px; padding: 12px 0 12px 20px; border: 0; background: transparent; color: var(--text-primary); text-align: left; }
+.previousSessions button + button { border-top: 1px solid var(--border-subtle); }
+.previousSessions button > span { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: 8.5px; }
+.previousSessions em { color: #587da8; font-style: normal; }
+.previousSessions strong { overflow: hidden; font-size: 10.5px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.previousSessions b { color: var(--text-secondary); font-size: 9.5px; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .empty, .loading { min-height: 170px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; color: var(--text-muted); font-size: 10px; text-align: center; }
 .empty strong { color: var(--text-secondary); font-size: 12px; }
 
@@ -95,5 +96,5 @@
 .insight em { color: #4776a7; font-style: normal; font-weight: 650; }
 
 @media (max-width: 1050px) { .mainLayout { grid-template-columns: 1fr; gap: 8px; }.insightColumn { display: grid; grid-template-columns: 1fr 1fr; gap: 38px; }.insightColumn .sideSection:first-child { grid-row: span 2; } }
-@media (max-width: 720px) { .content { padding: 28px 20px 42px; }.overview { grid-template-columns: 1fr 1fr; gap: 28px; }.todayBlock { grid-column: 1 / -1; }.periodStats { grid-column: 1 / -1; gap: 18px; }.mainLayout { gap: 0; }.insightColumn { grid-template-columns: 1fr; gap: 0; }.sessionRow { grid-template-columns: 38px minmax(0, 1fr) auto; }.rowActions { opacity: 1; } }
+@media (max-width: 720px) { .content { padding: 28px 20px 42px; }.overview { grid-template-columns: 1fr 1fr; gap: 28px; }.todayBlock { grid-column: 1 / -1; }.periodStats { grid-column: 1 / -1; gap: 18px; }.mainLayout { gap: 0; }.insightColumn { grid-template-columns: 1fr; gap: 0; }.recentPreview { grid-template-columns: 1fr; }.latestSession { border-right: 0; border-bottom: 1px solid var(--border-subtle); padding-right: 0; }.previousSessions button { padding-left: 0; } }
 @media (max-width: 480px) { .topActions { gap: 8px; }.overview, .periodStats { grid-template-columns: 1fr; }.todayBlock, .periodStats { grid-column: auto; }.smallStats { gap: 14px; } }
