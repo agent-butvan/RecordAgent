@@ -12,12 +12,12 @@ import { StudyRecordModal } from './StudyRecordModal';
 import { StudyStartModal } from './StudyStartModal';
 import { StudyHistoryDrawer } from './StudyHistoryDrawer';
 import { StudyHeatmap } from './StudyHeatmap';
+import { StudyTimeline } from './StudyTimeline';
 import { ActiveStudyCard } from './ActiveStudyCard';
 import { STUDY_CATEGORIES } from './studyCategories';
 import styles from './StudyPage.module.css';
 
 const TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
-const MIN_TIMELINE_HOURS = 8;
 
 function shiftedDate(days: number): Date { const date = new Date(); date.setHours(12, 0, 0, 0); date.setDate(date.getDate() + days); return date; }
 function shiftDateKey(dateKey: string, days: number): string {
@@ -47,40 +47,6 @@ function formatTimelineDate(dateKey: string, todayKey: string): string {
   }).format(date);
   return dateKey === todayKey ? `今天 · ${formatted}` : formatted;
 }
-function createTimelineRange(sessions: StudySession[], now: number, todayKey: string) {
-  const dayStart = new Date(`${todayKey}T00:00:00`).getTime();
-  const points = sessions.flatMap((session) => [
-    new Date(session.startedAt).getTime(),
-    session.endedAt ? new Date(session.endedAt).getTime() : now,
-  ]);
-  const earliestHour = Math.min(...points.map((point) => (point - dayStart) / 3_600_000));
-  const latestHour = Math.max(...points.map((point) => (point - dayStart) / 3_600_000));
-  let startHour = Math.max(0, Math.floor((earliestHour - 1) / 2) * 2);
-  let endHour = Math.min(24, Math.ceil((latestHour + 1) / 2) * 2);
-
-  if (endHour - startHour < MIN_TIMELINE_HOURS) {
-    const missingHours = MIN_TIMELINE_HOURS - (endHour - startHour);
-    startHour = Math.max(0, startHour - Math.ceil(missingHours / 4) * 2);
-    endHour = Math.min(24, Math.max(endHour, startHour + MIN_TIMELINE_HOURS));
-    startHour = Math.max(0, endHour - MIN_TIMELINE_HOURS);
-  }
-
-  const step = endHour - startHour > 14 ? 4 : 2;
-  const ticks = Array.from({ length: Math.floor((endHour - startHour) / step) + 1 }, (_, index) => startHour + index * step);
-  if (ticks.at(-1) !== endHour) ticks.push(endHour);
-  return { startHour, endHour, ticks };
-}
-
-function timelinePosition(session: StudySession, now: number, todayKey: string, startHour: number, endHour: number) {
-  const start = new Date(session.startedAt); const end = session.endedAt ? new Date(session.endedAt) : new Date(now);
-  const dayStart = new Date(`${todayKey}T00:00:00`);
-  const rangeStart = dayStart.getTime() + startHour * 3_600_000;
-  const total = (endHour - startHour) * 3_600_000;
-  const left = Math.max(0, Math.min(100, (start.getTime() - rangeStart) / total * 100));
-  const right = Math.max(0, Math.min(100, (end.getTime() - rangeStart) / total * 100));
-  return { left, width: Math.max(0, right - left) };
-}
-
 /** 学习记录工作台：将即时打卡、时间轴、历史维护和统计集中在单一页面。 */
 export function StudyPage() {
   const { showMessage } = useMessage();
@@ -134,12 +100,13 @@ export function StudyPage() {
   const todayStat = weekStats?.days.find((day) => day.date === todayKey);
   const todaySeconds = (todayStat?.durationSeconds ?? 0) + (active ? Math.max(0, elapsed - active.durationSeconds) : 0);
   const completedSessions = sessions.filter((session) => session.endedAt !== null);
-  const timelineStart = new Date(`${timelineDate}T00:00:00`).getTime();
-  const timelineEnd = new Date(`${timelineDate}T24:00:00`).getTime();
-  const timelineDaySessions = timelineSessions.filter((session) => new Date(session.startedAt).getTime() < timelineEnd
-    && (!session.endedAt || new Date(session.endedAt).getTime() > timelineStart))
-    .sort((first, second) => new Date(first.startedAt).getTime() - new Date(second.startedAt).getTime());
-  const timelineRange = timelineDaySessions.length ? createTimelineRange(timelineDaySessions, now, timelineDate) : null;
+  const timelineDaySessions = useMemo(() => {
+    const timelineStart = new Date(`${timelineDate}T00:00:00`).getTime();
+    const timelineEnd = new Date(`${timelineDate}T24:00:00`).getTime();
+    return timelineSessions.filter((session) => new Date(session.startedAt).getTime() < timelineEnd
+      && (!session.endedAt || new Date(session.endedAt).getTime() > timelineStart))
+      .sort((first, second) => new Date(first.startedAt).getTime() - new Date(second.startedAt).getTime());
+  }, [timelineDate, timelineSessions]);
   const chartMax = Math.max(1, ...(weekStats?.days.map((day) => day.durationSeconds) ?? [1]));
   const previousTotal = previousWeekStats?.totalDurationSeconds ?? 0;
   const weekChange = previousTotal > 0 ? Math.round(((weekStats?.totalDurationSeconds ?? 0) - previousTotal) / previousTotal * 100) : null;
@@ -194,23 +161,7 @@ export function StudyPage() {
           <label className={styles.datePicker} title="选择日期"><span>{timelineDate.slice(5).replace('-', '.')}</span><input type="date" value={timelineDate} max={todayKey} aria-label="选择轨迹日期" onChange={(event) => { if (event.target.value) setTimelineDate(event.target.value); }} /></label>
           <button type="button" className={styles.dateArrow} aria-label="后一天" title="后一天" disabled={timelineDate >= todayKey} onClick={() => setTimelineDate((date) => shiftDateKey(date, 1))}><CaretRightIcon size={13} /></button>
         </div>} />
-          {timelineLoading ? <div className={styles.compactEmpty}>正在读取这一天的轨迹…</div> : timelineError ? <div className={styles.timelineError} role="alert"><span>{timelineError}</span><button type="button" onClick={() => setTimelineRefresh((value) => value + 1)}>重试</button></div> : timelineRange ? <div className={styles.timeline}>
-            <div className={styles.timelineCanvas}>
-              <div className={styles.timelineHours} aria-hidden="true"><span />
-                <div>{timelineRange.ticks.map((hour, index) => <time key={hour} style={{ left: `${(hour - timelineRange.startHour) / (timelineRange.endHour - timelineRange.startHour) * 100}%` }} className={index === 0 ? styles.firstTick : index === timelineRange.ticks.length - 1 ? styles.lastTick : ''}>{String(hour).padStart(2, '0')}</time>)}</div>
-              </div>
-              {timelineDaySessions.map((session) => {
-                const position = timelinePosition(session, now, timelineDate, timelineRange.startHour, timelineRange.endHour);
-                const endTime = session.endedAt ? formatClock(session.endedAt) : '现在';
-                return <div className={styles.timelineRow} key={session.id}>
-                  <div className={styles.timelineLabel}><strong>{session.content}</strong><span>{formatClock(session.startedAt)} — {endTime}</span></div>
-                  <div className={styles.timelineTrack} style={{ '--timeline-columns': timelineRange.ticks.length - 1 } as React.CSSProperties}>
-                    <i className={session.status === 'active' ? styles.timelineActive : ''} style={{ left: `${position.left}%`, width: `${position.width}%` }} title={`${session.content} · ${formatDuration(session.status === 'active' ? elapsed : session.durationSeconds)}`} aria-label={`${session.content}，${formatClock(session.startedAt)}至${endTime}`}><span>{session.category}</span></i>
-                  </div>
-                </div>;
-              })}
-            </div>
-          </div> : <div className={styles.compactEmpty}>{timelineDate === todayKey ? '今天还没有轨迹。开始学习后，时间会在这里留下痕迹。' : '这一天没有学习轨迹。'}</div>}
+          {timelineLoading ? <div className={styles.compactEmpty}>正在读取这一天的轨迹…</div> : timelineError ? <div className={styles.timelineError} role="alert"><span>{timelineError}</span><button type="button" onClick={() => setTimelineRefresh((value) => value + 1)}>重试</button></div> : timelineDaySessions.length ? <StudyTimeline sessions={timelineDaySessions} dateKey={timelineDate} now={now} /> : <div className={styles.compactEmpty}>{timelineDate === todayKey ? '今天还没有轨迹。开始学习后，时间会在这里留下痕迹。' : '这一天没有学习轨迹。'}</div>}
         </section>
         <section className={styles.section}><Heading title="最近记录" subtitle="最近完成的学习片段" side={completedSessions.length > 0 ? <button className={styles.linkButton} type="button" onClick={() => setHistoryOpen(true)}>查看全部<ArrowRightIcon size={12} /></button> : undefined} />
           {loading ? <div className={styles.loading}>正在读取学习记录…</div> : completedSessions.length ? <RecentSessions sessions={completedSessions.slice(0, 3)} onSelect={openEdit} /> : <div className={styles.empty}><ClockCounterClockwiseIcon size={19} /><strong>还没有学习记录</strong><span>开始一次学习，或使用右上角补卡。</span></div>}
