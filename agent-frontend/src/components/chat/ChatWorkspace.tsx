@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import type { ChatMessage, SessionPermissionMode } from '../../types/chat';
+import type { ChatMessage, SessionPermissionMode, TokenUsageSummary } from '../../types/chat';
 import type { TaskDto } from '../../types/team';
 import { Card } from '../common/Card';
 import { LoadingTree } from '../common/LoadingTree';
 import { PermissionRequestCard } from './PermissionRequestCard';
 import { PlanApprovalCard } from './PlanApprovalCard';
 import { AgentResponse } from './AgentResponse';
+import { TokenUsageDetails } from './TokenUsageDetails';
+import { formatTokenCount } from './tokenUsageFormat';
 import { ChatStepRail, type StepRailChapter } from './ChatStepRail';
 import { MarkdownContent } from '../common/MarkdownContent';
 import { PromptInput } from './PromptInput';
@@ -35,6 +37,7 @@ interface ChatWorkspaceProps {
   messages: ChatMessage[];
   sessionId: string;
   sessionTitle?: string;
+  sessionUsageSummary?: TokenUsageSummary;
   isSessionLoading?: boolean;
   sessionLoadError?: string | null;
   onRetrySessionLoad?: () => void;
@@ -91,21 +94,26 @@ const AssistantMessageItem: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
         msg.content && <MarkdownContent content={msg.content} />
       )}
 
-      {/* 消息底部 4 个操作工具栏图标：复制、赞、踩、全屏/分享 */}
-      {msg.content && (
-        <div className={styles.messageActions}>
-          <button className={styles.actionBtn} title="复制内容" aria-label="复制内容" onClick={handleCopy}>
-            <Copy size={14} />
-          </button>
-          <button className={styles.actionBtn} title="即将推出" aria-label="赞（即将推出）" disabled>
-            <ThumbsUp size={14} />
-          </button>
-          <button className={styles.actionBtn} title="即将推出" aria-label="踩（即将推出）" disabled>
-            <ThumbsDown size={14} />
-          </button>
-          <button className={styles.actionBtn} title="即将推出" aria-label="全屏/扩展（即将推出）" disabled>
-            <Maximize2 size={14} />
-          </button>
+      {(msg.content || msg.usage) && (
+        <div className={styles.messageFooter}>
+          {/* 消息底部操作工具栏：复制、赞、踩、全屏/分享 */}
+          {msg.content && (
+            <div className={styles.messageActions}>
+              <button className={styles.actionBtn} title="复制内容" aria-label="复制内容" onClick={handleCopy}>
+                <Copy size={14} />
+              </button>
+              <button className={styles.actionBtn} title="即将推出" aria-label="赞（即将推出）" disabled>
+                <ThumbsUp size={14} />
+              </button>
+              <button className={styles.actionBtn} title="即将推出" aria-label="踩（即将推出）" disabled>
+                <ThumbsDown size={14} />
+              </button>
+              <button className={styles.actionBtn} title="即将推出" aria-label="全屏/扩展（即将推出）" disabled>
+                <Maximize2 size={14} />
+              </button>
+            </div>
+          )}
+          <TokenUsageDetails usage={msg.usage} />
         </div>
       )}
     </div>
@@ -116,6 +124,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   messages,
   sessionId,
   sessionTitle = '新对话',
+  sessionUsageSummary,
   isSessionLoading = false,
   sessionLoadError = null,
   onRetrySessionLoad,
@@ -267,6 +276,17 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
           <span className={styles.workspaceTitle} title={sessionTitle || '新对话'}>
             {sessionTitle || '新对话'}
           </span>
+          {sessionUsageSummary && sessionUsageSummary.reportedCallCount > 0 && (
+            <span
+              className={styles.sessionUsage}
+              title={sessionUsageSummary.status === 'PARTIAL'
+                ? '会话中存在尚未统计的历史轮次或不完整调用'
+                : '当前会话累计 Token 用量'}
+            >
+              {formatTokenCount(sessionUsageSummary.totalTokens)} tokens
+              {sessionUsageSummary.status === 'PARTIAL' ? ' · 部分' : ''}
+            </span>
+          )}
         </div>
         <button
           type="button"

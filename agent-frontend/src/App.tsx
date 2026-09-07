@@ -47,6 +47,7 @@ function mapTranscriptToChatMessage(dto: TranscriptMessageDto): ChatMessage {
     reasoning: dto.thinking || undefined,
     createdAt: new Date(dto.createdAt).getTime() || Date.now(),
     status: dto.status,
+    usage: dto.usage,
     elapsedTime:
       dto.durationMillis != null
         ? Math.max(1, Math.round(dto.durationMillis / 1000))
@@ -143,6 +144,7 @@ export const MainLayout: React.FC<{
           title: detail.summary.title,
           lastMessagePreview: detail.summary.lastMessagePreview,
           messages,
+          usageSummary: detail.usageSummary,
           isLoaded: true,
         }
       : session));
@@ -786,6 +788,7 @@ export const MainLayout: React.FC<{
               messages={activeMessages}
               sessionId={activeSessionId}
               sessionTitle={activeSession?.title || '新对话'}
+              sessionUsageSummary={activeSession?.usageSummary}
               isSessionLoading={Boolean(activeSession && !activeSession.isLoaded && !activeSessionLoadError)}
               sessionLoadError={activeSessionLoadError}
               onRetrySessionLoad={() => {

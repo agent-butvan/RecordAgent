@@ -39,6 +39,15 @@
   white-space: nowrap;
 }
 
+.sessionUsage {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
 .panelToggle {
   display: inline-flex;
   width: 30px;
@@ -289,13 +298,22 @@
   min-width: 0;
 }
 
+.messageFooter {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 10px;
+  padding-top: 4px;
+  min-width: 0;
+}
+
 /* 消息底部动作工具栏 */
 .messageActions {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-top: 10px;
-  padding-top: 4px;
 }
 
 .actionBtn {

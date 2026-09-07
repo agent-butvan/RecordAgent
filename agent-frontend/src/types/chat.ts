@@ -6,6 +6,45 @@ export type SessionStatus = 'ACTIVE' | 'DELETING';
 export type MessageRole = 'USER' | 'ASSISTANT';
 export type MessageStatus = 'COMPLETED' | 'FAILED' | 'CANCELLED';
 export type SessionPermissionMode = 'ASK' | 'AUTO_EDIT' | 'FULL_ACCESS';
+export type UsageStatus = 'COMPLETE' | 'PARTIAL' | 'UNAVAILABLE';
+export type UsagePurpose = 'CHAT' | 'SESSION_TITLE' | 'CONTEXT_COMPACTION' | 'BACKGROUND_AGENT';
+
+export interface ModelInvocationUsage {
+  invocationId: string;
+  source: string;
+  purpose: UsagePurpose;
+  vendor: string;
+  model: string;
+  inputTokens?: number | null;
+  outputTokens?: number | null;
+  cachedInputTokens?: number | null;
+  totalTokens?: number | null;
+  durationMillis?: number | null;
+  status: UsageStatus;
+}
+
+export interface TurnTokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cachedInputTokens: number;
+  totalTokens: number;
+  modelCallCount: number;
+  reportedCallCount: number;
+  status: UsageStatus;
+  calls: ModelInvocationUsage[];
+}
+
+export interface TokenUsageSummary {
+  inputTokens: number;
+  outputTokens: number;
+  cachedInputTokens: number;
+  totalTokens: number;
+  turnCount: number;
+  trackedTurnCount: number;
+  modelCallCount: number;
+  reportedCallCount: number;
+  status: UsageStatus;
+}
 
 /** Agent 响应时间线节点类型 */
 export type TraceNodeType =
@@ -90,6 +129,7 @@ export interface ChatMessage {
   startTime?: number;
   elapsedTime?: number;
   status?: MessageStatus;
+  usage?: TurnTokenUsage | null;
   tools?: ToolExecution[];
   subagentProgress?: SubagentProgressDto[];
 }
@@ -129,11 +169,13 @@ export interface TranscriptMessageDto {
   durationMillis?: number | null;
   tools?: TranscriptToolExecutionDto[];
   thinking?: string | null;
+  usage?: TurnTokenUsage | null;
 }
 
 export interface SessionDetailDto {
   summary: SessionSummaryDto;
   messages: TranscriptMessageDto[];
+  usageSummary: TokenUsageSummary;
 }
 
 export interface ChatSession {
@@ -145,5 +187,6 @@ export interface ChatSession {
   createdAt: number;
   updatedAt: number;
   messages: ChatMessage[];
+  usageSummary?: TokenUsageSummary;
   isLoaded?: boolean; // 消息记录是否已从后端详情接口中全量加载
 }

@@ -5,12 +5,15 @@ import butvan.agent.agents.session.dto.CreateSessionRequest;
 import butvan.agent.agents.session.dto.SessionDetailDto;
 import butvan.agent.agents.session.dto.SessionSummaryDto;
 import butvan.agent.agents.session.dto.SessionPermissionMode;
+import butvan.agent.agents.session.dto.TranscriptMessageDto;
 import butvan.agent.agents.agent.permission.PendingApprovalStore;
+import butvan.agent.agents.usage.TokenUsageAggregator;
 import io.agentscope.core.state.AgentStateStore;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * 会话生命周期协调服务。
@@ -40,7 +43,20 @@ public class SessionLifecycleService {
 
     public SessionDetailDto getDetail(String sessionId) {
         SessionSummaryDto summary = sessionCatalogService.requireActive(sessionId);
-        return new SessionDetailDto(summary, transcriptService.list(sessionId));
+        List<TranscriptMessageDto> messages = transcriptService.list(sessionId);
+        int turnCount = (int) messages.stream()
+                .filter(message -> message.role() == TranscriptMessageDto.MessageRole.ASSISTANT)
+                .count();
+        var usages = messages.stream()
+                .filter(message -> message.role() == TranscriptMessageDto.MessageRole.ASSISTANT)
+                .map(TranscriptMessageDto::usage)
+                .filter(Objects::nonNull)
+                .toList();
+        return new SessionDetailDto(
+                summary,
+                messages,
+                TokenUsageAggregator.summarize(turnCount, usages)
+        );
     }
 
     public SessionSummaryDto updateTitle(String sessionId, String title) {
