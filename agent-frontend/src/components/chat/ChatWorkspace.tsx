@@ -7,7 +7,7 @@ import { PermissionRequestCard } from './PermissionRequestCard';
 import { PlanApprovalCard } from './PlanApprovalCard';
 import { AgentResponse } from './AgentResponse';
 import { TokenUsageTrigger } from './TokenUsageTrigger';
-import { TokenUsagePanel } from './TokenUsagePanel';
+import { TokenUsagePanel, type TokenUsageTurnOption } from './TokenUsagePanel';
 import { formatTokenCount } from './tokenUsageFormat';
 import { ChatStepRail, type StepRailChapter } from './ChatStepRail';
 import { MarkdownContent } from '../common/MarkdownContent';
@@ -168,16 +168,38 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   const [tokenUsageMessageId, setTokenUsageMessageId] = useState<string | null>(null);
   const messagesAreaRef = useRef<HTMLDivElement>(null);
 
-  const selectedTokenUsage = useMemo(
-    () => messages.find((message) => message.id === tokenUsageMessageId)?.usage || null,
-    [messages, tokenUsageMessageId],
-  );
+  const tokenUsageTurns = useMemo<TokenUsageTurnOption[]>(() => {
+    const turns: TokenUsageTurnOption[] = [];
+    let latestUserPrompt = '';
+    let roundNumber = 0;
+
+    messages.forEach((message) => {
+      if (message.role === 'user') {
+        latestUserPrompt = message.content;
+        return;
+      }
+
+      roundNumber += 1;
+      if (!message.usage) return;
+      turns.push({
+        messageId: message.id,
+        label: formatTurnLabel(roundNumber, latestUserPrompt),
+        usage: message.usage,
+      });
+    });
+
+    return turns;
+  }, [messages]);
 
   const availablePanelTabs = useMemo<RightPanelTab[]>(() => {
     const tabs: RightPanelTab[] = [{
       id: 'tasks',
       label: '任务',
       icon: Bot,
+    }, {
+      id: 'tokens',
+      label: 'Token',
+      icon: ChartNoAxesColumnIncreasing,
     }];
     if (projectPath) {
       tabs.push({
@@ -186,15 +208,8 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
         icon: FolderTree,
       });
     }
-    if (selectedTokenUsage) {
-      tabs.push({
-        id: 'tokens',
-        label: 'Token',
-        icon: ChartNoAxesColumnIncreasing,
-      });
-    }
     return tabs;
-  }, [projectPath, selectedTokenUsage]);
+  }, [projectPath]);
 
   const openedPanelTabs = availablePanelTabs.filter((tab) => rightPanelTabs.includes(tab.id));
 
@@ -206,14 +221,12 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     }
   }, [projectPath]);
 
-  // 切换会话或消息失效后，移除无数据可展示的 Token 标签。
+  // 切换会话或消息失效后，回到整个会话的 Token 视图。
   useEffect(() => {
-    if (tokenUsageMessageId && !selectedTokenUsage) {
+    if (tokenUsageMessageId && !tokenUsageTurns.some((turn) => turn.messageId === tokenUsageMessageId)) {
       setTokenUsageMessageId(null);
-      setRightPanelTabs((tabs) => tabs.filter((tabId) => tabId !== 'tokens'));
-      setRightPanelTab((activeTab) => activeTab === 'tokens' ? null : activeTab);
     }
-  }, [selectedTokenUsage, tokenUsageMessageId]);
+  }, [tokenUsageMessageId, tokenUsageTurns]);
 
   useEffect(() => {
     const togglePanel = (event: KeyboardEvent) => {
@@ -228,6 +241,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
 
   const openPanelTab = (tabId: string) => {
     if (!availablePanelTabs.some((tab) => tab.id === tabId)) return;
+    if (tabId === 'tokens') setTokenUsageMessageId(null);
     setRightPanelTabs((tabs) => tabs.includes(tabId) ? tabs : [...tabs, tabId]);
     setRightPanelTab(tabId);
     setRightPanelOpen(true);
@@ -245,6 +259,13 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
 
   const openTokenUsage = (messageId: string) => {
     setTokenUsageMessageId(messageId);
+    setRightPanelTabs((tabs) => tabs.includes('tokens') ? tabs : [...tabs, 'tokens']);
+    setRightPanelTab('tokens');
+    setRightPanelOpen(true);
+  };
+
+  const openSessionTokenUsage = () => {
+    setTokenUsageMessageId(null);
     setRightPanelTabs((tabs) => tabs.includes('tokens') ? tabs : [...tabs, 'tokens']);
     setRightPanelTab('tokens');
     setRightPanelOpen(true);
@@ -323,15 +344,18 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
             {sessionTitle || '新对话'}
           </span>
           {sessionUsageSummary && sessionUsageSummary.reportedCallCount > 0 && (
-            <span
+            <button
+              type="button"
               className={styles.sessionUsage}
               title={sessionUsageSummary.status === 'PARTIAL'
-                ? '会话中存在尚未统计的历史轮次或不完整调用'
-                : '当前会话累计 Token 用量'}
+                ? '查看会话 Token 用量；部分历史轮次或调用尚未统计'
+                : '查看当前会话 Token 用量'}
+              aria-label="在右侧面板查看当前会话 Token 用量"
+              onClick={openSessionTokenUsage}
             >
               {formatTokenCount(sessionUsageSummary.totalTokens)} tokens
               {sessionUsageSummary.status === 'PARTIAL' ? ' · 部分' : ''}
-            </span>
+            </button>
           )}
         </div>
         <button
@@ -464,8 +488,13 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
               onRefresh={onRefreshSubagentTasks}
               onCancel={onCancelSubagentTask}
             />
-          ) : rightPanelTab === 'tokens' && selectedTokenUsage ? (
-            <TokenUsagePanel usage={selectedTokenUsage} />
+          ) : rightPanelTab === 'tokens' ? (
+            <TokenUsagePanel
+              turns={tokenUsageTurns}
+              sessionUsageSummary={sessionUsageSummary}
+              selectedMessageId={tokenUsageMessageId}
+              onSelectionChange={setTokenUsageMessageId}
+            />
           ) : projectPath ? (
             <ProjectFileTree projectPath={projectPath} />
           ) : null}
@@ -474,4 +503,12 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     </div>
   );
 };
+
+function formatTurnLabel(roundNumber: number, userPrompt: string): string {
+  const normalizedPrompt = userPrompt.replace(/\s+/g, ' ').trim();
+  if (!normalizedPrompt) return `第 ${roundNumber} 轮`;
+  const preview = normalizedPrompt.length > 20 ? `${normalizedPrompt.slice(0, 20)}…` : normalizedPrompt;
+  return `第 ${roundNumber} 轮 · ${preview}`;
+}
+
 export default ChatWorkspace;

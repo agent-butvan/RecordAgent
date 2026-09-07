@@ -1,33 +1,72 @@
 import React from 'react';
 import { ChartNoAxesColumnIncreasing, ChevronRight } from 'lucide-react';
-import type { TurnTokenUsage } from '../../types/chat';
+import type { InputTokenBreakdown, TokenUsageSummary, ToolTokenUsage, TurnTokenUsage } from '../../types/chat';
+import { Select, type SelectOption } from '../common/Select';
 import { formatTokenCount } from './tokenUsageFormat';
 import styles from './TokenUsagePanel.module.css';
 
-interface TokenUsagePanelProps {
+export interface TokenUsageTurnOption {
+  messageId: string;
+  label: string;
   usage: TurnTokenUsage;
 }
 
-/** 在聊天右侧面板展示单轮对话的完整 Token 用量。 */
-export const TokenUsagePanel: React.FC<TokenUsagePanelProps> = ({ usage }) => {
+interface TokenUsagePanelProps {
+  turns: TokenUsageTurnOption[];
+  sessionUsageSummary?: TokenUsageSummary;
+  selectedMessageId: string | null;
+  onSelectionChange: (messageId: string | null) => void;
+}
+
+/** 在聊天右侧面板切换展示整个会话或单轮对话的完整 Token 用量。 */
+export const TokenUsagePanel: React.FC<TokenUsagePanelProps> = ({
+  turns,
+  sessionUsageSummary,
+  selectedMessageId,
+  onSelectionChange,
+}) => {
+  const selectedTurn = turns.find((turn) => turn.messageId === selectedMessageId);
+  const usage = selectedTurn?.usage ?? aggregateSessionUsage(turns, sessionUsageSummary);
+  const scopeOptions: SelectOption[] = [
+    {
+      value: '',
+      label: `整个会话（${sessionUsageSummary?.turnCount ?? turns.length} 轮）`,
+    },
+    ...turns.map((turn) => ({ value: turn.messageId, label: turn.label })),
+  ];
+
+  if (!usage) {
+    return (
+      <section className={styles.content} aria-label="Token 用量详情">
+        <TokenPanelHeader title="Token 用量" summary="当前会话还没有可统计的 Token 用量" />
+        <div className={styles.body}>
+          <ScopeSelect options={scopeOptions} value="" onChange={onSelectionChange} />
+          <p className={styles.empty}>完成一轮模型对话后，可在这里查看整个会话或单轮的 Token 明细。</p>
+        </div>
+      </section>
+    );
+  }
+
   const hasReportedUsage = usage.reportedCallCount > 0;
   const hasBreakdown = usage.estimatedInputTokens > 0;
+  const scopeTitle = selectedTurn ? '本轮 Token 用量' : '整个会话 Token 用量';
 
   return (
-    <section className={styles.content} aria-label="本轮 Token 用量详情">
-      <header className={styles.header}>
-        <div className={styles.title}>
-          <ChartNoAxesColumnIncreasing size={16} aria-hidden="true" />
-          本轮 Token 用量
-        </div>
-        <p className={styles.summary}>
-          {usage.modelCallCount > 0
-            ? `${usage.modelCallCount} 次模型调用 · ${formatDuration(usage.durationMillis)}`
-            : '本轮没有可用的模型调用统计'}
-        </p>
-      </header>
+    <section className={styles.content} aria-label={`${scopeTitle}详情`}>
+      <TokenPanelHeader
+        title={scopeTitle}
+        summary={usage.modelCallCount > 0
+          ? `${usage.modelCallCount} 次模型调用 · ${formatDuration(usage.durationMillis)}`
+          : '没有可用的模型调用统计'}
+      />
 
       <div className={styles.body}>
+        <ScopeSelect
+          options={scopeOptions}
+          value={selectedTurn?.messageId ?? ''}
+          onChange={onSelectionChange}
+        />
+
         {hasReportedUsage ? (
           <section className={styles.section} aria-labelledby="token-overview-title">
             <h3 id="token-overview-title" className={styles.sectionTitle}>总览</h3>
@@ -52,7 +91,7 @@ export const TokenUsagePanel: React.FC<TokenUsagePanelProps> = ({ usage }) => {
 
         {usage.status === 'PARTIAL' && (
           <p className={styles.notice} role="status">
-            本轮部分模型调用失败、取消或未返回用量，合计可能偏低。
+            {selectedTurn ? '本轮' : '当前会话'}部分模型调用失败、取消或未返回用量，合计可能偏低。
           </p>
         )}
 
@@ -90,10 +129,12 @@ export const TokenUsagePanel: React.FC<TokenUsagePanelProps> = ({ usage }) => {
         {usage.calls.length > 0 && (
           <DisclosureSection title="模型调用" count={usage.calls.length}>
             <div className={styles.detailList}>
-              {usage.calls.map((call) => (
-                <div className={styles.detailItem} key={`${call.source}:${call.invocationId}`}>
+              {usage.calls.map((call, callIndex) => (
+                <div className={styles.detailItem} key={`${call.source}:${call.invocationId}:${callIndex}`}>
                   <div className={styles.callTitle}>
-                    <span className={styles.callIndex}>#{call.modelCallIndex || 1}</span>
+                    <span className={styles.callIndex}>
+                      #{selectedTurn ? (call.modelCallIndex || callIndex + 1) : callIndex + 1}
+                    </span>
                     <span className={styles.detailName}>{call.model}</span>
                   </div>
                   <span className={styles.detailMeta}>
@@ -117,6 +158,30 @@ export const TokenUsagePanel: React.FC<TokenUsagePanelProps> = ({ usage }) => {
     </section>
   );
 };
+
+const TokenPanelHeader: React.FC<{ title: string; summary: string }> = ({ title, summary }) => (
+  <header className={styles.header}>
+    <div className={styles.title}>
+      <ChartNoAxesColumnIncreasing size={16} aria-hidden="true" />
+      {title}
+    </div>
+    <p className={styles.summary}>{summary}</p>
+  </header>
+);
+
+const ScopeSelect: React.FC<{
+  options: SelectOption[];
+  value: string;
+  onChange: (messageId: string | null) => void;
+}> = ({ options, value, onChange }) => (
+  <Select
+    label="查看范围"
+    options={options}
+    value={value}
+    fullWidth
+    onChange={(event) => onChange(event.target.value || null)}
+  />
+);
 
 const MetricRow: React.FC<{ label: string; value: number; emphasized?: boolean }> = ({
   label,
@@ -148,4 +213,70 @@ function formatDuration(durationMillis: number): string {
   if (!durationMillis) return '—';
   if (durationMillis < 1000) return `${durationMillis} ms`;
   return `${(durationMillis / 1000).toFixed(1)} s`;
+}
+
+function aggregateSessionUsage(
+  turns: TokenUsageTurnOption[],
+  summary?: TokenUsageSummary,
+): TurnTokenUsage | null {
+  if (turns.length === 0 && !summary) return null;
+
+  const usages = turns.map((turn) => turn.usage);
+  const sum = (pick: (usage: TurnTokenUsage) => number) => usages.reduce((total, usage) => total + pick(usage), 0);
+  const breakdown = usages.reduce<InputTokenBreakdown>((total, usage) => ({
+    systemPromptTokens: total.systemPromptTokens + usage.breakdown.systemPromptTokens,
+    historyTokens: total.historyTokens + usage.breakdown.historyTokens,
+    currentUserTokens: total.currentUserTokens + usage.breakdown.currentUserTokens,
+    toolSchemaTokens: total.toolSchemaTokens + usage.breakdown.toolSchemaTokens,
+    toolResultTokens: total.toolResultTokens + usage.breakdown.toolResultTokens,
+    ragContextTokens: total.ragContextTokens + usage.breakdown.ragContextTokens,
+    otherTokens: total.otherTokens + usage.breakdown.otherTokens,
+  }), emptyBreakdown());
+  const toolTotals = new Map<string, ToolTokenUsage>();
+
+  usages.flatMap((usage) => usage.toolUsages).forEach((tool) => {
+    const current = toolTotals.get(tool.toolName);
+    toolTotals.set(tool.toolName, {
+      toolName: tool.toolName,
+      schemaTokens: (current?.schemaTokens ?? 0) + tool.schemaTokens,
+      resultTokens: (current?.resultTokens ?? 0) + tool.resultTokens,
+    });
+  });
+
+  const fallbackStatus = usages.every((usage) => usage.status === 'UNAVAILABLE')
+    ? 'UNAVAILABLE'
+    : usages.some((usage) => usage.status !== 'COMPLETE') ? 'PARTIAL' : 'COMPLETE';
+  const estimationDeltas = usages
+    .map((usage) => usage.estimationDeltaTokens)
+    .filter((value): value is number => value != null);
+
+  return {
+    inputTokens: summary?.inputTokens ?? sum((usage) => usage.inputTokens),
+    outputTokens: summary?.outputTokens ?? sum((usage) => usage.outputTokens),
+    cachedInputTokens: summary?.cachedInputTokens ?? sum((usage) => usage.cachedInputTokens),
+    totalTokens: summary?.totalTokens ?? sum((usage) => usage.totalTokens),
+    modelCallCount: summary?.modelCallCount ?? sum((usage) => usage.modelCallCount),
+    reportedCallCount: summary?.reportedCallCount ?? sum((usage) => usage.reportedCallCount),
+    status: summary?.status ?? fallbackStatus,
+    calls: usages.flatMap((usage) => usage.calls),
+    estimatedInputTokens: sum((usage) => usage.estimatedInputTokens),
+    estimationDeltaTokens: estimationDeltas.length > 0
+      ? estimationDeltas.reduce((total, value) => total + value, 0)
+      : undefined,
+    breakdown,
+    toolUsages: Array.from(toolTotals.values()),
+    durationMillis: sum((usage) => usage.durationMillis),
+  };
+}
+
+function emptyBreakdown(): InputTokenBreakdown {
+  return {
+    systemPromptTokens: 0,
+    historyTokens: 0,
+    currentUserTokens: 0,
+    toolSchemaTokens: 0,
+    toolResultTokens: 0,
+    ragContextTokens: 0,
+    otherTokens: 0,
+  };
 }
