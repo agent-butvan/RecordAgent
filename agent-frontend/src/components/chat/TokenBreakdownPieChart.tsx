@@ -1,4 +1,4 @@
-import React, { useId } from 'react';
+import React, { useId, useState } from 'react';
 import type { InputTokenBreakdown } from '../../types/chat';
 import { formatTokenCount } from './tokenUsageFormat';
 import styles from './TokenBreakdownPieChart.module.css';
@@ -16,20 +16,22 @@ interface ChartSegment {
 
 const SEGMENT_DEFINITIONS: Array<Omit<ChartSegment, 'value'>> = [
   { key: 'systemPromptTokens', label: '系统提示', color: '#2563eb' },
-  { key: 'historyTokens', label: '历史消息', color: '#7c3aed' },
-  { key: 'currentUserTokens', label: '当前输入', color: '#0f766e' },
-  { key: 'toolSchemaTokens', label: '工具定义', color: '#d97706' },
-  { key: 'toolResultTokens', label: '工具结果', color: '#dc2626' },
-  { key: 'ragContextTokens', label: 'RAG 上下文', color: '#0284c7' },
-  { key: 'otherTokens', label: '其他 / 协议', color: '#64748b' },
+  { key: 'historyTokens', label: '历史消息', color: '#4f6f96' },
+  { key: 'currentUserTokens', label: '当前输入', color: '#7895b2' },
+  { key: 'toolSchemaTokens', label: '工具定义', color: '#2f7f78' },
+  { key: 'toolResultTokens', label: '工具结果', color: '#6b9b96' },
+  { key: 'ragContextTokens', label: 'RAG 上下文', color: '#9aa8b8' },
+  { key: 'otherTokens', label: '其他 / 协议', color: '#cbd5e1' },
 ];
 
 const CHART_CENTER = 60;
-const CHART_RADIUS = 52;
+const CHART_RADIUS = 50;
 
-/** 使用 SVG 饼图与文字图例展示输入 Token 构成，避免仅依赖颜色传达数据。 */
+/** 可交互的极简 SVG 饼图，并以文本列表完整呈现每项 Token 与占比。 */
 export const TokenBreakdownPieChart: React.FC<TokenBreakdownPieChartProps> = ({ breakdown }) => {
   const titleId = useId();
+  const [hoveredKey, setHoveredKey] = useState<keyof InputTokenBreakdown | null>(null);
+  const [selectedKey, setSelectedKey] = useState<keyof InputTokenBreakdown | null>(null);
   const segments = SEGMENT_DEFINITIONS
     .map((segment) => ({ ...segment, value: breakdown[segment.key] }))
     .filter((segment) => segment.value > 0);
@@ -37,50 +39,89 @@ export const TokenBreakdownPieChart: React.FC<TokenBreakdownPieChartProps> = ({ 
 
   if (total <= 0) return null;
 
+  const activeKey = hoveredKey ?? selectedKey;
+  const activeSegment = segments.find((segment) => segment.key === activeKey) ?? null;
   let currentAngle = -90;
   const slices = segments.map((segment) => {
     const startAngle = currentAngle;
     const sweepAngle = (segment.value / total) * 360;
     currentAngle += sweepAngle;
-    return { ...segment, startAngle, endAngle: currentAngle, sweepAngle };
+    return { ...segment, startAngle, endAngle: currentAngle };
   });
+  const toggleSelection = (key: keyof InputTokenBreakdown) => {
+    setSelectedKey((current) => current === key ? null : key);
+  };
 
   return (
     <div className={styles.chart}>
-      <svg
-        className={styles.pie}
-        viewBox="0 0 120 120"
-        role="img"
-        aria-labelledby={titleId}
-      >
-        <title id={titleId}>输入 Token 构成占比</title>
-        {slices.map((slice) => slice.sweepAngle >= 359.999 ? (
-          <circle
-            key={slice.key}
-            cx={CHART_CENTER}
-            cy={CHART_CENTER}
-            r={CHART_RADIUS}
-            fill={slice.color}
-          />
-        ) : (
-          <path
-            key={slice.key}
-            d={describeSlice(slice.startAngle, slice.endAngle)}
-            fill={slice.color}
-          />
-        ))}
-      </svg>
+      <div className={styles.visual}>
+        <svg
+          className={`${styles.pie} ${activeKey ? styles.pieHasActive : ''}`}
+          viewBox="0 0 120 120"
+          role="group"
+          aria-labelledby={titleId}
+        >
+          <title id={titleId}>输入 Token 构成占比，可通过键盘或指针选择分类</title>
+          {slices.map((slice) => {
+            const percentage = formatPercentage(slice.value, total);
+            const selected = selectedKey === slice.key;
+            return (
+              <path
+                key={slice.key}
+                className={`${styles.slice} ${activeKey === slice.key ? styles.sliceActive : ''}`}
+                d={describeSlice(slice.startAngle, slice.endAngle)}
+                fill={slice.color}
+                tabIndex={0}
+                role="button"
+                aria-label={`${slice.label}，${formatTokenCount(slice.value)} tokens，占 ${percentage}`}
+                aria-pressed={selected}
+                onMouseEnter={() => setHoveredKey(slice.key)}
+                onMouseLeave={() => setHoveredKey(null)}
+                onFocus={() => setHoveredKey(slice.key)}
+                onBlur={() => setHoveredKey(null)}
+                onClick={() => toggleSelection(slice.key)}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter' && event.key !== ' ') return;
+                  event.preventDefault();
+                  toggleSelection(slice.key);
+                }}
+              />
+            );
+          })}
+        </svg>
 
-      <ul className={styles.legend} aria-label="输入 Token 构成图例">
-        {segments.map((segment) => (
-          <li key={segment.key}>
-            <span className={styles.swatch} style={{ backgroundColor: segment.color }} aria-hidden="true" />
-            <span className={styles.legendLabel}>{segment.label}</span>
-            <span className={styles.legendValue}>
-              {formatTokenCount(segment.value)} · {formatPercentage(segment.value, total)}
-            </span>
-          </li>
-        ))}
+        <div className={styles.readout} aria-live="polite">
+          <span className={styles.readoutLabel}>{activeSegment?.label ?? '输入合计'}</span>
+          <strong>{formatTokenCount(activeSegment?.value ?? total)}</strong>
+          <span className={styles.readoutMeta}>
+            {activeSegment ? `tokens · ${formatPercentage(activeSegment.value, total)}` : `tokens · ${segments.length} 项构成`}
+          </span>
+        </div>
+      </div>
+
+      <ul className={styles.breakdownList} aria-label="输入 Token 构成明细">
+        {segments.map((segment) => {
+          const selected = selectedKey === segment.key;
+          return (
+            <li key={segment.key}>
+              <button
+                type="button"
+                className={`${styles.breakdownRow} ${activeKey === segment.key ? styles.breakdownRowActive : ''}`}
+                aria-pressed={selected}
+                onMouseEnter={() => setHoveredKey(segment.key)}
+                onMouseLeave={() => setHoveredKey(null)}
+                onFocus={() => setHoveredKey(segment.key)}
+                onBlur={() => setHoveredKey(null)}
+                onClick={() => toggleSelection(segment.key)}
+              >
+                <span className={styles.swatch} style={{ backgroundColor: segment.color }} aria-hidden="true" />
+                <span className={styles.breakdownLabel}>{segment.label}</span>
+                <span className={styles.breakdownTokens}>{formatTokenCount(segment.value)} tokens</span>
+                <span className={styles.breakdownPercentage}>{formatPercentage(segment.value, total)}</span>
+              </button>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
@@ -89,7 +130,20 @@ export const TokenBreakdownPieChart: React.FC<TokenBreakdownPieChartProps> = ({ 
 function describeSlice(startAngle: number, endAngle: number): string {
   const start = pointOnCircle(startAngle);
   const end = pointOnCircle(endAngle);
-  const largeArcFlag = endAngle - startAngle > 180 ? 1 : 0;
+  const sweepAngle = endAngle - startAngle;
+
+  if (sweepAngle >= 359.999) {
+    const opposite = pointOnCircle(startAngle + 180);
+    return [
+      `M ${CHART_CENTER} ${CHART_CENTER}`,
+      `L ${start.x} ${start.y}`,
+      `A ${CHART_RADIUS} ${CHART_RADIUS} 0 1 1 ${opposite.x} ${opposite.y}`,
+      `A ${CHART_RADIUS} ${CHART_RADIUS} 0 1 1 ${start.x} ${start.y}`,
+      'Z',
+    ].join(' ');
+  }
+
+  const largeArcFlag = sweepAngle > 180 ? 1 : 0;
   return [
     `M ${CHART_CENTER} ${CHART_CENTER}`,
     `L ${start.x} ${start.y}`,
