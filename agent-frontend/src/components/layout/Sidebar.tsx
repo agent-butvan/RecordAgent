@@ -733,7 +733,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           className={styles.userProfileCard}
           type="button"
           onClick={() => (maskedEmail ? onOpenAccountSettings() : setIsEmailBindingOpen(true))}
-          title={maskedEmail ? `已绑定账号：${maskedEmail}（点击进入账户设置）` : '点击绑定邮箱'}
+          title={maskedEmail ? `已绑定账号：${maskedEmail}（点击进入个人资料）` : '点击绑定邮箱'}
         >
           <div className={styles.avatarWrapper}>
             {avatarUrl ? (
@@ -750,7 +750,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {maskedEmail || '未绑定邮箱'}
             </span>
             <span className={styles.profileStatus}>
-              {maskedEmail ? '个人账户' : '点击绑定'}
+              {maskedEmail ? '个人资料' : '点击绑定'}
             </span>
           </div>
         </button>
