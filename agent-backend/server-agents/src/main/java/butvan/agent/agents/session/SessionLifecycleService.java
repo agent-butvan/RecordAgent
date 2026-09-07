@@ -7,6 +7,8 @@ import butvan.agent.agents.session.dto.SessionSummaryDto;
 import butvan.agent.agents.session.dto.SessionPermissionMode;
 import butvan.agent.agents.session.dto.TranscriptMessageDto;
 import butvan.agent.agents.agent.permission.PendingApprovalStore;
+import butvan.agent.agents.agent.run.AgentRunCheckpointService;
+import butvan.agent.agents.usage.SystemUsageLedger;
 import butvan.agent.agents.usage.TokenUsageAggregator;
 import io.agentscope.core.state.AgentStateStore;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +33,8 @@ public class SessionLifecycleService {
     private final AgentStateStore agentStateStore;
     private final PendingApprovalStore pendingApprovalStore;
     private final SessionTitleService sessionTitleService;
+    private final AgentRunCheckpointService checkpointService;
+    private final SystemUsageLedger systemUsageLedger;
 
 
     public List<SessionSummaryDto> listSessions() {
@@ -81,7 +85,9 @@ public class SessionLifecycleService {
      */
     public void deleteSession(String sessionId) {
         sessionCatalogService.markDeleting(sessionId);
+        checkpointService.deleteSession(sessionId);
         transcriptService.delete(sessionId);
+        systemUsageLedger.deleteSession(sessionId);
 
         pendingApprovalStore.clearSession(currentUserProvider.currentUserId(), sessionId);
         agentStateStore.delete(currentUserProvider.currentUserId(), sessionId);

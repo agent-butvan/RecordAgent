@@ -20,7 +20,7 @@ class SessionTitleServiceTest {
 
     @Test
     void generatesFromFirstUserQuestionAndCleansModelDecoration() {
-        Fixture fixture = fixture("data-1", question -> "“优化模型配置界面。”");
+        Fixture fixture = fixture("data-1", (sessionId, question) -> "“优化模型配置界面。”");
         SessionSummaryDto session = fixture.catalog.create(new CreateSessionRequest(SessionKind.GENERAL, "新对话"));
         fixture.transcript.appendUserMessage(session.id(), "帮我优化模型配置界面");
 
@@ -29,7 +29,7 @@ class SessionTitleServiceTest {
 
     @Test
     void skipsGenerationWhenSessionWasAlreadyRenamed() {
-        Fixture fixture = fixture("data-2", question -> {
+        Fixture fixture = fixture("data-2", (sessionId, question) -> {
             throw new AssertionError("手动标题不应再次调用模型");
         });
         SessionSummaryDto session = fixture.catalog.create(new CreateSessionRequest(SessionKind.GENERAL, "新对话"));

@@ -2,6 +2,7 @@ package butvan.agent.agents.session;
 
 import butvan.agent.agents.agent.AgentRunCompleter;
 import butvan.agent.agents.agent.run.AgentRun;
+import butvan.agent.agents.agent.run.AgentRunCheckpointService;
 import butvan.agent.agents.identity.CurrentUserProvider;
 import butvan.agent.agents.session.dto.CreateSessionRequest;
 import butvan.agent.agents.session.dto.SessionKind;
@@ -42,7 +43,10 @@ class TranscriptTokenUsageTest {
         run.recordModelEvent(new ModelCallEndEvent("call-1", ChatUsage.builder()
                 .inputTokens(25).outputTokens(7).cachedTokens(5).time(0.4).build()), model);
 
-        AgentRunCompleter completer = new AgentRunCompleter(fixture.transcript(), fixture.catalog());
+        AgentRunCompleter completer = new AgentRunCompleter(
+                fixture.transcript(), fixture.catalog(),
+                new AgentRunCheckpointService(fixture.storage(), fixture.mapper())
+        );
         completer.complete(run, TranscriptMessageDto.MessageStatus.COMPLETED);
         completer.complete(run, TranscriptMessageDto.MessageStatus.FAILED);
 
@@ -82,6 +86,7 @@ class TranscriptTokenUsageTest {
         CurrentUserProvider user = new CurrentUserProvider();
         return new Fixture(
                 storage,
+                mapper,
                 new TranscriptService(storage, mapper),
                 new SessionCatalogService(storage, user, mapper)
         );
@@ -89,6 +94,7 @@ class TranscriptTokenUsageTest {
 
     private record Fixture(
             AgentStorageProperties storage,
+            ObjectMapper mapper,
             TranscriptService transcript,
             SessionCatalogService catalog
     ) {

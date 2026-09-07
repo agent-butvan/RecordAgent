@@ -3,6 +3,7 @@ package butvan.agent.agents.agent;
 import butvan.agent.agents.agent.event.AgentStreamEvent;
 import butvan.agent.agents.agent.permission.*;
 import butvan.agent.agents.agent.run.AgentRun;
+import butvan.agent.agents.agent.run.AgentRunCheckpointService;
 import butvan.agent.agents.identity.CurrentUserProvider;
 import butvan.agent.agents.model.ModelHolder;
 import butvan.agent.agents.model.ModelSelector;
@@ -49,6 +50,7 @@ public class AgentService {
     private final AgentFactory agentFactory;
     private final AgentSecurity agentSecurity;
     private final AgentRunCompleter agentRunCompleter;
+    private final AgentRunCheckpointService checkpointService;
 
     /**
      * 创建一次 HTTP 流对应的队列和生产虚拟线程。
@@ -87,6 +89,7 @@ public class AgentService {
             String userId = currentUserProvider.currentUserId();
             RuntimeContext context = createRuntimeContext(request.sessionId());
             run = new AgentRun(request.sessionId(), userId, turnId, context);
+            checkpointService.save(run);
 
             // 3. 初始调用将用户消息交给 AgentScope；后续回复会传入确认消息
             runAgentStream(run, List.of(new UserMessage(input)), streamSession);
@@ -166,6 +169,9 @@ public class AgentService {
 
             AgentStreamEvent mapped = agentEventManager.map(event, run.toolArgsBuffer());
             run.record(mapped);
+            if (event instanceof ModelCallEndEvent) {
+                checkpointService.save(run);
+            }
             if (mapped != null && mapped.isTerminal()) {
                 // 先持久化再发送终态，确保前端收到 done 后能立即读取完整消息与 usage。
                 agentRunCompleter.complete(run, TranscriptMessageDto.MessageStatus.COMPLETED);
@@ -229,6 +235,7 @@ public class AgentService {
                 result.getToolCall().getId(), result.isConfirmed()
         ));
         pendingApprovalStore.save(approval);
+        checkpointService.save(run);
 
         PermissionToolDto first = approval.nextTool();
         return putEvent(

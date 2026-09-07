@@ -98,6 +98,7 @@ public class TranscriptService {
             List<TranscriptMessageDto.ToolExecutionDto> tools,
             TurnTokenUsage usage
     ) {
+        if (hasAssistantMessage(sessionId, turnId)) return;
         append(sessionId, new TranscriptMessageDto(
                 UUID.randomUUID().toString(),
                 turnId,
@@ -110,6 +111,14 @@ public class TranscriptService {
                 thinking,
                 usage
         ));
+    }
+
+    /** 判断某轮 assistant 终态是否已经写入，用于崩溃恢复去重。 */
+    public synchronized boolean hasAssistantMessage(String sessionId, String turnId) {
+        return list(sessionId).stream().anyMatch(message ->
+                message.role() == TranscriptMessageDto.MessageRole.ASSISTANT
+                        && java.util.Objects.equals(message.turnId(), turnId)
+        );
     }
 
     /**

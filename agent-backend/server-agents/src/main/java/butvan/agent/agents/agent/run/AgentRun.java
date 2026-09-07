@@ -69,6 +69,20 @@ public class AgentRun {
         return usageAccumulator.snapshot();
     }
 
+    /** 生成可安全落盘的运行中快照；RUNNING 工具在意外退出后按取消恢复。 */
+    public AgentRunCheckpoint checkpoint() {
+        return new AgentRunCheckpoint(
+                sessionId,
+                turnId,
+                startedAt,
+                Instant.now(),
+                contentAsString(),
+                thinkingAsString(),
+                finalizeTools(TranscriptMessageDto.MessageStatus.CANCELLED),
+                tokenUsage()
+        );
+    }
+
     /** 仅允许一个终态路径进入持久化；写入失败后允许安全重试。 */
     public boolean beginCompletion() {
         return completionState.compareAndSet(CompletionState.READY, CompletionState.WRITING);
