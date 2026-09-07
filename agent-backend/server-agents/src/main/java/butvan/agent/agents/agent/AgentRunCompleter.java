@@ -27,19 +27,28 @@ public class AgentRunCompleter {
      * @param status
      */
     public void complete(AgentRun run, TranscriptMessageDto.MessageStatus status) {
+        if (!run.beginCompletion()) return;
+
         // 防止系统时钟微笑回拨产生负数
         long durationMillis = Math.max(0, Duration.between(run.startedAt(), Instant.now()).toMillis());
 
-        // 固化工具状态并落哭完整 assistant 消息
-        transcriptService.appendAssistantMessage(
-                run.sessionId(),
-                run.turnId(),
-                run.contentAsString(),
-                run.thinkingAsString(),
-                status,
-                durationMillis,
-                run.finalizeTools(status)
-        );
+        try {
+            // 固化工具状态并落库完整 assistant 消息
+            transcriptService.appendAssistantMessage(
+                    run.sessionId(),
+                    run.turnId(),
+                    run.contentAsString(),
+                    run.thinkingAsString(),
+                    status,
+                    durationMillis,
+                    run.finalizeTools(status),
+                    run.tokenUsage()
+            );
+            run.commitCompletion();
+        } catch (RuntimeException exception) {
+            run.abortCompletion();
+            throw exception;
+        }
 
         // 侧边栏预览仍只使用最终正文
         sessionCatalogService.touch(run.sessionId(), run.contentAsString());

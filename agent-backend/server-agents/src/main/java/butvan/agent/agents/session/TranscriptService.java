@@ -2,6 +2,7 @@ package butvan.agent.agents.session;
 
 import butvan.agent.agents.session.dto.TranscriptMessageDto;
 import butvan.agent.agents.storage.AgentStorageProperties;
+import butvan.agent.agents.usage.TurnTokenUsage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -77,7 +78,8 @@ public class TranscriptService {
                 TranscriptMessageDto.MessageStatus.COMPLETED,
                 null,
                 List.of(),
-                null // 用户消息没有思考过程
+                null, // 用户消息没有思考过程
+                null // 用户消息不承载模型用量
         ));
 
         return turnId;
@@ -93,7 +95,8 @@ public class TranscriptService {
             String thinking,
             TranscriptMessageDto.MessageStatus status,
             Long durationMillis,
-            List<TranscriptMessageDto.ToolExecutionDto> tools
+            List<TranscriptMessageDto.ToolExecutionDto> tools,
+            TurnTokenUsage usage
     ) {
         append(sessionId, new TranscriptMessageDto(
                 UUID.randomUUID().toString(),
@@ -104,7 +107,8 @@ public class TranscriptService {
                 status,
                 durationMillis,
                 tools,
-                thinking
+                thinking,
+                usage
         ));
     }
 

@@ -2,13 +2,19 @@ package butvan.agent.agents.agent.run;
 
 import butvan.agent.agents.agent.event.AgentStreamEvent;
 import butvan.agent.agents.session.dto.TranscriptMessageDto;
+import butvan.agent.agents.usage.ModelIdentity;
+import butvan.agent.agents.usage.TurnTokenUsage;
+import butvan.agent.agents.usage.TurnUsageAccumulator;
+import butvan.agent.agents.usage.UsagePurpose;
 import io.agentscope.core.agent.RuntimeContext;
+import io.agentscope.core.event.AgentEvent;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 一次尚未完成的用户会和，只在服务进程内存活
@@ -22,6 +28,9 @@ public class AgentRun {
     private final Instant startedAt;
     private final StringBuilder content = new StringBuilder();
     private final StringBuilder thinking = new StringBuilder();
+    private final TurnUsageAccumulator usageAccumulator = new TurnUsageAccumulator();
+    private final AtomicReference<CompletionState> completionState =
+            new AtomicReference<>(CompletionState.READY);
     // 初始 SSE 与恢复 SSE 共用同一份工具参数和执行记录
     private final Map<String, StringBuilder> toolArgsBuffer = new ConcurrentHashMap<>();
     private final Map<String, TranscriptMessageDto.ToolExecutionDto> toolExecutions = new LinkedHashMap<>();
@@ -49,6 +58,31 @@ public class AgentRun {
         return thinking.toString();
     }
     public Map<String, StringBuilder> toolArgsBuffer() { return toolArgsBuffer; }
+
+    /** 记录一次 AgentScope 原始模型事件，避免 UI 事件映射丢失 usage。 */
+    public void recordModelEvent(AgentEvent event, ModelIdentity modelIdentity) {
+        usageAccumulator.record(event, modelIdentity, UsagePurpose.CHAT);
+    }
+
+    /** 返回当前轮次全部模型调用的不可变用量快照。 */
+    public TurnTokenUsage tokenUsage() {
+        return usageAccumulator.snapshot();
+    }
+
+    /** 仅允许一个终态路径进入持久化；写入失败后允许安全重试。 */
+    public boolean beginCompletion() {
+        return completionState.compareAndSet(CompletionState.READY, CompletionState.WRITING);
+    }
+
+    /** transcript 已成功写入，此后其他终态路径不得重复追加。 */
+    public void commitCompletion() {
+        completionState.compareAndSet(CompletionState.WRITING, CompletionState.COMPLETED);
+    }
+
+    /** transcript 写入失败，恢复为可重试状态。 */
+    public void abortCompletion() {
+        completionState.compareAndSet(CompletionState.WRITING, CompletionState.READY);
+    }
 
     /**
      * 将映射后的业务事件累计到运行态：正文/思考增量与工具执行记录
@@ -118,6 +152,12 @@ public class AgentRun {
                                 tool.toolCallId(), tool.toolName(), tool.command(), tool.output(), fallbackStatus
                         ) : tool
                 ).toList();
+    }
+
+    private enum CompletionState {
+        READY,
+        WRITING,
+        COMPLETED
     }
 
 

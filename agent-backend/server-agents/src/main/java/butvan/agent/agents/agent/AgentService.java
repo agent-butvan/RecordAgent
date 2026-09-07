@@ -5,12 +5,14 @@ import butvan.agent.agents.agent.permission.*;
 import butvan.agent.agents.agent.run.AgentRun;
 import butvan.agent.agents.identity.CurrentUserProvider;
 import butvan.agent.agents.model.ModelHolder;
+import butvan.agent.agents.model.ModelSelector;
 import butvan.agent.agents.session.AgentStreamSession;
 import butvan.agent.agents.session.SessionCatalogService;
 import butvan.agent.agents.session.TranscriptService;
 import butvan.agent.agents.session.dto.TranscriptMessageDto;
 import butvan.agent.agents.session.dto.SessionPermissionMode;
 import butvan.agent.agents.security.AgentSecurity;
+import butvan.agent.agents.usage.ModelIdentity;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.*;
 import io.agentscope.core.message.Msg;
@@ -134,8 +136,9 @@ public class AgentService {
      * @param inputMessages
      * @param streamSession
      */
-    private void runAgentStream(AgentRun run, List<Msg> inputMessages, AgentStreamSession streamSession)    {
+    private void runAgentStream(AgentRun run, List<Msg> inputMessages, AgentStreamSession streamSession) {
         HarnessAgent agent = agentFactory.currentAgent();
+        ModelIdentity modelIdentity = currentModelIdentity();
         SessionPermissionMode productMode = sessionCatalogService.getPermissionMode(run.sessionId());
         agent.getDelegate().getAgentState(run.userId(), run.sessionId())
                 .setPermissionContext(agentSecurity.createPermissionContext(productMode));
@@ -144,14 +147,17 @@ public class AgentService {
 
         for (AgentEvent event : agent.streamEvents(inputMessages,
                 run.runtimeContext()).toIterable()) {
+            // Token usage 必须在 UI 映射之前采集，包含工具循环和子 Agent 原始事件。
+            run.recordModelEvent(event, modelIdentity);
+
             // 客户端断开：立即按取消收尾
             if (streamSession.isCancelled()) {
-                agentRunCompleter.complete(run, TranscriptMessageDto.MessageStatus.COMPLETED);
+                agentRunCompleter.complete(run, TranscriptMessageDto.MessageStatus.CANCELLED);
                 return;
             }
 
             // 必须在普通映射之前识别该事件
-            if (event instanceof  RequireUserConfirmEvent confirmEvent) {
+            if (event instanceof RequireUserConfirmEvent confirmEvent) {
                 if (pauseForConfirmation(run, confirmEvent.getToolCalls(), streamSession)) {
                     return;
                 }
@@ -160,12 +166,14 @@ public class AgentService {
 
             AgentStreamEvent mapped = agentEventManager.map(event, run.toolArgsBuffer());
             run.record(mapped);
-            if (mapped != null && !putEvent(streamSession, mapped)) {
-                agentRunCompleter.complete(run, TranscriptMessageDto.MessageStatus.CANCELLED);
+            if (mapped != null && mapped.isTerminal()) {
+                // 先持久化再发送终态，确保前端收到 done 后能立即读取完整消息与 usage。
+                agentRunCompleter.complete(run, TranscriptMessageDto.MessageStatus.COMPLETED);
+                putEvent(streamSession, mapped);
                 return;
             }
-            if (mapped != null && mapped.isTerminal()) {
-                agentRunCompleter.complete(run, TranscriptMessageDto.MessageStatus.COMPLETED);
+            if (mapped != null && !putEvent(streamSession, mapped)) {
+                agentRunCompleter.complete(run, TranscriptMessageDto.MessageStatus.CANCELLED);
                 return;
             }
         }
@@ -334,6 +342,13 @@ public class AgentService {
                 .userId(currentUserProvider.currentUserId())
                 .sessionId(sessionId)
                 .build();
+    }
+
+    /** 每段 Agent 流开始时固化模型身份，兼容权限暂停期间切换模型的情况。 */
+    private ModelIdentity currentModelIdentity() {
+        ModelSelector selector = modelHolder.getCurrentSelector();
+        String vendor = selector == null ? null : selector.vendor();
+        return new ModelIdentity(vendor, modelHolder.getModel().getModelName());
     }
 
 
