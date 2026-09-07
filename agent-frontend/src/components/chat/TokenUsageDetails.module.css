@@ -53,6 +53,7 @@
   width: min(240px, calc(100vw - 40px));
   padding: 10px 12px;
   background: var(--bg-app);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.1);
   color: var(--text-secondary);
 }
 
