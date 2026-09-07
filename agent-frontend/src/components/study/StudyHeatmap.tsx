@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { StudyDayStat } from '../../types/study';
 import styles from './StudyHeatmap.module.css';
 
@@ -31,6 +31,7 @@ function heatLevel(seconds: number): number {
 /** 最近一年学习热力图：按周排布，并以每日累计学习时长计算色阶。 */
 export function StudyHeatmap({ days, to }: StudyHeatmapProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; date: string; duration: string } | null>(null);
   const { cells, monthLabels } = useMemo(() => {
     const end = parseDate(to);
     const start = new Date(end.getTime() - 364 * DAY_MS);
@@ -71,11 +72,20 @@ export function StudyHeatmap({ days, to }: StudyHeatmapProps) {
           <div className={styles.weekdays} aria-hidden="true"><span /><span>一</span><span /><span>三</span><span /><span>五</span><span /></div>
           <div className={styles.cells} role="img" aria-label="最近一年每日学习时长热力图">
             {cells.map((cell) => <span key={cell.date} className={`${styles.cell} ${styles[`level${heatLevel(cell.durationSeconds)}`]} ${cell.future ? styles.future : ''}`}
-              title={cell.future ? '' : `${cell.date} · ${durationLabel(cell.durationSeconds)}`} aria-hidden="true" />)}
+              onPointerEnter={cell.future ? undefined : (event) => {
+                const bounds = event.currentTarget.getBoundingClientRect();
+                setTooltip({
+                  x: Math.max(92, Math.min(window.innerWidth - 92, bounds.left + bounds.width / 2)),
+                  y: bounds.top - 9,
+                  date: new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' }).format(parseDate(cell.date)),
+                  duration: durationLabel(cell.durationSeconds),
+                });
+              }} onPointerLeave={() => setTooltip(null)} aria-hidden="true" />)}
           </div>
         </div>
       </div>
     </div>
     <div className={styles.legend} aria-label="热力图图例"><span>少</span>{[0, 1, 2, 3, 4].map((level) => <i key={level} className={styles[`level${level}`]} />)}<span>多</span></div>
+    {tooltip && <div className={styles.tooltip} role="tooltip" style={{ left: tooltip.x, top: tooltip.y }}><strong>{tooltip.duration}</strong><span>{tooltip.date}</span></div>}
   </div>;
 }

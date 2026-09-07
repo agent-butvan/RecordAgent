@@ -80,7 +80,7 @@
 .empty, .loading { min-height: 170px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; color: var(--text-muted); font-size: 10px; text-align: center; }
 .empty strong { color: var(--text-secondary); font-size: 12px; }
 
-.heatmapSection { margin-top: 4px; padding-top: 32px; border-top: 1px solid var(--border-subtle); }
+.heatmapSection { margin-top: 4px; padding-top: 32px; }
 .heatmapSummary { color: var(--text-secondary); font-size: 10px; font-variant-numeric: tabular-nums; }
 .heatmapLoading { min-height: 152px; display: flex; align-items: center; color: var(--text-muted); font-size: 9px; }
 .heatmapError { min-height: 152px; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #9a4038; font-size: 9px; }
