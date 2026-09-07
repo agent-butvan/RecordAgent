@@ -80,23 +80,10 @@
 .empty, .loading { min-height: 170px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; color: var(--text-muted); font-size: 10px; text-align: center; }
 .empty strong { color: var(--text-secondary); font-size: 12px; }
 
-.goalControl { display: flex; align-items: center; gap: 7px; color: var(--text-secondary); font-size: 9px; }
-.goalControl button { width: 24px; height: 24px; display: grid; place-items: center; padding: 0; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: transparent; color: var(--text-secondary); font: 12px var(--font-sans); }
-.goalControl button:hover:not(:disabled) { border-color: var(--border-medium); color: var(--text-primary); }
-.goalControl button:focus-visible, .goalAction:focus-visible { outline: 1px solid var(--accent-blue); outline-offset: 2px; }
-.goalControl button:disabled { cursor: default; opacity: .35; }
-.weeklyGoal { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 18px 24px; padding: 20px 0; border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); }
-.goalSummary strong { display: block; color: var(--text-primary); font-size: 24px; font-weight: 680; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
-.goalSummary strong span { color: var(--text-muted); font-size: 11px; font-weight: 500; letter-spacing: 0; }
-.goalSummary p { margin-top: 7px; color: var(--text-muted); font-size: 9.5px; }
-.goalDays { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(var(--goal-days, 7), minmax(16px, 1fr)); gap: 6px; }
-.goalDays i { height: 6px; border-radius: 2px; background: #e7ebef; }
-.goalDays .goalDayDone { background: #6f9dcc; }
-.goalAction { display: inline-flex; align-items: center; gap: 4px; padding: 0 0 3px; border: 0; border-bottom: 1px solid var(--border-medium); background: transparent; color: var(--text-secondary); font: 600 10px var(--font-sans); }
-.goalAction:hover:not(:disabled) { border-color: var(--accent-blue); color: var(--accent-blue); }
-.goalAction:disabled { cursor: default; opacity: .55; }
-.heatmapLoading { min-height: 96px; display: flex; align-items: center; color: var(--text-muted); font-size: 9px; }
-.heatmapError { min-height: 96px; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #9a4038; font-size: 9px; }
+.heatmapSection { margin-top: 4px; padding-top: 32px; border-top: 1px solid var(--border-subtle); }
+.heatmapSummary { color: var(--text-secondary); font-size: 10px; font-variant-numeric: tabular-nums; }
+.heatmapLoading { min-height: 152px; display: flex; align-items: center; color: var(--text-muted); font-size: 9px; }
+.heatmapError { min-height: 152px; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #9a4038; font-size: 9px; }
 .heatmapError button { border: 0; background: transparent; color: inherit; font: 600 9px var(--font-sans); }
 
 .chart { height: 174px; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); align-items: end; gap: 9px; margin-top: 7px; }
