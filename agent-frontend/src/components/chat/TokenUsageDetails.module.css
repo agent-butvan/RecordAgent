@@ -49,25 +49,30 @@
   position: fixed;
   z-index: 10000;
   overflow-y: auto;
-  padding: 10px 12px;
-  border: 1px solid var(--border-subtle);
+  padding: 9px 10px;
+  border: 1px solid var(--border-medium);
   border-radius: var(--radius-lg);
   background: var(--bg-app);
   box-shadow: none;
   color: var(--text-secondary);
+  font: 400 11px/1.4 var(--font-sans);
   overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .popoverTitle {
-  margin-bottom: 9px;
+  margin-bottom: 7px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--border-subtle);
   color: var(--text-primary);
   font-size: 12px;
   font-weight: 600;
+  line-height: 1.35;
 }
 
 .metrics {
   display: grid;
-  gap: 6px;
+  gap: 4px;
   margin: 0;
 }
 
@@ -90,26 +95,28 @@
 }
 
 .totalRow {
-  padding-bottom: 6px;
+  padding-bottom: 5px;
+  margin-bottom: 1px;
   border-bottom: 1px solid var(--border-subtle);
 }
 
 .section {
-  margin-top: 10px;
-  padding-top: 10px;
+  margin-top: 8px;
+  padding-top: 8px;
   border-top: 1px solid var(--border-subtle);
 }
 
 .sectionTitle {
-  margin-bottom: 7px;
+  margin-bottom: 5px;
   color: var(--text-primary);
   font-size: 11px;
   font-weight: 600;
+  line-height: 1.35;
 }
 
 .compactList {
   display: grid;
-  gap: 6px;
+  gap: 5px;
 }
 
 .compactList > div {
@@ -124,7 +131,7 @@
 
 .compactList span:last-child {
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: 10px;
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
@@ -132,9 +139,10 @@
 .note {
   margin: 0;
   color: var(--text-secondary);
-  line-height: 1.5;
+  font-size: 10px;
+  line-height: 1.45;
 }
 
 .metrics + .note {
-  margin-top: 8px;
+  margin-top: 6px;
 }

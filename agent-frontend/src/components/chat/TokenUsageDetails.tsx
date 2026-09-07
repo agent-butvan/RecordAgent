@@ -19,7 +19,7 @@ interface PopoverPosition {
 
 const POPOVER_GAP = 8;
 const POPOVER_MAX_HEIGHT = 560;
-const POPOVER_MAX_WIDTH = 380;
+const POPOVER_MAX_WIDTH = 340;
 const VIEWPORT_MARGIN = 16;
 
 /** 一条 assistant 消息的低噪声 Token 用量与完整性详情。 */
