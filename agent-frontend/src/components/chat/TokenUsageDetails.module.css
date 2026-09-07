@@ -1,48 +1,85 @@
-.details {
+.root {
+  position: relative;
+  display: inline-flex;
   min-width: 0;
   max-width: 100%;
   color: var(--text-secondary);
   font-size: 12px;
 }
 
-.summary {
-  padding: 2px 0;
+.trigger {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
   cursor: pointer;
   font-variant-numeric: tabular-nums;
   line-height: 1.5;
-  list-style-position: inside;
+  text-align: start;
   overflow-wrap: anywhere;
-  transition: color var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast);
 }
 
-.summary:hover {
+.trigger:hover,
+.trigger[aria-expanded='true'] {
+  border-color: var(--border-subtle);
+  background: var(--bg-surface-hover);
   color: var(--text-primary);
 }
 
-.summary:focus-visible {
-  border-radius: var(--radius-sm);
+.trigger:focus-visible {
   outline: 2px solid var(--border-focus);
   outline-offset: 2px;
 }
 
-.breakdown {
-  margin-top: 6px;
-  padding: 8px 10px;
-  border: 1px solid var(--border-subtle);
+.chevron {
+  flex: 0 0 auto;
+  transform: rotate(-90deg);
+  transition: transform var(--transition-fast);
+}
+
+.trigger[aria-expanded='true'] .chevron {
+  transform: rotate(0deg);
+}
+
+.popover {
+  position: absolute;
+  inset-inline-start: 0;
+  bottom: calc(100% + 8px);
+  z-index: 120;
+  width: min(240px, calc(100vw - 40px));
+  padding: 10px 12px;
+  border: 1px solid var(--border-medium);
   border-radius: var(--radius-md);
-  background: var(--bg-surface);
+  background: var(--bg-app);
+  color: var(--text-secondary);
+}
+
+.popoverTitle {
+  margin-bottom: 7px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .metrics {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 18px;
+  display: grid;
+  gap: 6px;
   margin: 0;
 }
 
 .metrics > div {
   display: flex;
-  gap: 6px;
+  justify-content: space-between;
+  gap: 16px;
   align-items: baseline;
 }
 
@@ -58,12 +95,13 @@
 }
 
 .note {
-  max-width: 58ch;
   margin: 0;
   color: var(--text-secondary);
   line-height: 1.5;
 }
 
 .metrics + .note {
-  margin-top: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle);
 }
