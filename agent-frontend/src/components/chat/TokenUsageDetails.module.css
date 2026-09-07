@@ -13,8 +13,7 @@
   align-items: center;
   gap: 4px;
   padding: 2px 4px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  border: 0;
   background: transparent;
   color: inherit;
   font: inherit;
@@ -23,13 +22,11 @@
   line-height: 1.5;
   text-align: start;
   overflow-wrap: anywhere;
-  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast);
+  transition: color var(--transition-fast);
 }
 
 .trigger:hover,
 .trigger[aria-expanded='true'] {
-  border-color: var(--border-subtle);
-  background: var(--bg-surface-hover);
   color: var(--text-primary);
 }
 
@@ -55,16 +52,12 @@
   z-index: 120;
   width: min(240px, calc(100vw - 40px));
   padding: 10px 12px;
-  border: 1px solid var(--border-medium);
-  border-radius: var(--radius-md);
   background: var(--bg-app);
   color: var(--text-secondary);
 }
 
 .popoverTitle {
-  margin-bottom: 7px;
-  padding-bottom: 7px;
-  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 9px;
   color: var(--text-primary);
   font-size: 12px;
   font-weight: 600;
@@ -102,6 +95,4 @@
 
 .metrics + .note {
   margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border-subtle);
 }
