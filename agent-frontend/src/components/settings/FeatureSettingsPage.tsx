@@ -41,7 +41,7 @@ export function FeatureSettingsPage({
 }: FeatureSettingsPageProps) {
   if (tab === 'record') {
     return (
-      <SettingsPageLayout title="记录" description="配置学习计时进行中时的展示位置。">
+      <SettingsPageLayout title="记录" description="">
         <div className={styles.settingGroup}>
           <div className={styles.settingCopy}>
             <label htmlFor="study-window-mode">学习小窗</label>
