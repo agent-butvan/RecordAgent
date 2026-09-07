@@ -50,7 +50,9 @@
   inset-inline-start: 0;
   bottom: calc(100% + 8px);
   z-index: 120;
-  width: min(240px, calc(100vw - 40px));
+  width: min(380px, calc(100vw - 40px));
+  max-height: min(560px, calc(100vh - 40px));
+  overflow-y: auto;
   padding: 10px 12px;
   background: var(--bg-app);
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.1);
@@ -86,6 +88,46 @@
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
   font-weight: 600;
+}
+
+.totalRow {
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.section {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.sectionTitle {
+  margin-bottom: 7px;
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.compactList {
+  display: grid;
+  gap: 6px;
+}
+
+.compactList > div {
+  display: grid;
+  gap: 1px;
+}
+
+.compactList span:first-child {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.compactList span:last-child {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 
 .note {

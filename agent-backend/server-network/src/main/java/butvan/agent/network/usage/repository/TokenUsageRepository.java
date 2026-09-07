@@ -1,12 +1,15 @@
 package butvan.agent.network.usage.repository;
 
 import butvan.agent.network.usage.model.TokenUsageIndexModels.DailyAggregate;
+import butvan.agent.network.usage.model.TokenUsageIndexModels.BreakdownAggregate;
 import butvan.agent.network.usage.model.TokenUsageIndexModels.InvocationAggregate;
 import butvan.agent.network.usage.model.TokenUsageIndexModels.InvocationEntry;
 import butvan.agent.network.usage.model.TokenUsageIndexModels.ModelAggregate;
 import butvan.agent.network.usage.model.TokenUsageIndexModels.PurposeAggregate;
 import butvan.agent.network.usage.model.TokenUsageIndexModels.TurnAggregate;
 import butvan.agent.network.usage.model.TokenUsageIndexModels.TurnEntry;
+import butvan.agent.network.usage.model.TokenUsageIndexModels.ToolAggregate;
+import butvan.agent.network.usage.model.TokenUsageIndexModels.ToolEntry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -26,7 +29,19 @@ public class TokenUsageRepository {
     private final NamedParameterJdbcTemplate namedJdbcTemplate;
 
     /** 用文件源中的完整快照替换当前用户读模型。 */
-    public void replace(String ownerId, List<TurnEntry> turns, List<InvocationEntry> invocations) {
+    public void replace(
+            String ownerId,
+            List<TurnEntry> turns,
+            List<InvocationEntry> invocations,
+            List<ToolEntry> tools
+    ) {
+        // SQLite 外键级联取决于连接级 PRAGMA；显式清理可保证重复重建不会遗留工具投影。
+        jdbcTemplate.update("""
+                DELETE FROM token_usage_tool
+                WHERE invocation_row_id IN (
+                    SELECT id FROM token_usage_invocation WHERE owner_id = ?
+                )
+                """, ownerId);
         jdbcTemplate.update("DELETE FROM token_usage_invocation WHERE owner_id = ?", ownerId);
         jdbcTemplate.update("DELETE FROM token_usage_turn WHERE owner_id = ?", ownerId);
         jdbcTemplate.batchUpdate("""
@@ -53,8 +68,12 @@ public class TokenUsageRepository {
                 INSERT INTO token_usage_invocation (
                     id, owner_id, session_id, turn_id, message_id, usage_kind, purpose,
                     occurred_at, invocation_id, source, vendor, model, input_tokens,
-                    output_tokens, cached_input_tokens, total_tokens, duration_millis, usage_status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    output_tokens, cached_input_tokens, total_tokens, duration_millis, usage_status,
+                    model_call_index, token_counter_id, estimated_input_tokens,
+                    estimation_delta_tokens, system_prompt_tokens, history_tokens,
+                    current_user_tokens, tool_schema_tokens, tool_result_tokens,
+                    rag_context_tokens, other_tokens
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, invocations, invocations.size(), (statement, entry) -> {
             statement.setString(1, entry.id());
             statement.setString(2, entry.ownerId());
@@ -74,6 +93,27 @@ public class TokenUsageRepository {
             setNullableLong(statement, 16, entry.totalTokens());
             setNullableLong(statement, 17, entry.durationMillis());
             statement.setString(18, entry.usageStatus());
+            statement.setInt(19, entry.modelCallIndex());
+            setNullableString(statement, 20, entry.tokenCounterId());
+            statement.setLong(21, entry.estimatedInputTokens());
+            setNullableLong(statement, 22, entry.estimationDeltaTokens());
+            statement.setLong(23, entry.systemPromptTokens());
+            statement.setLong(24, entry.historyTokens());
+            statement.setLong(25, entry.currentUserTokens());
+            statement.setLong(26, entry.toolSchemaTokens());
+            statement.setLong(27, entry.toolResultTokens());
+            statement.setLong(28, entry.ragContextTokens());
+            statement.setLong(29, entry.otherTokens());
+        });
+        jdbcTemplate.batchUpdate("""
+                INSERT INTO token_usage_tool (
+                    invocation_row_id, tool_name, schema_tokens, result_tokens
+                ) VALUES (?, ?, ?, ?)
+                """, tools, tools.size(), (statement, entry) -> {
+            statement.setString(1, entry.invocationRowId());
+            statement.setString(2, entry.toolName());
+            statement.setLong(3, entry.schemaTokens());
+            statement.setLong(4, entry.resultTokens());
         });
     }
 
@@ -106,6 +146,35 @@ public class TokenUsageRepository {
                 """);
         return namedJdbcTemplate.queryForObject(query.sql(), query.parameters(), (rs, rowNum) ->
                 new TurnAggregate(rs.getInt("turn_count"), rs.getInt("tracked_turn_count")));
+    }
+
+    /** 查询输入 Token 分类合计。 */
+    public BreakdownAggregate summarizeBreakdown(QueryScope scope) {
+        Query query = invocationQuery(scope, """
+                SELECT COALESCE(SUM(estimated_input_tokens), 0) estimated_input_tokens,
+                       COALESCE(SUM(system_prompt_tokens), 0) system_prompt_tokens,
+                       COALESCE(SUM(history_tokens), 0) history_tokens,
+                       COALESCE(SUM(current_user_tokens), 0) current_user_tokens,
+                       COALESCE(SUM(tool_schema_tokens), 0) tool_schema_tokens,
+                       COALESCE(SUM(tool_result_tokens), 0) tool_result_tokens,
+                       COALESCE(SUM(rag_context_tokens), 0) rag_context_tokens,
+                       COALESCE(SUM(other_tokens), 0) other_tokens
+                FROM token_usage_invocation
+                """);
+        return namedJdbcTemplate.queryForObject(query.sql(), query.parameters(), (rs, rowNum) ->
+                new BreakdownAggregate(
+                        rs.getLong("estimated_input_tokens"), rs.getLong("system_prompt_tokens"),
+                        rs.getLong("history_tokens"), rs.getLong("current_user_tokens"),
+                        rs.getLong("tool_schema_tokens"), rs.getLong("tool_result_tokens"),
+                        rs.getLong("rag_context_tokens"), rs.getLong("other_tokens")));
+    }
+
+    /** 查询按工具名聚合的 Schema 与 Result Token。 */
+    public List<ToolAggregate> summarizeByTool(QueryScope scope) {
+        Query query = toolQuery(scope);
+        return namedJdbcTemplate.query(query.sql(), query.parameters(), (rs, rowNum) ->
+                new ToolAggregate(rs.getString("tool_name"), rs.getLong("schema_tokens"),
+                        rs.getLong("result_tokens")));
     }
 
     /** 按业务用途聚合。 */
@@ -186,6 +255,32 @@ public class TokenUsageRepository {
             parameters.addValue("sessionId", scope.sessionId());
         }
         sql.append(suffix);
+        return new Query(sql.toString(), parameters);
+    }
+
+    private Query toolQuery(QueryScope scope) {
+        StringBuilder sql = new StringBuilder("""
+                SELECT t.tool_name,
+                       COALESCE(SUM(t.schema_tokens), 0) schema_tokens,
+                       COALESCE(SUM(t.result_tokens), 0) result_tokens
+                FROM token_usage_tool t
+                JOIN token_usage_invocation i ON i.id = t.invocation_row_id
+                WHERE i.owner_id = :ownerId
+                """);
+        MapSqlParameterSource parameters = new MapSqlParameterSource("ownerId", scope.ownerId());
+        if (scope.fromInclusive() != null) {
+            sql.append(" AND i.occurred_at >= :fromInclusive");
+            parameters.addValue("fromInclusive", scope.fromInclusive().toString());
+        }
+        if (scope.toExclusive() != null) {
+            sql.append(" AND i.occurred_at < :toExclusive");
+            parameters.addValue("toExclusive", scope.toExclusive().toString());
+        }
+        if (scope.sessionId() != null && !scope.sessionId().isBlank()) {
+            sql.append(" AND i.session_id = :sessionId");
+            parameters.addValue("sessionId", scope.sessionId());
+        }
+        sql.append(" GROUP BY t.tool_name ORDER BY (schema_tokens + result_tokens) DESC, t.tool_name");
         return new Query(sql.toString(), parameters);
     }
 

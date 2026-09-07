@@ -3,11 +3,14 @@ package butvan.agent.agents.agent.run;
 import butvan.agent.agents.agent.event.AgentStreamEvent;
 import butvan.agent.agents.session.dto.TranscriptMessageDto;
 import butvan.agent.agents.usage.ModelIdentity;
+import butvan.agent.agents.usage.TokenUsageRoundContext;
 import butvan.agent.agents.usage.TurnTokenUsage;
 import butvan.agent.agents.usage.TurnUsageAccumulator;
 import butvan.agent.agents.usage.UsagePurpose;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.AgentEvent;
+import io.agentscope.core.message.Msg;
+import io.agentscope.core.message.UserMessage;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -41,6 +44,10 @@ public class AgentRun {
         this.turnId = turnId;
         this.runtimeContext = runtimeContext;
         this.startedAt = Instant.now();
+        if (runtimeContext != null) {
+            runtimeContext.put(TurnUsageAccumulator.class, usageAccumulator);
+            runtimeContext.put(TokenUsageRoundContext.class, new TokenUsageRoundContext(turnId));
+        }
     }
 
     // 下面 getter 仅暴露恢复和最终落库需要的数据。
@@ -58,6 +65,14 @@ public class AgentRun {
         return thinking.toString();
     }
     public Map<String, StringBuilder> toolArgsBuffer() { return toolArgsBuffer; }
+
+    /** 创建带当前轮次标记的用户消息，供 Middleware 区分历史消息。 */
+    public Msg currentUserMessage(String input) {
+        return UserMessage.builder()
+                .textContent(input)
+                .metadata(Map.of(TokenUsageRoundContext.TURN_METADATA_KEY, turnId))
+                .build();
+    }
 
     /** 记录一次 AgentScope 原始模型事件，避免 UI 事件映射丢失 usage。 */
     public void recordModelEvent(AgentEvent event, ModelIdentity modelIdentity) {

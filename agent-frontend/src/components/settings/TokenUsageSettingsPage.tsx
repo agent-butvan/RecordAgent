@@ -127,6 +127,18 @@ const UsageContent: React.FC<{ overview: TokenUsageOverview; stale: boolean }> =
       </section>
 
       <div className={styles.breakdowns}>
+        <BreakdownTable
+          title="输入构成"
+          rows={[
+            ['system', 'System Prompt', overview.breakdown.systemPromptTokens],
+            ['history', 'History', overview.breakdown.historyTokens],
+            ['user', 'Current User', overview.breakdown.currentUserTokens],
+            ['schema', 'Tool Schema', overview.breakdown.toolSchemaTokens],
+            ['result', 'Tool Result', overview.breakdown.toolResultTokens],
+            ['rag', 'RAG Context', overview.breakdown.ragContextTokens],
+            ['other', 'Other / Protocol', overview.breakdown.otherTokens],
+          ]}
+        />
         <UsageTable
           title="按模型"
           rows={overview.byModel.map((item) => ({
@@ -146,6 +158,18 @@ const UsageContent: React.FC<{ overview: TokenUsageOverview; stale: boolean }> =
             tokens: item.totalTokens,
             calls: item.modelCallCount,
           }))}
+        />
+        <BreakdownTable
+          title="按工具"
+          rows={overview.byTool.map((item) => ([
+            item.toolName,
+            item.toolName,
+            item.schemaTokens + item.resultTokens,
+          ]))}
+          details={Object.fromEntries(overview.byTool.map((item) => ([
+            item.toolName,
+            `schema ${formatTokenCount(item.schemaTokens)} · result ${formatTokenCount(item.resultTokens)}`,
+          ])))}
         />
       </div>
     </div>
@@ -168,6 +192,31 @@ const UsageTable: React.FC<{
                 <td><strong>{row.label}</strong><span>{row.detail}</span></td>
                 <td>{row.calls}</td>
                 <td>{formatTokenCount(row.tokens)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </section>
+);
+
+const BreakdownTable: React.FC<{
+  title: string;
+  rows: Array<[string, string, number]>;
+  details?: Record<string, string>;
+}> = ({ title, rows, details = {} }) => (
+  <section className={styles.section} aria-label={title}>
+    <div className={styles.sectionHeading}><h2>{title}</h2></div>
+    {rows.length === 0 ? <p className={styles.empty}>暂无数据</p> : (
+      <div className={styles.tableWrap}>
+        <table className={styles.table}>
+          <thead><tr><th>项目</th><th>Token</th></tr></thead>
+          <tbody>
+            {rows.map(([key, label, tokens]) => (
+              <tr key={key}>
+                <td><strong>{label}</strong>{details[key] && <span>{details[key]}</span>}</td>
+                <td>{formatTokenCount(tokens)}</td>
               </tr>
             ))}
           </tbody>

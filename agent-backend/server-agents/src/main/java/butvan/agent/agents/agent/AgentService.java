@@ -19,7 +19,6 @@ import io.agentscope.core.event.*;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
 import io.agentscope.core.message.ToolUseBlock;
-import io.agentscope.core.message.UserMessage;
 import io.agentscope.harness.agent.HarnessAgent;
 import io.agentscope.core.permission.PermissionMode;
 import io.agentscope.harness.agent.workspace.plan.PlanModeManager;
@@ -92,7 +91,7 @@ public class AgentService {
             checkpointService.save(run);
 
             // 3. 初始调用将用户消息交给 AgentScope；后续回复会传入确认消息
-            runAgentStream(run, List.of(new UserMessage(input)), streamSession);
+            runAgentStream(run, List.of(run.currentUserMessage(input)), streamSession);
         } catch (Exception e) {
             // 客户端已断开，按照取消收尾
             if (streamSession.isCancelled() || Thread.currentThread().isInterrupted()) {

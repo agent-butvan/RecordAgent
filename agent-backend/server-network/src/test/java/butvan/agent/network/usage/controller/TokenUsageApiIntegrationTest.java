@@ -8,9 +8,12 @@ import butvan.agent.agents.session.dto.SessionKind;
 import butvan.agent.agents.session.dto.TranscriptMessageDto;
 import butvan.agent.agents.storage.AgentStorageProperties;
 import butvan.agent.agents.usage.ModelIdentity;
+import butvan.agent.agents.usage.ModelInputEstimate;
 import butvan.agent.agents.usage.ModelInvocationUsage;
+import butvan.agent.agents.usage.InputTokenBreakdown;
 import butvan.agent.agents.usage.SystemUsageLedger;
 import butvan.agent.agents.usage.TurnTokenUsage;
+import butvan.agent.agents.usage.ToolTokenUsage;
 import butvan.agent.agents.usage.UsagePurpose;
 import butvan.agent.agents.usage.UsageStatus;
 import butvan.agent.network.config.database.LocalDatabaseConfiguration;
@@ -73,9 +76,13 @@ class TokenUsageApiIntegrationTest {
         String sessionId = sessionCatalogService.create(
                 new CreateSessionRequest(SessionKind.GENERAL, "Token 测试")).id();
         ModelInvocationUsage chatCall = ModelInvocationUsage.fromProvider(
-                "chat-call", "main", UsagePurpose.CHAT,
+                "chat-call", 1, "main", UsagePurpose.CHAT,
                 new ModelIdentity("openai", "gpt-test"),
-                ChatUsage.builder().inputTokens(25).outputTokens(7).cachedTokens(5).time(0.4).build());
+                ChatUsage.builder().inputTokens(25).outputTokens(7).cachedTokens(5).time(0.4).build(),
+                new ModelInputEstimate(
+                        "fixture",
+                        new InputTokenBreakdown(5, 3, 2, 10, 4, 0, 0),
+                        List.of(new ToolTokenUsage("search_web", 10, 4))));
         transcriptService.appendAssistantMessage(
                 sessionId, "turn-1", "完成", null,
                 TranscriptMessageDto.MessageStatus.COMPLETED, 400L, List.of(),
@@ -92,6 +99,13 @@ class TokenUsageApiIntegrationTest {
                 .andExpect(jsonPath("$.data.totals.turnCount").value(1))
                 .andExpect(jsonPath("$.data.totals.modelCallCount").value(2))
                 .andExpect(jsonPath("$.data.totals.status").value("COMPLETE"))
+                .andExpect(jsonPath("$.data.breakdown.systemPromptTokens").value(5))
+                .andExpect(jsonPath("$.data.breakdown.toolSchemaTokens").value(10))
+                // 会话范围还包含 4 个标题生成输入 Token；该直接 Model 调用没有本地分类，归入 Other。
+                .andExpect(jsonPath("$.data.breakdown.otherTokens").value(5))
+                .andExpect(jsonPath("$.data.byTool[0].toolName").value("search_web"))
+                .andExpect(jsonPath("$.data.byTool[0].schemaTokens").value(10))
+                .andExpect(jsonPath("$.data.byTool[0].resultTokens").value(4))
                 .andExpect(jsonPath("$.data.byPurpose[0].purpose").exists())
                 .andExpect(jsonPath("$.data.byModel[0].model").value("gpt-test"))
                 .andExpect(jsonPath("$.data.daily[0].totalTokens").value(37));

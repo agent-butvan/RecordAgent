@@ -4,10 +4,12 @@ import butvan.agent.agents.identity.CurrentUserProvider;
 import butvan.agent.agents.session.SessionCatalogService;
 import butvan.agent.agents.usage.UsageStatus;
 import butvan.agent.network.usage.dto.TokenUsageResponses.DailyResponse;
+import butvan.agent.network.usage.dto.TokenUsageResponses.InputBreakdownResponse;
 import butvan.agent.network.usage.dto.TokenUsageResponses.ModelResponse;
 import butvan.agent.network.usage.dto.TokenUsageResponses.OverviewResponse;
 import butvan.agent.network.usage.dto.TokenUsageResponses.PurposeResponse;
 import butvan.agent.network.usage.dto.TokenUsageResponses.TotalsResponse;
+import butvan.agent.network.usage.dto.TokenUsageResponses.ToolResponse;
 import butvan.agent.network.usage.repository.TokenUsageRepository;
 import butvan.agent.network.usage.repository.TokenUsageRepository.QueryScope;
 import lombok.RequiredArgsConstructor;
@@ -47,6 +49,7 @@ public class TokenUsageQueryService {
                 sessionId == null || sessionId.isBlank() ? null : sessionId);
         var invocation = repository.summarizeInvocations(scope);
         var turns = repository.summarizeTurns(scope);
+        var breakdown = repository.summarizeBreakdown(scope);
         UsageStatus status = aggregateStatus(invocation.modelCallCount(), invocation.reportedCallCount());
         return new OverviewResponse(
                 from, to, scope.sessionId(),
@@ -55,6 +58,15 @@ public class TokenUsageQueryService {
                         invocation.totalTokens(), invocation.durationMillis(), turns.turnCount(),
                         turns.trackedTurnCount(), invocation.modelCallCount(),
                         invocation.reportedCallCount(), status),
+                new InputBreakdownResponse(
+                        breakdown.estimatedInputTokens(), breakdown.systemPromptTokens(),
+                        breakdown.historyTokens(), breakdown.currentUserTokens(),
+                        breakdown.toolSchemaTokens(), breakdown.toolResultTokens(),
+                        breakdown.ragContextTokens(), breakdown.otherTokens()),
+                repository.summarizeByTool(scope).stream()
+                        .map(value -> new ToolResponse(
+                                value.toolName(), value.schemaTokens(), value.resultTokens()))
+                        .toList(),
                 repository.summarizeByPurpose(scope).stream()
                         .map(value -> new PurposeResponse(
                                 value.purpose(), value.inputTokens(), value.outputTokens(), value.totalTokens(),

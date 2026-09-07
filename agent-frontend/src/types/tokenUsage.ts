@@ -1,4 +1,5 @@
 import type { UsagePurpose, UsageStatus } from './chat';
+import type { InputTokenBreakdown, ToolTokenUsage } from './chat';
 
 export interface TokenUsageTotals {
   inputTokens: number;
@@ -45,6 +46,8 @@ export interface TokenUsageOverview {
   to: string | null;
   sessionId: string | null;
   totals: TokenUsageTotals;
+  breakdown: InputTokenBreakdown & { estimatedInputTokens: number };
+  byTool: ToolTokenUsage[];
   byPurpose: TokenUsagePurposeBreakdown[];
   byModel: TokenUsageModelBreakdown[];
   daily: DailyTokenUsage[];

@@ -10,6 +10,7 @@ import butvan.agent.agents.usage.SystemUsageLedger;
 import butvan.agent.agents.usage.TurnTokenUsage;
 import butvan.agent.agents.usage.UsageStatus;
 import butvan.agent.network.usage.model.TokenUsageIndexModels.InvocationEntry;
+import butvan.agent.network.usage.model.TokenUsageIndexModels.ToolEntry;
 import butvan.agent.network.usage.model.TokenUsageIndexModels.TurnEntry;
 import butvan.agent.network.usage.repository.TokenUsageRepository;
 import lombok.RequiredArgsConstructor;
@@ -41,13 +42,15 @@ public class TokenUsageIndexService {
         String ownerId = currentUserProvider.currentUserId();
         List<TurnEntry> turns = new ArrayList<>();
         List<InvocationEntry> invocations = new ArrayList<>();
+        List<ToolEntry> tools = new ArrayList<>();
 
         sessionCatalogService.listActive().forEach(session ->
                 transcriptService.list(session.id()).stream()
                         .filter(message -> message.role() == TranscriptMessageDto.MessageRole.ASSISTANT)
-                        .forEach(message -> appendChat(ownerId, session.id(), message, turns, invocations)));
+                        .forEach(message -> appendChat(
+                                ownerId, session.id(), message, turns, invocations, tools)));
         systemUsageLedger.list().forEach(record -> invocations.add(toSystemInvocation(ownerId, record)));
-        repository.replace(ownerId, turns, invocations);
+        repository.replace(ownerId, turns, invocations, tools);
     }
 
     private void appendChat(
@@ -55,7 +58,8 @@ public class TokenUsageIndexService {
             String sessionId,
             TranscriptMessageDto message,
             List<TurnEntry> turns,
-            List<InvocationEntry> invocations
+            List<InvocationEntry> invocations,
+            List<ToolEntry> tools
     ) {
         TurnTokenUsage usage = message.usage();
         turns.add(new TurnEntry(
@@ -70,34 +74,47 @@ public class TokenUsageIndexService {
         ));
         if (usage == null) return;
         for (int index = 0; index < usage.calls().size(); index++) {
-            invocations.add(toChatInvocation(
-                    ownerId, sessionId, message, usage.calls().get(index), index));
+            String rowId = "chat:" + message.id() + ":" + index;
+            ModelInvocationUsage call = usage.calls().get(index);
+            invocations.add(toChatInvocation(rowId, ownerId, sessionId, message, call));
+            call.toolUsages().forEach(tool -> tools.add(new ToolEntry(
+                    rowId, tool.toolName(), tool.schemaTokens(), tool.resultTokens())));
         }
     }
 
     private InvocationEntry toChatInvocation(
+            String rowId,
             String ownerId,
             String sessionId,
             TranscriptMessageDto message,
-            ModelInvocationUsage usage,
-            int index
+            ModelInvocationUsage usage
     ) {
+        var breakdown = usage.breakdown();
         return new InvocationEntry(
-                "chat:" + message.id() + ":" + index,
+                rowId,
                 ownerId, sessionId, message.turnId(), message.id(), "CHAT",
                 usage.purpose().name(), message.createdAt(), usage.invocationId(), usage.source(),
                 usage.vendor(), usage.model(), usage.inputTokens(), usage.outputTokens(),
-                usage.cachedInputTokens(), usage.totalTokens(), usage.durationMillis(), usage.status().name()
+                usage.cachedInputTokens(), usage.totalTokens(), usage.durationMillis(), usage.status().name(),
+                usage.modelCallIndex(), usage.tokenCounterId(), usage.estimatedInputTokens(),
+                usage.estimationDeltaTokens(), breakdown.systemPromptTokens(), breakdown.historyTokens(),
+                breakdown.currentUserTokens(), breakdown.toolSchemaTokens(), breakdown.toolResultTokens(),
+                breakdown.ragContextTokens(), breakdown.otherTokens()
         );
     }
 
     private InvocationEntry toSystemInvocation(String ownerId, SystemTokenUsageRecord record) {
         ModelInvocationUsage usage = record.usage();
+        var breakdown = usage.breakdown();
         return new InvocationEntry(
                 "system:" + record.id(), ownerId, record.sessionId(), null, null, "SYSTEM",
                 record.purpose().name(), record.createdAt(), usage.invocationId(), usage.source(),
                 usage.vendor(), usage.model(), usage.inputTokens(), usage.outputTokens(),
-                usage.cachedInputTokens(), usage.totalTokens(), usage.durationMillis(), usage.status().name()
+                usage.cachedInputTokens(), usage.totalTokens(), usage.durationMillis(), usage.status().name(),
+                usage.modelCallIndex(), usage.tokenCounterId(), usage.estimatedInputTokens(),
+                usage.estimationDeltaTokens(), breakdown.systemPromptTokens(), breakdown.historyTokens(),
+                breakdown.currentUserTokens(), breakdown.toolSchemaTokens(), breakdown.toolResultTokens(),
+                breakdown.ragContextTokens(), breakdown.otherTokens()
         );
     }
 }

@@ -9,8 +9,25 @@ export type SessionPermissionMode = 'ASK' | 'AUTO_EDIT' | 'FULL_ACCESS';
 export type UsageStatus = 'COMPLETE' | 'PARTIAL' | 'UNAVAILABLE';
 export type UsagePurpose = 'CHAT' | 'SESSION_TITLE' | 'CONTEXT_COMPACTION' | 'BACKGROUND_AGENT';
 
+export interface InputTokenBreakdown {
+  systemPromptTokens: number;
+  historyTokens: number;
+  currentUserTokens: number;
+  toolSchemaTokens: number;
+  toolResultTokens: number;
+  ragContextTokens: number;
+  otherTokens: number;
+}
+
+export interface ToolTokenUsage {
+  toolName: string;
+  schemaTokens: number;
+  resultTokens: number;
+}
+
 export interface ModelInvocationUsage {
   invocationId: string;
+  modelCallIndex: number;
   source: string;
   purpose: UsagePurpose;
   vendor: string;
@@ -21,6 +38,11 @@ export interface ModelInvocationUsage {
   totalTokens?: number | null;
   durationMillis?: number | null;
   status: UsageStatus;
+  tokenCounterId: string;
+  estimatedInputTokens: number;
+  estimationDeltaTokens?: number | null;
+  breakdown: InputTokenBreakdown;
+  toolUsages: ToolTokenUsage[];
 }
 
 export interface TurnTokenUsage {
@@ -32,6 +54,11 @@ export interface TurnTokenUsage {
   reportedCallCount: number;
   status: UsageStatus;
   calls: ModelInvocationUsage[];
+  estimatedInputTokens: number;
+  estimationDeltaTokens?: number | null;
+  breakdown: InputTokenBreakdown;
+  toolUsages: ToolTokenUsage[];
+  durationMillis: number;
 }
 
 export interface TokenUsageSummary {

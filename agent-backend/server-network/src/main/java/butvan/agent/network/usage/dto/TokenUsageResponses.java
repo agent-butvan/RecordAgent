@@ -17,10 +17,29 @@ public final class TokenUsageResponses {
             LocalDate to,
             String sessionId,
             TotalsResponse totals,
+            InputBreakdownResponse breakdown,
+            List<ToolResponse> byTool,
             List<PurposeResponse> byPurpose,
             List<ModelResponse> byModel,
             List<DailyResponse> daily
     ) {
+    }
+
+    /** 本地估算的输入构成，Other 使用 Provider Actual 与分类估算的非负差值。 */
+    public record InputBreakdownResponse(
+            long estimatedInputTokens,
+            long systemPromptTokens,
+            long historyTokens,
+            long currentUserTokens,
+            long toolSchemaTokens,
+            long toolResultTokens,
+            long ragContextTokens,
+            long otherTokens
+    ) {
+    }
+
+    /** 按工具名聚合的输入占用。 */
+    public record ToolResponse(String toolName, long schemaTokens, long resultTokens) {
     }
 
     /** 当前范围的核心合计。 */

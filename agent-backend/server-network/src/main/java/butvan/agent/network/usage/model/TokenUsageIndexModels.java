@@ -21,8 +21,16 @@ public final class TokenUsageIndexModels {
             String id, String ownerId, String sessionId, String turnId, String messageId,
             String usageKind, String purpose, Instant occurredAt, String invocationId,
             String source, String vendor, String model, Long inputTokens, Long outputTokens,
-            Long cachedInputTokens, Long totalTokens, Long durationMillis, String usageStatus
+            Long cachedInputTokens, Long totalTokens, Long durationMillis, String usageStatus,
+            int modelCallIndex, String tokenCounterId, long estimatedInputTokens,
+            Long estimationDeltaTokens, long systemPromptTokens, long historyTokens,
+            long currentUserTokens, long toolSchemaTokens, long toolResultTokens,
+            long ragContextTokens, long otherTokens
     ) {
+    }
+
+    /** 一次模型调用中某个工具的输入占用。 */
+    public record ToolEntry(String invocationRowId, String toolName, long schemaTokens, long resultTokens) {
     }
 
     /** 指定筛选范围内的调用与 Token 合计。 */
@@ -30,6 +38,18 @@ public final class TokenUsageIndexModels {
             long inputTokens, long outputTokens, long cachedInputTokens, long totalTokens,
             long durationMillis, int modelCallCount, int reportedCallCount
     ) {
+    }
+
+    /** 指定范围内的可解释输入构成。 */
+    public record BreakdownAggregate(
+            long estimatedInputTokens, long systemPromptTokens, long historyTokens,
+            long currentUserTokens, long toolSchemaTokens, long toolResultTokens,
+            long ragContextTokens, long otherTokens
+    ) {
+    }
+
+    /** 指定范围内按工具名聚合的输入占用。 */
+    public record ToolAggregate(String toolName, long schemaTokens, long resultTokens) {
     }
 
     /** 指定筛选范围内的聊天轮次数。 */

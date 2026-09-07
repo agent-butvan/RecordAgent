@@ -7,6 +7,7 @@ import butvan.agent.agents.security.PermissionChecker;
 import butvan.agent.agents.storage.AgentStorageProperties;
 import butvan.agent.agents.subagent.SubagentCatalog;
 import butvan.agent.agents.tool.ToolRegistry;
+import butvan.agent.agents.usage.TokenUsageMiddleware;
 import io.agentscope.core.model.Model;
 import io.agentscope.core.permission.PermissionMode;
 import io.agentscope.core.state.AgentStateStore;
@@ -38,6 +39,7 @@ public class AgentFactory {
     private final TaskRepository subagentTaskRepository;
     private final MessageBus subagentMessageBus;
     private final SubagentCatalog subagentCatalog;
+    private final TokenUsageMiddleware tokenUsageMiddleware;
 
     private final PermissionChecker permissionChecker = new PermissionChecker(
             PermissionMode.DEFAULT,
@@ -84,6 +86,7 @@ public class AgentFactory {
                 .name("butvan_agent")
                 .sysPrompt(systemPrompt)
                 .model(model)
+                .middleware(tokenUsageMiddleware)
                 .enablePlanMode() // 开启计划模式
                 .planFileDirectory("plans")
                 .toolkit(toolRegistry.getToolkit())
