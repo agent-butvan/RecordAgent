@@ -59,6 +59,8 @@ export function toCalendarDayEntry(day: DailyDay): CalendarDayEntry {
       };
       entry.journals?.push(journal);
       entry.journal ??= journal;
+    } else if (event.eventType === 'study') {
+      entry.otherRecords?.push({ id: event.id, type: '学习', title: event.title });
     } else {
       entry.otherRecords?.push({ id: event.id, type: event.originalEventType, title: event.title });
     }

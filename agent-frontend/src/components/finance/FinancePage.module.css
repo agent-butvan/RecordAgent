@@ -34,8 +34,8 @@
 
 .accountForm { display: flex; flex-direction: column; gap: 14px; }
 .accountForm label > span { display: block; margin-bottom: 6px; color: var(--text-secondary); font-size: 11px; font-weight: 550; }
-.accountForm input:not([type='checkbox']):not([type='radio']), .accountForm select { width: 100%; height: 36px; padding: 0 10px; border: 1px solid var(--border-medium); border-radius: var(--radius-md); outline: 0; background: var(--bg-app); color: var(--text-primary); font: 12px var(--font-sans); }
-.accountForm input:focus, .accountForm select:focus { border-color: var(--accent-blue); }
+.accountForm input:not([type='checkbox']):not([type='radio']) { width: 100%; height: 36px; padding: 0 10px; border: 1px solid var(--border-medium); border-radius: var(--radius-md); outline: 0; background: var(--bg-app); color: var(--text-primary); font: 12px var(--font-sans); }
+.accountForm input:focus { border-color: var(--accent-blue); }
 
 .transactions { display: flex; flex-direction: column; }
 .transactionRow { display: grid; align-items: center; gap: 9px; padding: 10px 0; border-bottom: 1px solid var(--border-subtle); }

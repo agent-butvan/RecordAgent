@@ -24,6 +24,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.hamcrest.Matchers.hasItem;
 
 /** 通过 HTTP seam 验证财务账户与流水接口。 */
 @SpringBootTest(classes = FinanceApiIntegrationTest.TestApplication.class)
@@ -66,7 +67,7 @@ class FinanceApiIntegrationTest {
                                 {
                                   "accountId": "%s",
                                   "transactionType": "income",
-                                  "category": "工资",
+                                  "category": "稿费",
                                   "note": "九月工资",
                                   "amount": 500.00,
                                   "date": "2026-09-03",
@@ -75,6 +76,11 @@ class FinanceApiIntegrationTest {
                                 """.formatted(accountId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.transactionType").value("income"));
+
+        mockMvc.perform(get("/agent/finance/categories"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.income", hasItem("稿费")))
+                .andExpect(jsonPath("$.data.expense").isArray());
 
         mockMvc.perform(get("/agent/finance/overview"))
                 .andExpect(status().isOk())

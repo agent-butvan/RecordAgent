@@ -90,41 +90,10 @@
   background: #ffffff;
 }
 
-.configPage {
-  width: 100%;
-  max-width: 920px;
-  margin: 0 auto;
-}
-
-.topHeader {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 28px;
-}
-
-.configSubtitle {
-  font-size: 13px;
-  color: #64748b;
-  line-height: 1.5;
-  margin: 6px 0 0;
-}
-
-.headerActions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
 .addForm {
   display: flex;
   flex-direction: column;
   gap: 16px;
-}
-
-.fullWidth {
-  width: 100%;
 }
 
 .formGrid {
@@ -204,22 +173,6 @@
     grid-template-columns: 1fr;
   }
 
-  .topHeader {
-    flex-direction: column;
-  }
-
-  .headerActions {
-    width: 100%;
-    justify-content: space-between;
-  }
-}
-
-.title {
-  font-size: 24px;
-  line-height: 1.25;
-  font-weight: 700;
-  color: #0f172a;
-  margin: 0;
 }
 
 .headerBtn {
@@ -305,17 +258,6 @@
   color: #b91c1c;
 }
 
-.sectionContainer {
-  max-width: 760px;
-}
-
-.pageTitle {
-  font-size: 24px;
-  font-weight: 700;
-  color: #0f172a;
-  margin-bottom: 24px;
-}
-
 .sectionHeader {
   font-size: 13px;
   font-weight: 600;
@@ -324,9 +266,6 @@
 }
 
 .settingsCard {
-  background-color: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: var(--radius-lg);
   padding: 16px 20px;
   display: flex;
   flex-direction: column;

@@ -60,7 +60,7 @@
   color: #374151;
 }
 
-.input, .select {
+.input {
   width: 100%;
   height: 46px;
   padding: 0 16px;
@@ -78,7 +78,7 @@
   color: #9ca3af;
 }
 
-.input:focus, .select:focus {
+.input:focus {
   border-color: #111827;
   box-shadow: 0 0 0 1px #111827;
 }

@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import type { CreateFinanceTransactionInput, FinanceAccount } from '../../types/finance';
+import type { CreateFinanceTransactionInput, FinanceAccount, FinanceCategoryOptions } from '../../types/finance';
 import { formatLocalDate } from '../../services/dailyEvents';
 import { Button } from '../common/Button';
+import { CategoryPicker } from '../common/CategoryPicker';
+import { mergeCategoryOptions } from '../common/categoryOptions';
 import { Modal } from '../common/Modal';
+import { Select } from '../common/Select';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from './financeCategories';
 import styles from './TransactionModal.module.css';
 
@@ -18,6 +21,7 @@ function money(value: number): string {
 interface TransactionModalProps {
   open: boolean;
   accounts: FinanceAccount[];
+  categories: FinanceCategoryOptions;
   defaultDate?: string;
   onClose: () => void;
   onSubmit: (input: CreateFinanceTransactionInput) => Promise<void>;
@@ -25,16 +29,21 @@ interface TransactionModalProps {
 
 /** 统一的收入 / 支出记账弹框，供财务页和日历页共用。 */
 export const TransactionModal: React.FC<TransactionModalProps> = ({
-  open, accounts, defaultDate, onClose, onSubmit,
+  open, accounts, categories, defaultDate, onClose, onSubmit,
 }) => {
   const [entryType, setEntryType] = useState<'expense' | 'income'>('expense');
+  const [category, setCategory] = useState<string>(EXPENSE_CATEGORIES[0]);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const categories = entryType === 'expense' ? EXPENSE_CATEGORIES : INCOME_CATEGORIES;
+  const availableCategories = mergeCategoryOptions(
+    entryType === 'expense' ? EXPENSE_CATEGORIES : INCOME_CATEGORIES,
+    categories[entryType],
+  );
 
   useEffect(() => {
     if (!open) return;
     setEntryType('expense');
+    setCategory(EXPENSE_CATEGORIES[0]);
     setError(null);
   }, [open]);
 
@@ -54,7 +63,7 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
       await onSubmit({
         accountId: String(data.get('accountId')),
         transactionType: entryType,
-        category: String(data.get('category')),
+        category: category.trim(),
         note: String(data.get('note') ?? '').trim(),
         amount: Number(data.get('amount')),
         date: String(data.get('date')),
@@ -73,19 +82,26 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
     <Modal open={open} title="记一笔" onClose={closeModal} width={600} centered>
       <form key={`${open}-${defaultDate ?? 'today'}`} className={styles.transactionForm} onSubmit={(event) => { void submitTransaction(event); }}>
         <div className={styles.typeSwitch} aria-label="流水类型">
-          <button type="button" className={entryType === 'expense' ? styles.typeActive : ''} onClick={() => setEntryType('expense')}>支出</button>
-          <button type="button" className={entryType === 'income' ? styles.typeActive : ''} onClick={() => setEntryType('income')}>收入</button>
+          <button type="button" className={entryType === 'expense' ? styles.typeActive : ''} onClick={() => { setEntryType('expense'); setCategory(EXPENSE_CATEGORIES[0]); }}>支出</button>
+          <button type="button" className={entryType === 'income' ? styles.typeActive : ''} onClick={() => { setEntryType('income'); setCategory(INCOME_CATEGORIES[0]); }}>收入</button>
         </div>
         {error && <div className={styles.modalError} role="alert">{error}</div>}
         <label className={styles.amountField}><span>金额</span><div><b>¥</b><input name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required autoFocus /></div></label>
         <div className={styles.formGrid}>
-          <label><span>资产账户</span><select name="accountId" required>{accounts.map((account) => <option value={account.id} key={account.id}>{account.name} · {money(account.balance)}</option>)}</select></label>
-          <label><span>分类</span><select name="category" key={entryType}>{categories.map((category) => <option key={category}>{category}</option>)}</select></label>
+          <Select
+            name="accountId"
+            label="资产账户"
+            options={accounts.map((account) => ({ value: account.id, label: `${account.name} · ${money(account.balance)}` }))}
+            fieldSize="md"
+            fullWidth
+            required
+          />
+          <CategoryPicker options={availableCategories} value={category} onChange={setCategory} disabled={isSaving} />
           <label className={styles.wideField}><span>说明</span><input name="note" required placeholder={entryType === 'expense' ? '例如：午餐' : '例如：九月工资'} /></label>
           <label><span>日期</span><input name="date" type="date" defaultValue={defaultDate ?? formatLocalDate(new Date())} required /></label>
           <label><span>时间</span><input name="time" type="time" defaultValue={nowTime()} required /></label>
         </div>
-        <div className={styles.modalActions}><Button type="button" variant="outline" onClick={closeModal} disabled={isSaving}>取消</Button><Button type="submit" variant="primary" disabled={isSaving}>{isSaving ? '保存中…' : `保存${entryType === 'expense' ? '支出' : '收入'}`}</Button></div>
+        <div className={styles.modalActions}><Button type="button" variant="outline" onClick={closeModal} disabled={isSaving}>取消</Button><Button type="submit" variant="primary" disabled={isSaving || !category.trim()}>{isSaving ? '保存中…' : `保存${entryType === 'expense' ? '支出' : '收入'}`}</Button></div>
       </form>
     </Modal>
   );

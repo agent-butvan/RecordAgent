@@ -9,12 +9,20 @@ import { TextInput } from '../common/TextInput';
 import { Modal } from '../common/Modal';
 import { Badge } from '../common/Badge';
 import { ModelCard, type ModelCardItem } from './ModelCard';
+import { FeatureSettingsPage, type FeatureSettingsTab } from '../settings/FeatureSettingsPage';
+import { SettingsPageLayout } from '../settings/SettingsPageLayout';
+import { getFeaturePreferences, setStudyWindowMode } from '../../services/featurePreferences';
+import type { StudyWindowMode } from '../../types/preferences';
 import {
   ArrowLeft,
+  CalendarDays,
+  Library,
+  NotebookPen,
   Sliders,
   Shield,
   Plus,
-  Inbox
+  Inbox,
+  WalletCards,
 } from 'lucide-react';
 import styles from './ModelSettingsPage.module.css';
 
@@ -46,6 +54,9 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
   const [activeTab, setActiveTab] = useState<string>(initialTab);
   const [supportedVendors, setSupportedVendors] = useState<string[]>(['gemini', 'openai', 'dashscope', 'deepseek', 'anthropic', 'ollama']);
   const [accountStatus, setAccountStatus] = useState<AccountStatus | null>(null);
+  const [studyWindowMode, setStudyWindowModeState] = useState<StudyWindowMode>(
+    () => getFeaturePreferences().studyWindowMode,
+  );
   
   const allModels = getAllModels();
 
@@ -123,9 +134,16 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
     setTestingMap((prev) => ({ ...prev, [key]: false }));
   };
 
+  const handleStudyWindowModeChange = (mode: StudyWindowMode) => {
+    setStudyWindowModeState(setStudyWindowMode(mode).studyWindowMode);
+  };
+
+  const isFeatureTab = (tab: string): tab is FeatureSettingsTab => (
+    tab === 'calendar' || tab === 'finance' || tab === 'library' || tab === 'record'
+  );
+
   return (
     <div className={styles.pageContainer}>
-      {/* 左侧仅展示已有实现的设置项。 */}
       <div className={styles.settingsSidebar}>
         <button className={styles.backBtn} onClick={onBack}>
           <ArrowLeft size={14} />
@@ -133,7 +151,7 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
         </button>
 
         <div className={styles.navGroup}>
-          <div className={styles.groupLabel}>设置</div>
+          <div className={styles.groupLabel}>通用</div>
           <button
             className={`${styles.navItem} ${activeTab === 'config' ? styles.navItemActive : ''}`}
             onClick={() => setActiveTab('config')}
@@ -147,28 +165,42 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
             <Shield size={14} /> 账户
           </button>
         </div>
+
+        <div className={styles.navGroup}>
+          <div className={styles.groupLabel}>功能</div>
+          {[
+            { id: 'calendar', label: '日历', icon: CalendarDays },
+            { id: 'finance', label: '财务', icon: WalletCards },
+            { id: 'library', label: '资料', icon: Library },
+            { id: 'record', label: '记录', icon: NotebookPen },
+          ].map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              className={`${styles.navItem} ${activeTab === id ? styles.navItemActive : ''}`}
+              onClick={() => setActiveTab(id)}
+            >
+              <Icon size={14} /> {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Right Settings Content Section */}
       <div className={styles.settingsContent}>
         {/* 模型配置 */}
         {activeTab === 'config' && (
-          <div className={styles.configPage}>
-            <div className={styles.topHeader}>
-              <div>
-                <h1 className={styles.title}>模型配置</h1>
-                <p className={styles.configSubtitle}>
-                  管理本地保存的模型，可随时测试连接并切换当前模型。
-                </p>
-              </div>
-
-              <div className={styles.headerActions}>
+          <SettingsPageLayout
+            title="模型配置"
+            description="管理本地保存的模型，可随时测试连接并切换当前模型。"
+            actions={(
+              <>
                 <Badge variant="default">{allModels.length} 个模型</Badge>
                 <Button variant="primary" icon={<Plus size={15} />} onClick={() => setShowAddForm(true)}>
                   添加模型
                 </Button>
-              </div>
-            </div>
+              </>
+            )}
+          >
 
             {/* 新增模型配置弹框 */}
             <Modal
@@ -182,7 +214,7 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
                     <Select
                       id="model-vendor"
                       fieldSize="md"
-                      className={styles.fullWidth}
+                      fullWidth
                       value={formVendor}
                       onChange={(e) => handleVendorChange(e.target.value)}
                       options={supportedVendors.map((v) => ({
@@ -265,14 +297,13 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
                 })}
               </div>
             )}
-          </div>
+          </SettingsPageLayout>
         )}
 
         {activeTab === 'account' && (
-          <div className={styles.sectionContainer}>
-            <h1 className={styles.pageTitle}>账户</h1>
+          <SettingsPageLayout title="账户" description="管理账户绑定与通知接收方式。">
             <div className={styles.sectionHeader}>邮箱账户</div>
-            <Card variant="flat" className={styles.settingsCard}>
+            <Card variant="bordered" className={styles.settingsCard}>
               <div className={styles.settingRow}>
                 <div className={styles.rowInfo}>
                   <div className={styles.rowTitle}>{accountStatus?.maskedEmail || '暂未绑定邮箱'}</div>
@@ -282,7 +313,15 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
                 </div>
               </div>
             </Card>
-          </div>
+          </SettingsPageLayout>
+        )}
+
+        {isFeatureTab(activeTab) && (
+          <FeatureSettingsPage
+            tab={activeTab}
+            studyWindowMode={studyWindowMode}
+            onStudyWindowModeChange={handleStudyWindowModeChange}
+          />
         )}
 
       </div>

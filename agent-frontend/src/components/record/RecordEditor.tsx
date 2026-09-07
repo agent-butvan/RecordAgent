@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { FileArrowUpIcon, PaperclipIcon } from '@phosphor-icons/react';
 import { attachmentContentUrl, fetchRecordAttachments, uploadRecordAttachment } from '../../services/recordApi';
 import type { RecordEntry, RecordTab, RecordType, SaveRecordInput } from '../../types/record';
+import { Select } from '../common/Select';
 import { WritingEditorPage } from '../common/WritingEditorPage';
 import styles from './RecordEditor.module.css';
 
@@ -47,9 +48,14 @@ export function RecordEditor({ date, entry, initialType = 'quick', initialTabId,
     initialTitle={entry?.title ?? ''} initialBody={entry?.contentText ?? ''} saving={saving} error={attachmentError}
     bodyPlaceholder="开始整理知识、问题与思考……" onBack={onBack}
     meta={<div className={styles.metaControls}>
-      <select value={tabId} onChange={(event) => { const nextId = event.target.value; setTabId(nextId); const nextType = typeForSystemTab(tabs.find((tab) => tab.id === nextId)); if (nextType) setType(nextType); }} aria-label="所属 Tab">
-        <option value="" disabled>选择分类</option>{tabs.map((tab) => <option key={tab.id} value={tab.id}>{tab.name}</option>)}
-      </select>
+      <Select
+        value={tabId}
+        placeholder="选择分类"
+        options={tabs.map((tab) => ({ value: tab.id, label: tab.name }))}
+        appearance="ghost"
+        onChange={(event) => { const nextId = event.target.value; setTabId(nextId); const nextType = typeForSystemTab(tabs.find((tab) => tab.id === nextId)); if (nextType) setType(nextType); }}
+        aria-label="所属 Tab"
+      />
       <input type="date" value={recordDate} onChange={(event) => setRecordDate(event.target.value)} aria-label="资料日期" />
     </div>}
     footer={<div className={styles.details}>

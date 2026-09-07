@@ -10,6 +10,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 
 /** 财务接口请求、响应与领域映射。 */
 public final class FinanceDtos {
@@ -53,6 +54,13 @@ public final class FinanceDtos {
     public record ExpenseChartResponse(
             String range, LocalDate from, LocalDate to, BigDecimal totalExpense, BigDecimal totalIncome,
             List<ExpenseChartDayResponse> days) {
+    }
+
+    public record TransactionCategoryOptionsResponse(List<String> expense, List<String> income) {
+    }
+
+    public static TransactionCategoryOptionsResponse categoryOptions(Map<String, List<String>> categories) {
+        return new TransactionCategoryOptionsResponse(categories.get("expense"), categories.get("income"));
     }
 
     public static AccountResponse from(FinanceAccount account) {

@@ -8,6 +8,7 @@ import butvan.agent.network.daily.model.DailyEventModels.JournalDetails;
 import butvan.agent.network.daily.model.DailyEventModels.IncomeDetails;
 import butvan.agent.network.daily.model.DailyEventModels.ScheduleDetails;
 import butvan.agent.network.daily.model.DailyEventModels.TodoDetails;
+import butvan.agent.network.study.model.StudyModels.StudyDetails;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -71,6 +72,10 @@ public final class DailyEventResponses {
     public record JournalDetailResponse(String body, String mood) {
     }
 
+    /** 学习时段详情响应。 */
+    public record StudyDetailResponse(String startedAt, String endedAt, String category, String timezone) {
+    }
+
     /** 将领域日记录转换为协议 DTO。 */
     public static EventResponse from(DailyEvent event) {
         return new EventResponse(
@@ -108,6 +113,9 @@ public final class DailyEventResponses {
         }
         if (details instanceof JournalDetails journal) {
             return new JournalDetailResponse(journal.body(), journal.mood());
+        }
+        if (details instanceof StudyDetails study) {
+            return new StudyDetailResponse(study.startedAt(), study.endedAt(), study.category(), study.timezone());
         }
         return null;
     }

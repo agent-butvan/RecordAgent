@@ -44,6 +44,13 @@ public class FinanceController {
                 .map(FinanceDtos::from).toList());
     }
 
+    @ApiLog("查询收支分类")
+    @GetMapping("/categories")
+    public Result<FinanceDtos.TransactionCategoryOptionsResponse> categories() {
+        return Result.success(FinanceDtos.categoryOptions(
+                financeService.getTransactionCategories(currentUserProvider.currentUserId())));
+    }
+
     @ApiLog("查询收支趋势与支出分类构成")
     @GetMapping("/expense-chart")
     public Result<FinanceDtos.ExpenseChartResponse> expenseChart(
