@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChartNoAxesColumnIncreasing } from 'lucide-react';
+import { ChartNoAxesColumnIncreasing, ChevronRight } from 'lucide-react';
 import type { TurnTokenUsage } from '../../types/chat';
 import { formatTokenCount } from './tokenUsageFormat';
 import styles from './TokenUsagePanel.module.css';
@@ -73,8 +73,7 @@ export const TokenUsagePanel: React.FC<TokenUsagePanelProps> = ({ usage }) => {
         )}
 
         {usage.toolUsages.length > 0 && (
-          <section className={styles.section} aria-labelledby="token-tools-title">
-            <h3 id="token-tools-title" className={styles.sectionTitle}>工具</h3>
+          <DisclosureSection title="工具" count={usage.toolUsages.length}>
             <div className={styles.detailList}>
               {usage.toolUsages.map((tool) => (
                 <div className={styles.detailItem} key={tool.toolName}>
@@ -85,12 +84,11 @@ export const TokenUsagePanel: React.FC<TokenUsagePanelProps> = ({ usage }) => {
                 </div>
               ))}
             </div>
-          </section>
+          </DisclosureSection>
         )}
 
         {usage.calls.length > 0 && (
-          <section className={styles.section} aria-labelledby="token-calls-title">
-            <h3 id="token-calls-title" className={styles.sectionTitle}>模型调用</h3>
+          <DisclosureSection title="模型调用" count={usage.calls.length}>
             <div className={styles.detailList}>
               {usage.calls.map((call) => (
                 <div className={styles.detailItem} key={`${call.source}:${call.invocationId}`}>
@@ -113,7 +111,7 @@ export const TokenUsagePanel: React.FC<TokenUsagePanelProps> = ({ usage }) => {
                 </div>
               ))}
             </div>
-          </section>
+          </DisclosureSection>
         )}
       </div>
     </section>
@@ -129,6 +127,21 @@ const MetricRow: React.FC<{ label: string; value: number; emphasized?: boolean }
     <dt>{label}</dt>
     <dd>{formatTokenCount(value)}</dd>
   </div>
+);
+
+const DisclosureSection: React.FC<React.PropsWithChildren<{ title: string; count: number }>> = ({
+  title,
+  count,
+  children,
+}) => (
+  <details className={styles.disclosure}>
+    <summary className={styles.disclosureSummary}>
+      <ChevronRight className={styles.disclosureChevron} size={14} aria-hidden="true" />
+      <span>{title}</span>
+      <span className={styles.disclosureCount}>{count}</span>
+    </summary>
+    {children}
+  </details>
 );
 
 function formatDuration(durationMillis: number): string {
