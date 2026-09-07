@@ -11,6 +11,7 @@ import { Badge } from '../common/Badge';
 import { ModelCard, type ModelCardItem } from './ModelCard';
 import { FeatureSettingsPage, type FeatureSettingsTab } from '../settings/FeatureSettingsPage';
 import { SettingsPageLayout } from '../settings/SettingsPageLayout';
+import { TokenUsageSettingsPage } from '../settings/TokenUsageSettingsPage';
 import { getFeaturePreferences, setStudyWindowMode } from '../../services/featurePreferences';
 import type { StudyWindowMode } from '../../types/preferences';
 import {
@@ -23,6 +24,7 @@ import {
   Plus,
   Inbox,
   WalletCards,
+  ChartNoAxesColumnIncreasing,
 } from 'lucide-react';
 import styles from './ModelSettingsPage.module.css';
 
@@ -163,6 +165,12 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
             onClick={() => setActiveTab('account')}
           >
             <Shield size={14} /> 账户
+          </button>
+          <button
+            className={`${styles.navItem} ${activeTab === 'usage' ? styles.navItemActive : ''}`}
+            onClick={() => setActiveTab('usage')}
+          >
+            <ChartNoAxesColumnIncreasing size={14} /> Token 用量
           </button>
         </div>
 
@@ -315,6 +323,8 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
             </Card>
           </SettingsPageLayout>
         )}
+
+        {activeTab === 'usage' && <TokenUsageSettingsPage />}
 
         {isFeatureTab(activeTab) && (
           <FeatureSettingsPage
