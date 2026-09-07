@@ -43,6 +43,11 @@ export const RightSidePanel: React.FC<RightSidePanelProps> = ({
     if (open && tabs.length === 0) setShowPicker(true);
   }, [open, tabs.length]);
 
+  // 消息区等外部入口直接打开标签时，应退出功能选择页并展示目标内容。
+  useEffect(() => {
+    if (open && activeTab) setShowPicker(false);
+  }, [activeTab, open]);
+
   const selectFeature = (tabId: string) => {
     onOpenTab(tabId);
     setShowPicker(false);

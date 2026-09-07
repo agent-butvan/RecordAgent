@@ -6,7 +6,8 @@ import { LoadingTree } from '../common/LoadingTree';
 import { PermissionRequestCard } from './PermissionRequestCard';
 import { PlanApprovalCard } from './PlanApprovalCard';
 import { AgentResponse } from './AgentResponse';
-import { TokenUsageDetails } from './TokenUsageDetails';
+import { TokenUsageTrigger } from './TokenUsageTrigger';
+import { TokenUsagePanel } from './TokenUsagePanel';
 import { formatTokenCount } from './tokenUsageFormat';
 import { ChatStepRail, type StepRailChapter } from './ChatStepRail';
 import { MarkdownContent } from '../common/MarkdownContent';
@@ -30,6 +31,7 @@ import {
   FolderTree,
   MessageSquare,
   PanelRight,
+  ChartNoAxesColumnIncreasing,
 } from 'lucide-react';
 import styles from './ChatWorkspace.module.css';
 
@@ -60,7 +62,17 @@ interface ChatWorkspaceProps {
   isPermissionModeSaving?: boolean;
 }
 
-const AssistantMessageItem: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
+interface AssistantMessageItemProps {
+  msg: ChatMessage;
+  tokenUsageActive: boolean;
+  onOpenTokenUsage: (messageId: string) => void;
+}
+
+const AssistantMessageItem: React.FC<AssistantMessageItemProps> = ({
+  msg,
+  tokenUsageActive,
+  onOpenTokenUsage,
+}) => {
   const isGenerating = msg.status === undefined && msg.elapsedTime === undefined;
   const elapsedSec = msg.elapsedTime !== undefined
     ? msg.elapsedTime
@@ -113,7 +125,11 @@ const AssistantMessageItem: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
               </button>
             </div>
           )}
-          <TokenUsageDetails usage={msg.usage} />
+          <TokenUsageTrigger
+            usage={msg.usage}
+            active={tokenUsageActive}
+            onOpen={() => onOpenTokenUsage(msg.id)}
+          />
         </div>
       )}
     </div>
@@ -149,7 +165,13 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [rightPanelTabs, setRightPanelTabs] = useState<string[]>([]);
   const [rightPanelTab, setRightPanelTab] = useState<string | null>(null);
+  const [tokenUsageMessageId, setTokenUsageMessageId] = useState<string | null>(null);
   const messagesAreaRef = useRef<HTMLDivElement>(null);
+
+  const selectedTokenUsage = useMemo(
+    () => messages.find((message) => message.id === tokenUsageMessageId)?.usage || null,
+    [messages, tokenUsageMessageId],
+  );
 
   const availablePanelTabs = useMemo<RightPanelTab[]>(() => {
     const tabs: RightPanelTab[] = [{
@@ -164,8 +186,15 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
         icon: FolderTree,
       });
     }
+    if (selectedTokenUsage) {
+      tabs.push({
+        id: 'tokens',
+        label: 'Token',
+        icon: ChartNoAxesColumnIncreasing,
+      });
+    }
     return tabs;
-  }, [projectPath]);
+  }, [projectPath, selectedTokenUsage]);
 
   const openedPanelTabs = availablePanelTabs.filter((tab) => rightPanelTabs.includes(tab.id));
 
@@ -176,6 +205,15 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
       setRightPanelTab((activeTab) => activeTab === 'files' ? null : activeTab);
     }
   }, [projectPath]);
+
+  // 切换会话或消息失效后，移除无数据可展示的 Token 标签。
+  useEffect(() => {
+    if (tokenUsageMessageId && !selectedTokenUsage) {
+      setTokenUsageMessageId(null);
+      setRightPanelTabs((tabs) => tabs.filter((tabId) => tabId !== 'tokens'));
+      setRightPanelTab((activeTab) => activeTab === 'tokens' ? null : activeTab);
+    }
+  }, [selectedTokenUsage, tokenUsageMessageId]);
 
   useEffect(() => {
     const togglePanel = (event: KeyboardEvent) => {
@@ -202,6 +240,14 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     if (rightPanelTab === tabId) {
       setRightPanelTab(nextTabs[closedIndex] ?? nextTabs[closedIndex - 1] ?? null);
     }
+    if (tabId === 'tokens') setTokenUsageMessageId(null);
+  };
+
+  const openTokenUsage = (messageId: string) => {
+    setTokenUsageMessageId(messageId);
+    setRightPanelTabs((tabs) => tabs.includes('tokens') ? tabs : [...tabs, 'tokens']);
+    setRightPanelTab('tokens');
+    setRightPanelOpen(true);
   };
 
   useEffect(() => {
@@ -384,7 +430,11 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
                       {msg.role === 'user' ? (
                         <div className={styles.userMessage}>{msg.content}</div>
                       ) : (
-                        <AssistantMessageItem msg={msg} />
+                        <AssistantMessageItem
+                          msg={msg}
+                          tokenUsageActive={rightPanelOpen && rightPanelTab === 'tokens' && tokenUsageMessageId === msg.id}
+                          onOpenTokenUsage={openTokenUsage}
+                        />
                       )}
                     </div>
                   ))}
@@ -414,6 +464,8 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
               onRefresh={onRefreshSubagentTasks}
               onCancel={onCancelSubagentTask}
             />
+          ) : rightPanelTab === 'tokens' && selectedTokenUsage ? (
+            <TokenUsagePanel usage={selectedTokenUsage} />
           ) : projectPath ? (
             <ProjectFileTree projectPath={projectPath} />
           ) : null}
