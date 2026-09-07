@@ -11,12 +11,14 @@ import { TopBar } from '../common/TopBar';
 import { StudyRecordModal } from './StudyRecordModal';
 import { StudyStartModal } from './StudyStartModal';
 import { StudyHistoryDrawer } from './StudyHistoryDrawer';
+import { StudyHeatmap } from './StudyHeatmap';
 import { ActiveStudyCard } from './ActiveStudyCard';
 import { STUDY_CATEGORIES } from './studyCategories';
 import styles from './StudyPage.module.css';
 
 const TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const MIN_TIMELINE_HOURS = 8;
+const WEEKLY_GOAL_KEY = 'butvan-study-weekly-goal-days';
 
 function shiftedDate(days: number): Date { const date = new Date(); date.setHours(12, 0, 0, 0); date.setDate(date.getDate() + days); return date; }
 function shiftDateKey(dateKey: string, days: number): string {
@@ -25,6 +27,12 @@ function shiftDateKey(dateKey: string, days: number): string {
   return formatLocalDate(date);
 }
 function startOfMonth(): Date { const date = new Date(); date.setDate(1); date.setHours(12, 0, 0, 0); return date; }
+function startOfWeek(): Date { const date = new Date(); date.setHours(12, 0, 0, 0); date.setDate(date.getDate() - ((date.getDay() + 6) % 7)); return date; }
+function heatmapStart(): Date {
+  const date = shiftedDate(-364);
+  date.setDate(date.getDate() - date.getDay());
+  return date;
+}
 function formatDuration(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
   if (minutes < 1) return seconds > 0 ? '不足 1 分钟' : '0 分钟';
@@ -83,6 +91,12 @@ export function StudyPage() {
   const [weekStats, setWeekStats] = useState<StudyStatistics | null>(null);
   const [previousWeekStats, setPreviousWeekStats] = useState<StudyStatistics | null>(null);
   const [monthStats, setMonthStats] = useState<StudyStatistics | null>(null);
+  const [heatmapStats, setHeatmapStats] = useState<StudyStatistics | null>(null);
+  const [heatmapError, setHeatmapError] = useState<string | null>(null);
+  const [weeklyGoalDays, setWeeklyGoalDays] = useState(() => {
+    const stored = Number(localStorage.getItem(WEEKLY_GOAL_KEY));
+    return Number.isInteger(stored) && stored >= 1 && stored <= 7 ? stored : 5;
+  });
   const [rememberedCategories, setRememberedCategories] = useState<string[]>([]);
   const [now, setNow] = useState(Date.now()); const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false);
   const todayKey = formatLocalDate(new Date());
@@ -93,16 +107,19 @@ export function StudyPage() {
   const [modalOpen, setModalOpen] = useState(false); const [editing, setEditing] = useState<StudySession | null>(null); const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
-    setError(null); const today = formatLocalDate(new Date());
+    setError(null); setHeatmapError(null); const today = formatLocalDate(new Date());
     try {
-      const [nextActive, recent, nextWeek, previousWeek, nextMonth, categories] = await Promise.all([
+      const [nextActive, recent, nextWeek, previousWeek, nextMonth, nextHeatmap, categories] = await Promise.all([
         fetchActiveStudySession(), fetchStudySessions(formatLocalDate(shiftedDate(-30)), today, TIMEZONE),
         fetchStudyStatistics(formatLocalDate(shiftedDate(-6)), today, TIMEZONE),
         fetchStudyStatistics(formatLocalDate(shiftedDate(-13)), formatLocalDate(shiftedDate(-7)), TIMEZONE),
         fetchStudyStatistics(formatLocalDate(startOfMonth()), today, TIMEZONE),
+        fetchStudyStatistics(formatLocalDate(heatmapStart()), today, TIMEZONE)
+          .then((value) => ({ value, error: null }))
+          .catch((cause: unknown) => ({ value: null, error: cause instanceof Error ? cause.message : '热力图加载失败' })),
         fetchStudyCategories(),
       ]);
-      setActive(nextActive); setSessions(recent); setWeekStats(nextWeek); setPreviousWeekStats(previousWeek); setMonthStats(nextMonth); setRememberedCategories(categories);
+      setActive(nextActive); setSessions(recent); setWeekStats(nextWeek); setPreviousWeekStats(previousWeek); setMonthStats(nextMonth); setHeatmapStats(nextHeatmap.value); setHeatmapError(nextHeatmap.error); setRememberedCategories(categories);
     } catch (cause) { setError(cause instanceof Error ? cause.message : '学习记录加载失败，请稍后重试。'); }
     finally { setLoading(false); }
   }, []);
@@ -137,6 +154,13 @@ export function StudyPage() {
     return [...totals.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
   }, [completedSessions]);
   const categoryOptions = mergeCategoryOptions(STUDY_CATEGORIES, rememberedCategories);
+  const currentWeekStart = formatLocalDate(startOfWeek());
+  const currentWeekStudyDays = heatmapStats?.days.filter((day) => day.date >= currentWeekStart && day.date <= todayKey && day.durationSeconds > 0).length ?? 0;
+  const updateWeeklyGoal = (nextGoal: number) => {
+    const value = Math.max(1, Math.min(7, nextGoal));
+    setWeeklyGoalDays(value);
+    localStorage.setItem(WEEKLY_GOAL_KEY, String(value));
+  };
 
   const begin = async (content: string, category: string) => {
     setSaving(true); setStartError(null);
@@ -204,9 +228,15 @@ export function StudyPage() {
         <section className={styles.section}><Heading title="最近记录" subtitle="最近完成的学习片段" side={completedSessions.length > 0 ? <button className={styles.linkButton} type="button" onClick={() => setHistoryOpen(true)}>查看全部<ArrowRightIcon size={12} /></button> : undefined} />
           {loading ? <div className={styles.loading}>正在读取学习记录…</div> : completedSessions.length ? <RecentSessions sessions={completedSessions.slice(0, 3)} onSelect={openEdit} /> : <div className={styles.empty}><ClockCounterClockwiseIcon size={19} /><strong>还没有学习记录</strong><span>开始一次学习，或使用右上角补卡。</span></div>}
         </section>
+        <section className={styles.section}><Heading title="本周目标" subtitle="用稳定的学习天数建立节奏" side={<div className={styles.goalControl}><button type="button" onClick={() => updateWeeklyGoal(weeklyGoalDays - 1)} disabled={weeklyGoalDays === 1} aria-label="减少每周目标天数">−</button><span>{weeklyGoalDays} 天</span><button type="button" onClick={() => updateWeeklyGoal(weeklyGoalDays + 1)} disabled={weeklyGoalDays === 7} aria-label="增加每周目标天数">＋</button></div>} />
+          <WeeklyGoal completedDays={currentWeekStudyDays} goalDays={weeklyGoalDays} onStart={() => { setStartError(null); setStartModalOpen(true); }} active={Boolean(active)} />
+        </section>
       </div><aside className={styles.insightColumn}>
         <section className={styles.sideSection}><Heading title="近 7 天节奏" subtitle="每天的有效学习时长" /><div className={styles.chart}>{weekStats?.days.map((day) => <div className={styles.chartDay} key={day.date}><strong>{day.durationSeconds ? Math.round(day.durationSeconds / 60) : '—'}</strong><div className={styles.barArea}><i className={day.date === todayKey ? styles.todayBar : ''} style={{ height: `${Math.max(day.durationSeconds ? 7 : 0, day.durationSeconds / chartMax * 100)}%` }} /></div><span>{weekday(day.date)}</span></div>)}</div><dl className={styles.smallStats}><div><dt>日均时长</dt><dd>{formatDuration(weekStats?.averageDailySeconds ?? 0)}</dd></div><div><dt>学习天数</dt><dd>{weekStats?.studyDays ?? 0} / 7 天</dd></div><div><dt>较上周</dt><dd>{weekChange === null ? '暂无对比' : `${weekChange >= 0 ? '↑' : '↓'} ${Math.abs(weekChange)}%`}</dd></div><div><dt>完成次数</dt><dd>{weekStats?.sessionCount ?? 0} 次</dd></div></dl></section>
         <section className={styles.sideSection}><Heading title="本周观察" /><p className={styles.insight}>这周已经学习 <em>{weekStats?.studyDays ?? 0} 天</em>{weekChange !== null && <>，相比上周{weekChange >= 0 ? '增加' : '减少'}了 <em>{formatDuration(Math.abs((weekStats?.totalDurationSeconds ?? 0) - previousTotal))}</em></>}。{topCategory ? <>最近投入最多的是“<em>{topCategory}</em>”。</> : '完成第一段学习后，这里会生成观察。'}</p></section>
+        <section className={styles.sideSection}><Heading title="学习热力图" subtitle="最近一年 · 颜色按每日学习时长加深" />
+          {heatmapStats ? <StudyHeatmap days={heatmapStats.days} to={todayKey} /> : heatmapError ? <div className={styles.heatmapError}><span>{heatmapError}</span><button type="button" onClick={() => void reload()}>重新加载</button></div> : <div className={styles.heatmapLoading}>正在生成学习热力图…</div>}
+        </section>
       </aside></div>
     </div></div>
     <StudyStartModal open={startModalOpen} saving={saving} error={startError} categories={categoryOptions}
@@ -231,6 +261,18 @@ function RecentSessions({ sessions, onSelect }: { sessions: StudySession[]; onSe
       <strong>{session.content}</strong>
       <b>{formatDuration(session.durationSeconds)}</b>
     </button>)}</div>}
+  </div>;
+}
+
+function WeeklyGoal({ completedDays, goalDays, active, onStart }: { completedDays: number; goalDays: number; active: boolean; onStart: () => void }) {
+  const achievedDays = Math.min(completedDays, goalDays);
+  const remainingDays = Math.max(0, goalDays - completedDays);
+  return <div className={styles.weeklyGoal}>
+    <div className={styles.goalSummary}><strong>{completedDays}<span> / {goalDays} 天</span></strong><p>{remainingDays ? `再学习 ${remainingDays} 天，即可完成本周目标。` : '本周目标已完成，继续保持这个节奏。'}</p></div>
+    <div className={styles.goalDays} style={{ '--goal-days': goalDays } as React.CSSProperties} role="img" aria-label={`本周目标 ${goalDays} 天，已完成 ${achievedDays} 天`}>
+      {Array.from({ length: goalDays }, (_, index) => <i key={index} className={index < achievedDays ? styles.goalDayDone : ''} />)}
+    </div>
+    <button type="button" className={styles.goalAction} onClick={onStart} disabled={active}>{active ? '正在学习' : '开始今天的学习'}<ArrowRightIcon size={12} /></button>
   </div>;
 }
 
