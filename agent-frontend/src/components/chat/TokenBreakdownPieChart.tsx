@@ -15,13 +15,13 @@ interface ChartSegment {
 }
 
 const SEGMENT_DEFINITIONS: Array<Omit<ChartSegment, 'value'>> = [
-  { key: 'systemPromptTokens', label: '系统提示', color: '#2563eb' },
-  { key: 'historyTokens', label: '历史消息', color: '#4f6f96' },
-  { key: 'currentUserTokens', label: '当前输入', color: '#7895b2' },
-  { key: 'toolSchemaTokens', label: '工具定义', color: '#2f7f78' },
-  { key: 'toolResultTokens', label: '工具结果', color: '#6b9b96' },
-  { key: 'ragContextTokens', label: 'RAG 上下文', color: '#9aa8b8' },
-  { key: 'otherTokens', label: '其他 / 协议', color: '#cbd5e1' },
+  { key: 'systemPromptTokens', label: 'System Prompt', color: 'var(--chart-system)' },
+  { key: 'historyTokens', label: 'History', color: 'var(--chart-history)' },
+  { key: 'currentUserTokens', label: 'Current User', color: 'var(--chart-current-user)' },
+  { key: 'toolSchemaTokens', label: 'Tool Schema', color: 'var(--chart-tool-schema)' },
+  { key: 'toolResultTokens', label: 'Tool Result', color: 'var(--chart-tool-result)' },
+  { key: 'ragContextTokens', label: 'RAG Context', color: 'var(--chart-rag)' },
+  { key: 'otherTokens', label: 'Other / Protocol', color: 'var(--chart-other)' },
 ];
 
 const CHART_CENTER = 60;
@@ -91,10 +91,10 @@ export const TokenBreakdownPieChart: React.FC<TokenBreakdownPieChartProps> = ({ 
         </svg>
 
         <div className={styles.readout} aria-live="polite">
-          <span className={styles.readoutLabel}>{activeSegment?.label ?? '输入合计'}</span>
+          <span className={styles.readoutLabel}>{activeSegment?.label ?? 'Input Total'}</span>
           <strong>{formatTokenCount(activeSegment?.value ?? total)}</strong>
           <span className={styles.readoutMeta}>
-            {activeSegment ? `tokens · ${formatPercentage(activeSegment.value, total)}` : `tokens · ${segments.length} 项构成`}
+            {activeSegment ? `tokens · ${formatPercentage(activeSegment.value, total)}` : `tokens · ${segments.length} categories`}
           </span>
         </div>
       </div>

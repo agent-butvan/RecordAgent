@@ -1,4 +1,12 @@
 .chart {
+  --chart-system: var(--accent-blue);
+  --chart-history: var(--text-secondary);
+  --chart-current-user: color-mix(in srgb, var(--text-secondary) 55%, var(--text-muted));
+  --chart-tool-schema: var(--text-muted);
+  --chart-tool-result: color-mix(in srgb, var(--text-muted) 55%, var(--border-medium));
+  --chart-rag: var(--border-medium);
+  --chart-other: var(--border-subtle);
+
   display: grid;
   gap: 14px;
 }
