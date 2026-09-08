@@ -86,48 +86,52 @@ export const TokenUsagePanel: React.FC<TokenUsagePanelProps> = ({
           </section>
         )}
 
-        {usage.toolUsages.length > 0 && (
-          <DisclosureSection title="工具" count={usage.toolUsages.length}>
-            <div className={styles.detailList}>
-              {usage.toolUsages.map((tool) => (
-                <div className={styles.detailItem} key={tool.toolName}>
-                  <span className={styles.detailName}>{tool.toolName}</span>
-                  <span className={styles.detailMeta}>
-                    Schema {formatTokenCount(tool.schemaTokens)} · Result {formatTokenCount(tool.resultTokens)}
-                  </span>
+        {(usage.toolUsages.length > 0 || usage.calls.length > 0) && (
+          <div className={styles.disclosureGroup}>
+            {usage.toolUsages.length > 0 && (
+              <DisclosureSection title="工具" count={usage.toolUsages.length}>
+                <div className={styles.detailList}>
+                  {usage.toolUsages.map((tool) => (
+                    <div className={styles.detailItem} key={tool.toolName}>
+                      <span className={styles.detailName}>{tool.toolName}</span>
+                      <span className={styles.detailMeta}>
+                        Schema {formatTokenCount(tool.schemaTokens)} · Result {formatTokenCount(tool.resultTokens)}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </DisclosureSection>
-        )}
+              </DisclosureSection>
+            )}
 
-        {usage.calls.length > 0 && (
-          <DisclosureSection title="模型调用" count={usage.calls.length}>
-            <div className={styles.detailList}>
-              {usage.calls.map((call, callIndex) => (
-                <div className={styles.detailItem} key={`${call.source}:${call.invocationId}:${callIndex}`}>
-                  <div className={styles.callTitle}>
-                    <span className={styles.callIndex}>
-                      #{selectedTurn ? (call.modelCallIndex || callIndex + 1) : callIndex + 1}
-                    </span>
-                    <span className={styles.detailName}>{call.model}</span>
-                  </div>
-                  <span className={styles.detailMeta}>
-                    {call.inputTokens == null ? 'Input —' : `Input ${formatTokenCount(call.inputTokens)}`}
-                    {' · '}
-                    {call.outputTokens == null ? 'Output —' : `Output ${formatTokenCount(call.outputTokens)}`}
-                  </span>
-                  {(call.cachedInputTokens != null || call.durationMillis != null) && (
-                    <span className={styles.detailMeta}>
-                      {call.cachedInputTokens == null ? 'Cached —' : `Cached ${formatTokenCount(call.cachedInputTokens)}`}
-                      {' · '}
-                      {formatDuration(call.durationMillis || 0)}
-                    </span>
-                  )}
+            {usage.calls.length > 0 && (
+              <DisclosureSection title="模型调用" count={usage.calls.length}>
+                <div className={styles.detailList}>
+                  {usage.calls.map((call, callIndex) => (
+                    <div className={styles.detailItem} key={`${call.source}:${call.invocationId}:${callIndex}`}>
+                      <div className={styles.callTitle}>
+                        <span className={styles.callIndex}>
+                          #{selectedTurn ? (call.modelCallIndex || callIndex + 1) : callIndex + 1}
+                        </span>
+                        <span className={styles.detailName}>{call.model}</span>
+                      </div>
+                      <span className={styles.detailMeta}>
+                        {call.inputTokens == null ? 'Input —' : `Input ${formatTokenCount(call.inputTokens)}`}
+                        {' · '}
+                        {call.outputTokens == null ? 'Output —' : `Output ${formatTokenCount(call.outputTokens)}`}
+                      </span>
+                      {(call.cachedInputTokens != null || call.durationMillis != null) && (
+                        <span className={styles.detailMeta}>
+                          {call.cachedInputTokens == null ? 'Cached —' : `Cached ${formatTokenCount(call.cachedInputTokens)}`}
+                          {' · '}
+                          {formatDuration(call.durationMillis || 0)}
+                        </span>
+                      )}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </DisclosureSection>
+              </DisclosureSection>
+            )}
+          </div>
         )}
       </div>
     </section>

@@ -115,6 +115,11 @@
   padding: 8px 0 0 20px;
 }
 
+.disclosureGroup {
+  display: grid;
+  gap: 4px;
+}
+
 .detailItem {
   display: grid;
   gap: 3px;
