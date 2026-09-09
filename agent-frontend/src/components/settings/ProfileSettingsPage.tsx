@@ -100,7 +100,7 @@ export function ProfileSettingsPage({ accountStatus }: ProfileSettingsPageProps)
               </div>
               <span>近一年</span>
             </div>
-            <div className={styles.heatmapScroll}>
+            <div className={styles.heatmapContainer}>
               <div className={styles.heatmap} role="img" aria-label="近一年每日 Token 用量热力图">
                 {activity.weeks.map((week) => (
                   <div className={styles.week} key={week.key}>
