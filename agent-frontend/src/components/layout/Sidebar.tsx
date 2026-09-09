@@ -740,7 +740,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <img src={avatarUrl} alt="用户头像" className={styles.avatarImage} />
             ) : (
               <div className={styles.avatar}>
-                {maskedEmail ? getAvatarText(maskedEmail) : <User size={15} />}
+                {maskedEmail ? getAvatarText(maskedEmail) : <User size={13} />}
               </div>
             )}
           </div>
@@ -758,7 +758,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           aria-label="系统设置"
           onClick={onOpenSettings}
         >
-          <Settings size={18} strokeWidth={1.75} />
+          <Settings size={15} strokeWidth={1.75} />
         </button>
       </div>
     </aside>

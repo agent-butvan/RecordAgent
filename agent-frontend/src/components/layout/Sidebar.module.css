@@ -616,10 +616,6 @@
   transition: background-color var(--transition-fast);
 }
 
-.userProfileCard:hover {
-  background-color: #d8e4ec;
-}
-
 .userProfileCard:active {
   background-color: #cbd9e3;
 }
@@ -631,19 +627,19 @@
 
 .avatarWrapper {
   position: relative;
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
   flex-shrink: 0;
 }
 
 .avatar {
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   user-select: none;
   background: #f1f5f9;
@@ -651,8 +647,8 @@
 }
 
 .avatarImage {
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   object-fit: cover;
   background: #f1f5f9;
@@ -665,7 +661,7 @@
 }
 
 .profileName {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 400;
   color: #111111;
   overflow: hidden;
@@ -687,10 +683,6 @@
   cursor: pointer;
   flex-shrink: 0;
   transition: background-color var(--transition-fast), color var(--transition-fast);
-}
-
-.settingsBtn:hover {
-  background-color: #f1f5f9;
 }
 
 .settingsBtn:active {
