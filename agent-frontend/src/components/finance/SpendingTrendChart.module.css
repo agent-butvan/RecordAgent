@@ -1,4 +1,4 @@
-.section { --expense-color: #913f38; --income-color: #246247; padding: 24px 32px 20px; }
+.section { --expense-color: #e11d48; --income-color: #059669; padding: 24px 32px 20px; }
 .heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .titleRow { display: flex; align-items: center; gap: 8px; }
 .heading h2 { color: var(--text-primary); font-size: 13px; font-weight: 650; margin: 0; }

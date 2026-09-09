@@ -30,6 +30,13 @@ interface AssetDetailModalProps {
   onAddAccount?: () => void;
 }
 
+function accountToneClass(type: FinanceAccountType): string {
+  if (type.startsWith('wechat')) return styles.wechatTone;
+  if (type.startsWith('alipay')) return styles.alipayTone;
+  if (type === 'bank') return styles.bankTone;
+  return styles.otherTone;
+}
+
 /** 全部资产概览：极简无边框、无卡片块分区、纯净排版呈现。 */
 export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
   open,
@@ -45,7 +52,12 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
       <div className={styles.container}>
         {/* 顶部净资产大字与副信息，无背景块与边框 */}
         <div className={styles.headline}>
-          <strong className={styles.headlineAmount}>{money(totalAssets)}</strong>
+          <div className={styles.headlineAmountWrap}>
+            <span className={styles.currencySign}>¥</span>
+            <strong className={styles.headlineAmount}>
+              {new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(totalAssets)}
+            </strong>
+          </div>
           <span className={styles.headlineMeta}>
             共 {accounts.length} 个账户
             {yieldCount > 0 ? ` · ${yieldCount} 个生息账户` : ''}
@@ -59,13 +71,19 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
             return (
               <div key={account.id} className={styles.row}>
                 <div className={styles.left}>
-                  <AccountTypeIcon type={account.accountType} size={18} />
+                  <div className={`${styles.iconWrap} ${accountToneClass(account.accountType)}`}>
+                    <AccountTypeIcon type={account.accountType} size={16} />
+                  </div>
                   <div className={styles.nameBlock}>
                     <span className={styles.accountName}>{account.name}</span>
-                    <span className={styles.accountDesc}>
-                      {ACCOUNT_LABELS[account.accountType] ?? '账户'}
-                      {account.interestEnabled ? ` · 年化 ${account.annualRatePercent}%` : ''}
-                    </span>
+                    <div className={styles.descLine}>
+                      <span className={styles.accountDesc}>{ACCOUNT_LABELS[account.accountType] ?? '账户'}</span>
+                      {account.interestEnabled && (
+                        <span className={styles.yieldBadge}>
+                          年化 {account.annualRatePercent}%
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 

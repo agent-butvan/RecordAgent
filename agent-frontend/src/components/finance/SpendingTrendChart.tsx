@@ -6,7 +6,16 @@ import styles from './SpendingTrendChart.module.css';
 const RANGE_OPTIONS: Array<{ value: FinanceChartRange; label: string }> = [
   { value: 'week', label: '本周' }, { value: 'month', label: '本月' }, { value: 'year', label: '今年' },
 ];
-const CATEGORY_COLORS = ['#aabbd5', '#ddc0ae', '#afcbbf', '#c8b9d2', '#d9cca8', '#b5c9d2', '#dbb9bb', '#c1c9b6'];
+const CATEGORY_COLORS = [
+  '#3b82f6', // 活力蓝
+  '#f59e0b', // 温暖琥珀
+  '#10b981', // 清爽翠绿
+  '#8b5cf6', // 优雅紫
+  '#f43f5e', // 珊瑚粉
+  '#06b6d4', // 青蓝
+  '#fb923c', // 柔橙
+  '#14b8a6', // 碧绿
+];
 const money = (value: number) => new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY' }).format(value);
 const compactMoney = (value: number) => value >= 10000
   ? `${Number((value / 10000).toFixed(2))}万` : `${Number(value.toFixed(2))}`;
