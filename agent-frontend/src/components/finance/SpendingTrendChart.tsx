@@ -1,6 +1,6 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { FinanceChartRange, FinanceExpenseChart } from '../../types/finance';
-import { trendBuckets, trendCeiling, trendTicks } from './spendingTrendData';
+import { trendBuckets, trendCeiling, trendTicks, hasOutlier, createTrendScale } from './spendingTrendData';
 import styles from './SpendingTrendChart.module.css';
 
 const RANGE_OPTIONS: Array<{ value: FinanceChartRange; label: string }> = [
@@ -30,6 +30,7 @@ export const SpendingTrendChart: React.FC<SpendingTrendChartProps> = ({ chart, r
   const helpId = useId();
   const [width, setWidth] = useState(0);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const [isManualEnhanced, setIsManualEnhanced] = useState<boolean | null>(null);
   const barClipId = useId();
   const displayedRange = chart?.range ?? range;
   const days = useMemo(() => trendBuckets(chart?.days ?? [], displayedRange), [chart, displayedRange]);
@@ -43,7 +44,10 @@ export const SpendingTrendChart: React.FC<SpendingTrendChartProps> = ({ chart, r
     observer.observe(host);
     return () => observer.disconnect();
   }, []);
-  useEffect(() => setActiveIndex(null), [chart, range]);
+  useEffect(() => {
+    setActiveIndex(null);
+    setIsManualEnhanced(null);
+  }, [chart, range]);
 
   const categories = useMemo(() => {
     const totals = new Map<string, number>();
@@ -57,10 +61,16 @@ export const SpendingTrendChart: React.FC<SpendingTrendChartProps> = ({ chart, r
   const margin = { top: 18, right: 16, bottom: 30, left: 58 };
   const plotWidth = Math.max(1, width - margin.left - margin.right);
   const plotHeight = height - margin.top - margin.bottom;
-  const ceiling = trendCeiling(Math.max(0, ...days.flatMap((day) => [day.total, day.income])));
+
+  const allAmounts = useMemo(() => days.flatMap((day) => [day.total, day.income]), [days]);
+  const isOutlier = useMemo(() => hasOutlier(allAmounts), [allAmounts]);
+  const isEnhanced = isManualEnhanced ?? isOutlier;
+  const ceiling = useMemo(() => trendCeiling(Math.max(0, ...allAmounts)), [allAmounts]);
+  const scale = useMemo(() => createTrendScale(ceiling, isEnhanced), [ceiling, isEnhanced]);
+
   const step = plotWidth / Math.max(1, days.length);
   const x = (index: number) => margin.left + step * (index + .5);
-  const y = (amount: number) => margin.top + plotHeight * (1 - amount / ceiling);
+  const y = (amount: number) => margin.top + plotHeight * (1 - scale.map(amount));
   const line = (field: 'total' | 'income') => days.map((day, index) => `${index ? 'L' : 'M'} ${x(index)} ${y(day[field])}`).join(' ');
   const interactive = !loading && !error && hasData;
   const barWidth = Math.min(36, step * .62);
@@ -90,7 +100,22 @@ export const SpendingTrendChart: React.FC<SpendingTrendChartProps> = ({ chart, r
 
   return <section className={styles.section} aria-labelledby={titleId} aria-busy={loading}>
     <div className={styles.heading}>
-      <div><h2 id={titleId}>收支趋势</h2><p>{chart ? `${chart.from.replaceAll('-', '/')} — ${chart.to.replaceAll('-', '/')}` : '查看收支变化'} · {displayedRange === 'year' ? '按月汇总' : '按日统计'}</p></div>
+      <div>
+        <div className={styles.titleRow}>
+          <h2 id={titleId}>收支趋势</h2>
+          {isOutlier && (
+            <button
+              type="button"
+              className={`${styles.scaleBadge} ${isEnhanced ? styles.scaleBadgeActive : ''}`}
+              onClick={() => setIsManualEnhanced((prev) => (prev === null ? !isOutlier : !prev))}
+              title={isEnhanced ? '当前已开启对比增强，小额起伏更清晰；点击切换为普通刻度' : '当前为标准刻度；点击开启对比增强'}
+            >
+              {isEnhanced ? '已增强小额对比' : '标准刻度'}
+            </button>
+          )}
+        </div>
+        <p>{chart ? `${chart.from.replaceAll('-', '/')} — ${chart.to.replaceAll('-', '/')}` : '查看收支变化'} · {displayedRange === 'year' ? '按月汇总' : '按日统计'}</p>
+      </div>
       <div className={styles.rangeSwitch} role="group" aria-label="收支趋势时间范围">
         {RANGE_OPTIONS.map((option) => <button type="button" key={option.value} aria-pressed={range === option.value}
           className={range === option.value ? styles.rangeActive : ''} onClick={() => onRangeChange(option.value)}>{option.label}</button>)}
@@ -109,12 +134,17 @@ export const SpendingTrendChart: React.FC<SpendingTrendChartProps> = ({ chart, r
         tabIndex={interactive ? 0 : -1} aria-label="收支趋势图" aria-describedby={helpId}
         onPointerMove={selectFromPointer} onPointerDown={selectFromPointer} onKeyDown={selectFromKeyboard}
         onFocus={() => { if (interactive) setActiveIndex((current) => current ?? 0); }}>
-        {[0, .25, .5, .75, 1].map((ratio) => <g key={ratio} aria-hidden="true">
-          <line x1={margin.left} x2={width - margin.right} y1={y(ceiling * ratio)} y2={y(ceiling * ratio)} className={ratio === 0 ? styles.baseline : styles.gridLine} />
-          <text x={margin.left - 10} y={y(ceiling * ratio) + 3} textAnchor="end" className={styles.axisLabel}>
-            {compactMoney(ceiling * ratio)}{ratio === 1 ? '元' : ''}
-          </text>
-        </g>)}
+        {scale.ticks.map((tick) => {
+          const lineY = margin.top + plotHeight * (1 - tick.ratio);
+          return (
+            <g key={tick.ratio} aria-hidden="true">
+              <line x1={margin.left} x2={width - margin.right} y1={lineY} y2={lineY} className={tick.ratio === 0 ? styles.baseline : styles.gridLine} />
+              <text x={margin.left - 10} y={lineY + 3} textAnchor="end" className={styles.axisLabel}>
+                {compactMoney(tick.value)}{tick.ratio === 1 ? '元' : ''}
+              </text>
+            </g>
+          );
+        })}
         <g aria-hidden="true" className={loading ? styles.pendingData : undefined}>
           {interactive && activeDay && activeIndex !== null && <line x1={x(activeIndex)} x2={x(activeIndex)} y1={margin.top} y2={y(0)} className={styles.cursorLine} />}
           {days.map((day, index) => {
@@ -122,13 +152,21 @@ export const SpendingTrendChart: React.FC<SpendingTrendChartProps> = ({ chart, r
             const segments = [...day.categories].filter((item) => item.amount > 0)
               .sort((a, b) => categories.indexOf(a.category) - categories.indexOf(b.category));
             const total = segments.reduce((sum, item) => sum + item.amount, 0);
+            const barTop = y(total);
+            const barBase = y(0);
+            const barHeight = Math.max(0, barBase - barTop);
+
             return <g key={day.date} className={activeIndex !== null && activeIndex !== index ? styles.barDimmed : styles.bar}>
-              <defs><clipPath id={`${barClipId}-${index}`}><rect x={x(index) - barWidth / 2} y={y(total)}
-                width={barWidth} height={total / ceiling * plotHeight} rx={Math.min(4, barWidth / 4)} /></clipPath></defs>
+              <defs><clipPath id={`${barClipId}-${index}`}><rect x={x(index) - barWidth / 2} y={barTop}
+                width={barWidth} height={barHeight} rx={Math.min(4, barWidth / 4)} /></clipPath></defs>
               <g clipPath={`url(#${barClipId}-${index})`}>{segments.map((item) => {
+                const prev = accumulated;
                 accumulated += item.amount;
-                return <rect key={item.category} x={x(index) - barWidth / 2} y={y(accumulated)}
-                  width={barWidth} height={item.amount / ceiling * plotHeight} fill={categoryColor(item.category)}
+                const segTop = y(accumulated);
+                const segBottom = y(prev);
+                const segHeight = Math.max(0, segBottom - segTop);
+                return <rect key={item.category} x={x(index) - barWidth / 2} y={segTop}
+                  width={barWidth} height={segHeight} fill={categoryColor(item.category)}
                   stroke="var(--bg-app)" strokeWidth={.6} />;
               })}</g>
             </g>;
