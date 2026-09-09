@@ -739,18 +739,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {avatarUrl ? (
               <img src={avatarUrl} alt="用户头像" className={styles.avatarImage} />
             ) : (
-              <div className={`${styles.avatar} ${maskedEmail ? styles.avatarBound : styles.avatarUnbound}`}>
+              <div className={styles.avatar}>
                 {maskedEmail ? getAvatarText(maskedEmail) : <User size={15} />}
               </div>
             )}
-            {maskedEmail && <span className={styles.verifiedDot} title="已验证" />}
           </div>
           <div className={styles.profileInfo}>
             <span className={styles.profileName}>
               {maskedEmail || '未绑定邮箱'}
-            </span>
-            <span className={styles.profileStatus}>
-              {maskedEmail ? '个人资料' : '点击绑定'}
             </span>
           </div>
         </button>
@@ -762,7 +758,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           aria-label="系统设置"
           onClick={onOpenSettings}
         >
-          <Settings size={15} />
+          <Settings size={18} strokeWidth={1.75} />
         </button>
       </div>
     </aside>
