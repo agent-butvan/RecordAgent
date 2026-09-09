@@ -170,13 +170,10 @@ export const FinancePage: React.FC = () => {
                 setIsAssetDetailModalOpen(true);
               }
             }}
-            title="点击查看全部资产详情概览"
+            title="点击查看全部资产概览"
             aria-label="总资产：点击查看全部资产详情概览"
           >
-            <div className={styles.balanceTitleRow}>
-              <span>总资产</span>
-              <CaretRightIcon size={12} className={styles.balanceArrow} aria-hidden="true" />
-            </div>
+            <span>总资产</span>
             <strong>{money(overview?.totalAssets ?? 0)}</strong>
             <small>{overview?.accounts.length ?? 0} 个账户</small>
           </div>

@@ -1,100 +1,68 @@
 .container {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 4px 0 0;
+  padding: 4px 6px 0;
 }
 
-.summaryCard {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 18px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  background: var(--bg-surface);
-}
-
-.summaryMain {
+.headline {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
+  padding-bottom: 22px;
 }
 
-.summaryLabel {
-  color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 500;
-}
-
-.summaryAmount {
+.headlineAmount {
   color: var(--text-primary);
-  font-size: 20px;
+  font-size: 30px;
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
+  line-height: 1.1;
 }
 
-.summaryMeta {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-  color: var(--text-secondary);
+.headlineMeta {
+  color: var(--text-muted);
   font-size: 11px;
-}
-
-.summaryMeta b {
-  color: var(--text-primary);
 }
 
 .list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 4px;
   max-height: 380px;
   overflow-y: auto;
-  padding-right: 2px;
+  padding-right: 4px;
 }
 
-.accountCard {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px 14px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--bg-app);
-  transition: border-color var(--transition-fast), background-color var(--transition-fast);
-}
-
-.accountCard:hover {
-  border-color: var(--border-medium);
-  background: var(--bg-surface);
-}
-
-.accountHeader {
+.row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
+  padding: 10px 8px;
+  border-radius: var(--radius-md);
+  transition: background-color var(--transition-fast);
 }
 
-.accountIdentity {
+.row:hover {
+  background-color: var(--bg-surface);
+}
+
+.left {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
 }
 
 .nameBlock {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
   min-width: 0;
 }
 
-.nameBlock strong {
+.accountName {
   color: var(--text-primary);
   font-size: 13px;
   font-weight: 600;
@@ -103,30 +71,12 @@
   text-overflow: ellipsis;
 }
 
-.tagRow {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.accountDesc {
+  color: var(--text-muted);
+  font-size: 10.5px;
 }
 
-.typeTag {
-  color: var(--text-secondary);
-  font-size: 10px;
-}
-
-.yieldTag {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 1px 5px;
-  border-radius: var(--radius-sm);
-  background: rgba(16, 185, 129, 0.1);
-  color: #059669;
-  font-size: 9.5px;
-  font-weight: 600;
-}
-
-.balanceBlock {
+.right {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -134,48 +84,40 @@
   flex-shrink: 0;
 }
 
-.balanceAmount {
+.accountAmount {
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 650;
   font-variant-numeric: tabular-nums;
 }
 
-.ratioText {
+.accountRatio {
   color: var(--text-muted);
   font-size: 10px;
-}
-
-.progressTrack {
-  width: 100%;
-  height: 4px;
-  border-radius: 9999px;
-  background: var(--border-subtle);
-  overflow: hidden;
-}
-
-.progressBar {
-  height: 100%;
-  border-radius: 9999px;
-  background: linear-gradient(90deg, #3b82f6, #60a5fa);
-  transition: width 300ms ease-out;
-}
-
-.emptyState {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 36px 0;
-  color: var(--text-muted);
-  font-size: 12px;
 }
 
 .footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-top: 12px;
-  border-top: 1px solid var(--border-subtle);
+  padding-top: 24px;
+}
+
+.addBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font: 500 11px var(--font-sans);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.addBtn:hover {
+  color: var(--accent-blue);
+  background: var(--bg-surface);
 }

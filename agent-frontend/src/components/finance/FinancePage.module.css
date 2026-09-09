@@ -7,12 +7,7 @@
 
 .overview { min-height: 132px; display: grid; grid-template-columns: minmax(220px, 1.2fr) minmax(0, 2.8fr); align-items: center; padding: 24px 32px; }
 .balanceBlock, .monthStats > div { min-width: 0; display: flex; flex-direction: column; justify-content: center; padding: 8px 18px; }
-.balanceBlock { padding-left: 0; cursor: pointer; border-radius: var(--radius-md); transition: background-color var(--transition-fast), padding-left var(--transition-fast); }
-.balanceBlock:hover { background-color: var(--bg-surface); padding-left: 10px; }
-.balanceBlock:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 2px; }
-.balanceTitleRow { display: flex; align-items: center; gap: 4px; }
-.balanceArrow { color: var(--text-muted); transition: transform var(--transition-fast), color var(--transition-fast); }
-.balanceBlock:hover .balanceArrow { color: var(--accent-blue); transform: translateX(2px); }
+.balanceBlock { padding-left: 0; cursor: pointer; }
 .balanceBlock span, .monthStats dt { font-size: 10px; font-weight: 600; }
 .balanceBlock span { color: var(--text-secondary); }
 .balanceBlock strong { margin-top: 5px; color: var(--text-primary); font-size: 23px; font-weight: 650; letter-spacing: -.025em; font-variant-numeric: tabular-nums; }
