@@ -97,8 +97,9 @@ public class AgentFactory {
                 .messageBus(subagentMessageBus)
                 .subagents(subagentCatalog.declarations())
                 .compaction(CompactionConfig.builder()
-                        .triggerMessages(30) // 30 条消息触发上下文压缩
-                        .keepMessages(10)    // 压缩后保留最近 10 条
+                        .triggerMessages(30)    // 30 条消息触发上下文压缩
+                        .keepMessages(10)       // 压缩后保留最近 10 条
+                        .triggerTokens(32000)   // 固定 token 阈值，禁用动态 contextWindowSize 探测（避免框架向 DashScope 发送非法 URL 的探测请求）
                         .build())
                 .build();
     }
