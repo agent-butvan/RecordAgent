@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { ChatMessage, SessionPermissionMode, TokenUsageSummary } from '../../types/chat';
 import type { TaskDto } from '../../types/team';
-import { Card } from '../common/Card';
 import { LoadingTree } from '../common/LoadingTree';
 import { PermissionRequestCard } from './PermissionRequestCard';
 import { PlanApprovalCard } from './PlanApprovalCard';
@@ -18,11 +17,6 @@ import { ProjectFileTree } from './ProjectFileTree';
 import { RightSidePanel, type RightPanelTab } from './RightSidePanel';
 import type { PermissionToolPayload } from '../../services/api';
 import {
-  Compass,
-  Wrench,
-  RotateCcw,
-  Bug,
-  Cloud,
   Copy,
   ThumbsUp,
   ThumbsDown,
@@ -282,10 +276,6 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     onSendMessage(prompt);
   };
 
-  const handleQuickCardClick = (promptText: string) => {
-    setInputPrompt(promptText);
-  };
-
   // 点击左侧任务步骤时间轨：滚动定位到对应消息行
   const handleRailSelect = (chapter: StepRailChapter) => {
     if (!chapter.messageId) return;
@@ -384,59 +374,6 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
           <div className={styles.sessionLoadState}>
             <LoadingTree size="large" label="正在读取聊天记录…" />
           </div>
-        ) : messages.length === 0 ? (
-          <div className={styles.centerHero}>
-            <Cloud className={styles.cloudIcon} />
-            <h1 className={styles.heroTitle}>要在 <span style={{ textDecoration: 'underline', textUnderlineOffset: '6px' }}>ButvanAgent</span> 内开发什么？</h1>
-
-            {/* 4 Quick Action Cards using extracted Card component */}
-            <div className={styles.cardGrid}>
-              <Card
-                variant="interactive"
-                className={styles.quickCard}
-                onClick={() => handleQuickCardClick('探索并理解当前项目代码结构与架构设计')}
-              >
-                <div className={styles.cardIcon}>
-                  <Compass size={18} style={{ color: '#0284c7' }} />
-                </div>
-                <span className={styles.cardText}>探索并理解代码</span>
-              </Card>
-
-              <Card
-                variant="interactive"
-                className={styles.quickCard}
-                onClick={() => handleQuickCardClick('构建新功能、应用或工具模块')}
-              >
-                <div className={styles.cardIcon}>
-                  <Wrench size={18} style={{ color: '#9333ea' }} />
-                </div>
-                <span className={styles.cardText}>构建新功能、应用或工具</span>
-              </Card>
-
-              <Card
-                variant="interactive"
-                className={styles.quickCard}
-                onClick={() => handleQuickCardClick('审查代码并提出重构及修改建议')}
-              >
-                <div className={styles.cardIcon}>
-                  <RotateCcw size={18} style={{ color: '#16a34a' }} />
-                </div>
-                <span className={styles.cardText}>审查代码并提出修改建议</span>
-              </Card>
-
-              <Card
-                variant="interactive"
-                className={styles.quickCard}
-                onClick={() => handleQuickCardClick('定位并修复项目中出现的 Bug 和报错')}
-              >
-                <div className={styles.cardIcon}>
-                  <Bug size={18} style={{ color: '#ea580c' }} />
-                </div>
-                <span className={styles.cardText}>修复问题和失败</span>
-              </Card>
-            </div>
-            {inputArea}
-          </div>
         ) : (
           <div className={styles.chatBody}>
             {/* Codex 风格任务步骤时间轨 */}
@@ -446,21 +383,23 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
 
             <div className={styles.chatColumn}>
               <div ref={messagesAreaRef} className={styles.messagesArea}>
-                <div className={styles.messagesInner}>
-                  {messages.map((msg) => (
-                    <div key={msg.id} data-msg-id={msg.id} className={styles.messageRow}>
-                      {msg.role === 'user' ? (
-                        <div className={styles.userMessage}>{msg.content}</div>
-                      ) : (
-                        <AssistantMessageItem
-                          msg={msg}
-                          tokenUsageActive={rightPanelOpen && rightPanelTab === 'tokens' && tokenUsageMessageId === msg.id}
-                          onOpenTokenUsage={openTokenUsage}
-                        />
-                      )}
-                    </div>
-                  ))}
-                </div>
+                {messages.length > 0 && (
+                  <div className={styles.messagesInner}>
+                    {messages.map((msg) => (
+                      <div key={msg.id} data-msg-id={msg.id} className={styles.messageRow}>
+                        {msg.role === 'user' ? (
+                          <div className={styles.userMessage}>{msg.content}</div>
+                        ) : (
+                          <AssistantMessageItem
+                            msg={msg}
+                            tokenUsageActive={rightPanelOpen && rightPanelTab === 'tokens' && tokenUsageMessageId === msg.id}
+                            onOpenTokenUsage={openTokenUsage}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {inputArea}
