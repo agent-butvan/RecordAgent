@@ -102,7 +102,7 @@ Ruling something out of scope is a scoping act, not a step on the route. When a 
 
 ## Invocation
 
-Two modes. Either way, **never resolve more than one ticket per session**, with the exception of research tickets.
+Two modes. Continue through authorized, unblocked decision tickets while useful context and evidence remain available. Pause for unresolved human decisions, missing authorization or access, or context pressure that requires a handoff. Preserve the default planning scope, ticket claims, and HITL requirements; continuing within a session does not authorize implementation.
 
 ### Chart the map
 
@@ -113,7 +113,7 @@ User invokes with a loose idea.
 3. **Create the map** (label `wayfinder:map`): Destination and Notes filled in, Decisions-so-far empty, the fog sketched into **Not yet specified**.
 4. **Create the tickets you can specify now** as child issues of the map, then wire blocking edges in a **second pass** (issues need ids before they can reference each other). Wiring sorts them into the frontier and the blocked; everything you can't yet specify stays in the fog: the **Not yet specified** section.
 5. **Fire the research subagents.** For each `research` ticket you just created, spin up a subagent that calls the Skill tool with "research" to resolve it in parallel, capturing its findings on a throwaway `research/<name>` branch with a context pointer from the ticket.
-6. Stop: charting is one session's work; it hand-resolves nothing.
+6. If the request only authorizes charting, deliver the map. If it also authorizes resolving decisions, continue with an unblocked ticket below; wait where its HITL requirements need user input.
 
 ### Work through the map
 

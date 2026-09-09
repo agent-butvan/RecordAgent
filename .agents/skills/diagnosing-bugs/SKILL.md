@@ -1,11 +1,11 @@
 ---
 name: diagnosing-bugs
-description: Diagnosis loop for hard bugs and performance regressions. Use when the user says "diagnose"/"debug this", or reports something broken/throwing/failing/slow.
+description: Diagnose bugs with unclear causes, intermittent failures, and performance regressions when initial inspection has not established the cause. Simple errors with an evident fix do not need this workflow.
 ---
 
 # Diagnosing Bugs
 
-A discipline for hard bugs. Skip phases only when explicitly justified.
+A discipline for hard bugs. Use the phases as a toolkit: move between code inspection, hypotheses, and reproduction as evidence develops. Report verified findings separately from hypotheses and unverified fixes.
 
 When exploring the codebase, read `CONTEXT.md` (if it exists) to get a clear mental model of the relevant modules, and check ADRs in the area you're touching.
 
@@ -17,9 +17,7 @@ If the redacted output is not enough to diagnose the bug, say so and ask the use
 
 ## Phase 1: Build a feedback loop
 
-**This is the skill.** Everything else is mechanical. If you have a **tight** pass/fail signal for the bug (one that goes red on _this_ bug), you will find the cause; bisection, hypothesis-testing, and instrumentation all just consume it. If you don't have one, no amount of staring at code will save you.
-
-Spend disproportionate effort here. **Be aggressive. Be creative. Refuse to give up.**
+A **tight** pass/fail signal makes bisection, hypothesis-testing, and instrumentation useful. Invest in a reproducible signal, using code inspection and available traces to identify a practical trigger.
 
 ### Ways to construct one, in roughly this order
 
@@ -52,18 +50,18 @@ The goal is not a clean repro but a **higher reproduction rate**. Loop the trigg
 
 ### When you genuinely cannot build a loop
 
-Stop and say so explicitly. List what you tried. Ask the user for: (a) access to whatever environment reproduces it, (b) a redacted captured artifact (HAR file, log dump, core dump, screen recording with timestamps), or (c) permission to add temporary production instrumentation. Do **not** proceed to hypothesise without a loop.
+State what you tried and what remains unverified. Continue useful static analysis and form falsifiable hypotheses from available evidence. Ask only for missing access or redacted artifacts needed to resolve the uncertainty. Obtain authorization before adding production instrumentation; lack of a local repro does not authorize production changes. If verification remains unavailable, report that limit rather than claiming a confirmed fix.
 
-### Completion criterion: a tight loop that goes red
+### Evidence from a feedback loop
 
-Phase 1 is done when the loop is **tight** and **red-capable**: you can name **one command** (a script path, a test invocation, a curl) that you have **already run at least once** (show the invocation and its output, redacted), and that is:
+When a runnable reproduction is available, record a command (a script path, a test invocation, a curl) you actually ran and its redacted output. Aim for a loop that is:
 
 - [ ] **Red-capable**: it drives the actual bug code path and asserts the **user's exact symptom**, so it can go red on this bug and green once fixed. Not "runs without erroring"; it must be able to _catch this specific bug_.
 - [ ] **Deterministic**: same verdict every run (flaky bugs: a pinned, high reproduction rate, per above).
 - [ ] **Fast**: seconds, not minutes.
 - [ ] **Agent-runnable**: you can run it unattended; a human in the loop only via `scripts/hitl-loop.template.sh`.
 
-If you catch yourself reading code to build a theory before this command exists, **stop: jumping straight to a hypothesis is the exact failure this skill prevents.** No red-capable command, no Phase 2.
+A missing reproduction command does not block code inspection or hypothesis testing. Explain which evidence supports the suspected cause and what observation would confirm or refute it.
 
 ## Phase 2: Reproduce + minimise
 
@@ -77,17 +75,15 @@ Confirm:
 
 ### Minimise
 
-Once it's red, shrink the repro to the **smallest scenario that still goes red**. Cut inputs, callers, config, data, and steps **one at a time**, re-running the loop after each cut, and keep only what's load-bearing for the failure.
+Shrink the repro when doing so helps distinguish causes or produces a maintainable regression test. Remove inputs, callers, config, data, or steps incrementally, checking that the original symptom remains.
 
 Why bother: a minimal repro shrinks the hypothesis space in Phase 3 (fewer moving parts left to suspect) and becomes the clean regression test in Phase 5.
 
-Done when **every remaining element is load-bearing**: removing any one of them makes the loop go green.
-
-Do not proceed until you have reproduced **and** minimised.
+Stop minimising when further reduction would not improve the diagnosis or regression test. Strong evidence for a cause can justify testing it before further minimisation.
 
 ## Phase 3: Hypothesise
 
-Generate **3–5 ranked hypotheses** before testing any of them. Single-hypothesis generation anchors on the first plausible idea.
+Compare plausible hypotheses when the evidence supports competing explanations. Test a strongly supported cause directly; there is no required number of alternatives. Reconsider the hypothesis when observations contradict it.
 
 Each hypothesis must be **falsifiable**: state the prediction it makes.
 
@@ -125,14 +121,13 @@ If a correct seam exists:
 2. Watch it fail.
 3. Apply the fix.
 4. Watch it pass.
-5. Re-run the Phase 1 feedback loop against the original (un-minimised) scenario.
+5. Verify the original scenario as part of final validation below; a narrow regression test alone may not cover it.
 
 ## Phase 6: Cleanup
 
 Required before declaring done:
 
-- [ ] Original repro no longer reproduces (re-run the Phase 1 loop)
-- [ ] Regression test passes (or absence of seam is documented)
+- [ ] The original scenario and relevant regression test pass against the final code, or the unavailable reproduction/test seam and remaining uncertainty are documented. Reuse successful results while they remain valid; rerun affected checks if cleanup, code, fixtures, or environment changes invalidate them.
 - [ ] All `[DEBUG-...]` instrumentation removed (`grep` the prefix)
 - [ ] Throwaway prototypes deleted (or moved to a clearly-marked debug location)
-- [ ] The hypothesis that turned out correct is stated in the commit / PR message, so the next debugger learns
+- [ ] The commit / PR message states the supported cause and evidence, or clearly labels the remaining hypothesis and verification limits.
