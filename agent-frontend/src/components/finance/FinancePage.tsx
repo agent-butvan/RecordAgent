@@ -225,6 +225,7 @@ export const FinancePage: React.FC = () => {
     <TransactionDrawer
       open={isTransactionDrawerOpen}
       transactions={allTransactions}
+      accounts={overview?.accounts ?? []}
       loading={isTransactionsLoading}
       error={transactionsError}
       onClose={() => setIsTransactionDrawerOpen(false)}
