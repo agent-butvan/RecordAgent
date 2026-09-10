@@ -387,7 +387,10 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
             </div>}
 
             <div className={styles.chatColumn}>
-              <div ref={messagesAreaRef} className={styles.messagesArea}>
+              <div
+                ref={messagesAreaRef}
+                className={`${styles.messagesArea} ${messages.length === 0 ? styles.overviewArea : ''}`}
+              >
                 {messages.length === 0 && <SessionOverview key={sessionId} onOpenFeature={onOpenFeature} onOpenRecords={onOpenRecords} onCompose={(prompt) => {
                   setInputPrompt(prompt);
                   messagesAreaRef.current?.parentElement?.querySelector<HTMLTextAreaElement>('textarea')?.focus();

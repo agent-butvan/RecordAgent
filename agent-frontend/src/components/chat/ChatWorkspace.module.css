@@ -172,6 +172,11 @@
   min-width: 0;
 }
 
+/* 空会话首页始终收进当前工作区；聊天消息仍由 .messagesArea 独立滚动。 */
+.overviewArea {
+  overflow: hidden;
+}
+
 .messagesInner {
   width: 100%;
   max-width: 840px;
