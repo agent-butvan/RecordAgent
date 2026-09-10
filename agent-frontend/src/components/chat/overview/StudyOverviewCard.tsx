@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { DotsThree } from '@phosphor-icons/react';
-import { fetchActiveStudySession, fetchStudyCategories, fetchStudyStatistics, finishStudySession, startStudySession } from '../../../services/studyApi';
+import { fetchActiveStudySession, fetchStudyCategories, fetchStudyStatistics, startStudySession } from '../../../services/studyApi';
 import { formatLocalDate } from '../../../services/dailyEvents';
 import { notifyStudySessionChanged, subscribeStudySessionChanges } from '../../../services/studySessionEvents';
-import { OverviewCard } from '../../common/OverviewCard';
-import { Button } from '../../common/Button';
 import { mergeCategoryOptions } from '../../common/categoryOptions';
 import { StudyStartModal } from '../../study/StudyStartModal';
 import { STUDY_CATEGORIES } from '../../study/studyCategories';
@@ -12,7 +10,11 @@ import { useOverviewResource } from './useOverviewResource';
 import { overviewDuration } from './overviewData';
 import styles from './SessionOverview.module.css';
 
-interface StudyOverviewCardProps { date: string; onOpenStudy: () => void }
+export interface StudyTileProps {
+  date: string;
+  onOpenStudy: () => void;
+}
+
 const TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const compactDuration = (seconds: number) => {
   const minutes = Math.floor(Math.max(0, seconds) / 60);
@@ -21,8 +23,7 @@ const compactDuration = (seconds: number) => {
 const weekday = (date: string) => new Intl.DateTimeFormat('zh-CN', { weekday: 'short' })
   .format(new Date(`${date}T12:00:00`)).replace('周', '');
 
-/** 学习统计采用后端统一口径，每分钟及跨窗口事件后刷新，避免重复叠加计时。 */
-export function StudyOverviewCard({ date, onOpenStudy }: StudyOverviewCardProps) {
+export function LearningTile({ date, onOpenStudy }: StudyTileProps) {
   const load = useCallback(async () => {
     const historyFrom = new Date(`${date}T12:00:00`);
     historyFrom.setFullYear(historyFrom.getFullYear() - 1);
@@ -37,12 +38,14 @@ export function StudyOverviewCard({ date, onOpenStudy }: StudyOverviewCardProps)
   const busy = useRef(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const hasActiveStudy = Boolean(data?.active);
+
   useEffect(() => subscribeStudySessionChanges(() => void reload()), [reload]);
   useEffect(() => {
     if (!hasActiveStudy) return;
     const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void reload(); }, 60_000);
     return () => window.clearInterval(timer);
   }, [hasActiveStudy, reload]);
+
   const changeStudy = async (action: () => Promise<unknown>) => {
     if (busy.current) return;
     busy.current = true; setSaving(true); setSaveError(null);
@@ -53,6 +56,7 @@ export function StudyOverviewCard({ date, onOpenStudy }: StudyOverviewCardProps)
       await reload();
     } finally { busy.current = false; setSaving(false); }
   };
+
   const historyDays = data?.history.days ?? [];
   const weekDays = historyDays.slice(-7);
   const today = weekDays.find((day) => day.date === date);
@@ -65,40 +69,64 @@ export function StudyOverviewCard({ date, onOpenStudy }: StudyOverviewCardProps)
     streak++;
   }
   const maximum = Math.max(1, ...weekDays.map((day) => day.durationSeconds));
-  const ringProgress = Math.min(100, (today?.durationSeconds ?? 0) / maximum * 100);
-  return <>
-    <OverviewCard className={styles.study} eyebrow="LEARNING" title="今日学习" loading={loading} error={error} onRetry={() => void reload()}
-      action={<button type="button" className={styles.moreButton} onClick={onOpenStudy} aria-label="打开学习记录"><DotsThree size={18} weight="bold" aria-hidden="true" /></button>}
-      footer={<><span className={styles.muted}>{data?.active ? '计时中 · 每分钟更新' : '准备好就开始'} </span>
-        <Button type="button" size="sm" variant="outline" disabled={saving} onClick={() => {
-          if (data?.active) { const active = data.active; void changeStudy(() => finishStudySession(active.id, active.version)); }
-          else { setSaveError(null); setOpen(true); }
-        }}>{saving ? '保存中…' : data?.active ? '结束学习' : '开始学习'}</Button></>}>
-      {data && <>
-        <div className={styles.studyOverview}>
-          <div className={styles.studyRing} role="img" aria-label={`今日学习${overviewDuration(today?.durationSeconds ?? 0)}，相当于近七日最高单日的${Math.round(ringProgress)}%`}>
-            <svg viewBox="0 0 80 80" aria-hidden="true">
-              <circle className={styles.studyRingTrack} cx="40" cy="40" r="32" pathLength="100" />
-              <circle className={styles.studyRingValue} cx="40" cy="40" r="32" pathLength="100" strokeDasharray={`${ringProgress} 100`} />
-            </svg>
-            <strong>{compactDuration(today?.durationSeconds ?? 0)}</strong>
+  const ringProgress = Math.min(100, Math.round(((today?.durationSeconds ?? 0) / maximum) * 100));
+
+  return (
+    <>
+      <section className={`${styles.tile} ${styles.learning}`}>
+        <div className={styles.tileHead}>
+          <div>
+            <div className={styles.eyebrow}>LEARNING</div>
+            <div className={styles.title}>今日学习</div>
           </div>
-          <dl className={styles.studyKpis}>
-            <div><dt>近 7 天</dt><dd>{overviewDuration(weekTotal)}</dd></div>
-            <div><dt>连续学习</dt><dd>{streak} 天</dd></div>
-            <div><dt>今日片段</dt><dd>{today?.sessionCount ?? 0} 段</dd></div>
-            <div><dt>本月累计</dt><dd>{overviewDuration(monthTotal)}</dd></div>
-          </dl>
+          <button type="button" className={styles.more} onClick={onOpenStudy} aria-label="打开学习记录" title="打开学习记录">
+            <DotsThree size={18} weight="bold" />
+          </button>
         </div>
-        {data.active && <p className={styles.activeStudy}><strong>正在学习</strong>{data.active.content}</p>}
-        {!open && saveError && <p className={styles.error} role="alert">{saveError}</p>}
-        <div className={styles.bars} aria-label="近七天学习时长">{weekDays.map((day) => <div className={styles.barDay} key={day.date} title={`${day.date}：${overviewDuration(day.durationSeconds)}`}>
-          <span className={styles.barTrack} role="img" aria-label={`${day.date}学习${overviewDuration(day.durationSeconds)}`}><span className={styles.barFill} style={{ height: `${day.durationSeconds / maximum * 100}%` }} /></span>
-          <span>{weekday(day.date)}</span>
-        </div>)}</div>
-      </>}
-    </OverviewCard>
-    <StudyStartModal open={open} saving={saving} error={saveError} categories={mergeCategoryOptions(STUDY_CATEGORIES, data?.categories ?? [])}
-      onClose={() => { if (!saving) setOpen(false); }} onStart={(content, category) => changeStudy(() => startStudySession(content, category, TIMEZONE))} />
-  </>;
+
+        {loading ? (
+          <p className={styles.empty}>正在加载学习数据…</p>
+        ) : error ? (
+          <p className={styles.error} onClick={() => void reload()}>{error}</p>
+        ) : data ? (
+          <>
+            <div className={styles.learnRing}>
+              <div
+                className={styles.ring}
+                style={{
+                  background: `conic-gradient(#2f6df6 0 ${ringProgress}%, #eef2f6 ${ringProgress}% 100%)`,
+                }}
+              >
+                <div className={styles.ringLabel}>{compactDuration(today?.durationSeconds ?? 0)}</div>
+              </div>
+              <div className={styles.learnKpis}>
+                <div><span>近 7 天</span><b>{overviewDuration(weekTotal)}</b></div>
+                <div><span>连续学习</span><b>{streak} 天</b></div>
+                <div><span>今日片段</span><b>{today?.sessionCount ?? 0} 段</b></div>
+                <div><span>本月累计</span><b>{overviewDuration(monthTotal)}</b></div>
+              </div>
+            </div>
+
+            <div className={styles.weekDots}>
+              {weekDays.map((day) => (
+                <div className={styles.day} key={day.date} title={`${day.date}：${overviewDuration(day.durationSeconds)}`}>
+                  <div className={styles.bar}>
+                    <i style={{ height: `${maximum > 0 ? (day.durationSeconds / maximum) * 100 : 0}%` }} />
+                  </div>
+                  <span>{weekday(day.date)}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : null}
+      </section>
+
+      <StudyStartModal open={open} saving={saving} error={saveError} categories={mergeCategoryOptions(STUDY_CATEGORIES, data?.categories ?? [])}
+        onClose={() => { if (!saving) setOpen(false); }} onStart={(content, category) => changeStudy(() => startStudySession(content, category, TIMEZONE))} />
+    </>
+  );
+}
+
+export function StudyOverviewCard(props: StudyTileProps) {
+  return <LearningTile date={props.date} onOpenStudy={props.onOpenStudy} />;
 }

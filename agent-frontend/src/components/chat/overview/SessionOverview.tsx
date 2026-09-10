@@ -7,10 +7,10 @@ import type { RecordEntry, RecordType } from '../../../types/record';
 import { CalendarQuickCreate } from '../../calendar/CalendarQuickCreate';
 import { TransactionModal } from '../../finance/TransactionModal';
 import { useMessage } from '../../common/Message';
-import { TodoOverviewCard } from './TodoOverviewCard';
-import { FinanceOverviewCard } from './FinanceOverviewCard';
-import { RecordsOverviewCard } from './RecordsOverviewCard';
-import { StudyOverviewCard } from './StudyOverviewCard';
+import { TodoSummaryTile, TodoListTile } from './TodoOverviewCard';
+import { FinanceTile, FinanceMiniTile } from './FinanceOverviewCard';
+import { DocsTile, DocsListTile } from './RecordsOverviewCard';
+import { LearningTile } from './StudyOverviewCard';
 import styles from './SessionOverview.module.css';
 
 export interface SessionOverviewProps {
@@ -64,28 +64,51 @@ export function SessionOverview({ onOpenFeature, onOpenRecords, onCompose }: Ses
   const dateValue = new Date(`${date}T12:00:00`);
   const dateText = new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }).format(dateValue);
   const weekdayText = new Intl.DateTimeFormat('zh-CN', { weekday: 'long' }).format(dateValue);
-  return <section className={styles.overview} aria-label="今日概览">
-    <header className={styles.welcome}><div><h1>今天，想从哪件事开始？</h1><p>先看一眼你今天的状态，再直接交给 Agent 继续推进。</p></div>
-      <time className={styles.date} dateTime={date}>{dateText} · {weekdayText}</time>
-      <CalendarQuickCreate selectedDate={new Date(`${date}T12:00:00`)} onCreate={create} onWriteJournal={() => onOpenRecords(null, 'journal')} onCreateFinance={() => void openFinance()} />
-    </header>
-    {openingFinance && <p className={styles.muted} role="status">正在准备记账表单…</p>}
-    <div className={styles.grid}>
-      <div className={styles.column}>
-        <TodoOverviewCard key={`todo-${date}`} date={date} refreshKey={refreshKey} onOpenCalendar={() => onOpenFeature('calendar')} onCompose={onCompose} />
+
+  return (
+    <section className={styles.layoutWrap} aria-label="今日概览">
+      <header className={styles.welcome}>
+        <div>
+          <h1>今天，想从哪件事开始？</h1>
+          <p>先看一眼你今天的状态，再直接交给 Agent 继续推进。</p>
+        </div>
+        <div className={styles.welcomeRight}>
+          <time className={styles.date} dateTime={date}>{dateText} · {weekdayText}</time>
+          <CalendarQuickCreate
+            selectedDate={new Date(`${date}T12:00:00`)}
+            onCreate={create}
+            onWriteJournal={() => onOpenRecords(null, 'journal')}
+            onCreateFinance={() => void openFinance()}
+          />
+        </div>
+      </header>
+
+      {openingFinance && <p className={styles.muted} role="status">正在准备记账表单…</p>}
+
+      <div className={styles.bento}>
+        <TodoSummaryTile key={`todo-summary-${date}`} date={date} refreshKey={refreshKey} onOpenCalendar={() => onOpenFeature('calendar')} />
+        <TodoListTile key={`todo-list-${date}`} date={date} refreshKey={refreshKey} onCompose={onCompose} />
+        <FinanceTile key={`finance-${date}`} date={date} refreshKey={refreshKey} onCreate={() => void openFinance()} />
+        <FinanceMiniTile key={`finance-mini-${date}`} date={date} refreshKey={refreshKey} onOpenFinance={() => onOpenFeature('finance')} />
+        <DocsTile key={`docs-${date}`} date={date} onOpen={onOpenRecords} />
+        <DocsListTile key={`docs-list-${date}`} date={date} onOpen={onOpenRecords} />
+        <LearningTile key={`learning-${date}`} date={date} onOpenStudy={() => onOpenFeature('study')} />
       </div>
-      <div className={styles.column}>
-        <FinanceOverviewCard date={date} refreshKey={refreshKey} onOpenFinance={() => onOpenFeature('finance')} onCreate={() => void openFinance()} />
-      </div>
-      <div className={styles.column}>
-        <RecordsOverviewCard date={date} onOpen={onOpenRecords} />
-        <StudyOverviewCard date={date} onOpenStudy={() => onOpenFeature('study')} />
-      </div>
-    </div>
-    {financeForm && <TransactionModal open accounts={financeForm.accounts} categories={financeForm.categories} defaultDate={financeForm.date} onClose={() => setFinanceForm(null)} onSubmit={async (input) => {
-      await createFinanceTransaction(input);
-      setRefreshKey((value) => value + 1);
-      showMessage('success', '流水已保存');
-    }} />}
-  </section>;
+
+      {financeForm && (
+        <TransactionModal
+          open
+          accounts={financeForm.accounts}
+          categories={financeForm.categories}
+          defaultDate={financeForm.date}
+          onClose={() => setFinanceForm(null)}
+          onSubmit={async (input) => {
+            await createFinanceTransaction(input);
+            setRefreshKey((value) => value + 1);
+            showMessage('success', '流水已保存');
+          }}
+        />
+      )}
+    </section>
+  );
 }
