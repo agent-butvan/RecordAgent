@@ -172,9 +172,11 @@
   min-width: 0;
 }
 
-/* 空会话首页始终收进当前工作区；聊天消息仍由 .messagesArea 独立滚动。 */
+/* 空会话首页：使用温润浅灰底色衬托纯白卡片，支持自适应滚动 */
 .overviewArea {
-  overflow: hidden;
+  background-color: #f8fafc;
+  overflow-y: auto;
+  padding: 24px 32px;
 }
 
 .messagesInner {

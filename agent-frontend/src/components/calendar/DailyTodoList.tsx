@@ -50,33 +50,54 @@ export const DailyTodoList: React.FC<DailyTodoListProps> = ({ todos, onToggle, o
             </span>
           </label>
           <span className={styles.todoContent}>
-            <span className={styles.todoLine}>
-              <span className={todo.completed ? styles.todoTitleDone : styles.todoTitle}>{todo.title}</span>
-              <motion.svg
-                viewBox="0 0 340 32"
-                preserveAspectRatio="none"
-                className={styles.strike}
-                aria-hidden="true"
-              >
-                <motion.path
-                  d="M 8 16.5 C 49 7, 89 12, 128 16 C 169 21, 215 8, 258 14 C 288 18, 314 11, 334 15"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeWidth="2"
-                  initial={false}
-                  animate={{ pathLength: todo.completed ? 1 : 0, opacity: todo.completed ? 1 : 0 }}
-                  transition={{ pathLength: { duration: 0.52, ease: 'easeInOut' }, opacity: { duration: 0.01, delay: todo.completed ? 0 : 0.52 } }}
-                />
-              </motion.svg>
-            </span>
-            <span className={styles.meta}>
-              <span className={`${styles.priority} ${styles[`priority${todo.priority[0].toUpperCase()}${todo.priority.slice(1)}`]}`}>{priorityLabels[todo.priority]}</span>
-              {todo.recurrence && todo.recurrence !== 'none' && (
-                <span className={styles.recurrence}>{recurrenceLabels[todo.recurrence]}</span>
+            <div className={styles.todoHeaderRow}>
+              <span className={styles.todoLine}>
+                <span className={todo.completed ? styles.todoTitleDone : styles.todoTitle}>{todo.title}</span>
+                <motion.svg
+                  viewBox="0 0 340 32"
+                  preserveAspectRatio="none"
+                  className={styles.strike}
+                  aria-hidden="true"
+                >
+                  <motion.path
+                    d="M 8 16.5 C 49 7, 89 12, 128 16 C 169 21, 215 8, 258 14 C 288 18, 314 11, 334 15"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeWidth="2"
+                    initial={false}
+                    animate={{ pathLength: todo.completed ? 1 : 0, opacity: todo.completed ? 1 : 0 }}
+                    transition={{ pathLength: { duration: 0.52, ease: 'easeInOut' }, opacity: { duration: 0.01, delay: todo.completed ? 0 : 0.52 } }}
+                  />
+                </motion.svg>
+              </span>
+              {compact && (
+                todo.completed ? (
+                  <span className={`${styles.badgePill} ${styles.badgeDone}`}>已完成</span>
+                ) : todo.priority === 'high' ? (
+                  <span className={`${styles.badgePill} ${styles.badgePriorityHigh}`}>优先</span>
+                ) : (
+                  <span className={`${styles.badgePill} ${styles.badgePriorityNormal}`}>待完成</span>
+                )
               )}
-              {todo.time && <span>{todo.time}</span>}
-            </span>
+            </div>
+            <div className={styles.meta}>
+              {compact ? (
+                todo.completed ? (
+                  <span>{todo.time ? `${todo.time} 已完成` : '今日已完成'}</span>
+                ) : (
+                  <span>计划 · {todo.recurrence && todo.recurrence !== 'none' ? recurrenceLabels[todo.recurrence] : '今天'}</span>
+                )
+              ) : (
+                <>
+                  <span className={`${styles.priority} ${styles[`priority${todo.priority[0].toUpperCase()}${todo.priority.slice(1)}`]}`}>{priorityLabels[todo.priority]}</span>
+                  {todo.recurrence && todo.recurrence !== 'none' && (
+                    <span className={styles.recurrence}>{recurrenceLabels[todo.recurrence]}</span>
+                  )}
+                  {todo.time && <span>{todo.time}</span>}
+                </>
+              )}
+            </div>
           </span>
           {onDelete && <DailyRecordDeleteButton label={`待办“${todo.title}”`} onDelete={() => onDelete(todo)} />}
         </div>

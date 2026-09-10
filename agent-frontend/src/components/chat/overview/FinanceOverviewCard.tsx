@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
+import { DotsThree } from '@phosphor-icons/react';
 import { fetchFinanceOverview, fetchFinanceExpenseChart } from '../../../services/financeApi';
 import { OverviewCard } from '../../common/OverviewCard';
-import { Button } from '../../common/Button';
 import { Modal } from '../../common/Modal';
 import type { FinanceTransaction } from '../../../types/finance';
 import { useOverviewResource } from './useOverviewResource';
@@ -27,37 +27,71 @@ export function FinanceOverviewCard({ date, refreshKey, onOpenFinance, onCreate 
   const today = data?.chart.days.find((day) => day.date === date);
   const trend = data?.chart.days.slice(-7) ?? [];
   const trendMaximum = Math.max(1, ...trend.flatMap((day) => [day.total, day.income]));
+  const getPointCoords = (day: (typeof trend)[0], index: number, field: 'total' | 'income') => {
+    const x = trend.length <= 1 ? 50 : (index / (trend.length - 1)) * 100;
+    const y = 38 - (day[field] / trendMaximum) * 30;
+    return { x, y };
+  };
   const trendPoints = (field: 'total' | 'income') => trend.map((day, index) => {
-    const x = trend.length === 1 ? 50 : index / (trend.length - 1) * 100;
-    const y = 42 - day[field] / trendMaximum * 36;
-    return `${x},${y}`;
+    const pt = getPointCoords(day, index, field);
+    return `${pt.x},${pt.y}`;
   }).join(' ');
+
+  let peakIndex = -1;
+  let peakValue = 0;
+  trend.forEach((day, index) => {
+    if (day.total > peakValue) {
+      peakValue = day.total;
+      peakIndex = index;
+    }
+  });
+  const peakPoint = peakIndex >= 0 ? getPointCoords(trend[peakIndex], peakIndex, 'total') : null;
+  const todayCount = data?.overview.transactions.filter((item) => item.date === date).length ?? 0;
+
   return <>
-    <OverviewCard className={styles.financeSummary} title="今日花销" description="近七日收支趋势" loading={loading} error={error} onRetry={() => void reload()}
-      action={<Button type="button" size="sm" variant="ghost" onClick={onCreate}>记一笔</Button>}>
+    <OverviewCard className={styles.financeSummary} eyebrow="FINANCE" title="今日花销" loading={loading} error={error} onRetry={() => void reload()}
+      action={<button type="button" className={styles.moreButton} onClick={onCreate} aria-label="记一笔" title="记一笔"><DotsThree size={18} weight="bold" /></button>}>
       {data && <>
-        <div className={styles.metric}><strong>{money(today?.total ?? 0)}</strong><span>今日支出</span></div>
+        <div className={styles.financeHeaderRow}>
+          <div className={styles.financeAmount}>
+            <span className={styles.currencySymbol}>¥</span>
+            <strong className={styles.financeBigNumber}>{(today?.total ?? 0).toFixed(2)}</strong>
+          </div>
+          <div className={styles.budgetBox}>
+            <span className={styles.budgetLabel}>本月预算使用</span>
+            <span className={styles.budgetValue}>{money(data.overview.monthExpense)}</span>
+          </div>
+        </div>
+        <div className={styles.flowDotRow}>
+          <span className={styles.blueDot} />
+          <span>今日 {todayCount} 笔流水</span>
+        </div>
         <div className={styles.financeTrend}>
           {trend.length > 0 ? <>
             <svg viewBox="0 0 100 44" preserveAspectRatio="none" role="img" aria-label="近七日收入与支出趋势">
               <title>近七日收入与支出趋势</title>
-              <line x1="0" y1="42" x2="100" y2="42" />
+              <line className={styles.gridLine} x1="0" y1="8" x2="100" y2="8" />
+              <line className={styles.gridLine} x1="0" y1="22" x2="100" y2="22" />
+              <line className={styles.axisLine} x1="0" y1="38" x2="100" y2="38" />
               <polyline className={styles.expenseLine} points={trendPoints('total')} />
               <polyline className={styles.incomeLine} points={trendPoints('income')} />
+              {peakPoint && (
+                <circle cx={peakPoint.x} cy={peakPoint.y} r="2.8" fill="#ffffff" stroke="#dc2626" strokeWidth="1.8" />
+              )}
             </svg>
             <div className={styles.trendLabels}>{trend.map((day) => <span key={day.date}>{Number(day.date.slice(5, 7))}/{Number(day.date.slice(8))}</span>)}</div>
           </> : <p className={styles.empty}>还没有可展示的收支趋势。</p>}
         </div>
         <dl className={styles.stats}>
-          <div><dt>本月支出</dt><dd>{money(data.overview.monthExpense)}</dd></div>
-          <div><dt>本月收入</dt><dd>{money(data.overview.monthIncome)}</dd></div>
-          <div><dt>本月收益</dt><dd>{money(data.overview.monthYield)}</dd></div>
+          <div><dt>本月支出</dt><dd className={styles.statExpense}>{money(data.overview.monthExpense)}</dd></div>
+          <div><dt>本月收入</dt><dd className={styles.statIncome}>{money(data.overview.monthIncome)}</dd></div>
+          <div><dt>本月收益</dt><dd className={styles.statYield}>{money(data.overview.monthYield)}</dd></div>
         </dl>
       </>}
     </OverviewCard>
 
-    <OverviewCard className={styles.financeRecent} title="最近流水" loading={loading} error={error} onRetry={() => void reload()}
-      action={<Button type="button" size="sm" variant="ghost" onClick={onOpenFinance}>查看全部</Button>}>
+    <OverviewCard className={styles.financeRecent} eyebrow="RECENT" title="最近流水" loading={loading} error={error} onRetry={() => void reload()}
+      action={<button type="button" className={styles.pillButton} onClick={onOpenFinance}>查看全部</button>}>
       {data && (data.overview.transactions.length === 0 ? <p className={styles.empty}>还没有流水。从「记一笔」开始，留下今天的收支。</p>
           : <ul className={styles.rows}>{data.overview.transactions.slice(0, 3).map((item) => <li key={item.id}>
             <button type="button" className={styles.row} onClick={() => setSelected(item)}>
