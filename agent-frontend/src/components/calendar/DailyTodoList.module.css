@@ -1,6 +1,9 @@
 .list { display: flex; flex-direction: column; }
 .item { display: flex; align-items: center; gap: 10px; padding: 11px 0; }
 .item:last-child { padding-bottom: 0; }
+.compact .item { gap: 8px; padding: 6px 0; }
+.compact .checkbox { width: 16px; height: 16px; }
+.compact .meta { margin-top: 2px; }
 .toggle { display: inline-flex; align-items: center; cursor: pointer; }
 .checkboxInput { position: absolute; opacity: 0; pointer-events: none; }
 .checkbox { width: 18px; height: 18px; border: 1px solid var(--border-medium); border-radius: 5px; display: inline-flex; align-items: center; justify-content: center; color: #fff; flex: 0 0 auto; transition: background-color var(--transition-fast), border-color var(--transition-fast); }

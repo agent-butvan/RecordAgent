@@ -8,6 +8,8 @@ interface DailyTodoListProps {
   todos: CalendarTodo[];
   onToggle: (todoId: string) => void;
   onDelete?: (todo: CalendarTodo) => void;
+  /** 概览卡片使用紧凑密度，日历页保持完整行高。 */
+  compact?: boolean;
   /** 保存中的条目禁止重复切换。 */
   pendingIds?: ReadonlySet<string>;
 }
@@ -25,13 +27,13 @@ const recurrenceLabels = {
 } as const;
 
 /** 带手绘划线反馈的当日待办清单。 */
-export const DailyTodoList: React.FC<DailyTodoListProps> = ({ todos, onToggle, onDelete, pendingIds }) => {
+export const DailyTodoList: React.FC<DailyTodoListProps> = ({ todos, onToggle, onDelete, compact = false, pendingIds }) => {
   if (todos.length === 0) {
     return <p className={styles.empty}>这一天没有待办，留给自己一点空白。</p>;
   }
 
   return (
-    <div className={styles.list}>
+    <div className={`${styles.list} ${compact ? styles.compact : ''}`}>
       {todos.map((todo) => (
         <div key={todo.id} className={styles.item}>
           <label className={styles.toggle}>

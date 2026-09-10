@@ -47,7 +47,7 @@ export function TodoOverviewCard({ date, refreshKey, onOpenCalendar, onCompose }
     {todos.length > 0 && <progress className={styles.progress} value={completed} max={todos.length} aria-label="今日待办完成进度" />}
     {saveError && <p className={styles.error} role="alert">{saveError}</p>}
     <div className={styles.cardDetails}>
-      <DailyTodoList todos={todos.slice(0, 3).map((todo) => ({ id: todo.id, title: todo.title, version: todo.version, ...todo.details, time: todo.details.time ?? undefined }))}
+      <DailyTodoList compact todos={todos.slice(0, 3).map((todo) => ({ id: todo.id, title: todo.title, version: todo.version, ...todo.details, time: todo.details.time ?? undefined }))}
         onToggle={(id) => void toggle(id)} pendingIds={pendingIds} />
     </div>
   </OverviewCard>;

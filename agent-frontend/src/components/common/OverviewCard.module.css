@@ -1,14 +1,14 @@
-.card { height: 100%; min-height: 0; display: flex; flex-direction: column; min-width: 0; overflow: hidden; padding: 16px; }
-.header { flex: 0 0 auto; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.card { height: 100%; min-height: 0; display: flex; flex-direction: column; min-width: 0; overflow: hidden; padding: 14px; }
+.header { flex: 0 0 auto; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
 .header h2 { font-size: 15px; font-weight: 600; color: var(--text-primary); }
 .header p { margin-top: 4px; font-size: 12px; color: var(--text-secondary); }
 .body { flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
 .state { min-height: 140px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--text-secondary); font-size: 13px; overflow-wrap: anywhere; }
-.footer { flex: 0 0 auto; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border-subtle); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.footer { flex: 0 0 auto; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-subtle); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 
-@container (max-height: 700px) {
-  .card { padding: 12px; }
-  .header { margin-bottom: 8px; }
+@container (max-height: 520px) {
+  .card { padding: 10px; }
+  .header { margin-bottom: 6px; }
   .header p { display: none; }
-  .footer { margin-top: 8px; padding-top: 6px; }
+  .footer { margin-top: 6px; padding-top: 5px; }
 }
