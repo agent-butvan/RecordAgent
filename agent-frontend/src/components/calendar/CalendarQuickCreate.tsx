@@ -18,7 +18,7 @@ type ModalRecordKind = Exclude<RecordKind, 'journal' | 'expense'>;
 
 interface CalendarQuickCreateProps {
   selectedDate: Date;
-  onCreate: (draft: CalendarRecordDraft) => void;
+  onCreate: (draft: CalendarRecordDraft) => void | Promise<void>;
   onWriteJournal: () => void;
   onCreateFinance: () => void;
 }
@@ -53,17 +53,21 @@ const valueOf = (formData: FormData, key: string): string => String(formData.get
 /** 日历顶栏快捷记录入口：在当前选中日期内创建四类日记录。 */
 export const CalendarQuickCreate: React.FC<CalendarQuickCreateProps> = ({ selectedDate, onCreate, onWriteJournal, onCreateFinance }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [activeKind, setActiveKind] = useState<ModalRecordKind | null>(null);
   const selectedDateLabel = `${selectedDate.getMonth() + 1}月${selectedDate.getDate()}日`;
 
   const closeModal = () => {
+    if (saving) return;
     setIsOpen(false);
     setActiveKind(null);
+    setError(null);
   };
 
-  const submitRecord = (event: React.FormEvent<HTMLFormElement>) => {
+  const submitRecord = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!activeKind) return;
+    if (!activeKind || saving) return;
 
     const formData = new FormData(event.currentTarget);
     let draft: CalendarRecordDraft;
@@ -85,8 +89,13 @@ export const CalendarQuickCreate: React.FC<CalendarQuickCreateProps> = ({ select
       };
     } else return;
 
-    onCreate(draft);
-    closeModal();
+    setSaving(true); setError(null);
+    try {
+      await onCreate(draft);
+      setIsOpen(false); setActiveKind(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '保存失败，请重试。');
+    } finally { setSaving(false); }
   };
 
   return (
@@ -111,7 +120,9 @@ export const CalendarQuickCreate: React.FC<CalendarQuickCreateProps> = ({ select
         className={styles.modal}
       >
         {activeKind ? (
-          <form className={styles.form} onSubmit={submitRecord}>
+          <form className={styles.form} onSubmit={(event) => void submitRecord(event)}>
+            <fieldset disabled={saving} className={styles.formFields}>
+            {error && <p role="alert">{error}</p>}
             <div className={styles.formHeading}>
               <button type="button" className={styles.backButton} aria-label="返回记录类型" onClick={() => setActiveKind(null)}>
                 <ArrowLeftIcon size={15} />
@@ -139,8 +150,9 @@ export const CalendarQuickCreate: React.FC<CalendarQuickCreateProps> = ({ select
 
             <div className={styles.formActions}>
               <button type="button" className={styles.cancelButton} onClick={closeModal}>取消</button>
-              <button type="submit" className={styles.submitButton}>保存到 {selectedDateLabel}</button>
+              <button type="submit" className={styles.submitButton}>{saving ? '保存中…' : `保存到 ${selectedDateLabel}`}</button>
             </div>
+            </fieldset>
           </form>
         ) : (
           <div className={styles.menu} aria-label="选择记录类型">

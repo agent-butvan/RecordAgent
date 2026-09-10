@@ -16,6 +16,7 @@ import { clearRecordTrash, createRecord, createRecordTab, deleteRecordTab, expor
 import type { RecordEntry, RecordTab, RecordType, SaveRecordInput } from '../../types/record';
 import { RecordEditor } from './RecordEditor';
 import { RECORD_TYPES } from './recordTypes';
+import { LoadingTree } from '../common/LoadingTree';
 import { Button } from '../common/Button';
 import { useMessage } from '../common/Message';
 import { Modal } from '../common/Modal';
@@ -40,7 +41,7 @@ function typeForTab(tab?: RecordTab): RecordType {
 }
 
 /** 极简资料看板：全部内容通过统一 Tab 导航和统一写作编辑器管理。 */
-export function RecordPage() {
+export function RecordPage({ initialEntry, initialType = 'quick' }: { initialEntry?: RecordEntry | null; initialType?: RecordType }) {
   const { showMessage } = useMessage();
   const today = useMemo(() => new Date(), []);
   const todayKey = formatDate(today);
@@ -48,7 +49,7 @@ export function RecordPage() {
   const [tabs, setTabs] = useState<RecordTab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string>('all');
   const [query, setQuery] = useState('');
-  const [editing, setEditing] = useState<EditorTarget | null>(null);
+  const [editing, setEditing] = useState<EditorTarget | null>(() => initialEntry === undefined ? null : { entry: initialEntry ?? undefined, type: initialEntry?.type ?? initialType });
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [summaryCopy, setSummaryCopy] = useState(() => localStorage.getItem(SUMMARY_COPY_KEY) || DEFAULT_SUMMARY_COPY);
@@ -228,8 +229,10 @@ export function RecordPage() {
     moveTab(tabId, currentIndex + (event.key === 'ArrowLeft' ? -1 : 1));
   };
 
+  if (editing && loading && tabs.length === 0) return <main className={styles.workspace}><LoadingTree label="正在读取资料分类…" /></main>;
+
   if (editing) return <RecordEditor date={editing.entry?.recordDate ?? todayKey} entry={editing.entry}
-    initialType={editing.entry?.type ?? editing.type} initialTabId={editing.entry?.tabId ?? editing.tabId}
+    initialType={editing.entry?.type ?? editing.type} initialTabId={editing.entry?.tabId ?? editing.tabId ?? (editing.type === 'journal' ? tabs.find((tab) => tab.systemKey === 'journal')?.id : undefined)}
     tabs={tabs} saving={saving} onSave={save} onBack={() => setEditing(null)} />;
 
   return <main className={styles.workspace}>

@@ -7,7 +7,9 @@ import styles from './DailyTodoList.module.css';
 interface DailyTodoListProps {
   todos: CalendarTodo[];
   onToggle: (todoId: string) => void;
-  onDelete: (todo: CalendarTodo) => void;
+  onDelete?: (todo: CalendarTodo) => void;
+  /** 保存中的条目禁止重复切换。 */
+  pendingIds?: ReadonlySet<string>;
 }
 
 const priorityLabels = {
@@ -23,7 +25,7 @@ const recurrenceLabels = {
 } as const;
 
 /** 带手绘划线反馈的当日待办清单。 */
-export const DailyTodoList: React.FC<DailyTodoListProps> = ({ todos, onToggle, onDelete }) => {
+export const DailyTodoList: React.FC<DailyTodoListProps> = ({ todos, onToggle, onDelete, pendingIds }) => {
   if (todos.length === 0) {
     return <p className={styles.empty}>这一天没有待办，留给自己一点空白。</p>;
   }
@@ -37,8 +39,9 @@ export const DailyTodoList: React.FC<DailyTodoListProps> = ({ todos, onToggle, o
               className={styles.checkboxInput}
               type="checkbox"
               checked={todo.completed}
+              disabled={pendingIds?.has(todo.id)}
               onChange={() => onToggle(todo.id)}
-              aria-label={`标记“${todo.title}”完成`}
+              aria-label={`${todo.completed ? '取消完成' : '标记完成'}：${todo.title}`}
             />
             <span className={styles.checkbox} aria-hidden="true">
               {todo.completed && <CheckIcon size={13} weight="bold" />}
@@ -73,7 +76,7 @@ export const DailyTodoList: React.FC<DailyTodoListProps> = ({ todos, onToggle, o
               {todo.time && <span>{todo.time}</span>}
             </span>
           </span>
-          <DailyRecordDeleteButton label={`待办“${todo.title}”`} onDelete={() => onDelete(todo)} />
+          {onDelete && <DailyRecordDeleteButton label={`待办“${todo.title}”`} onDelete={() => onDelete(todo)} />}
         </div>
       ))}
     </div>

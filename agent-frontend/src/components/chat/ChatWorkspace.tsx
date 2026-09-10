@@ -10,6 +10,7 @@ import { TokenUsagePanel, type TokenUsageTurnOption } from './TokenUsagePanel';
 import { formatTokenCount } from './tokenUsageFormat';
 import { ChatStepRail, type StepRailChapter } from './ChatStepRail';
 import { MarkdownContent } from '../common/MarkdownContent';
+import { SessionOverview, type SessionOverviewProps } from './overview/SessionOverview';
 import { PromptInput } from './PromptInput';
 import { SubagentActivity } from './SubagentActivity';
 import { SubagentTaskPanel } from './SubagentTaskPanel';
@@ -30,6 +31,8 @@ import {
 import styles from './ChatWorkspace.module.css';
 
 interface ChatWorkspaceProps {
+  onOpenFeature: SessionOverviewProps['onOpenFeature'];
+  onOpenRecords: SessionOverviewProps['onOpenRecords'];
   messages: ChatMessage[];
   sessionId: string;
   sessionTitle?: string;
@@ -132,6 +135,8 @@ const AssistantMessageItem: React.FC<AssistantMessageItemProps> = ({
 
 export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   messages,
+  onOpenFeature,
+  onOpenRecords,
   sessionId,
   sessionTitle = '新对话',
   sessionUsageSummary,
@@ -265,7 +270,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
 
   useEffect(() => {
     const area = messagesAreaRef.current;
-    if (!area) return;
+    if (!area || messages.length === 0) return;
     requestAnimationFrame(() => area.scrollTo({ top: area.scrollHeight, behavior: 'smooth' }));
   }, [messages, pendingPermission]);
 
@@ -377,12 +382,16 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
         ) : (
           <div className={styles.chatBody}>
             {/* Codex 风格任务步骤时间轨 */}
-            <div className={styles.railColumn}>
+            {messages.length > 0 && <div className={styles.railColumn}>
               <ChatStepRail messages={messages} onSelect={handleRailSelect} />
-            </div>
+            </div>}
 
             <div className={styles.chatColumn}>
               <div ref={messagesAreaRef} className={styles.messagesArea}>
+                {messages.length === 0 && <SessionOverview key={sessionId} onOpenFeature={onOpenFeature} onOpenRecords={onOpenRecords} onCompose={(prompt) => {
+                  setInputPrompt(prompt);
+                  messagesAreaRef.current?.parentElement?.querySelector<HTMLTextAreaElement>('textarea')?.focus();
+                }} />}
                 {messages.length > 0 && (
                   <div className={styles.messagesInner}>
                     {messages.map((msg) => (
