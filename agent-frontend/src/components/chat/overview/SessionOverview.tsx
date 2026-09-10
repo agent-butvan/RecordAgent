@@ -71,10 +71,16 @@ export function SessionOverview({ onOpenFeature, onOpenRecords, onCompose }: Ses
     </header>
     {openingFinance && <p className={styles.muted} role="status">正在准备记账表单…</p>}
     <div className={styles.grid}>
-      <TodoOverviewCard key={`todo-${date}`} date={date} refreshKey={refreshKey} onOpenCalendar={() => onOpenFeature('calendar')} onCompose={onCompose} />
-      <FinanceOverviewCard date={date} refreshKey={refreshKey} onOpenFinance={() => onOpenFeature('finance')} onCreate={() => void openFinance()} />
-      <RecordsOverviewCard date={date} onOpen={onOpenRecords} />
-      <StudyOverviewCard date={date} onOpenStudy={() => onOpenFeature('study')} />
+      <div className={styles.column}>
+        <TodoOverviewCard key={`todo-${date}`} date={date} refreshKey={refreshKey} onOpenCalendar={() => onOpenFeature('calendar')} onCompose={onCompose} />
+      </div>
+      <div className={styles.column}>
+        <FinanceOverviewCard date={date} refreshKey={refreshKey} onOpenFinance={() => onOpenFeature('finance')} onCreate={() => void openFinance()} />
+      </div>
+      <div className={styles.column}>
+        <RecordsOverviewCard date={date} onOpen={onOpenRecords} />
+        <StudyOverviewCard date={date} onOpenStudy={() => onOpenFeature('study')} />
+      </div>
     </div>
     {financeForm && <TransactionModal open accounts={financeForm.accounts} categories={financeForm.categories} defaultDate={financeForm.date} onClose={() => setFinanceForm(null)} onSubmit={async (input) => {
       await createFinanceTransaction(input);

@@ -5,6 +5,7 @@ import { LoadingTree } from './LoadingTree';
 import styles from './OverviewCard.module.css';
 
 export interface OverviewCardProps {
+  eyebrow?: string;
   title: string;
   description?: string;
   action?: ReactNode;
@@ -17,11 +18,11 @@ export interface OverviewCardProps {
 }
 
 /** 概览卡片模板：统一标题、操作、加载和错误状态，正文与页脚由业务域扩展。 */
-export function OverviewCard({ title, description, action, footer, children, loading, error, onRetry, className = '' }: OverviewCardProps) {
+export function OverviewCard({ eyebrow, title, description, action, footer, children, loading, error, onRetry, className = '' }: OverviewCardProps) {
   const titleId = useId();
   return <Card className={`${styles.card} ${className}`} role="region" aria-labelledby={titleId} aria-busy={loading}>
     <header className={styles.header}>
-      <div><h2 id={titleId}>{title}</h2>{description && <p>{description}</p>}</div>
+      <div>{eyebrow && <span className={styles.eyebrow}>{eyebrow}</span>}<h2 id={titleId}>{title}</h2>{description && <p>{description}</p>}</div>
       {action}
     </header>
     <div className={styles.body}>

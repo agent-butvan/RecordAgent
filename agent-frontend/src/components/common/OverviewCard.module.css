@@ -1,5 +1,6 @@
-.card { height: 100%; min-height: 0; display: flex; flex-direction: column; min-width: 0; overflow: hidden; padding: 14px; }
+.card { min-height: 0; display: flex; flex-direction: column; min-width: 0; overflow: hidden; padding: 14px; }
 .header { flex: 0 0 auto; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.eyebrow { display: block; margin-bottom: 4px; color: var(--text-muted); font-size: 10px; font-weight: 500; letter-spacing: .08em; }
 .header h2 { font-size: 15px; font-weight: 600; color: var(--text-primary); }
 .header p { margin-top: 4px; font-size: 12px; color: var(--text-secondary); }
 .body { flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
