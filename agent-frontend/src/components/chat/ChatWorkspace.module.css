@@ -162,6 +162,14 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  position: relative;
+}
+
+.chatColumnOverview {
+  position: relative;
+  background:
+    radial-gradient(circle at 18% 14%, rgba(47, 109, 246, 0.025), transparent 24%),
+    linear-gradient(#fbfcfd, #fbfcfd);
 }
 
 .messagesArea {
@@ -172,13 +180,11 @@
   min-width: 0;
 }
 
-/* 空会话首页：使用与设计稿一致的径向微渐变与安全留白自适应滚动 */
+/* 空会话首页：透明背景（由外层统一样式），并留出 160px 底部安全留白防止绝对定位输入框遮挡 */
 .overviewArea {
-  background:
-    radial-gradient(circle at 18% 14%, rgba(47, 109, 246, 0.025), transparent 24%),
-    linear-gradient(#fbfcfd, #fbfcfd);
+  background: transparent;
   overflow-y: auto;
-  padding: 34px 40px 140px;
+  padding: 34px 40px 160px;
 }
 
 .messagesInner {
@@ -241,6 +247,31 @@
   flex-direction: column;
   gap: 8px;
   min-width: 0;
+}
+
+/* 空会话概览下的悬浮输入框：绝对定位到底部，不独占文档流高度，背景透明统一 */
+.bottomContainerOverview {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  width: min(840px, calc(100% - 80px));
+  padding: 0;
+  margin: 0;
+  z-index: 20;
+  background: transparent;
+  pointer-events: none;
+}
+
+.bottomContainerOverview > * {
+  pointer-events: auto;
+}
+
+@media (max-width: 768px) {
+  .bottomContainerOverview {
+    width: calc(100% - 32px);
+    bottom: 16px;
+  }
 }
 
 .permissionContainer {

@@ -42,13 +42,15 @@
 .bento {
   display: grid;
   grid-template-columns: minmax(220px, 0.90fr) minmax(330px, 1.22fr) minmax(220px, 0.92fr);
-  grid-template-rows: auto auto auto;
-  grid-template-areas:
-    "todo      finance      docs"
-    "todoList  finance      docsList"
-    "todoList  financeMini   learning";
   gap: 16px;
-  align-items: stretch;
+  align-items: start;
+}
+
+.bentoCol {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
 }
 
 .tile {
@@ -69,13 +71,15 @@
   transform: translateY(-1px);
 }
 
-.todo { grid-area: todo; min-height: 150px; }
-.todoList { grid-area: todoList; min-height: 330px; }
-.finance { grid-area: finance; min-height: 390px; }
-.financeMini { grid-area: financeMini; min-height: 130px; }
-.docs { grid-area: docs; min-height: 140px; }
-.docsList { grid-area: docsList; min-height: 180px; }
-.learning { grid-area: learning; min-height: 160px; }
+.todo,
+.todoList,
+.finance,
+.financeMini,
+.docs,
+.docsList,
+.learning {
+  min-height: auto;
+}
 
 .tileHead {
   display: flex;
@@ -272,7 +276,7 @@
   color: #596579;
   font-size: 11px;
   line-height: 1.6;
-  margin-top: auto;
+  margin-top: 14px;
   cursor: pointer;
   transition: background-color 0.15s ease, border-color 0.15s ease;
 }

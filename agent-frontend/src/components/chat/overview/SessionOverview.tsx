@@ -86,13 +86,19 @@ export function SessionOverview({ onOpenFeature, onOpenRecords, onCompose }: Ses
       {openingFinance && <p className={styles.muted} role="status">正在准备记账表单…</p>}
 
       <div className={styles.bento}>
-        <TodoSummaryTile key={`todo-summary-${date}`} date={date} refreshKey={refreshKey} onOpenCalendar={() => onOpenFeature('calendar')} />
-        <TodoListTile key={`todo-list-${date}`} date={date} refreshKey={refreshKey} onCompose={onCompose} />
-        <FinanceTile key={`finance-${date}`} date={date} refreshKey={refreshKey} onCreate={() => void openFinance()} />
-        <FinanceMiniTile key={`finance-mini-${date}`} date={date} refreshKey={refreshKey} onOpenFinance={() => onOpenFeature('finance')} />
-        <DocsTile key={`docs-${date}`} date={date} onOpen={onOpenRecords} />
-        <DocsListTile key={`docs-list-${date}`} date={date} onOpen={onOpenRecords} />
-        <LearningTile key={`learning-${date}`} date={date} onOpenStudy={() => onOpenFeature('study')} />
+        <div className={styles.bentoCol}>
+          <TodoSummaryTile key={`todo-summary-${date}`} date={date} refreshKey={refreshKey} onOpenCalendar={() => onOpenFeature('calendar')} />
+          <TodoListTile key={`todo-list-${date}`} date={date} refreshKey={refreshKey} onCompose={onCompose} />
+        </div>
+        <div className={styles.bentoCol}>
+          <FinanceTile key={`finance-${date}`} date={date} refreshKey={refreshKey} onCreate={() => void openFinance()} />
+          <FinanceMiniTile key={`finance-mini-${date}`} date={date} refreshKey={refreshKey} onOpenFinance={() => onOpenFeature('finance')} />
+        </div>
+        <div className={styles.bentoCol}>
+          <DocsTile key={`docs-${date}`} date={date} onOpen={onOpenRecords} />
+          <DocsListTile key={`docs-list-${date}`} date={date} onOpen={onOpenRecords} />
+          <LearningTile key={`learning-${date}`} date={date} onOpenStudy={() => onOpenFeature('study')} />
+        </div>
       </div>
 
       {financeForm && (

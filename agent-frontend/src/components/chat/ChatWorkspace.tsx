@@ -292,8 +292,10 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     row?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
+  const isOverview = messages.length === 0;
+
   const inputArea = pendingPermission && onPermissionDecision ? (
-    <div className={styles.permissionContainer}>
+    <div className={`${styles.permissionContainer} ${isOverview ? styles.bottomContainerOverview : ''}`}>
       {pendingPermission.tool.toolName === 'plan_exit' ? (
         <PlanApprovalCard
           sessionId={sessionId}
@@ -309,7 +311,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
       )}
     </div>
   ) : (
-    <div className={styles.bottomContainer}>
+    <div className={`${styles.bottomContainer} ${isOverview ? styles.bottomContainerOverview : ''}`}>
       <PromptInput
         value={inputPrompt}
         onValueChange={setInputPrompt}
@@ -386,10 +388,10 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
               <ChatStepRail messages={messages} onSelect={handleRailSelect} />
             </div>}
 
-            <div className={styles.chatColumn}>
+            <div className={`${styles.chatColumn} ${isOverview ? styles.chatColumnOverview : ''}`}>
               <div
                 ref={messagesAreaRef}
-                className={`${styles.messagesArea} ${messages.length === 0 ? styles.overviewArea : ''}`}
+                className={`${styles.messagesArea} ${isOverview ? styles.overviewArea : ''}`}
               >
                 {messages.length === 0 && <SessionOverview key={sessionId} onOpenFeature={onOpenFeature} onOpenRecords={onOpenRecords} onCompose={(prompt) => {
                   setInputPrompt(prompt);
