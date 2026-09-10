@@ -25,25 +25,46 @@ export function FinanceOverviewCard({ date, refreshKey, onOpenFinance, onCreate 
   const { data, loading, error, reload } = useOverviewResource(load, `${date}:${refreshKey}`);
   const [selected, setSelected] = useState<FinanceTransaction | null>(null);
   const today = data?.chart.days.find((day) => day.date === date);
+  const trend = data?.chart.days.slice(-7) ?? [];
+  const trendMaximum = Math.max(1, ...trend.flatMap((day) => [day.total, day.income]));
+  const trendPoints = (field: 'total' | 'income') => trend.map((day, index) => {
+    const x = trend.length === 1 ? 50 : index / (trend.length - 1) * 100;
+    const y = 42 - day[field] / trendMaximum * 36;
+    return `${x},${y}`;
+  }).join(' ');
   return <>
-    <OverviewCard title="收支一览" description="今日花销与本月收支" loading={loading} error={error} onRetry={() => void reload()}
-      action={<Button type="button" size="sm" variant="ghost" onClick={onCreate}>记一笔</Button>}
-      footer={<><span className={styles.muted}>最近流水</span><Button type="button" size="sm" variant="ghost" onClick={onOpenFinance}>全部财务</Button></>}>
+    <OverviewCard className={styles.financeSummary} title="今日花销" description="近七日收支趋势" loading={loading} error={error} onRetry={() => void reload()}
+      action={<Button type="button" size="sm" variant="ghost" onClick={onCreate}>记一笔</Button>}>
       {data && <>
         <div className={styles.metric}><strong>{money(today?.total ?? 0)}</strong><span>今日支出</span></div>
+        <div className={styles.financeTrend}>
+          {trend.length > 0 ? <>
+            <svg viewBox="0 0 100 44" preserveAspectRatio="none" role="img" aria-label="近七日收入与支出趋势">
+              <title>近七日收入与支出趋势</title>
+              <line x1="0" y1="42" x2="100" y2="42" />
+              <polyline className={styles.expenseLine} points={trendPoints('total')} />
+              <polyline className={styles.incomeLine} points={trendPoints('income')} />
+            </svg>
+            <div className={styles.trendLabels}>{trend.map((day) => <span key={day.date}>{Number(day.date.slice(5, 7))}/{Number(day.date.slice(8))}</span>)}</div>
+          </> : <p className={styles.empty}>还没有可展示的收支趋势。</p>}
+        </div>
         <dl className={styles.stats}>
           <div><dt>本月支出</dt><dd>{money(data.overview.monthExpense)}</dd></div>
           <div><dt>本月收入</dt><dd>{money(data.overview.monthIncome)}</dd></div>
           <div><dt>本月收益</dt><dd>{money(data.overview.monthYield)}</dd></div>
         </dl>
-        {data.overview.transactions.length === 0 ? <p className={styles.empty}>还没有流水。从「记一笔」开始，留下今天的收支。</p>
+      </>}
+    </OverviewCard>
+
+    <OverviewCard className={styles.financeRecent} title="最近流水" loading={loading} error={error} onRetry={() => void reload()}
+      action={<Button type="button" size="sm" variant="ghost" onClick={onOpenFinance}>查看全部</Button>}>
+      {data && (data.overview.transactions.length === 0 ? <p className={styles.empty}>还没有流水。从「记一笔」开始，留下今天的收支。</p>
           : <ul className={styles.rows}>{data.overview.transactions.slice(0, 3).map((item) => <li key={item.id}>
             <button type="button" className={styles.row} onClick={() => setSelected(item)}>
               <span className={styles.rowContent}><span className={styles.rowTitle}>{item.note || item.category}</span><small>{item.accountName} · {item.date.slice(5)} {item.time}</small></span>
               <span className={`${styles.amount} ${item.transactionType === 'expense' ? styles.expense : styles.income}`}>{item.transactionType === 'expense' ? '−' : '+'}{money(item.amount, item.currency)}</span>
             </button>
-          </li>)}</ul>}
-      </>}
+          </li>)}</ul>)}
     </OverviewCard>
     <Modal open={selected !== null} title="流水详情" onClose={() => setSelected(null)} centered width={480}>
       {selected && <><div className={styles.metric}><strong>{selected.transactionType === 'expense' ? '−' : '+'}{money(selected.amount, selected.currency)}</strong><span>{selected.transactionType === 'expense' ? '支出' : selected.transactionType === 'yield' ? '收益' : '收入'}</span></div>

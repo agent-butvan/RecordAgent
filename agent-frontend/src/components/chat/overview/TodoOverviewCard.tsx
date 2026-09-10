@@ -40,15 +40,21 @@ export function TodoOverviewCard({ date, refreshKey, onOpenCalendar, onCompose }
     }
   };
   const plan = () => onCompose(`请根据以下今天（${date}）的未完成待办，帮我安排接下来的时间：\n${todos.filter((todo) => !todo.details.completed).map((todo) => `- ${todo.title}${todo.details.time ? `（${todo.details.time}）` : ''}`).join('\n')}`);
-  return <OverviewCard title="今天要做" description="先完成一件，再开始下一件" loading={loading} error={error} onRetry={() => void reload()}
-    action={<Button type="button" size="sm" variant="ghost" onClick={onOpenCalendar}>日历</Button>}
-    footer={<><span className={styles.muted}>{todos.length > 3 ? `显示前 3 项，共 ${todos.length} 项` : `已完成 ${completed} 项`}</span><Button type="button" size="sm" variant="ghost" disabled={completed === todos.length} onClick={plan}>帮我安排今天</Button></>}>
-    <div className={styles.metric}><strong>{todos.length - completed}</strong><span>项待完成 / 共 {todos.length} 项</span></div>
-    {todos.length > 0 && <progress className={styles.progress} value={completed} max={todos.length} aria-label="今日待办完成进度" />}
-    {saveError && <p className={styles.error} role="alert">{saveError}</p>}
-    <div className={styles.cardDetails}>
-      <DailyTodoList compact todos={todos.slice(0, 3).map((todo) => ({ id: todo.id, title: todo.title, version: todo.version, ...todo.details, time: todo.details.time ?? undefined }))}
+  const completion = todos.length ? Math.round(completed / todos.length * 100) : 0;
+  return <>
+    <OverviewCard className={styles.todoSummary} title="今日待办" description="先完成一件，再开始下一件" loading={loading} error={error} onRetry={() => void reload()}
+      action={<Button type="button" size="sm" variant="ghost" onClick={onOpenCalendar}>日历</Button>}>
+      <div className={styles.metric}><strong>{todos.length - completed}</strong><span>/ {todos.length} 项待完成</span></div>
+      <progress className={styles.progress} value={completed} max={Math.max(1, todos.length)} aria-label="今日待办完成进度" />
+      <div className={styles.progressMeta}><span>已完成 {completed} 项</span><span>{completion}%</span></div>
+    </OverviewCard>
+
+    <OverviewCard className={styles.todoDetails} title="接下来要做" loading={loading} error={error} onRetry={() => void reload()}
+      action={<span className={styles.badge}>按优先级</span>}
+      footer={<><span className={styles.muted}>{todos.length > 5 ? `显示前 5 项，共 ${todos.length} 项` : `共 ${todos.length} 项`}</span><Button type="button" size="sm" variant="ghost" disabled={completed === todos.length} onClick={plan}>帮我安排今天</Button></>}>
+      {saveError && <p className={styles.error} role="alert">{saveError}</p>}
+      <DailyTodoList compact todos={todos.slice(0, 5).map((todo) => ({ id: todo.id, title: todo.title, version: todo.version, ...todo.details, time: todo.details.time ?? undefined }))}
         onToggle={(id) => void toggle(id)} pendingIds={pendingIds} />
-    </div>
-  </OverviewCard>;
+    </OverviewCard>
+  </>;
 }

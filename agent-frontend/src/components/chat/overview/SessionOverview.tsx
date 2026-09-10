@@ -61,9 +61,12 @@ export function SessionOverview({ onOpenFeature, onOpenRecords, onCompose }: Ses
       if (lifecycle.active) setOpeningFinance(false);
     }
   };
+  const dateValue = new Date(`${date}T12:00:00`);
+  const dateText = new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }).format(dateValue);
+  const weekdayText = new Intl.DateTimeFormat('zh-CN', { weekday: 'long' }).format(dateValue);
   return <section className={styles.overview} aria-label="今日概览">
-    <header className={styles.welcome}><div><h1>今天，想从哪件事开始？</h1><p>看看今天的进展，也可以直接在下方开始对话。</p></div>
-      <time className={styles.date} dateTime={date}>{new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' }).format(new Date(`${date}T12:00:00`))}</time>
+    <header className={styles.welcome}><div><h1>今天，想从哪件事开始？</h1><p>先看一眼你今天的状态，再直接交给 Agent 继续推进。</p></div>
+      <time className={styles.date} dateTime={date}>{dateText} · {weekdayText}</time>
       <CalendarQuickCreate selectedDate={new Date(`${date}T12:00:00`)} onCreate={create} onWriteJournal={() => onOpenRecords(null, 'journal')} onCreateFinance={() => void openFinance()} />
     </header>
     {openingFinance && <p className={styles.muted} role="status">正在准备记账表单…</p>}

@@ -49,7 +49,7 @@ export function StudyOverviewCard({ date, onOpenStudy }: StudyOverviewCardProps)
   const today = data?.week.days.find((day) => day.date === date);
   const maximum = Math.max(1, ...(data?.week.days.map((day) => day.durationSeconds) ?? []));
   return <>
-    <OverviewCard title="学习足迹" description="给专注留一点时间" loading={loading} error={error} onRetry={() => void reload()}
+    <OverviewCard className={styles.study} title="今日学习" description="给专注留一点时间" loading={loading} error={error} onRetry={() => void reload()}
       action={<Button type="button" size="sm" variant="ghost" onClick={onOpenStudy}>学习记录</Button>}
       footer={<><span className={styles.muted}>{data?.active ? '计时中 · 每分钟更新' : '准备好就开始'} </span>
         <Button type="button" size="sm" variant="outline" disabled={saving} onClick={() => {
