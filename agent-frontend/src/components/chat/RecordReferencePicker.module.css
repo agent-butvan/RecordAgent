@@ -49,6 +49,9 @@
 .error { padding: 22px 12px; text-align: center; font-size: 13px; }
 .state { color: var(--text-muted); }
 .error { color: #b42318; }
+.loadMore { width: 100%; min-height: 34px; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--accent-blue); font-size: 12px; }
+.loadMore:hover:not(:disabled) { background: var(--bg-surface-hover); }
+.loadMore:disabled { color: var(--text-muted); }
 
 @media (max-width: 640px) {
   .option { grid-template-columns: 20px minmax(0, 1fr); }

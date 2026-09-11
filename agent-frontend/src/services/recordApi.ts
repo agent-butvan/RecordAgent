@@ -1,5 +1,5 @@
 import { getApiBaseUrl, type ApiResponse } from './api';
-import type { RecordAttachment, RecordDaySummary, RecordEntry, RecordReferenceOption, RecordTab, SaveRecordInput } from '../types/record';
+import type { RecordAttachment, RecordDaySummary, RecordEntry, RecordReferencePage, RecordTab, SaveRecordInput } from '../types/record';
 
 async function recordRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${getApiBaseUrl()}${path}`, init);
@@ -31,9 +31,9 @@ export function fetchRecordDays(from: string, to: string) {
 }
 
 /** 查询资料引用候选；响应不包含完整正文。 */
-export function fetchRecordReferences(query = '', limit = 50) {
-  const params = new URLSearchParams({ query, limit: String(limit) });
-  return recordRequest<RecordReferenceOption[]>(`/agent/records/references?${params}`);
+export function fetchRecordReferences(query = '', limit = 30, offset = 0) {
+  const params = new URLSearchParams({ query, limit: String(limit), offset: String(offset) });
+  return recordRequest<RecordReferencePage>(`/agent/records/references?${params}`);
 }
 
 export function fetchRecord(id: string) {

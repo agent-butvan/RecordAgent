@@ -20,7 +20,7 @@ export type SlashCommandResultData =
   | { kind: 'agenda'; data: DailyDay }
   | { kind: 'spending'; data: FinanceExpenseChart }
   | { kind: 'study-report'; data: StudyStatistics; period: SlashQueryPeriod }
-  | { kind: 'find-record'; data: RecordReferenceOption[]; query: string }
+  | { kind: 'find-record'; data: RecordReferenceOption[]; query: string; hasMore: boolean }
   | { kind: 'loading'; message: string }
   | { kind: 'error'; message: string };
 
@@ -66,7 +66,7 @@ export function SlashCommandResult({ result, onClose }: SlashCommandResultProps)
             : result.kind === 'agenda' ? <AgendaContent data={result.data} />
               : result.kind === 'spending' ? <SpendingContent data={result.data} />
                 : result.kind === 'study-report' ? <StudyReportContent data={result.data} period={result.period} />
-                  : result.kind === 'find-record' ? <RecordSearchContent data={result.data} query={result.query} />
+                  : result.kind === 'find-record' ? <RecordSearchContent data={result.data} query={result.query} hasMore={result.hasMore} />
                     : <p className={result.kind === 'error' ? styles.error : styles.loading}>{result.message}</p>}
     </section>
   );
@@ -226,7 +226,11 @@ function StudyReportContent({ data, period }: { data: StudyStatistics; period: S
   );
 }
 
-function RecordSearchContent({ data, query }: { data: RecordReferenceOption[]; query: string }) {
+function RecordSearchContent({ data, query, hasMore }: {
+  data: RecordReferenceOption[];
+  query: string;
+  hasMore: boolean;
+}) {
   return (
     <div className={styles.queryContent}>
       <p className={styles.insightDate}>“{query}” · {data.length} 条结果</p>
@@ -239,6 +243,7 @@ function RecordSearchContent({ data, query }: { data: RecordReferenceOption[]; q
           </li>)}
         </ul>
       )}
+      {hasMore && <p className={styles.queryNote}>结果较多，当前显示前 {data.length} 条；请补充关键词缩小范围。</p>}
     </div>
   );
 }

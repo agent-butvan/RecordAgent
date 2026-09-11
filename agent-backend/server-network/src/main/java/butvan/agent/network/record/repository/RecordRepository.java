@@ -40,7 +40,7 @@ public class RecordRepository {
     }
 
     /** 查询资料引用候选，只读取选择器需要的轻量字段。 */
-    public List<RecordReference> searchReferences(String ownerId, String query, int limit) {
+    public List<RecordReference> searchReferences(String ownerId, String query, int limit, int offset) {
         String normalized = query == null ? "" : query.trim();
         String like = "%" + normalized + "%";
         return jdbcTemplate.query("""
@@ -53,13 +53,13 @@ public class RecordRepository {
                     WHERE rt.record_id = r.id AND t.name LIKE ?
                   ))
                 ORDER BY r.pinned DESC, r.updated_at DESC, r.id
-                LIMIT ?
+                LIMIT ? OFFSET ?
                 """, (rs, rowNum) -> new RecordReference(
                         rs.getString("id"), LocalDate.parse(rs.getString("record_date")),
                         RecordType.parse(rs.getString("record_type")), rs.getString("title"),
                         rs.getString("summary"), findTags(rs.getString("id")),
                         Instant.parse(rs.getString("updated_at"))),
-                ownerId, normalized, like, like, like, limit);
+                ownerId, normalized, like, like, like, limit, offset);
     }
 
     /** 查询回收站记录。 */

@@ -48,6 +48,9 @@ public final class RecordModels {
     public record RecordReference(String id, LocalDate recordDate, RecordType type, String title,
                                   String summary, List<String> tags, Instant updatedAt) { }
 
+    /** 可继续按偏移量加载的资料引用候选页。 */
+    public record RecordReferencePage(List<RecordReference> items, boolean hasMore, int nextOffset) { }
+
     /** 记录附件的元数据，文件内容由本地文件适配器保存。 */
     public record RecordAttachment(String id, String recordId, String originalName, String storedName,
                                    String mediaType, long sizeBytes, Instant createdAt) {

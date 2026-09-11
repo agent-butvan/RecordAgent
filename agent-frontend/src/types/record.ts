@@ -64,3 +64,9 @@ export interface RecordReferenceOption {
   tags: string[];
   updatedAt: string;
 }
+
+export interface RecordReferencePage {
+  items: RecordReferenceOption[];
+  hasMore: boolean;
+  nextOffset: number;
+}

@@ -5,6 +5,7 @@ import butvan.agent.network.record.model.RecordModels.RecordEntry;
 import butvan.agent.network.record.model.RecordModels.RecordAttachment;
 import butvan.agent.network.record.model.RecordModels.RecordTab;
 import butvan.agent.network.record.model.RecordModels.RecordReference;
+import butvan.agent.network.record.model.RecordModels.RecordReferencePage;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -41,6 +42,8 @@ public final class RecordDtos {
     public record ReferenceResponse(String id, LocalDate recordDate, String type, String title,
                                     String summary, List<String> tags, Instant updatedAt) { }
 
+    public record ReferencePageResponse(List<ReferenceResponse> items, boolean hasMore, int nextOffset) { }
+
     /** 附件响应；下载地址由记录 ID 与附件 ID 稳定定位。 */
     public record AttachmentResponse(String id, String recordId, String originalName,
                                      String mediaType, long sizeBytes, Instant createdAt) { }
@@ -60,6 +63,11 @@ public final class RecordDtos {
     public static ReferenceResponse from(RecordReference reference) {
         return new ReferenceResponse(reference.id(), reference.recordDate(), reference.type().value(),
                 reference.title(), reference.summary(), reference.tags(), reference.updatedAt());
+    }
+
+    public static ReferencePageResponse from(RecordReferencePage page) {
+        return new ReferencePageResponse(page.items().stream().map(RecordDtos::from).toList(),
+                page.hasMore(), page.nextOffset());
     }
 
     public static AttachmentResponse from(RecordAttachment attachment) {

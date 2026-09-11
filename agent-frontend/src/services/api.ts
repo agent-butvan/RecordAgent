@@ -270,7 +270,13 @@ export async function submitPermissionDecision(params: {
  * 利用 fetch + ReadableStream 实时解析后端推流
  */
 export async function streamAgentChat(
-  params: { sessionId: string; content?: string; context?: string; approvalId?: string },
+  params: {
+    sessionId: string;
+    content?: string;
+    context?: string;
+    recordReferenceIds?: string[];
+    approvalId?: string;
+  },
   onChunk: (text: string) => void,
   onComplete?: () => void,
   onError?: (error: Error) => void,
@@ -293,7 +299,12 @@ export async function streamAgentChat(
       },
         body: JSON.stringify(isResume
           ? { sessionId: params.sessionId, approvalId: params.approvalId }
-          : { sessionId: params.sessionId, context: modelContext, content: payloadContent }),
+          : {
+              sessionId: params.sessionId,
+              context: modelContext,
+              content: payloadContent,
+              recordReferenceIds: params.recordReferenceIds ?? [],
+            }),
       }
     );
 

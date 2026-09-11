@@ -54,10 +54,35 @@ class RecordApiIntegrationTest {
 
         mockMvc.perform(get("/agent/records/references").param("query", "稳定 ID").param("limit", "10"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.length()").value(1))
-                .andExpect(jsonPath("$.data[0].title").value("Slash Command 架构"))
-                .andExpect(jsonPath("$.data[0].summary").value("引用选择器应保存稳定 ID"))
-                .andExpect(jsonPath("$.data[0].contentText").doesNotExist());
+                .andExpect(jsonPath("$.data.items.length()").value(1))
+                .andExpect(jsonPath("$.data.hasMore").value(false))
+                .andExpect(jsonPath("$.data.nextOffset").value(1))
+                .andExpect(jsonPath("$.data.items[0].title").value("Slash Command 架构"))
+                .andExpect(jsonPath("$.data.items[0].summary").value("引用选择器应保存稳定 ID"))
+                .andExpect(jsonPath("$.data.items[0].contentText").doesNotExist());
+    }
+
+    @Test
+    void pagesReferenceOptionsWithoutLoadingFullContent() throws Exception {
+        for (int index = 1; index <= 2; index++) {
+            mockMvc.perform(post("/agent/records").contentType("application/json").content("""
+                    {"recordDate":"2026-09-10","type":"quick","title":"分页候选 %d",
+                     "contentHtml":"<p>分页候选正文</p>","contentText":"分页候选正文","tags":[]}
+                    """.formatted(index))).andExpect(status().isOk());
+        }
+
+        mockMvc.perform(get("/agent/records/references")
+                        .param("query", "分页候选").param("limit", "1").param("offset", "0"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items.length()").value(1))
+                .andExpect(jsonPath("$.data.hasMore").value(true))
+                .andExpect(jsonPath("$.data.nextOffset").value(1));
+        mockMvc.perform(get("/agent/records/references")
+                        .param("query", "分页候选").param("limit", "1").param("offset", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items.length()").value(1))
+                .andExpect(jsonPath("$.data.hasMore").value(false))
+                .andExpect(jsonPath("$.data.nextOffset").value(2));
     }
 
     @Test

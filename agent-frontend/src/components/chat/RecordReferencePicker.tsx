@@ -7,7 +7,10 @@ interface RecordReferencePickerProps {
   selectedIndex: number;
   loading: boolean;
   error: string | null;
+  hasMore: boolean;
+  loadingMore: boolean;
   onSelect: (option: RecordReferenceOption) => void;
+  onLoadMore: () => void;
 }
 
 const TYPE_LABELS: Record<RecordType, string> = {
@@ -19,7 +22,9 @@ const TYPE_LABELS: Record<RecordType, string> = {
 };
 
 /** `?` 触发的资料引用列表，仅展示后端返回的轻量元数据。 */
-export function RecordReferencePicker({ options, selectedIndex, loading, error, onSelect }: RecordReferencePickerProps) {
+export function RecordReferencePicker({
+  options, selectedIndex, loading, error, hasMore, loadingMore, onSelect, onLoadMore,
+}: RecordReferencePickerProps) {
   return (
     <section className={styles.picker} aria-label="选择引用资料">
       <header className={styles.header}>
@@ -29,9 +34,11 @@ export function RecordReferencePicker({ options, selectedIndex, loading, error, 
       </header>
       <div id="record-reference-list" className={styles.list} role="listbox">
         {loading ? <p className={styles.state}>正在读取资料…</p>
-          : error ? <p className={styles.error} role="alert">{error}</p>
-            : options.length === 0 ? <p className={styles.state}>没有找到可引用的资料</p>
-              : options.map((option, index) => (
+          : options.length === 0
+            ? error ? <p className={styles.error} role="alert">{error}</p>
+              : <p className={styles.state}>没有找到可引用的资料</p>
+            : <>
+              {options.map((option, index) => (
                 <button
                   key={option.id}
                   type="button"
@@ -49,6 +56,13 @@ export function RecordReferencePicker({ options, selectedIndex, loading, error, 
                   <span className={styles.meta}>{TYPE_LABELS[option.type]} · {option.recordDate}</span>
                 </button>
               ))}
+              {error && <p className={styles.error} role="alert">{error}</p>}
+              {hasMore && (
+                <button type="button" className={styles.loadMore} onClick={onLoadMore} disabled={loadingMore}>
+                  {loadingMore ? '正在加载…' : '加载更多资料'}
+                </button>
+              )}
+            </>}
       </div>
     </section>
   );

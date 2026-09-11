@@ -56,11 +56,11 @@ public class RecordController {
 
     @ApiLog("查询可引用的资料候选")
     @GetMapping("/references")
-    public Result<List<RecordDtos.ReferenceResponse>> references(
+    public Result<RecordDtos.ReferencePageResponse> references(
             @RequestParam(defaultValue = "") String query,
-            @RequestParam(defaultValue = "50") int limit) {
-        return Result.success(recordService.searchReferences(owner(), query, limit).stream()
-                .map(RecordDtos::from).toList());
+            @RequestParam(defaultValue = "30") int limit,
+            @RequestParam(defaultValue = "0") int offset) {
+        return Result.success(RecordDtos.from(recordService.searchReferences(owner(), query, limit, offset)));
     }
 
     @ApiLog("查询单条资料")
