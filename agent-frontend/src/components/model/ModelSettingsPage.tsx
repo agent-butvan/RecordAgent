@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useModel } from '../../context/ModelContext';
 import { fetchAccountStatus, fetchSupportedVendors, type AccountStatus } from '../../services/api';
 import { Button } from '../common/Button';
-import { Card } from '../common/Card';
 import { Select } from '../common/Select';
 import { FormField } from '../common/FormField';
 import { TextInput } from '../common/TextInput';
@@ -11,6 +10,8 @@ import { Badge } from '../common/Badge';
 import { ModelCard, type ModelCardItem } from './ModelCard';
 import { FeatureSettingsPage, type FeatureSettingsTab } from '../settings/FeatureSettingsPage';
 import { SettingsPageLayout } from '../settings/SettingsPageLayout';
+import { TokenUsageSettingsPage } from '../settings/TokenUsageSettingsPage';
+import { ProfileSettingsPage } from '../settings/ProfileSettingsPage';
 import { getFeaturePreferences, setStudyWindowMode } from '../../services/featurePreferences';
 import type { StudyWindowMode } from '../../types/preferences';
 import {
@@ -19,10 +20,11 @@ import {
   Library,
   NotebookPen,
   Sliders,
-  Shield,
+  UserRound,
   Plus,
   Inbox,
   WalletCards,
+  ChartNoAxesColumnIncreasing,
 } from 'lucide-react';
 import styles from './ModelSettingsPage.module.css';
 
@@ -162,7 +164,13 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
             className={`${styles.navItem} ${activeTab === 'account' ? styles.navItemActive : ''}`}
             onClick={() => setActiveTab('account')}
           >
-            <Shield size={14} /> 账户
+            <UserRound size={14} /> 个人资料
+          </button>
+          <button
+            className={`${styles.navItem} ${activeTab === 'usage' ? styles.navItemActive : ''}`}
+            onClick={() => setActiveTab('usage')}
+          >
+            <ChartNoAxesColumnIncreasing size={14} /> Token 用量
           </button>
         </div>
 
@@ -300,21 +308,9 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
           </SettingsPageLayout>
         )}
 
-        {activeTab === 'account' && (
-          <SettingsPageLayout title="账户" description="管理账户绑定与通知接收方式。">
-            <div className={styles.sectionHeader}>邮箱账户</div>
-            <Card variant="bordered" className={styles.settingsCard}>
-              <div className={styles.settingRow}>
-                <div className={styles.rowInfo}>
-                  <div className={styles.rowTitle}>{accountStatus?.maskedEmail || '暂未绑定邮箱'}</div>
-                  <div className={styles.rowSub}>
-                    {accountStatus?.bound ? '邮箱已验证，可用于接收 Agent 通知。' : '绑定邮箱后可接收 Agent 通知。'}
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </SettingsPageLayout>
-        )}
+        {activeTab === 'account' && <ProfileSettingsPage accountStatus={accountStatus} />}
+
+        {activeTab === 'usage' && <TokenUsageSettingsPage />}
 
         {isFeatureTab(activeTab) && (
           <FeatureSettingsPage

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { CalendarDotsIcon, MagnifyingGlassIcon, WalletIcon } from '@phosphor-icons/react';
-import type { FinanceTransaction } from '../../types/finance';
+import type { FinanceAccount, FinanceTransaction } from '../../types/finance';
 import { Drawer } from '../common/Drawer';
 import { TransactionTypeIcon } from './TransactionTypeIcon';
 import styles from './TransactionDrawer.module.css';
@@ -8,6 +8,7 @@ import styles from './TransactionDrawer.module.css';
 interface TransactionDrawerProps {
   open: boolean;
   transactions: FinanceTransaction[];
+  accounts?: FinanceAccount[];
   loading: boolean;
   error: string | null;
   onClose: () => void;
@@ -16,30 +17,101 @@ interface TransactionDrawerProps {
 
 const money = (value: number) => new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY' }).format(value);
 
-/** 全部流水抽屉：按日期和说明筛选，并完整展示流水来源与账户信息。 */
+/** 全部流水抽屉：支持按支付分类、不同资产支付、交易类型、日期和关键词多维筛选。 */
 export const TransactionDrawer: React.FC<TransactionDrawerProps> = ({
-  open, transactions, loading, error, onClose, onRetry,
+  open, transactions, accounts, loading, error, onClose, onRetry,
 }) => {
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedAccountId, setSelectedAccountId] = useState('');
+  const [selectedType, setSelectedType] = useState<string>('all');
   const [date, setDate] = useState('');
   const [keyword, setKeyword] = useState('');
+
+  // 提取所有可用分类选项
+  const availableCategories = useMemo(() => {
+    const set = new Set<string>();
+    transactions.forEach((t) => {
+      if (t.category) set.add(t.category);
+    });
+    return Array.from(set).sort();
+  }, [transactions]);
+
+  // 提取所有可用资产支付账户选项
+  const availableAccounts = useMemo(() => {
+    const map = new Map<string, string>();
+    if (accounts) {
+      accounts.forEach((acc) => map.set(acc.id, acc.name));
+    }
+    transactions.forEach((t) => {
+      if (t.accountId && t.accountName) map.set(t.accountId, t.accountName);
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [accounts, transactions]);
+
+  const hasActiveFilter = Boolean(date || keyword || selectedCategory || selectedAccountId || (selectedType && selectedType !== 'all'));
+
+  const resetFilters = () => {
+    setSelectedCategory('');
+    setSelectedAccountId('');
+    setSelectedType('all');
+    setDate('');
+    setKeyword('');
+  };
+
   const filtered = useMemo(() => {
     const normalizedKeyword = keyword.trim().toLocaleLowerCase('zh-CN');
-    return transactions.filter((transaction) => (
-      (!date || transaction.date === date)
-      && (!normalizedKeyword || transaction.note.toLocaleLowerCase('zh-CN').includes(normalizedKeyword))
-    ));
-  }, [date, keyword, transactions]);
+    return transactions.filter((transaction) => {
+      if (date && transaction.date !== date) return false;
+      if (selectedCategory && transaction.category !== selectedCategory) return false;
+      if (selectedAccountId && transaction.accountId !== selectedAccountId && transaction.accountName !== selectedAccountId) return false;
+      if (selectedType && selectedType !== 'all' && transaction.transactionType !== selectedType) return false;
+      if (normalizedKeyword && !transaction.note.toLocaleLowerCase('zh-CN').includes(normalizedKeyword)) return false;
+      return true;
+    });
+  }, [date, keyword, selectedCategory, selectedAccountId, selectedType, transactions]);
 
   return <Drawer
     open={open}
     title="全部流水"
-    description={loading ? '正在读取流水…' : `共 ${transactions.length} 笔，当前显示 ${filtered.length} 笔`}
+    description={loading ? '正在读取流水…' : `共 ${transactions.length} 笔${hasActiveFilter ? `，筛选出 ${filtered.length} 笔` : ''}`}
     onClose={onClose}
   >
     <div className={styles.filters} role="search" aria-label="筛选流水">
-      <label><span>日期</span><input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label>
-      <label className={styles.searchField}><span>说明</span><div><MagnifyingGlassIcon size={14} aria-hidden="true" /><input type="search" value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="搜索说明" /></div></label>
-      {(date || keyword) && <button type="button" className={styles.clearButton} onClick={() => { setDate(''); setKeyword(''); }}>清除筛选</button>}
+      <div className={styles.filterRow}>
+        <label>
+          <span>支付分类</span>
+          <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} aria-label="按支付分类筛选">
+            <option value="">全部分类</option>
+            {availableCategories.map((cat) => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>资产支付</span>
+          <select value={selectedAccountId} onChange={(e) => setSelectedAccountId(e.target.value)} aria-label="按资产支付账户筛选">
+            <option value="">全部资产账户</option>
+            {availableAccounts.map((acc) => (
+              <option key={acc.id} value={acc.id}>{acc.name}</option>
+            ))}
+          </select>
+        </label>
+        <label className={styles.typeField}>
+          <span>类型</span>
+          <select value={selectedType} onChange={(e) => setSelectedType(e.target.value)} aria-label="按收支类型筛选">
+            <option value="all">全部</option>
+            <option value="expense">支出</option>
+            <option value="income">收入</option>
+            <option value="yield">收益</option>
+          </select>
+        </label>
+      </div>
+
+      <div className={styles.filterRowBottom}>
+        <label><span>日期</span><input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label>
+        <label className={styles.searchField}><span>说明搜索</span><div><MagnifyingGlassIcon size={14} aria-hidden="true" /><input type="search" value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="搜索流水说明" /></div></label>
+        {hasActiveFilter && <button type="button" className={styles.clearButton} onClick={resetFilters}>清除筛选</button>}
+      </div>
     </div>
 
     <div className={styles.list} aria-live="polite">
@@ -59,7 +131,7 @@ export const TransactionDrawer: React.FC<TransactionDrawerProps> = ({
                 </div>
               </div>
             </article>;
-          }) : <div className={styles.state}><strong>没有匹配的流水</strong><p>请调整日期或说明关键词。</p></div>}
+          }) : <div className={styles.state}><strong>没有匹配的流水</strong><p>请调整分类、支付资产或关键词筛选条件。</p></div>}
     </div>
   </Drawer>;
 };

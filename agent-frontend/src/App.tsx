@@ -1,3 +1,4 @@
+import type { RecordEntry, RecordType } from './types/record';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ModelProviderContext } from './context/ModelContext';
 import { Sidebar } from './components/layout/Sidebar';
@@ -47,6 +48,7 @@ function mapTranscriptToChatMessage(dto: TranscriptMessageDto): ChatMessage {
     reasoning: dto.thinking || undefined,
     createdAt: new Date(dto.createdAt).getTime() || Date.now(),
     status: dto.status,
+    usage: dto.usage,
     elapsedTime:
       dto.durationMillis != null
         ? Math.max(1, Math.round(dto.durationMillis / 1000))
@@ -78,6 +80,8 @@ export const MainLayout: React.FC<{
   const [projects, setProjects] = useState<Project[]>([]);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string>('');
+  const [recordInitialType, setRecordInitialType] = useState<RecordType>('quick');
+  const [recordTarget, setRecordTarget] = useState<RecordEntry | null | undefined>(undefined);
   const [activeFeature, setActiveFeature] = useState<'chat' | 'calendar' | 'finance' | 'record' | 'study'>('chat');
   const [pendingPermission, setPendingPermission] = useState<{
     sessionId: string;
@@ -143,6 +147,7 @@ export const MainLayout: React.FC<{
           title: detail.summary.title,
           lastMessagePreview: detail.summary.lastMessagePreview,
           messages,
+          usageSummary: detail.usageSummary,
           isLoaded: true,
         }
       : session));
@@ -760,7 +765,7 @@ export const MainLayout: React.FC<{
         <>
           <Sidebar
             activeFeature={activeFeature}
-            onSelectFeature={setActiveFeature}
+            onSelectFeature={(feature) => { setRecordTarget(undefined); setActiveFeature(feature); }}
             projects={projects}
             sessions={sessions}
             activeSessionId={activeSessionId}
@@ -778,14 +783,17 @@ export const MainLayout: React.FC<{
           ) : activeFeature === 'finance' ? (
             <FinancePage />
           ) : activeFeature === 'record' ? (
-            <RecordPage />
+            <RecordPage initialEntry={recordTarget} initialType={recordInitialType} />
           ) : activeFeature === 'study' ? (
             <StudyPage />
           ) : (
             <ChatWorkspace
+              onOpenFeature={setActiveFeature}
+              onOpenRecords={(entry, initialType = 'quick') => { setRecordTarget(entry); setRecordInitialType(initialType); setActiveFeature('record'); }}
               messages={activeMessages}
               sessionId={activeSessionId}
               sessionTitle={activeSession?.title || '新对话'}
+              sessionUsageSummary={activeSession?.usageSummary}
               isSessionLoading={Boolean(activeSession && !activeSession.isLoaded && !activeSessionLoadError)}
               sessionLoadError={activeSessionLoadError}
               onRetrySessionLoad={() => {

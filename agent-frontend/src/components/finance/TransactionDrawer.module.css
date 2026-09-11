@@ -1,12 +1,15 @@
-.filters { position: sticky; top: 0; z-index: 1; display: grid; grid-template-columns: 156px minmax(0, 1fr) auto; gap: 10px; align-items: end; padding: 16px 22px; border-bottom: 1px solid var(--border-subtle); background: var(--bg-app); }
+.filters { position: sticky; top: 0; z-index: 1; display: flex; flex-direction: column; gap: 10px; padding: 16px 22px; border-bottom: 1px solid var(--border-subtle); background: var(--bg-app); }
+.filterRow { display: grid; grid-template-columns: 1fr 1fr 88px; gap: 10px; }
+.filterRowBottom { display: grid; grid-template-columns: 140px minmax(0, 1fr) auto; gap: 10px; align-items: end; }
 .filters label > span { display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 10px; font-weight: 600; }
-.filters input { width: 100%; height: 34px; border: 1px solid var(--border-medium); border-radius: var(--radius-md); outline: none; background: var(--bg-app); color: var(--text-primary); font: 11px var(--font-sans); }
-.filters input:focus { border-color: var(--accent-blue); }
+.filters input, .filters select { width: 100%; height: 34px; border: 1px solid var(--border-medium); border-radius: var(--radius-md); outline: none; background: var(--bg-app); color: var(--text-primary); font: 11px var(--font-sans); }
+.filters select { padding: 0 8px; cursor: pointer; }
+.filters input:focus, .filters select:focus { border-color: var(--accent-blue); }
 .filters label > input { padding: 0 9px; }
 .searchField > div { height: 34px; display: flex; align-items: center; gap: 7px; padding: 0 9px; border: 1px solid var(--border-medium); border-radius: var(--radius-md); color: var(--text-muted); }
 .searchField > div:focus-within { border-color: var(--accent-blue); color: var(--text-secondary); }
 .searchField > div input { min-width: 0; height: 30px; padding: 0; border: 0; }
-.clearButton { height: 34px; padding: 0 8px; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--text-secondary); font: 600 10px var(--font-sans); white-space: nowrap; }
+.clearButton { height: 34px; padding: 0 8px; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--text-secondary); font: 600 10px var(--font-sans); white-space: nowrap; cursor: pointer; }
 .clearButton:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
 .list { min-height: 0; flex: 1; overflow-y: auto; padding: 4px 22px 24px; }
 .row { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 10px; padding: 14px 0; border-bottom: 1px solid var(--border-subtle); }

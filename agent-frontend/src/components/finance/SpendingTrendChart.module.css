@@ -1,6 +1,10 @@
-.section { --expense-color: #913f38; --income-color: #246247; padding: 24px 32px 20px; }
+.section { --expense-color: #e11d48; --income-color: #059669; padding: 24px 32px 20px; }
 .heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-.heading h2 { color: var(--text-primary); font-size: 13px; font-weight: 650; }
+.titleRow { display: flex; align-items: center; gap: 8px; }
+.heading h2 { color: var(--text-primary); font-size: 13px; font-weight: 650; margin: 0; }
+.scaleBadge { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border: 1px solid var(--border-medium); border-radius: 9999px; background: var(--bg-surface); color: var(--text-secondary); font: 500 10px var(--font-sans); cursor: pointer; transition: all var(--transition-fast); }
+.scaleBadge:hover { background: var(--bg-surface-hover); color: var(--text-primary); border-color: var(--border-focus); }
+.scaleBadgeActive { background: rgba(37, 99, 235, 0.08); border-color: rgba(37, 99, 235, 0.35); color: #2563eb; font-weight: 600; }
 .heading p { margin-top: 5px; color: var(--text-secondary); font-size: 10px; font-variant-numeric: tabular-nums; }
 .rangeSwitch { display: inline-flex; flex-shrink: 0; gap: 4px; padding: 0; border-bottom: 1px solid var(--border-subtle); }
 .rangeSwitch button { position: relative; min-width: 48px; height: 32px; padding: 0 12px; border: 0; border-radius: var(--radius-sm) var(--radius-sm) 0 0; background: transparent; color: var(--text-secondary); font: 500 11px var(--font-sans); transition: background-color var(--transition-fast), color var(--transition-fast); }

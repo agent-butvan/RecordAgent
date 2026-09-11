@@ -36,7 +36,7 @@ public class SessionTitleService {
 
         String candidate;
         try {
-            candidate = sanitize(titleGenerator.generate(firstQuestion));
+            candidate = sanitize(titleGenerator.generate(sessionId, firstQuestion));
         } catch (RuntimeException exception) {
             log.warn("会话标题模型生成失败，使用首问摘要降级：sessionId={}", sessionId, exception);
             candidate = "";

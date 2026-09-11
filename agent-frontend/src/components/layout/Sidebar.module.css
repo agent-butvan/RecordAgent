@@ -7,7 +7,7 @@
   background-color: #e3edf3;
   display: flex;
   flex-direction: column;
-  padding: 12px;
+  padding: 12px 12px 4px;
   user-select: none;
 }
 
@@ -594,7 +594,7 @@
 .footer {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   padding-top: 10px;
   position: relative;
   flex-shrink: 0;
@@ -605,7 +605,7 @@
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   height: 40px;
   padding: 0 8px;
   border-radius: 8px;
@@ -614,10 +614,6 @@
   cursor: pointer;
   text-align: left;
   transition: background-color var(--transition-fast);
-}
-
-.userProfileCard:hover {
-  background-color: #d8e4ec;
 }
 
 .userProfileCard:active {
@@ -631,88 +627,55 @@
 
 .avatarWrapper {
   position: relative;
-  width: 34px;
-  height: 34px;
+  width: 24px;
+  height: 24px;
   flex-shrink: 0;
 }
 
 .avatar {
-  width: 34px;
-  height: 34px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
+  font-size: 12px;
+  font-weight: 500;
   user-select: none;
-  background: #e3edf3;
-  color: #111111;
-}
-
-.avatarBound {
-  border: 1.5px solid #111111;
-}
-
-.avatarUnbound {
-  border: 1.5px dashed #111111;
+  background: #f1f5f9;
   color: #111111;
 }
 
 .avatarImage {
-  width: 34px;
-  height: 34px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   object-fit: cover;
-  background: #e3edf3;
-  border: 1.5px solid #111111;
-}
-
-.verifiedDot {
-  position: absolute;
-  bottom: -1px;
-  right: -1px;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background-color: #111111;
-  border: 2px solid #e3edf3;
+  background: #f1f5f9;
 }
 
 .profileInfo {
   display: flex;
-  flex-direction: column;
   min-width: 0;
   flex: 1;
-  gap: 2px;
 }
 
 .profileName {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 400;
   color: #111111;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  line-height: 1.2;
-}
-
-.profileStatus {
-  font-size: 11px;
-  color: #6b7280;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  line-height: 1.2;
+  line-height: 1.5;
 }
 
 .settingsBtn {
-  width: 32px;
-  height: 32px;
+  width: 40px;
+  height: 40px;
   border-radius: 8px;
   background: transparent;
-  color: #111111;
+  color: #64748b;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -720,10 +683,6 @@
   cursor: pointer;
   flex-shrink: 0;
   transition: background-color var(--transition-fast), color var(--transition-fast);
-}
-
-.settingsBtn:hover {
-  background-color: #f1f5f9;
 }
 
 .settingsBtn:active {

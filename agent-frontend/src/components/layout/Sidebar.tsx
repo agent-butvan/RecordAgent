@@ -733,24 +733,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
           className={styles.userProfileCard}
           type="button"
           onClick={() => (maskedEmail ? onOpenAccountSettings() : setIsEmailBindingOpen(true))}
-          title={maskedEmail ? `已绑定账号：${maskedEmail}（点击进入账户设置）` : '点击绑定邮箱'}
+          title={maskedEmail ? `已绑定账号：${maskedEmail}（点击进入个人资料）` : '点击绑定邮箱'}
         >
           <div className={styles.avatarWrapper}>
             {avatarUrl ? (
               <img src={avatarUrl} alt="用户头像" className={styles.avatarImage} />
             ) : (
-              <div className={`${styles.avatar} ${maskedEmail ? styles.avatarBound : styles.avatarUnbound}`}>
-                {maskedEmail ? getAvatarText(maskedEmail) : <User size={15} />}
+              <div className={styles.avatar}>
+                {maskedEmail ? getAvatarText(maskedEmail) : <User size={13} />}
               </div>
             )}
-            {maskedEmail && <span className={styles.verifiedDot} title="已验证" />}
           </div>
           <div className={styles.profileInfo}>
             <span className={styles.profileName}>
               {maskedEmail || '未绑定邮箱'}
-            </span>
-            <span className={styles.profileStatus}>
-              {maskedEmail ? '个人账户' : '点击绑定'}
             </span>
           </div>
         </button>
@@ -762,7 +758,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           aria-label="系统设置"
           onClick={onOpenSettings}
         >
-          <Settings size={15} />
+          <Settings size={15} strokeWidth={1.75} />
         </button>
       </div>
     </aside>

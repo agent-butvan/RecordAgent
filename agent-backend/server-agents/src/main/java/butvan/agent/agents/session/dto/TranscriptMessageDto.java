@@ -1,5 +1,7 @@
 package butvan.agent.agents.session.dto;
 
+import butvan.agent.agents.usage.TurnTokenUsage;
+
 import java.time.Instant;
 import java.util.List;
 
@@ -13,7 +15,8 @@ public record TranscriptMessageDto(
         MessageStatus status,
         Long durationMillis,
         List<ToolExecutionDto> tools,
-        String thinking
+        String thinking,
+        TurnTokenUsage usage
 ) {
 
     public TranscriptMessageDto {

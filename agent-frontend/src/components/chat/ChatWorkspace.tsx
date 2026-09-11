@@ -1,13 +1,16 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import type { ChatMessage, SessionPermissionMode } from '../../types/chat';
+import type { ChatMessage, SessionPermissionMode, TokenUsageSummary } from '../../types/chat';
 import type { TaskDto } from '../../types/team';
-import { Card } from '../common/Card';
 import { LoadingTree } from '../common/LoadingTree';
 import { PermissionRequestCard } from './PermissionRequestCard';
 import { PlanApprovalCard } from './PlanApprovalCard';
 import { AgentResponse } from './AgentResponse';
+import { TokenUsageTrigger } from './TokenUsageTrigger';
+import { TokenUsagePanel, type TokenUsageTurnOption } from './TokenUsagePanel';
+import { formatTokenCount } from './tokenUsageFormat';
 import { ChatStepRail, type StepRailChapter } from './ChatStepRail';
 import { MarkdownContent } from '../common/MarkdownContent';
+import { SessionOverview, type SessionOverviewProps } from './overview/SessionOverview';
 import { PromptInput } from './PromptInput';
 import { SubagentActivity } from './SubagentActivity';
 import { SubagentTaskPanel } from './SubagentTaskPanel';
@@ -15,11 +18,6 @@ import { ProjectFileTree } from './ProjectFileTree';
 import { RightSidePanel, type RightPanelTab } from './RightSidePanel';
 import type { PermissionToolPayload } from '../../services/api';
 import {
-  Compass,
-  Wrench,
-  RotateCcw,
-  Bug,
-  Cloud,
   Copy,
   ThumbsUp,
   ThumbsDown,
@@ -28,13 +26,17 @@ import {
   FolderTree,
   MessageSquare,
   PanelRight,
+  ChartNoAxesColumnIncreasing,
 } from 'lucide-react';
 import styles from './ChatWorkspace.module.css';
 
 interface ChatWorkspaceProps {
+  onOpenFeature: SessionOverviewProps['onOpenFeature'];
+  onOpenRecords: SessionOverviewProps['onOpenRecords'];
   messages: ChatMessage[];
   sessionId: string;
   sessionTitle?: string;
+  sessionUsageSummary?: TokenUsageSummary;
   isSessionLoading?: boolean;
   sessionLoadError?: string | null;
   onRetrySessionLoad?: () => void;
@@ -57,7 +59,17 @@ interface ChatWorkspaceProps {
   isPermissionModeSaving?: boolean;
 }
 
-const AssistantMessageItem: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
+interface AssistantMessageItemProps {
+  msg: ChatMessage;
+  tokenUsageActive: boolean;
+  onOpenTokenUsage: (messageId: string) => void;
+}
+
+const AssistantMessageItem: React.FC<AssistantMessageItemProps> = ({
+  msg,
+  tokenUsageActive,
+  onOpenTokenUsage,
+}) => {
   const isGenerating = msg.status === undefined && msg.elapsedTime === undefined;
   const elapsedSec = msg.elapsedTime !== undefined
     ? msg.elapsedTime
@@ -91,21 +103,30 @@ const AssistantMessageItem: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
         msg.content && <MarkdownContent content={msg.content} />
       )}
 
-      {/* 消息底部 4 个操作工具栏图标：复制、赞、踩、全屏/分享 */}
-      {msg.content && (
-        <div className={styles.messageActions}>
-          <button className={styles.actionBtn} title="复制内容" aria-label="复制内容" onClick={handleCopy}>
-            <Copy size={14} />
-          </button>
-          <button className={styles.actionBtn} title="即将推出" aria-label="赞（即将推出）" disabled>
-            <ThumbsUp size={14} />
-          </button>
-          <button className={styles.actionBtn} title="即将推出" aria-label="踩（即将推出）" disabled>
-            <ThumbsDown size={14} />
-          </button>
-          <button className={styles.actionBtn} title="即将推出" aria-label="全屏/扩展（即将推出）" disabled>
-            <Maximize2 size={14} />
-          </button>
+      {(msg.content || msg.usage) && (
+        <div className={styles.messageFooter}>
+          {/* 消息底部操作工具栏：复制、赞、踩、全屏/分享 */}
+          {msg.content && (
+            <div className={styles.messageActions}>
+              <button className={styles.actionBtn} title="复制内容" aria-label="复制内容" onClick={handleCopy}>
+                <Copy size={14} />
+              </button>
+              <button className={styles.actionBtn} title="即将推出" aria-label="赞（即将推出）" disabled>
+                <ThumbsUp size={14} />
+              </button>
+              <button className={styles.actionBtn} title="即将推出" aria-label="踩（即将推出）" disabled>
+                <ThumbsDown size={14} />
+              </button>
+              <button className={styles.actionBtn} title="即将推出" aria-label="全屏/扩展（即将推出）" disabled>
+                <Maximize2 size={14} />
+              </button>
+            </div>
+          )}
+          <TokenUsageTrigger
+            usage={msg.usage}
+            active={tokenUsageActive}
+            onOpen={() => onOpenTokenUsage(msg.id)}
+          />
         </div>
       )}
     </div>
@@ -114,8 +135,11 @@ const AssistantMessageItem: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
 
 export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   messages,
+  onOpenFeature,
+  onOpenRecords,
   sessionId,
   sessionTitle = '新对话',
+  sessionUsageSummary,
   isSessionLoading = false,
   sessionLoadError = null,
   onRetrySessionLoad,
@@ -140,13 +164,32 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [rightPanelTabs, setRightPanelTabs] = useState<string[]>([]);
   const [rightPanelTab, setRightPanelTab] = useState<string | null>(null);
+  const [tokenUsageMessageId, setTokenUsageMessageId] = useState<string | null>(null);
   const messagesAreaRef = useRef<HTMLDivElement>(null);
+
+  const tokenUsageTurns = useMemo<TokenUsageTurnOption[]>(() => {
+    const turns: TokenUsageTurnOption[] = [];
+
+    messages.forEach((message) => {
+      if (message.role !== 'assistant' || !message.usage) return;
+      turns.push({
+        messageId: message.id,
+        usage: message.usage,
+      });
+    });
+
+    return turns;
+  }, [messages]);
 
   const availablePanelTabs = useMemo<RightPanelTab[]>(() => {
     const tabs: RightPanelTab[] = [{
       id: 'tasks',
       label: '任务',
       icon: Bot,
+    }, {
+      id: 'tokens',
+      label: 'Token',
+      icon: ChartNoAxesColumnIncreasing,
     }];
     if (projectPath) {
       tabs.push({
@@ -168,6 +211,13 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     }
   }, [projectPath]);
 
+  // 切换会话或消息失效后，回到整个会话的 Token 视图。
+  useEffect(() => {
+    if (tokenUsageMessageId && !tokenUsageTurns.some((turn) => turn.messageId === tokenUsageMessageId)) {
+      setTokenUsageMessageId(null);
+    }
+  }, [tokenUsageMessageId, tokenUsageTurns]);
+
   useEffect(() => {
     const togglePanel = (event: KeyboardEvent) => {
       if (event.altKey && event.metaKey && event.code === 'KeyB') {
@@ -181,9 +231,15 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
 
   const openPanelTab = (tabId: string) => {
     if (!availablePanelTabs.some((tab) => tab.id === tabId)) return;
+    if (tabId === 'tokens') setTokenUsageMessageId(null);
     setRightPanelTabs((tabs) => tabs.includes(tabId) ? tabs : [...tabs, tabId]);
     setRightPanelTab(tabId);
     setRightPanelOpen(true);
+  };
+
+  const changePanelTab = (tabId: string) => {
+    if (tabId === 'tokens') setTokenUsageMessageId(null);
+    setRightPanelTab(tabId);
   };
 
   const closePanelTab = (tabId: string) => {
@@ -191,13 +247,30 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     const nextTabs = rightPanelTabs.filter((openTabId) => openTabId !== tabId);
     setRightPanelTabs(nextTabs);
     if (rightPanelTab === tabId) {
-      setRightPanelTab(nextTabs[closedIndex] ?? nextTabs[closedIndex - 1] ?? null);
+      const nextTab = nextTabs[closedIndex] ?? nextTabs[closedIndex - 1] ?? null;
+      if (nextTab === 'tokens') setTokenUsageMessageId(null);
+      setRightPanelTab(nextTab);
     }
+    if (tabId === 'tokens') setTokenUsageMessageId(null);
+  };
+
+  const openTokenUsage = (messageId: string) => {
+    setTokenUsageMessageId(messageId);
+    setRightPanelTabs((tabs) => tabs.includes('tokens') ? tabs : [...tabs, 'tokens']);
+    setRightPanelTab('tokens');
+    setRightPanelOpen(true);
+  };
+
+  const openSessionTokenUsage = () => {
+    setTokenUsageMessageId(null);
+    setRightPanelTabs((tabs) => tabs.includes('tokens') ? tabs : [...tabs, 'tokens']);
+    setRightPanelTab('tokens');
+    setRightPanelOpen(true);
   };
 
   useEffect(() => {
     const area = messagesAreaRef.current;
-    if (!area) return;
+    if (!area || messages.length === 0) return;
     requestAnimationFrame(() => area.scrollTo({ top: area.scrollHeight, behavior: 'smooth' }));
   }, [messages, pendingPermission]);
 
@@ -206,10 +279,6 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     const prompt = inputPrompt.trim();
     setInputPrompt('');
     onSendMessage(prompt);
-  };
-
-  const handleQuickCardClick = (promptText: string) => {
-    setInputPrompt(promptText);
   };
 
   // 点击左侧任务步骤时间轨：滚动定位到对应消息行
@@ -223,8 +292,10 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     row?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
+  const isOverview = messages.length === 0;
+
   const inputArea = pendingPermission && onPermissionDecision ? (
-    <div className={styles.permissionContainer}>
+    <div className={`${styles.permissionContainer} ${isOverview ? styles.bottomContainerOverview : ''}`}>
       {pendingPermission.tool.toolName === 'plan_exit' ? (
         <PlanApprovalCard
           sessionId={sessionId}
@@ -240,7 +311,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
       )}
     </div>
   ) : (
-    <div className={styles.bottomContainer}>
+    <div className={`${styles.bottomContainer} ${isOverview ? styles.bottomContainerOverview : ''}`}>
       <PromptInput
         value={inputPrompt}
         onValueChange={setInputPrompt}
@@ -267,6 +338,20 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
           <span className={styles.workspaceTitle} title={sessionTitle || '新对话'}>
             {sessionTitle || '新对话'}
           </span>
+          {sessionUsageSummary && sessionUsageSummary.reportedCallCount > 0 && (
+            <button
+              type="button"
+              className={styles.sessionUsage}
+              title={sessionUsageSummary.status === 'PARTIAL'
+                ? '查看会话 Token 用量；部分历史轮次或调用尚未统计'
+                : '查看当前会话 Token 用量'}
+              aria-label="在右侧面板查看当前会话 Token 用量"
+              onClick={openSessionTokenUsage}
+            >
+              {formatTokenCount(sessionUsageSummary.totalTokens)} tokens
+              {sessionUsageSummary.status === 'PARTIAL' ? ' · 部分' : ''}
+            </button>
+          )}
         </div>
         <button
           type="button"
@@ -296,79 +381,39 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
           <div className={styles.sessionLoadState}>
             <LoadingTree size="large" label="正在读取聊天记录…" />
           </div>
-        ) : messages.length === 0 ? (
-          <div className={styles.centerHero}>
-            <Cloud className={styles.cloudIcon} />
-            <h1 className={styles.heroTitle}>要在 <span style={{ textDecoration: 'underline', textUnderlineOffset: '6px' }}>ButvanAgent</span> 内开发什么？</h1>
-
-            {/* 4 Quick Action Cards using extracted Card component */}
-            <div className={styles.cardGrid}>
-              <Card
-                variant="interactive"
-                className={styles.quickCard}
-                onClick={() => handleQuickCardClick('探索并理解当前项目代码结构与架构设计')}
-              >
-                <div className={styles.cardIcon}>
-                  <Compass size={18} style={{ color: '#0284c7' }} />
-                </div>
-                <span className={styles.cardText}>探索并理解代码</span>
-              </Card>
-
-              <Card
-                variant="interactive"
-                className={styles.quickCard}
-                onClick={() => handleQuickCardClick('构建新功能、应用或工具模块')}
-              >
-                <div className={styles.cardIcon}>
-                  <Wrench size={18} style={{ color: '#9333ea' }} />
-                </div>
-                <span className={styles.cardText}>构建新功能、应用或工具</span>
-              </Card>
-
-              <Card
-                variant="interactive"
-                className={styles.quickCard}
-                onClick={() => handleQuickCardClick('审查代码并提出重构及修改建议')}
-              >
-                <div className={styles.cardIcon}>
-                  <RotateCcw size={18} style={{ color: '#16a34a' }} />
-                </div>
-                <span className={styles.cardText}>审查代码并提出修改建议</span>
-              </Card>
-
-              <Card
-                variant="interactive"
-                className={styles.quickCard}
-                onClick={() => handleQuickCardClick('定位并修复项目中出现的 Bug 和报错')}
-              >
-                <div className={styles.cardIcon}>
-                  <Bug size={18} style={{ color: '#ea580c' }} />
-                </div>
-                <span className={styles.cardText}>修复问题和失败</span>
-              </Card>
-            </div>
-            {inputArea}
-          </div>
         ) : (
           <div className={styles.chatBody}>
             {/* Codex 风格任务步骤时间轨 */}
-            <div className={styles.railColumn}>
+            {messages.length > 0 && <div className={styles.railColumn}>
               <ChatStepRail messages={messages} onSelect={handleRailSelect} />
-            </div>
+            </div>}
 
-            <div className={styles.chatColumn}>
-              <div ref={messagesAreaRef} className={styles.messagesArea}>
-                <div className={styles.messagesInner}>
-                  {messages.map((msg) => (
-                    <div key={msg.id} data-msg-id={msg.id} className={styles.messageRow}>
-                      {msg.role === 'user' ? (
-                        <div className={styles.userMessage}>{msg.content}</div>
-                      ) : (
-                        <AssistantMessageItem msg={msg} />
-                      )}
-                    </div>
-                  ))}
-                </div>
+            <div className={`${styles.chatColumn} ${isOverview ? styles.chatColumnOverview : ''}`}>
+              <div
+                ref={messagesAreaRef}
+                className={`${styles.messagesArea} ${isOverview ? styles.overviewArea : ''}`}
+              >
+                {messages.length === 0 && <SessionOverview key={sessionId} onOpenFeature={onOpenFeature} onOpenRecords={onOpenRecords} onCompose={(prompt) => {
+                  setInputPrompt(prompt);
+                  messagesAreaRef.current?.parentElement?.querySelector<HTMLTextAreaElement>('textarea')?.focus();
+                }} />}
+                {messages.length > 0 && (
+                  <div className={styles.messagesInner}>
+                    {messages.map((msg) => (
+                      <div key={msg.id} data-msg-id={msg.id} className={styles.messageRow}>
+                        {msg.role === 'user' ? (
+                          <div className={styles.userMessage}>{msg.content}</div>
+                        ) : (
+                          <AssistantMessageItem
+                            msg={msg}
+                            tokenUsageActive={rightPanelOpen && rightPanelTab === 'tokens' && tokenUsageMessageId === msg.id}
+                            onOpenTokenUsage={openTokenUsage}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {inputArea}
@@ -381,7 +426,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
           availableTabs={availablePanelTabs}
           tabs={openedPanelTabs}
           activeTab={rightPanelTab}
-          onTabChange={setRightPanelTab}
+          onTabChange={changePanelTab}
           onOpenTab={openPanelTab}
           onCloseTab={closePanelTab}
         >
@@ -394,6 +439,12 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
               onRefresh={onRefreshSubagentTasks}
               onCancel={onCancelSubagentTask}
             />
+          ) : rightPanelTab === 'tokens' ? (
+            <TokenUsagePanel
+              turns={tokenUsageTurns}
+              sessionUsageSummary={sessionUsageSummary}
+              selectedMessageId={tokenUsageMessageId}
+            />
           ) : projectPath ? (
             <ProjectFileTree projectPath={projectPath} />
           ) : null}
@@ -402,4 +453,5 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     </div>
   );
 };
+
 export default ChatWorkspace;

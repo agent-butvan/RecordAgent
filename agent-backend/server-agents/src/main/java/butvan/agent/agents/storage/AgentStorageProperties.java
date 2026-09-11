@@ -27,6 +27,12 @@ public class AgentStorageProperties {
     /** 保存用户可见消息记录的目录。 */
     private final Path transcriptDirectory;
 
+    /** 保存非聊天模型调用用量的追加式账本。 */
+    private final Path systemUsageFile;
+
+    /** 保存尚未完成聊天轮次检查点的目录。 */
+    private final Path runCheckpointDirectory;
+
     /** AgentScope AgentStateStore 的根目录。 */
     private final Path agentStateDirectory;
 
@@ -47,12 +53,16 @@ public class AgentStorageProperties {
         this.rootDirectory = rootDirectory.toAbsolutePath().normalize();
         sessionCatalogFile = this.rootDirectory.resolve("sessions").resolve("catalog.json");
         transcriptDirectory = this.rootDirectory.resolve("transcripts");
+        systemUsageFile = this.rootDirectory.resolve("usage").resolve("system-usage.jsonl");
+        runCheckpointDirectory = this.rootDirectory.resolve("runs");
         agentStateDirectory = this.rootDirectory.resolve("agentscope").resolve("state");
         workspaceDirectory = this.rootDirectory.resolve("agentscope").resolve("workspace");
 
         // 应用启动的时候创建本项目明确拥有的目录
         createDirectories(sessionCatalogFile.getParent());
         createDirectories(transcriptDirectory);
+        createDirectories(systemUsageFile.getParent());
+        createDirectories(runCheckpointDirectory);
         createDirectories(agentStateDirectory);
         createDirectories(workspaceDirectory);
     }
@@ -68,6 +78,14 @@ public class AgentStorageProperties {
         }
 
         return transcriptDirectory.resolve(sessionId + ".jsonl");
+    }
+
+    /** 根据受控 turnId 返回运行中检查点文件。 */
+    public Path runCheckpointFile(String turnId) {
+        if (turnId == null || !turnId.matches("[a-zA-Z0-9-]+")) {
+            throw new IllegalArgumentException("轮次ID 格式非法");
+        }
+        return runCheckpointDirectory.resolve(turnId + ".json");
     }
 
     private void createDirectories(Path directory) {

@@ -1,0 +1,121 @@
+import React from 'react';
+import { PlusIcon } from '@phosphor-icons/react';
+import type { FinanceAccount, FinanceAccountType } from '../../types/finance';
+import { Button } from '../common/Button';
+import { Modal } from '../common/Modal';
+import { AccountTypeIcon } from './AccountTypeIcon';
+import styles from './AssetDetailModal.module.css';
+
+const ACCOUNT_LABELS: Record<FinanceAccountType, string> = {
+  wechat_balance: '微信余额',
+  wechat_yield: '微信零钱通',
+  alipay_balance: '支付宝余额',
+  alipay_yuebao: '支付宝余额宝',
+  bank: '银行卡',
+  other: '其他',
+  wechat: '微信',
+  alipay: '支付宝',
+  cash: '现金',
+};
+
+function money(value: number): string {
+  return new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY' }).format(value);
+}
+
+interface AssetDetailModalProps {
+  open: boolean;
+  accounts: FinanceAccount[];
+  totalAssets: number;
+  onClose: () => void;
+  onAddAccount?: () => void;
+}
+
+function accountToneClass(type: FinanceAccountType): string {
+  if (type.startsWith('wechat')) return styles.wechatTone;
+  if (type.startsWith('alipay')) return styles.alipayTone;
+  if (type === 'bank') return styles.bankTone;
+  return styles.otherTone;
+}
+
+/** 全部资产概览：极简无边框、无卡片块分区、纯净排版呈现。 */
+export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
+  open,
+  accounts,
+  totalAssets,
+  onClose,
+  onAddAccount,
+}) => {
+  const yieldCount = accounts.filter((item) => item.interestEnabled).length;
+
+  return (
+    <Modal open={open} title="全部资产概览" onClose={onClose} width={460} centered>
+      <div className={styles.container}>
+        {/* 顶部净资产大字与副信息，无背景块与边框 */}
+        <div className={styles.headline}>
+          <div className={styles.headlineAmountWrap}>
+            <span className={styles.currencySign}>¥</span>
+            <strong className={styles.headlineAmount}>
+              {new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(totalAssets)}
+            </strong>
+          </div>
+          <span className={styles.headlineMeta}>
+            共 {accounts.length} 个账户
+            {yieldCount > 0 ? ` · ${yieldCount} 个生息账户` : ''}
+          </span>
+        </div>
+
+        {/* 账户明细列表：平铺流式排版，无边框、无卡片、无进度条 */}
+        <div className={styles.list}>
+          {accounts.map((account) => {
+            const ratio = totalAssets > 0 ? (account.balance / totalAssets) * 100 : 0;
+            return (
+              <div key={account.id} className={styles.row}>
+                <div className={styles.left}>
+                  <div className={`${styles.iconWrap} ${accountToneClass(account.accountType)}`}>
+                    <AccountTypeIcon type={account.accountType} size={16} />
+                  </div>
+                  <div className={styles.nameBlock}>
+                    <span className={styles.accountName}>{account.name}</span>
+                    <div className={styles.descLine}>
+                      <span className={styles.accountDesc}>{ACCOUNT_LABELS[account.accountType] ?? '账户'}</span>
+                      {account.interestEnabled && (
+                        <span className={styles.yieldBadge}>
+                          年化 {account.annualRatePercent}%
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className={styles.right}>
+                  <strong className={styles.accountAmount}>{money(account.balance)}</strong>
+                  <span className={styles.accountRatio}>{ratio.toFixed(1)}%</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* 底部操作区：无分割线 */}
+        <div className={styles.footer}>
+          {onAddAccount ? (
+            <button
+              type="button"
+              className={styles.addBtn}
+              onClick={() => {
+                onClose();
+                onAddAccount();
+              }}
+            >
+              <PlusIcon size={12} weight="bold" />
+              添加账户
+            </button>
+          ) : <span />}
+          <Button type="button" variant="outline" size="sm" onClick={onClose}>
+            关闭
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+};

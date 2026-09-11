@@ -7,6 +7,7 @@ import butvan.agent.agents.security.PermissionChecker;
 import butvan.agent.agents.storage.AgentStorageProperties;
 import butvan.agent.agents.subagent.SubagentCatalog;
 import butvan.agent.agents.tool.ToolRegistry;
+import butvan.agent.agents.usage.TokenUsageMiddleware;
 import io.agentscope.core.model.Model;
 import io.agentscope.core.permission.PermissionMode;
 import io.agentscope.core.state.AgentStateStore;
@@ -38,6 +39,7 @@ public class AgentFactory {
     private final TaskRepository subagentTaskRepository;
     private final MessageBus subagentMessageBus;
     private final SubagentCatalog subagentCatalog;
+    private final TokenUsageMiddleware tokenUsageMiddleware;
 
     private final PermissionChecker permissionChecker = new PermissionChecker(
             PermissionMode.DEFAULT,
@@ -84,6 +86,7 @@ public class AgentFactory {
                 .name("butvan_agent")
                 .sysPrompt(systemPrompt)
                 .model(model)
+                .middleware(tokenUsageMiddleware)
                 .enablePlanMode() // 开启计划模式
                 .planFileDirectory("plans")
                 .toolkit(toolRegistry.getToolkit())
@@ -94,8 +97,9 @@ public class AgentFactory {
                 .messageBus(subagentMessageBus)
                 .subagents(subagentCatalog.declarations())
                 .compaction(CompactionConfig.builder()
-                        .triggerMessages(30) // 30 条消息触发上下文压缩
-                        .keepMessages(10)    // 压缩后保留最近 10 条
+                        .triggerMessages(30)    // 30 条消息触发上下文压缩
+                        .keepMessages(10)       // 压缩后保留最近 10 条
+                        //.triggerTokens(131072)   // 固定 token 阈值，禁用动态 contextWindowSize 探测（避免框架向 DashScope 发送非法 URL 的探测请求）
                         .build())
                 .build();
     }

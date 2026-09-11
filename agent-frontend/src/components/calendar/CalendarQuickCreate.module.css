@@ -256,3 +256,5 @@
     grid-template-columns: 1fr;
   }
 }
+
+.formFields { display: flex; flex-direction: column; gap: 20px; border: 0; padding: 0; margin: 0; min-width: 0; }

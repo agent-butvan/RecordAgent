@@ -3,20 +3,22 @@ package butvan.agent.agents.agent;
 import butvan.agent.agents.agent.event.AgentStreamEvent;
 import butvan.agent.agents.agent.permission.*;
 import butvan.agent.agents.agent.run.AgentRun;
+import butvan.agent.agents.agent.run.AgentRunCheckpointService;
 import butvan.agent.agents.identity.CurrentUserProvider;
 import butvan.agent.agents.model.ModelHolder;
+import butvan.agent.agents.model.ModelSelector;
 import butvan.agent.agents.session.AgentStreamSession;
 import butvan.agent.agents.session.SessionCatalogService;
 import butvan.agent.agents.session.TranscriptService;
 import butvan.agent.agents.session.dto.TranscriptMessageDto;
 import butvan.agent.agents.session.dto.SessionPermissionMode;
 import butvan.agent.agents.security.AgentSecurity;
+import butvan.agent.agents.usage.ModelIdentity;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.*;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
 import io.agentscope.core.message.ToolUseBlock;
-import io.agentscope.core.message.UserMessage;
 import io.agentscope.harness.agent.HarnessAgent;
 import io.agentscope.core.permission.PermissionMode;
 import io.agentscope.harness.agent.workspace.plan.PlanModeManager;
@@ -47,6 +49,7 @@ public class AgentService {
     private final AgentFactory agentFactory;
     private final AgentSecurity agentSecurity;
     private final AgentRunCompleter agentRunCompleter;
+    private final AgentRunCheckpointService checkpointService;
 
     /**
      * 创建一次 HTTP 流对应的队列和生产虚拟线程。
@@ -85,9 +88,10 @@ public class AgentService {
             String userId = currentUserProvider.currentUserId();
             RuntimeContext context = createRuntimeContext(request.sessionId());
             run = new AgentRun(request.sessionId(), userId, turnId, context);
+            checkpointService.save(run);
 
             // 3. 初始调用将用户消息交给 AgentScope；后续回复会传入确认消息
-            runAgentStream(run, List.of(new UserMessage(input)), streamSession);
+            runAgentStream(run, List.of(run.currentUserMessage(input)), streamSession);
         } catch (Exception e) {
             // 客户端已断开，按照取消收尾
             if (streamSession.isCancelled() || Thread.currentThread().isInterrupted()) {
@@ -134,8 +138,9 @@ public class AgentService {
      * @param inputMessages
      * @param streamSession
      */
-    private void runAgentStream(AgentRun run, List<Msg> inputMessages, AgentStreamSession streamSession)    {
+    private void runAgentStream(AgentRun run, List<Msg> inputMessages, AgentStreamSession streamSession) {
         HarnessAgent agent = agentFactory.currentAgent();
+        ModelIdentity modelIdentity = currentModelIdentity();
         SessionPermissionMode productMode = sessionCatalogService.getPermissionMode(run.sessionId());
         agent.getDelegate().getAgentState(run.userId(), run.sessionId())
                 .setPermissionContext(agentSecurity.createPermissionContext(productMode));
@@ -144,14 +149,17 @@ public class AgentService {
 
         for (AgentEvent event : agent.streamEvents(inputMessages,
                 run.runtimeContext()).toIterable()) {
+            // Token usage 必须在 UI 映射之前采集，包含工具循环和子 Agent 原始事件。
+            run.recordModelEvent(event, modelIdentity);
+
             // 客户端断开：立即按取消收尾
             if (streamSession.isCancelled()) {
-                agentRunCompleter.complete(run, TranscriptMessageDto.MessageStatus.COMPLETED);
+                agentRunCompleter.complete(run, TranscriptMessageDto.MessageStatus.CANCELLED);
                 return;
             }
 
             // 必须在普通映射之前识别该事件
-            if (event instanceof  RequireUserConfirmEvent confirmEvent) {
+            if (event instanceof RequireUserConfirmEvent confirmEvent) {
                 if (pauseForConfirmation(run, confirmEvent.getToolCalls(), streamSession)) {
                     return;
                 }
@@ -160,12 +168,17 @@ public class AgentService {
 
             AgentStreamEvent mapped = agentEventManager.map(event, run.toolArgsBuffer());
             run.record(mapped);
-            if (mapped != null && !putEvent(streamSession, mapped)) {
-                agentRunCompleter.complete(run, TranscriptMessageDto.MessageStatus.CANCELLED);
-                return;
+            if (event instanceof ModelCallEndEvent) {
+                checkpointService.save(run);
             }
             if (mapped != null && mapped.isTerminal()) {
+                // 先持久化再发送终态，确保前端收到 done 后能立即读取完整消息与 usage。
                 agentRunCompleter.complete(run, TranscriptMessageDto.MessageStatus.COMPLETED);
+                putEvent(streamSession, mapped);
+                return;
+            }
+            if (mapped != null && !putEvent(streamSession, mapped)) {
+                agentRunCompleter.complete(run, TranscriptMessageDto.MessageStatus.CANCELLED);
                 return;
             }
         }
@@ -221,6 +234,7 @@ public class AgentService {
                 result.getToolCall().getId(), result.isConfirmed()
         ));
         pendingApprovalStore.save(approval);
+        checkpointService.save(run);
 
         PermissionToolDto first = approval.nextTool();
         return putEvent(
@@ -334,6 +348,13 @@ public class AgentService {
                 .userId(currentUserProvider.currentUserId())
                 .sessionId(sessionId)
                 .build();
+    }
+
+    /** 每段 Agent 流开始时固化模型身份，兼容权限暂停期间切换模型的情况。 */
+    private ModelIdentity currentModelIdentity() {
+        ModelSelector selector = modelHolder.getCurrentSelector();
+        String vendor = selector == null ? null : selector.vendor();
+        return new ModelIdentity(vendor, modelHolder.getModel().getModelName());
     }
 
 

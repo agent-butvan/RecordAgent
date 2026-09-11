@@ -1,0 +1,184 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 6px 0;
+}
+
+.headline {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 22px;
+}
+
+.headlineAmountWrap {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+}
+
+.currencySign {
+  color: var(--text-secondary);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.headlineAmount {
+  color: var(--text-primary);
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.headlineMeta {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 380px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 8px;
+  border-radius: var(--radius-md);
+  transition: background-color var(--transition-fast);
+}
+
+.row:hover {
+  background-color: var(--bg-surface);
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* 克制温润的资产类型图标微底色，避免纯黑白生硬 */
+.iconWrap {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+}
+
+.wechatTone {
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+}
+
+.alipayTone {
+  background: rgba(37, 99, 235, 0.1);
+  color: #2563eb;
+}
+
+.bankTone {
+  background: rgba(99, 102, 241, 0.1);
+  color: #4f46e5;
+}
+
+.otherTone {
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+}
+
+.nameBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.accountName {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.descLine {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.accountDesc {
+  color: var(--text-muted);
+  font-size: 10.5px;
+}
+
+.yieldBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+  font-size: 9.5px;
+  font-weight: 600;
+}
+
+.right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.accountAmount {
+  color: var(--text-primary);
+  font-size: 13.5px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.accountRatio {
+  color: var(--text-secondary);
+  font-size: 10.5px;
+  font-weight: 500;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 22px;
+}
+
+.addBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font: 500 11px var(--font-sans);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.addBtn:hover {
+  color: var(--accent-blue);
+  background: var(--bg-surface);
+}

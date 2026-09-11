@@ -12,6 +12,7 @@ import { SpendingTrendChart } from './SpendingTrendChart';
 import { TransactionTypeIcon } from './TransactionTypeIcon';
 import { TransactionDrawer } from './TransactionDrawer';
 import { TransactionModal } from './TransactionModal';
+import { AssetDetailModal } from './AssetDetailModal';
 
 const ACCOUNT_TYPES: Array<{ value: FinanceAccountType; label: string; interest: boolean }> = [
   { value: 'wechat_balance', label: '微信余额', interest: false },
@@ -40,6 +41,7 @@ export const FinancePage: React.FC = () => {
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [isTransactionDrawerOpen, setIsTransactionDrawerOpen] = useState(false);
+  const [isAssetDetailModalOpen, setIsAssetDetailModalOpen] = useState(false);
   const [allTransactions, setAllTransactions] = useState<FinanceTransaction[]>([]);
   const [isTransactionsLoading, setIsTransactionsLoading] = useState(false);
   const [transactionsError, setTransactionsError] = useState<string | null>(null);
@@ -157,7 +159,24 @@ export const FinancePage: React.FC = () => {
       {error && <div className={styles.dataError} role="alert"><span>{error}</span><button type="button" onClick={() => setError(null)}>关闭</button></div>}
       {isLoading && !overview ? <div className={styles.loading}>正在读取财务数据…</div> : <>
         <section className={styles.overview} aria-label="本月财务概览">
-          <div className={styles.balanceBlock}><span>总资产</span><strong>{money(overview?.totalAssets ?? 0)}</strong><small>{overview?.accounts.length ?? 0} 个账户</small></div>
+          <div
+            className={styles.balanceBlock}
+            role="button"
+            tabIndex={0}
+            onClick={() => setIsAssetDetailModalOpen(true)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setIsAssetDetailModalOpen(true);
+              }
+            }}
+            title="点击查看全部资产概览"
+            aria-label="总资产：点击查看全部资产详情概览"
+          >
+            <span>总资产</span>
+            <strong>{money(overview?.totalAssets ?? 0)}</strong>
+            <small>{overview?.accounts.length ?? 0} 个账户</small>
+          </div>
           <dl className={styles.monthStats}>
             <div className={styles.incomeStat}><dt>本月收入</dt><dd>{money(overview?.monthIncome ?? 0)}</dd></div>
             <div className={styles.expenseStat}><dt>本月支出</dt><dd>{money(overview?.monthExpense ?? 0)}</dd></div>
@@ -225,10 +244,19 @@ export const FinancePage: React.FC = () => {
     <TransactionDrawer
       open={isTransactionDrawerOpen}
       transactions={allTransactions}
+      accounts={overview?.accounts ?? []}
       loading={isTransactionsLoading}
       error={transactionsError}
       onClose={() => setIsTransactionDrawerOpen(false)}
       onRetry={() => void loadAllTransactions()}
+    />
+
+    <AssetDetailModal
+      open={isAssetDetailModalOpen}
+      accounts={overview?.accounts ?? []}
+      totalAssets={overview?.totalAssets ?? 0}
+      onClose={() => setIsAssetDetailModalOpen(false)}
+      onAddAccount={openAccountModal}
     />
   </main>;
 };
