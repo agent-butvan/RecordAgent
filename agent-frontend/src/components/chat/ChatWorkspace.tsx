@@ -30,10 +30,14 @@ import type { RecordReferenceOption } from '../../types/record';
 import { useMessage } from '../common/Message';
 import { useModel } from '../../context/ModelContext';
 import {
+  asRecordReferenceCommand,
   findSlashCommand,
   parseSlashCommand,
+  parseRecordReferencePickerQuery,
+  RECORD_REFERENCE_LIMITS,
   SLASH_COMMANDS,
   suggestSlashCommands,
+  type RecordReferenceCommandName,
   type SlashCommandDefinition,
 } from '../../features/slash-command/slashCommands';
 import {
@@ -194,7 +198,10 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   const [commandResult, setCommandResult] = useState<SlashCommandResultData | null>(null);
   const [recordReferences, setRecordReferences] = useState<RecordReferenceOption[]>([]);
   const [recordReferenceIndex, setRecordReferenceIndex] = useState(0);
-  const [selectedRecordReference, setSelectedRecordReference] = useState<RecordReferenceOption | null>(null);
+  const [recordReferenceSelection, setRecordReferenceSelection] = useState<{
+    command: RecordReferenceCommandName | null;
+    items: RecordReferenceOption[];
+  }>({ command: null, items: [] });
   const [recordReferencesLoading, setRecordReferencesLoading] = useState(false);
   const [recordReferencesLoadingMore, setRecordReferencesLoadingMore] = useState(false);
   const [recordReferencesError, setRecordReferencesError] = useState<string | null>(null);
@@ -210,11 +217,19 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     () => commandMenuDismissed ? [] : suggestSlashCommands(inputPrompt),
     [commandMenuDismissed, inputPrompt],
   );
+  const activeRecordReferenceCommand = asRecordReferenceCommand(parseSlashCommand(inputPrompt)?.name ?? '');
+  const selectedRecordReferences = useMemo(
+    () => recordReferenceSelection.command === activeRecordReferenceCommand
+      ? recordReferenceSelection.items : [],
+    [activeRecordReferenceCommand, recordReferenceSelection],
+  );
   const recordReferenceQuery = useMemo(() => {
-    if (selectedRecordReference) return null;
-    const match = inputPrompt.match(/^\/ask-record\s+\?([^?]*)$/i);
-    return match ? match[1].trim() : null;
-  }, [inputPrompt, selectedRecordReference]);
+    return parseRecordReferencePickerQuery(inputPrompt, selectedRecordReferences.length);
+  }, [inputPrompt, selectedRecordReferences.length]);
+  const availableRecordReferences = useMemo(() => {
+    const selectedIds = new Set(selectedRecordReferences.map((item) => item.id));
+    return recordReferences.filter((item) => !selectedIds.has(item.id));
+  }, [recordReferences, selectedRecordReferences]);
 
   useEffect(() => {
     setCommandSelectedIndex((index) => Math.min(index, Math.max(0, commandSuggestions.length - 1)));
@@ -384,7 +399,10 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
 
   const handleInputValueChange = (value: string) => {
     setInputPrompt(value);
-    if (!/^\/ask-record(?:\s|$)/i.test(value)) setSelectedRecordReference(null);
+    const nextCommand = asRecordReferenceCommand(parseSlashCommand(value)?.name ?? '');
+    setRecordReferenceSelection((current) => current.command && current.command !== nextCommand
+      ? { command: null, items: [] }
+      : current);
     setCommandMenuDismissed(false);
     setCommandSelectedIndex(0);
   };
@@ -502,16 +520,28 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
       return;
     }
 
-    if (command.name === 'ask-record') {
-      if (!selectedRecordReference) {
-        setCommandResult({ kind: 'error', message: '请先输入 ? 并选择一篇要引用的资料。' });
+    const referenceCommand = asRecordReferenceCommand(command.name);
+    if (referenceCommand) {
+      const requiredCount = RECORD_REFERENCE_LIMITS[referenceCommand];
+      if (recordReferenceSelection.command !== referenceCommand
+          || recordReferenceSelection.items.length !== requiredCount) {
+        setCommandResult({
+          kind: 'error',
+          message: `请先用 ? 选择${requiredCount === 1 ? '一篇' : '两篇'}要引用的资料。`,
+        });
         return;
       }
-      const displayPrompt = `/ask-record [资料：${selectedRecordReference.title || '无标题资料'}] ${parsed.args}`;
-      const referenceId = selectedRecordReference.id;
-      setSelectedRecordReference(null);
+      const references = recordReferenceSelection.items;
+      const referenceLabels = references.map((item) => `资料：${item.title || '无标题资料'}`).join('；');
+      const modelContext = referenceCommand === 'ask-record'
+        ? parsed.args
+        : referenceCommand === 'summarize-record'
+          ? '请为引用资料生成结构化摘要，包括核心主题、关键观点、重要细节和可执行结论；只依据资料内容，不确定之处请明确说明。'
+          : '请比较两篇引用资料，分别概括核心观点，并列出共同点、关键差异、可能的互补关系与可执行结论；只依据资料内容。';
+      const displayPrompt = `/${referenceCommand} [${referenceLabels}]${parsed.args ? ` ${parsed.args}` : ''}`;
+      setRecordReferenceSelection({ command: null, items: [] });
       setCommandResult(null);
-      onSendMessage(displayPrompt, parsed.args, [referenceId]);
+      onSendMessage(displayPrompt, modelContext, references.map((item) => item.id));
       return;
     }
 
@@ -535,8 +565,12 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   };
 
   const selectCommand = (command: SlashCommandDefinition) => {
-    if (command.name === 'ask-record') {
-      setInputPrompt('/ask-record ?');
+    const referenceCommand = asRecordReferenceCommand(command.name);
+    if (referenceCommand) {
+      setRecordReferenceSelection({ command: referenceCommand, items: [] });
+      setInputPrompt(referenceCommand === 'compare-records'
+        ? '/compare-records ? ?'
+        : `/${referenceCommand} ?`);
       setCommandMenuDismissed(true);
       setCommandResult(null);
       return;
@@ -552,28 +586,33 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   };
 
   const selectRecordReference = (reference: RecordReferenceOption) => {
-    setSelectedRecordReference(reference);
-    setInputPrompt('/ask-record ');
-    setRecordReferences([]);
+    if (!activeRecordReferenceCommand) return;
+    const command = activeRecordReferenceCommand;
+    const nextItems = [...selectedRecordReferences, reference]
+      .filter((item, index, items) => items.findIndex((candidate) => candidate.id === item.id) === index)
+      .slice(0, RECORD_REFERENCE_LIMITS[command]);
+    setRecordReferenceSelection({ command, items: nextItems });
+    setInputPrompt(nextItems.length < RECORD_REFERENCE_LIMITS[command] ? `/${command} ?` : `/${command} `);
+    setRecordReferenceIndex(0);
     setRecordReferencesError(null);
   };
 
   const handleComposerKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (recordReferenceQuery !== null) {
-      if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && recordReferences.length > 0) {
+      if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && availableRecordReferences.length > 0) {
         event.preventDefault();
-        if (event.key === 'ArrowDown' && recordReferenceIndex === recordReferences.length - 1
+        if (event.key === 'ArrowDown' && recordReferenceIndex === availableRecordReferences.length - 1
             && recordReferencesHasMore) {
           void loadMoreRecordReferences();
           return true;
         }
         const offset = event.key === 'ArrowDown' ? 1 : -1;
         setRecordReferenceIndex((index) =>
-          (index + offset + recordReferences.length) % recordReferences.length);
+          (index + offset + availableRecordReferences.length) % availableRecordReferences.length);
         return true;
       }
       if ((event.key === 'Enter' && !event.shiftKey) || event.key === 'Tab') {
-        const selected = recordReferences[recordReferenceIndex];
+        const selected = availableRecordReferences[recordReferenceIndex];
         if (selected) {
           event.preventDefault();
           selectRecordReference(selected);
@@ -582,7 +621,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
       }
       if (event.key === 'Escape') {
         event.preventDefault();
-        setInputPrompt('/ask-record ');
+        setInputPrompt(`/${activeRecordReferenceCommand ?? 'ask-record'} `);
         return true;
       }
     }
@@ -655,7 +694,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
         />
       ) : recordReferenceQuery !== null ? (
         <RecordReferencePicker
-          options={recordReferences}
+          options={availableRecordReferences}
           selectedIndex={recordReferenceIndex}
           loading={recordReferencesLoading}
           error={recordReferencesError}
@@ -667,14 +706,24 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
       ) : commandResult ? (
         <SlashCommandResult result={commandResult} onClose={() => setCommandResult(null)} />
       ) : null}
-      {selectedRecordReference && (
-        <RecordReferenceChip
-          reference={selectedRecordReference}
-          onRemove={() => {
-            setSelectedRecordReference(null);
-            setInputPrompt('/ask-record ?');
-          }}
-        />
+      {selectedRecordReferences.length > 0 && (
+        <div className={styles.recordReferenceChips} aria-label="已选择的资料引用">
+          {selectedRecordReferences.map((reference) => (
+            <RecordReferenceChip
+              key={reference.id}
+              reference={reference}
+              onRemove={() => {
+                const command = activeRecordReferenceCommand ?? recordReferenceSelection.command;
+                if (!command) return;
+                setRecordReferenceSelection((current) => ({
+                  command,
+                  items: current.items.filter((item) => item.id !== reference.id),
+                }));
+                setInputPrompt(`/${command} ?`);
+              }}
+            />
+          ))}
+        </div>
       )}
       <PromptInput
         value={inputPrompt}

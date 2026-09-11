@@ -62,6 +62,27 @@ class AgentChatContextServiceTest {
     }
 
     @Test
+    void sharesContextBudgetAcrossComparedRecords() {
+        String firstContent = "甲".repeat(30_000);
+        String secondContent = "乙".repeat(30_000);
+        var first = recordService.create("owner", new RecordCommand(
+                LocalDate.of(2026, 9, 8), RecordType.READING, "第一篇",
+                "<p>第一篇</p>", firstContent, List.of(), null));
+        var second = recordService.create("owner", new RecordCommand(
+                LocalDate.of(2026, 9, 9), RecordType.READING, "第二篇",
+                "<p>第二篇</p>", secondContent, List.of(), null));
+
+        var call = contextService.prepare("owner", new AgentChatRequest(
+                "session-1", "/compare-records", "请比较两篇资料", List.of(first.id(), second.id())));
+
+        assertEquals(2, call.ragContexts().size());
+        assertEquals(25_000, call.ragContexts().get(0).length());
+        assertEquals(25_000, call.ragContexts().get(1).length());
+        assertTrue(call.context().contains("资料标题：第一篇"));
+        assertTrue(call.context().contains("资料标题：第二篇"));
+    }
+
+    @Test
     void rejectsReferencesThatAreNoLongerVisible() {
         var record = recordService.create("owner", new RecordCommand(
                 LocalDate.of(2026, 9, 10), RecordType.QUICK, "已归档资料",

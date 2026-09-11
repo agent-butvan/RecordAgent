@@ -1,5 +1,14 @@
 export type SlashCommandName = 'help' | 'rename' | 'status' | 'tokens' | 'today'
-  | 'agenda' | 'spending' | 'study-report' | 'find-record' | 'ask-record';
+  | 'agenda' | 'spending' | 'study-report' | 'find-record' | 'ask-record'
+  | 'summarize-record' | 'compare-records';
+
+export type RecordReferenceCommandName = 'ask-record' | 'summarize-record' | 'compare-records';
+
+export const RECORD_REFERENCE_LIMITS: Record<RecordReferenceCommandName, number> = {
+  'ask-record': 1,
+  'summarize-record': 1,
+  'compare-records': 2,
+};
 
 export interface SlashCommandDefinition {
   name: SlashCommandName;
@@ -78,6 +87,18 @@ export const SLASH_COMMANDS: readonly SlashCommandDefinition[] = [
     usage: '/ask-record ? <问题>',
     requiresArgs: true,
   },
+  {
+    name: 'summarize-record',
+    aliases: [],
+    description: '引用一篇资料并生成结构化摘要',
+    usage: '/summarize-record ?',
+  },
+  {
+    name: 'compare-records',
+    aliases: [],
+    description: '引用两篇资料并比较共同点与差异',
+    usage: '/compare-records ? ?',
+  },
 ] as const;
 
 const COMMAND_TOKEN = /^[a-zA-Z][a-zA-Z0-9-]*$/;
@@ -102,6 +123,19 @@ export function findSlashCommand(name: string): SlashCommandDefinition | undefin
   const normalized = name.toLowerCase();
   return SLASH_COMMANDS.find((command) =>
     command.name === normalized || command.aliases.includes(normalized));
+}
+
+export function asRecordReferenceCommand(name: string): RecordReferenceCommandName | null {
+  return Object.hasOwn(RECORD_REFERENCE_LIMITS, name) ? name as RecordReferenceCommandName : null;
+}
+
+/** 解析当前待选择的资料占位符；对比命令首次可同时保留两个 `?`。 */
+export function parseRecordReferencePickerQuery(input: string, selectedCount: number): string | null {
+  const parsed = parseSlashCommand(input);
+  const command = asRecordReferenceCommand(parsed?.name ?? '');
+  if (!parsed || !command || selectedCount >= RECORD_REFERENCE_LIMITS[command]) return null;
+  const match = parsed.args.match(/^\?([^?]*?)(?:\s+\?)?$/);
+  return match ? match[1].trim() : null;
 }
 
 /** 输入仍处于命令名阶段时返回建议；出现参数后由具体命令接管。 */

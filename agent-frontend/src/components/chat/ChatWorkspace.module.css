@@ -267,6 +267,12 @@
   pointer-events: auto;
 }
 
+.recordReferenceChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 @media (max-width: 768px) {
   .bottomContainerOverview {
     width: calc(100% - 32px);
