@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import {
   Activity, BookOpenText, CalendarClock, CalendarDays, ChartNoAxesColumnIncreasing,
   CircleHelp, GraduationCap, Pencil, Search, WalletCards,
@@ -28,6 +29,14 @@ const ICONS = {
 
 /** 输入框上方的命令建议列表，键盘焦点始终保留在 textarea。 */
 export function SlashCommandMenu({ commands, selectedIndex, onSelect }: SlashCommandMenuProps) {
+  const selectedRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (selectedRef.current) {
+      selectedRef.current.scrollIntoView({ block: 'nearest' });
+    }
+  }, [selectedIndex]);
+
   if (commands.length === 0) return null;
 
   return (
@@ -38,6 +47,7 @@ export function SlashCommandMenu({ commands, selectedIndex, onSelect }: SlashCom
         return (
           <button
             key={command.name}
+            ref={selected ? selectedRef : undefined}
             type="button"
             role="option"
             aria-selected={selected}
@@ -45,7 +55,9 @@ export function SlashCommandMenu({ commands, selectedIndex, onSelect }: SlashCom
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => onSelect(command)}
           >
-            <Icon size={17} strokeWidth={1.8} aria-hidden="true" />
+            <span className={styles.iconWrap} aria-hidden="true">
+              <Icon size={15} strokeWidth={1.6} />
+            </span>
             <span className={styles.name}>/{command.name}</span>
             <span className={styles.description}>{command.description}</span>
             {command.aliases.length > 0 && (
@@ -57,3 +69,4 @@ export function SlashCommandMenu({ commands, selectedIndex, onSelect }: SlashCom
     </div>
   );
 }
+
