@@ -28,7 +28,7 @@ export function RecordReferencePicker({
   return (
     <section className={styles.picker} aria-label="选择引用资料">
       <header className={styles.header}>
-        <BookOpenText size={16} aria-hidden="true" />
+        <BookOpenText size={14} strokeWidth={1.6} aria-hidden="true" />
         <span>引用资料</span>
         <span className={styles.hint}>输入关键词筛选</span>
       </header>
@@ -48,7 +48,7 @@ export function RecordReferencePicker({
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => onSelect(option)}
                 >
-                  <BookOpenText size={16} strokeWidth={1.7} aria-hidden="true" />
+                  <BookOpenText size={14} strokeWidth={1.6} aria-hidden="true" />
                   <span className={styles.content}>
                     <span className={styles.title}>{option.title || '无标题资料'}</span>
                     <span className={styles.summary}>{option.summary || '暂无正文摘要'}</span>

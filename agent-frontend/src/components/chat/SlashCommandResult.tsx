@@ -56,7 +56,7 @@ export function SlashCommandResult({ result, onClose }: SlashCommandResultProps)
                 : result.kind === 'loading' ? '正在执行' : '命令提示'}</span>
         </div>
         <button type="button" className={styles.close} onClick={onClose} aria-label="关闭命令结果">
-          <X size={15} aria-hidden="true" />
+          <X size={14} strokeWidth={1.8} aria-hidden="true" />
         </button>
       </header>
 
@@ -73,14 +73,14 @@ export function SlashCommandResult({ result, onClose }: SlashCommandResultProps)
 }
 
 function ResultIcon({ kind }: { kind: SlashCommandResultData['kind'] }) {
-  if (kind === 'status') return <Activity size={16} aria-hidden="true" />;
-  if (kind === 'today') return <CalendarDays size={16} aria-hidden="true" />;
-  if (kind === 'agenda') return <CalendarClock size={16} aria-hidden="true" />;
-  if (kind === 'spending') return <WalletCards size={16} aria-hidden="true" />;
-  if (kind === 'study-report') return <GraduationCap size={16} aria-hidden="true" />;
-  if (kind === 'find-record') return <Search size={16} aria-hidden="true" />;
-  if (kind === 'loading') return <LoaderCircle className={styles.spinner} size={16} aria-hidden="true" />;
-  return <CircleHelp size={16} aria-hidden="true" />;
+  if (kind === 'status') return <Activity size={15} strokeWidth={1.6} aria-hidden="true" />;
+  if (kind === 'today') return <CalendarDays size={15} strokeWidth={1.6} aria-hidden="true" />;
+  if (kind === 'agenda') return <CalendarClock size={15} strokeWidth={1.6} aria-hidden="true" />;
+  if (kind === 'spending') return <WalletCards size={15} strokeWidth={1.6} aria-hidden="true" />;
+  if (kind === 'study-report') return <GraduationCap size={15} strokeWidth={1.6} aria-hidden="true" />;
+  if (kind === 'find-record') return <Search size={15} strokeWidth={1.6} aria-hidden="true" />;
+  if (kind === 'loading') return <LoaderCircle className={styles.spinner} size={15} strokeWidth={1.6} aria-hidden="true" />;
+  return <CircleHelp size={15} strokeWidth={1.6} aria-hidden="true" />;
 }
 
 function HelpContent({ result }: { result: Extract<SlashCommandResultData, { kind: 'help' }> }) {
