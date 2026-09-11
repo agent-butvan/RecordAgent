@@ -16,7 +16,18 @@ import { SubagentActivity } from './SubagentActivity';
 import { SubagentTaskPanel } from './SubagentTaskPanel';
 import { ProjectFileTree } from './ProjectFileTree';
 import { RightSidePanel, type RightPanelTab } from './RightSidePanel';
+import { SlashCommandMenu } from './SlashCommandMenu';
+import { SlashCommandResult, type SlashCommandResultData } from './SlashCommandResult';
 import type { PermissionToolPayload } from '../../services/api';
+import { useMessage } from '../common/Message';
+import { useModel } from '../../context/ModelContext';
+import {
+  findSlashCommand,
+  parseSlashCommand,
+  SLASH_COMMANDS,
+  suggestSlashCommands,
+  type SlashCommandDefinition,
+} from '../../features/slash-command/slashCommands';
 import {
   Copy,
   ThumbsUp,
@@ -42,6 +53,7 @@ interface ChatWorkspaceProps {
   onRetrySessionLoad?: () => void;
   onSendMessage: (prompt: string) => void;
   onOpenSettings: () => void;
+  onRenameSession: (title: string) => Promise<{ success: boolean; message?: string }>;
   pendingPermission?: { assistantMessageId: string; tool: PermissionToolPayload } | null;
   isPermissionSubmitting?: boolean;
   onPermissionDecision?: (approved: boolean, rememberForSession: boolean) => void;
@@ -145,6 +157,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   onRetrySessionLoad,
   onSendMessage,
   onOpenSettings,
+  onRenameSession,
   pendingPermission = null,
   isPermissionSubmitting = false,
   onPermissionDecision,
@@ -160,12 +173,25 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   isPermissionModeDisabled = false,
   isPermissionModeSaving = false,
 }) => {
+  const { showMessage } = useMessage();
+  const { getActiveModel, getActiveProvider } = useModel();
   const [inputPrompt, setInputPrompt] = useState('');
+  const [commandSelectedIndex, setCommandSelectedIndex] = useState(0);
+  const [commandMenuDismissed, setCommandMenuDismissed] = useState(false);
+  const [commandResult, setCommandResult] = useState<SlashCommandResultData | null>(null);
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [rightPanelTabs, setRightPanelTabs] = useState<string[]>([]);
   const [rightPanelTab, setRightPanelTab] = useState<string | null>(null);
   const [tokenUsageMessageId, setTokenUsageMessageId] = useState<string | null>(null);
   const messagesAreaRef = useRef<HTMLDivElement>(null);
+  const commandSuggestions = useMemo(
+    () => commandMenuDismissed ? [] : suggestSlashCommands(inputPrompt),
+    [commandMenuDismissed, inputPrompt],
+  );
+
+  useEffect(() => {
+    setCommandSelectedIndex((index) => Math.min(index, Math.max(0, commandSuggestions.length - 1)));
+  }, [commandSuggestions.length]);
 
   const tokenUsageTurns = useMemo<TokenUsageTurnOption[]>(() => {
     const turns: TokenUsageTurnOption[] = [];
@@ -274,11 +300,120 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     requestAnimationFrame(() => area.scrollTo({ top: area.scrollHeight, behavior: 'smooth' }));
   }, [messages, pendingPermission]);
 
+  const handleInputValueChange = (value: string) => {
+    setInputPrompt(value);
+    setCommandMenuDismissed(false);
+    setCommandSelectedIndex(0);
+  };
+
+  const executeSlashCommand = async (rawInput: string) => {
+    const parsed = parseSlashCommand(rawInput);
+    if (!parsed) {
+      onSendMessage(rawInput.startsWith('//') ? rawInput.slice(1) : rawInput);
+      return;
+    }
+    if (!parsed.name) {
+      setCommandResult({ kind: 'help', commands: SLASH_COMMANDS });
+      return;
+    }
+
+    const command = findSlashCommand(parsed.name);
+    if (!command) {
+      setCommandResult({ kind: 'error', message: `未知命令：/${parsed.name}。输入 /help 查看可用命令。` });
+      return;
+    }
+    if (command.requiresArgs && !parsed.args) {
+      setCommandResult({ kind: 'error', message: `缺少参数。用法：${command.usage}` });
+      return;
+    }
+
+    if (command.name === 'help') {
+      const targetName = parsed.args.replace(/^\//, '').trim();
+      const target = targetName ? findSlashCommand(targetName) : undefined;
+      if (targetName && !target) {
+        setCommandResult({ kind: 'error', message: `没有找到命令：/${targetName}` });
+      } else {
+        setCommandResult({ kind: 'help', commands: SLASH_COMMANDS, command: target });
+      }
+      return;
+    }
+
+    if (command.name === 'rename') {
+      const outcome = await onRenameSession(parsed.args);
+      if (outcome.success) {
+        setCommandResult(null);
+        showMessage('success', `会话已重命名为“${parsed.args}”。`);
+      } else {
+        setCommandResult({ kind: 'error', message: outcome.message || '会话名称修改失败，请重试。' });
+      }
+      return;
+    }
+
+    if (command.name === 'tokens') {
+      setCommandResult(null);
+      openSessionTokenUsage();
+      return;
+    }
+
+    const activeModel = getActiveModel();
+    const activeProvider = getActiveProvider();
+    const latestUsage = [...messages].reverse().find((message) => message.role === 'assistant' && message.usage)?.usage;
+    const latestCall = latestUsage?.calls.at(-1);
+    setCommandResult({
+      kind: 'status',
+      data: {
+        sessionId,
+        sessionTitle,
+        providerName: activeProvider?.name || activeProvider?.id || '未配置',
+        modelName: activeModel?.name || activeModel?.id || '未配置',
+        permissionMode: permissionMode === 'ASK' ? '逐次询问' : permissionMode === 'AUTO_EDIT' ? '自动编辑' : '完全访问',
+        totalTokens: sessionUsageSummary?.totalTokens ?? 0,
+        contextTokens: latestCall?.inputTokens ?? latestCall?.estimatedInputTokens,
+        contextWindow: activeModel?.contextWindow,
+      },
+    });
+  };
+
+  const selectCommand = (command: SlashCommandDefinition) => {
+    if (command.requiresArgs) {
+      setInputPrompt(`/${command.name} `);
+      setCommandMenuDismissed(true);
+      return;
+    }
+    setInputPrompt('');
+    setCommandMenuDismissed(true);
+    void executeSlashCommand(`/${command.name}`);
+  };
+
+  const handleCommandKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (commandSuggestions.length === 0) return false;
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      const offset = event.key === 'ArrowDown' ? 1 : -1;
+      setCommandSelectedIndex((index) =>
+        (index + offset + commandSuggestions.length) % commandSuggestions.length);
+      return true;
+    }
+    if ((event.key === 'Enter' && !event.shiftKey) || event.key === 'Tab') {
+      event.preventDefault();
+      const selected = commandSuggestions[commandSelectedIndex];
+      if (selected) selectCommand(selected);
+      return true;
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      setCommandMenuDismissed(true);
+      return true;
+    }
+    return false;
+  };
+
   const handleSend = () => {
     if (!inputPrompt.trim()) return;
     const prompt = inputPrompt.trim();
     setInputPrompt('');
-    onSendMessage(prompt);
+    setCommandMenuDismissed(false);
+    void executeSlashCommand(prompt);
   };
 
   // 点击左侧任务步骤时间轨：滚动定位到对应消息行
@@ -312,15 +447,26 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     </div>
   ) : (
     <div className={`${styles.bottomContainer} ${isOverview ? styles.bottomContainerOverview : ''}`}>
+      {commandSuggestions.length > 0 ? (
+        <SlashCommandMenu
+          commands={commandSuggestions}
+          selectedIndex={commandSelectedIndex}
+          onSelect={selectCommand}
+        />
+      ) : commandResult ? (
+        <SlashCommandResult result={commandResult} onClose={() => setCommandResult(null)} />
+      ) : null}
       <PromptInput
         value={inputPrompt}
-        onValueChange={setInputPrompt}
+        onValueChange={handleInputValueChange}
         onSend={handleSend}
         onOpenSettings={onOpenSettings}
         permissionMode={permissionMode}
         onPermissionModeChange={onPermissionModeChange}
         isPermissionModeDisabled={isPermissionModeDisabled}
         isPermissionModeSaving={isPermissionModeSaving}
+        onInputKeyDown={handleCommandKeyDown}
+        commandMenuOpen={commandSuggestions.length > 0}
       />
     </div>
   );

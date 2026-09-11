@@ -21,6 +21,7 @@
 | `agent-frontend/src/components/` | 可复用视图组件；按业务域建立目录，例如 `chat/`、`model/`、`layout/`、`common/`。 |
 | `agent-frontend/src/services/` | HTTP、SSE、存储与第三方调用等基础设施适配；不得承载页面状态或 JSX。 |
 | `agent-frontend/src/context/` | 跨页面共享状态与领域上下文；不得把一次性局部状态提升到此处。 |
+| `agent-frontend/src/features/` | 前端领域能力模块；封装不属于视图或基础设施的解析、规则与应用交互逻辑，例如 Slash Command。 |
 | `agent-frontend/src/types/` | 前端领域类型、接口和 DTO 定义；禁止放置运行逻辑。 |
 | `agent-frontend/src-tauri/` | Tauri/Rust 桌面端能力；系统权限与原生能力必须最小化授权。 |
 | `agent-frontend/src-tauri/binaries/` | Tauri sidecar 产物目录：启动器脚本入库，fat jar 与最小 JRE 运行时不入库。 |

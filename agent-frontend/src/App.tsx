@@ -401,10 +401,16 @@ export const MainLayout: React.FC<{
 
   // 7. 修改会话标题
   const handleUpdateSessionTitle = async (id: string, newTitle: string) => {
+    const previousTitle = sessions.find((session) => session.id === id)?.title;
     setSessions((prev) =>
       prev.map((s) => (s.id === id ? { ...s, title: newTitle } : s))
     );
-    await updateSessionTitleApi(id, newTitle);
+    const result = await updateSessionTitleApi(id, newTitle);
+    if (!result.success && previousTitle !== undefined) {
+      setSessions((prev) => prev.map((session) =>
+        session.id === id ? { ...session, title: previousTitle } : session));
+    }
+    return result;
   };
 
   // 7.5 选择会话：切换到对应会话并确保回到对话视图（日历模式下点击会话可跳回）
@@ -800,6 +806,7 @@ export const MainLayout: React.FC<{
                 if (activeSessionId) void syncSessionDetail(activeSessionId);
               }}
               onSendMessage={handleSendMessage}
+              onRenameSession={(title) => handleUpdateSessionTitle(activeSessionId, title)}
               onOpenSettings={() => setIsSettingsOpen(true)}
               pendingPermission={pendingPermission}
               isPermissionSubmitting={isPermissionSubmitting}
