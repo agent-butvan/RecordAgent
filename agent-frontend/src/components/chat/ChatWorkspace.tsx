@@ -22,6 +22,7 @@ import { RecordReferencePicker } from './RecordReferencePicker';
 import { RecordReferenceChip } from './RecordReferenceChip';
 import type { PermissionToolPayload } from '../../services/api';
 import { fetchRecord, fetchRecordReferences } from '../../services/recordApi';
+import { fetchDailyInsight } from '../../services/dailyInsightApi';
 import type { RecordReferenceOption } from '../../types/record';
 import { useMessage } from '../common/Message';
 import { useModel } from '../../context/ModelContext';
@@ -393,6 +394,19 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     if (command.name === 'tokens') {
       setCommandResult(null);
       openSessionTokenUsage();
+      return;
+    }
+
+    if (command.name === 'today') {
+      setCommandResult({ kind: 'loading', message: '正在汇总今日活动…' });
+      try {
+        setCommandResult({ kind: 'today', data: await fetchDailyInsight() });
+      } catch (error) {
+        setCommandResult({
+          kind: 'error',
+          message: error instanceof Error ? error.message : '今日活动汇总失败，请重试。',
+        });
+      }
       return;
     }
 

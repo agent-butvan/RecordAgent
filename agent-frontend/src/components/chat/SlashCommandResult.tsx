@@ -1,11 +1,14 @@
-import { Activity, CircleHelp, X } from 'lucide-react';
+import { Activity, CalendarDays, CircleHelp, LoaderCircle, X } from 'lucide-react';
 import type { SlashCommandDefinition } from '../../features/slash-command/slashCommands';
+import type { DailyInsight } from '../../types/dailyInsight';
 import { formatTokenCount } from './tokenUsageFormat';
 import styles from './SlashCommandResult.module.css';
 
 export type SlashCommandResultData =
   | { kind: 'help'; commands: readonly SlashCommandDefinition[]; command?: SlashCommandDefinition }
   | { kind: 'status'; data: SlashStatusData }
+  | { kind: 'today'; data: DailyInsight }
+  | { kind: 'loading'; message: string }
   | { kind: 'error'; message: string };
 
 export interface SlashStatusData {
@@ -29,10 +32,11 @@ export function SlashCommandResult({ result, onClose }: SlashCommandResultProps)
     <section className={styles.panel} aria-live="polite">
       <header className={styles.header}>
         <div className={styles.heading}>
-          {result.kind === 'status'
-            ? <Activity size={16} aria-hidden="true" />
-            : <CircleHelp size={16} aria-hidden="true" />}
-          <span>{result.kind === 'status' ? '状态' : result.kind === 'help' ? '可用命令' : '命令提示'}</span>
+          <ResultIcon kind={result.kind} />
+          <span>{result.kind === 'status' ? '状态'
+            : result.kind === 'help' ? '可用命令'
+              : result.kind === 'today' ? '今日活动'
+                : result.kind === 'loading' ? '正在执行' : '命令提示'}</span>
         </div>
         <button type="button" className={styles.close} onClick={onClose} aria-label="关闭命令结果">
           <X size={15} aria-hidden="true" />
@@ -41,9 +45,17 @@ export function SlashCommandResult({ result, onClose }: SlashCommandResultProps)
 
       {result.kind === 'help' ? <HelpContent result={result} />
         : result.kind === 'status' ? <StatusContent data={result.data} />
-          : <p className={styles.error}>{result.message}</p>}
+          : result.kind === 'today' ? <TodayContent data={result.data} />
+            : <p className={result.kind === 'error' ? styles.error : styles.loading}>{result.message}</p>}
     </section>
   );
+}
+
+function ResultIcon({ kind }: { kind: SlashCommandResultData['kind'] }) {
+  if (kind === 'status') return <Activity size={16} aria-hidden="true" />;
+  if (kind === 'today') return <CalendarDays size={16} aria-hidden="true" />;
+  if (kind === 'loading') return <LoaderCircle className={styles.spinner} size={16} aria-hidden="true" />;
+  return <CircleHelp size={16} aria-hidden="true" />;
 }
 
 function HelpContent({ result }: { result: Extract<SlashCommandResultData, { kind: 'help' }> }) {
@@ -91,4 +103,33 @@ function StatusContent({ data }: { data: SlashStatusData }) {
       </div>
     </dl>
   );
+}
+
+const MONEY_FORMATTER = new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY' });
+
+function TodayContent({ data }: { data: DailyInsight }) {
+  const categories = Object.entries(data.finance.expenseCategories)
+    .sort((left, right) => right[1] - left[1])
+    .map(([name, amount]) => `${name} ${MONEY_FORMATTER.format(amount)}`)
+    .join(' · ');
+  return (
+    <div>
+      <p className={styles.insightDate}>{data.date}</p>
+      <dl className={styles.insightGrid}>
+        <div><dt>待办</dt><dd>{data.todos.completed} / {data.todos.total}</dd><small>{data.todos.pending} 项待完成</small></div>
+        <div><dt>日程</dt><dd>{data.scheduleCount} 项</dd><small>今日安排</small></div>
+        <div><dt>资料</dt><dd>{data.records.createdCount} 篇</dd><small>今日新增</small></div>
+        <div><dt>花销</dt><dd>{MONEY_FORMATTER.format(data.finance.expenseTotal)}</dd><small>{data.finance.expenseCount} 笔{categories ? ` · ${categories}` : ''}</small></div>
+        <div><dt>学习</dt><dd>{formatStudyDuration(data.study.durationSeconds)}</dd><small>{data.study.sessionCount} 次记录</small></div>
+      </dl>
+    </div>
+  );
+}
+
+function formatStudyDuration(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  if (hours > 0) return remainingMinutes > 0 ? `${hours} 小时 ${remainingMinutes} 分钟` : `${hours} 小时`;
+  return `${minutes} 分钟`;
 }

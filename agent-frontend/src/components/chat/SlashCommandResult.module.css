@@ -37,6 +37,17 @@
 .commandDetail p { color: var(--text-secondary); }
 .commandDetail { display: grid; gap: 6px; font-size: 13px; }
 .error { color: #b42318; font-size: 13px; }
+.loading { color: var(--text-secondary); font-size: 13px; }
+.spinner { animation: command-result-spin 900ms linear infinite; }
+
+.insightDate { margin-bottom: 8px; color: var(--text-muted); font-size: 12px; }
+.insightGrid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.insightGrid > div { min-width: 0; padding: 9px 10px; background: var(--bg-surface); border-radius: var(--radius-md); }
+.insightGrid dt { color: var(--text-muted); font-size: 11px; }
+.insightGrid dd { margin-top: 3px; overflow: hidden; color: var(--text-primary); font-size: 14px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.insightGrid small { display: block; margin-top: 3px; overflow: hidden; color: var(--text-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+
+@keyframes command-result-spin { to { transform: rotate(360deg); } }
 
 .statusGrid { display: grid; gap: 7px; }
 .statusGrid > div { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 10px; align-items: center; }
@@ -47,4 +58,5 @@
 @media (max-width: 560px) {
   .statusGrid > div { grid-template-columns: 86px minmax(0, 1fr); }
   .commandRow { grid-template-columns: 78px 1fr; }
+  .insightGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
