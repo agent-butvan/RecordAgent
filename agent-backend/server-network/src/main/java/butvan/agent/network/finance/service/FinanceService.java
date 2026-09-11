@@ -66,10 +66,11 @@ public class FinanceService {
         String normalizedRange = range == null || range.isBlank() ? "month" : range.trim().toLowerCase();
         LocalDate today = LocalDate.now();
         LocalDate from = switch (normalizedRange) {
+            case "today" -> today;
             case "week" -> today.minusDays(today.getDayOfWeek().getValue() - 1L);
             case "month" -> today.withDayOfMonth(1);
             case "year" -> today.withDayOfYear(1);
-            default -> throw new IllegalArgumentException("图表时间范围仅支持 week、month 或 year");
+            default -> throw new IllegalArgumentException("图表时间范围仅支持 today、week、month 或 year");
         };
         settleYieldThrough(ownerId, today);
         var analysis = expenseAnalyticsService.analyze(ownerId, from, today);

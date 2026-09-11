@@ -49,6 +49,35 @@
 
 @keyframes command-result-spin { to { transform: rotate(360deg); } }
 
+.queryContent { min-width: 0; }
+.empty,
+.queryNote { color: var(--text-muted); font-size: 12px; }
+.summaryMetrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.summaryMetrics > div { min-width: 0; padding: 9px 10px; background: var(--bg-surface); border-radius: var(--radius-md); }
+.summaryMetrics dt { color: var(--text-muted); font-size: 11px; }
+.summaryMetrics dd { margin-top: 3px; overflow: hidden; color: var(--text-primary); font-size: 14px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.queryNote { margin-top: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.agendaColumns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.queryList { min-width: 0; }
+.queryList h4 { margin-bottom: 5px; color: var(--text-muted); font-size: 11px; font-weight: 600; }
+.queryList ul { display: grid; gap: 2px; }
+.queryList li { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) max-content; gap: 8px; padding: 5px 7px; border-radius: var(--radius-md); font-size: 12px; }
+.queryList li:hover { background: var(--bg-surface); }
+.queryList li > span { overflow: hidden; color: var(--text-primary); text-overflow: ellipsis; white-space: nowrap; }
+.queryList li small { color: var(--text-muted); }
+.completed { color: var(--text-muted) !important; text-decoration: line-through; }
+
+.recordResults { max-height: 260px; overflow-y: auto; display: grid; gap: 2px; }
+.recordResults li { min-width: 0; display: grid; grid-template-columns: 20px minmax(0, 1fr) max-content; align-items: center; gap: 7px; padding: 6px 7px; border-radius: var(--radius-md); color: var(--text-secondary); }
+.recordResults li:hover { background: var(--bg-surface); }
+.recordResults li > span { min-width: 0; display: grid; }
+.recordResults b,
+.recordResults small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recordResults b { color: var(--text-primary); font-size: 12px; }
+.recordResults small { color: var(--text-muted); font-size: 11px; }
+.recordResults em { color: var(--text-muted); font-size: 10px; font-style: normal; }
+
 .statusGrid { display: grid; gap: 7px; }
 .statusGrid > div { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 10px; align-items: center; }
 .statusGrid dt { color: var(--text-muted); font-size: 12px; }
@@ -59,4 +88,8 @@
   .statusGrid > div { grid-template-columns: 86px minmax(0, 1fr); }
   .commandRow { grid-template-columns: 78px 1fr; }
   .insightGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .summaryMetrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .agendaColumns { grid-template-columns: 1fr; }
+  .recordResults li { grid-template-columns: 20px minmax(0, 1fr); }
+  .recordResults em { display: none; }
 }

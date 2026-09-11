@@ -3,9 +3,9 @@ import { formatLocalDate } from './dailyEvents';
 import { getApiBaseUrl, type ApiResponse } from './api';
 
 /** 读取由后端统一计算的每日洞察，前端只负责传递本地日期与时区。 */
-export async function fetchDailyInsight(date = new Date()): Promise<DailyInsight> {
+export async function fetchDailyInsight(date = formatLocalDate(new Date())): Promise<DailyInsight> {
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const params = new URLSearchParams({ date: formatLocalDate(date), timezone });
+  const params = new URLSearchParams({ date, timezone });
   const response = await fetch(`${getApiBaseUrl()}/agent/insights/daily?${params}`);
   let payload: ApiResponse<DailyInsight>;
   try {

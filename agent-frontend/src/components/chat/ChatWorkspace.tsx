@@ -23,6 +23,9 @@ import { RecordReferenceChip } from './RecordReferenceChip';
 import type { PermissionToolPayload } from '../../services/api';
 import { fetchRecord, fetchRecordReferences } from '../../services/recordApi';
 import { fetchDailyInsight } from '../../services/dailyInsightApi';
+import { fetchDailyDay } from '../../services/dailyEvents';
+import { fetchFinanceExpenseChart } from '../../services/financeApi';
+import { fetchStudyStatistics } from '../../services/studyApi';
 import type { RecordReferenceOption } from '../../types/record';
 import { useMessage } from '../common/Message';
 import { useModel } from '../../context/ModelContext';
@@ -33,6 +36,11 @@ import {
   suggestSlashCommands,
   type SlashCommandDefinition,
 } from '../../features/slash-command/slashCommands';
+import {
+  parseOptionalDateArgument,
+  parseQueryPeriod,
+  queryPeriodRange,
+} from '../../features/slash-command/slashCommandArguments';
 import {
   Copy,
   ThumbsUp,
@@ -400,12 +408,62 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     if (command.name === 'today') {
       setCommandResult({ kind: 'loading', message: '正在汇总今日活动…' });
       try {
-        setCommandResult({ kind: 'today', data: await fetchDailyInsight() });
+        const date = parseOptionalDateArgument(parsed.args);
+        setCommandResult({ kind: 'today', data: await fetchDailyInsight(date) });
       } catch (error) {
         setCommandResult({
           kind: 'error',
           message: error instanceof Error ? error.message : '今日活动汇总失败，请重试。',
         });
+      }
+      return;
+    }
+
+    if (command.name === 'agenda') {
+      setCommandResult({ kind: 'loading', message: '正在读取待办与日程…' });
+      try {
+        const date = parseOptionalDateArgument(parsed.args);
+        setCommandResult({ kind: 'agenda', data: await fetchDailyDay(new Date(`${date}T12:00:00`)) });
+      } catch (error) {
+        setCommandResult({ kind: 'error', message: commandError(error, '日程读取失败，请重试。') });
+      }
+      return;
+    }
+
+    if (command.name === 'spending') {
+      setCommandResult({ kind: 'loading', message: '正在统计收支情况…' });
+      try {
+        const period = parseQueryPeriod(parsed.args, 'month');
+        setCommandResult({ kind: 'spending', data: await fetchFinanceExpenseChart(period) });
+      } catch (error) {
+        setCommandResult({ kind: 'error', message: commandError(error, '收支统计失败，请重试。') });
+      }
+      return;
+    }
+
+    if (command.name === 'study-report') {
+      setCommandResult({ kind: 'loading', message: '正在统计学习情况…' });
+      try {
+        const period = parseQueryPeriod(parsed.args, 'week');
+        const range = queryPeriodRange(period);
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        setCommandResult({
+          kind: 'study-report',
+          data: await fetchStudyStatistics(range.from, range.to, timezone),
+          period,
+        });
+      } catch (error) {
+        setCommandResult({ kind: 'error', message: commandError(error, '学习统计失败，请重试。') });
+      }
+      return;
+    }
+
+    if (command.name === 'find-record') {
+      setCommandResult({ kind: 'loading', message: '正在检索资料…' });
+      try {
+        setCommandResult({ kind: 'find-record', query: parsed.args, data: await fetchRecordReferences(parsed.args, 20) });
+      } catch (error) {
+        setCommandResult({ kind: 'error', message: commandError(error, '资料检索失败，请重试。') });
       }
       return;
     }
@@ -735,5 +793,9 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     </div>
   );
 };
+
+function commandError(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
 
 export default ChatWorkspace;

@@ -1,6 +1,15 @@
-import { Activity, CalendarDays, CircleHelp, LoaderCircle, X } from 'lucide-react';
+import {
+  Activity, BookOpenText, CalendarClock, CalendarDays, CircleHelp,
+  GraduationCap, LoaderCircle, Search, WalletCards, X,
+} from 'lucide-react';
 import type { SlashCommandDefinition } from '../../features/slash-command/slashCommands';
 import type { DailyInsight } from '../../types/dailyInsight';
+import type { DailyDay, ScheduleDailyEvent, TodoDailyEvent } from '../../types/dailyEvent';
+import type { FinanceExpenseChart } from '../../types/finance';
+import type { RecordReferenceOption } from '../../types/record';
+import type { StudyStatistics } from '../../types/study';
+import type { SlashQueryPeriod } from '../../features/slash-command/slashCommandArguments';
+import { RECORD_REFERENCE_TYPE_LABELS } from './RecordReferencePicker';
 import { formatTokenCount } from './tokenUsageFormat';
 import styles from './SlashCommandResult.module.css';
 
@@ -8,6 +17,10 @@ export type SlashCommandResultData =
   | { kind: 'help'; commands: readonly SlashCommandDefinition[]; command?: SlashCommandDefinition }
   | { kind: 'status'; data: SlashStatusData }
   | { kind: 'today'; data: DailyInsight }
+  | { kind: 'agenda'; data: DailyDay }
+  | { kind: 'spending'; data: FinanceExpenseChart }
+  | { kind: 'study-report'; data: StudyStatistics; period: SlashQueryPeriod }
+  | { kind: 'find-record'; data: RecordReferenceOption[]; query: string }
   | { kind: 'loading'; message: string }
   | { kind: 'error'; message: string };
 
@@ -36,6 +49,10 @@ export function SlashCommandResult({ result, onClose }: SlashCommandResultProps)
           <span>{result.kind === 'status' ? '状态'
             : result.kind === 'help' ? '可用命令'
               : result.kind === 'today' ? '今日活动'
+                : result.kind === 'agenda' ? '待办与日程'
+                  : result.kind === 'spending' ? '收支统计'
+                    : result.kind === 'study-report' ? '学习统计'
+                      : result.kind === 'find-record' ? '资料检索'
                 : result.kind === 'loading' ? '正在执行' : '命令提示'}</span>
         </div>
         <button type="button" className={styles.close} onClick={onClose} aria-label="关闭命令结果">
@@ -46,7 +63,11 @@ export function SlashCommandResult({ result, onClose }: SlashCommandResultProps)
       {result.kind === 'help' ? <HelpContent result={result} />
         : result.kind === 'status' ? <StatusContent data={result.data} />
           : result.kind === 'today' ? <TodayContent data={result.data} />
-            : <p className={result.kind === 'error' ? styles.error : styles.loading}>{result.message}</p>}
+            : result.kind === 'agenda' ? <AgendaContent data={result.data} />
+              : result.kind === 'spending' ? <SpendingContent data={result.data} />
+                : result.kind === 'study-report' ? <StudyReportContent data={result.data} period={result.period} />
+                  : result.kind === 'find-record' ? <RecordSearchContent data={result.data} query={result.query} />
+                    : <p className={result.kind === 'error' ? styles.error : styles.loading}>{result.message}</p>}
     </section>
   );
 }
@@ -54,6 +75,10 @@ export function SlashCommandResult({ result, onClose }: SlashCommandResultProps)
 function ResultIcon({ kind }: { kind: SlashCommandResultData['kind'] }) {
   if (kind === 'status') return <Activity size={16} aria-hidden="true" />;
   if (kind === 'today') return <CalendarDays size={16} aria-hidden="true" />;
+  if (kind === 'agenda') return <CalendarClock size={16} aria-hidden="true" />;
+  if (kind === 'spending') return <WalletCards size={16} aria-hidden="true" />;
+  if (kind === 'study-report') return <GraduationCap size={16} aria-hidden="true" />;
+  if (kind === 'find-record') return <Search size={16} aria-hidden="true" />;
   if (kind === 'loading') return <LoaderCircle className={styles.spinner} size={16} aria-hidden="true" />;
   return <CircleHelp size={16} aria-hidden="true" />;
 }
@@ -118,7 +143,7 @@ function TodayContent({ data }: { data: DailyInsight }) {
       <dl className={styles.insightGrid}>
         <div><dt>待办</dt><dd>{data.todos.completed} / {data.todos.total}</dd><small>{data.todos.pending} 项待完成</small></div>
         <div><dt>日程</dt><dd>{data.scheduleCount} 项</dd><small>今日安排</small></div>
-        <div><dt>资料</dt><dd>{data.records.createdCount} 篇</dd><small>今日新增</small></div>
+        <div><dt>资料</dt><dd>{data.records.createdCount} 篇</dd><small>当日资料</small></div>
         <div><dt>花销</dt><dd>{MONEY_FORMATTER.format(data.finance.expenseTotal)}</dd><small>{data.finance.expenseCount} 笔{categories ? ` · ${categories}` : ''}</small></div>
         <div><dt>学习</dt><dd>{formatStudyDuration(data.study.durationSeconds)}</dd><small>{data.study.sessionCount} 次记录</small></div>
       </dl>
@@ -132,4 +157,88 @@ function formatStudyDuration(seconds: number): string {
   const remainingMinutes = minutes % 60;
   if (hours > 0) return remainingMinutes > 0 ? `${hours} 小时 ${remainingMinutes} 分钟` : `${hours} 小时`;
   return `${minutes} 分钟`;
+}
+
+function AgendaContent({ data }: { data: DailyDay }) {
+  const todos = data.events.filter((event): event is TodoDailyEvent => event.eventType === 'todo');
+  const schedules = data.events.filter((event): event is ScheduleDailyEvent => event.eventType === 'schedule');
+  return (
+    <div className={styles.queryContent}>
+      <p className={styles.insightDate}>{data.date} · {todos.length} 项待办 · {schedules.length} 项日程</p>
+      {todos.length === 0 && schedules.length === 0 ? <p className={styles.empty}>这一天没有待办或日程。</p> : (
+        <div className={styles.agendaColumns}>
+          <QueryList title="待办">
+            {todos.map((todo) => <li key={todo.id}>
+              <span className={todo.details.completed ? styles.completed : ''}>{todo.title}</span>
+              <small>{todo.details.completed ? '已完成' : todo.details.time || '未完成'}</small>
+            </li>)}
+          </QueryList>
+          <QueryList title="日程">
+            {schedules.map((schedule) => <li key={schedule.id}>
+              <span>{schedule.title}</span>
+              <small>{schedule.details.startTime || '时间待定'}{schedule.details.location ? ` · ${schedule.details.location}` : ''}</small>
+            </li>)}
+          </QueryList>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function QueryList({ title, children }: { title: string; children: React.ReactNode }) {
+  return <section className={styles.queryList}><h4>{title}</h4><ul>{children}</ul></section>;
+}
+
+function SpendingContent({ data }: { data: FinanceExpenseChart }) {
+  const categories = new Map<string, number>();
+  data.days.forEach((day) => day.categories.forEach((item) =>
+    categories.set(item.category, (categories.get(item.category) ?? 0) + item.amount)));
+  const categoryText = [...categories.entries()]
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, 4)
+    .map(([name, amount]) => `${name} ${MONEY_FORMATTER.format(amount)}`)
+    .join(' · ');
+  return (
+    <div className={styles.queryContent}>
+      <p className={styles.insightDate}>{data.from} 至 {data.to}</p>
+      <dl className={styles.summaryMetrics}>
+        <div><dt>支出</dt><dd>{MONEY_FORMATTER.format(data.totalExpense)}</dd></div>
+        <div><dt>收入</dt><dd>{MONEY_FORMATTER.format(data.totalIncome)}</dd></div>
+        <div><dt>结余</dt><dd>{MONEY_FORMATTER.format(data.totalIncome - data.totalExpense)}</dd></div>
+      </dl>
+      <p className={styles.queryNote}>{categoryText || '当前范围内没有支出分类。'}</p>
+    </div>
+  );
+}
+
+function StudyReportContent({ data, period }: { data: StudyStatistics; period: SlashQueryPeriod }) {
+  const label = period === 'today' ? '今日' : period === 'week' ? '本周' : '本月';
+  return (
+    <div className={styles.queryContent}>
+      <p className={styles.insightDate}>{label} · {data.from} 至 {data.to}</p>
+      <dl className={styles.summaryMetrics}>
+        <div><dt>学习时长</dt><dd>{formatStudyDuration(data.totalDurationSeconds)}</dd></div>
+        <div><dt>记录次数</dt><dd>{data.sessionCount} 次</dd></div>
+        <div><dt>学习天数</dt><dd>{data.studyDays} 天</dd></div>
+        <div><dt>日均投入</dt><dd>{formatStudyDuration(data.averageDailySeconds)}</dd></div>
+      </dl>
+    </div>
+  );
+}
+
+function RecordSearchContent({ data, query }: { data: RecordReferenceOption[]; query: string }) {
+  return (
+    <div className={styles.queryContent}>
+      <p className={styles.insightDate}>“{query}” · {data.length} 条结果</p>
+      {data.length === 0 ? <p className={styles.empty}>没有找到匹配的资料。</p> : (
+        <ul className={styles.recordResults}>
+          {data.map((record) => <li key={record.id}>
+            <BookOpenText size={15} aria-hidden="true" />
+            <span><b>{record.title || '无标题资料'}</b><small>{record.summary || '暂无正文摘要'}</small></span>
+            <em>{RECORD_REFERENCE_TYPE_LABELS[record.type]} · {record.recordDate}</em>
+          </li>)}
+        </ul>
+      )}
+    </div>
+  );
 }

@@ -1,4 +1,7 @@
-import { Activity, BookOpenText, CalendarDays, ChartNoAxesColumnIncreasing, CircleHelp, Pencil } from 'lucide-react';
+import {
+  Activity, BookOpenText, CalendarClock, CalendarDays, ChartNoAxesColumnIncreasing,
+  CircleHelp, GraduationCap, Pencil, Search, WalletCards,
+} from 'lucide-react';
 import type { SlashCommandDefinition } from '../../features/slash-command/slashCommands';
 import styles from './SlashCommandMenu.module.css';
 
@@ -14,6 +17,10 @@ const ICONS = {
   status: Activity,
   tokens: ChartNoAxesColumnIncreasing,
   today: CalendarDays,
+  agenda: CalendarClock,
+  spending: WalletCards,
+  'study-report': GraduationCap,
+  'find-record': Search,
   'ask-record': BookOpenText,
 } as const;
 

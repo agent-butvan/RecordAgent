@@ -1,4 +1,5 @@
-export type SlashCommandName = 'help' | 'rename' | 'status' | 'tokens' | 'today' | 'ask-record';
+export type SlashCommandName = 'help' | 'rename' | 'status' | 'tokens' | 'today'
+  | 'agenda' | 'spending' | 'study-report' | 'find-record' | 'ask-record';
 
 export interface SlashCommandDefinition {
   name: SlashCommandName;
@@ -43,7 +44,32 @@ export const SLASH_COMMANDS: readonly SlashCommandDefinition[] = [
     name: 'today',
     aliases: [],
     description: '汇总今日待办、日程、资料、花销与学习情况',
-    usage: '/today',
+    usage: '/today [YYYY-MM-DD]',
+  },
+  {
+    name: 'agenda',
+    aliases: [],
+    description: '查看指定日期的待办和日程',
+    usage: '/agenda [YYYY-MM-DD]',
+  },
+  {
+    name: 'spending',
+    aliases: [],
+    description: '统计今日、本周或本月的收支与支出分类',
+    usage: '/spending [today|week|month]',
+  },
+  {
+    name: 'study-report',
+    aliases: [],
+    description: '统计今日、本周或本月的学习投入',
+    usage: '/study-report [today|week|month]',
+  },
+  {
+    name: 'find-record',
+    aliases: [],
+    description: '按标题、正文和标签检索资料',
+    usage: '/find-record <关键词>',
+    requiresArgs: true,
   },
   {
     name: 'ask-record',
