@@ -18,6 +18,7 @@ import { ProjectFileTree } from './ProjectFileTree';
 import { RightSidePanel, type RightPanelTab } from './RightSidePanel';
 import { SlashCommandMenu } from './SlashCommandMenu';
 import { SlashCommandChip } from './SlashCommandChip';
+import { RecordReferenceTag } from './RecordReferenceTag';
 import { SlashCommandResult, type SlashCommandResultData } from './SlashCommandResult';
 import { RecordReferencePicker } from './RecordReferencePicker';
 import { RecordReferenceChip } from './RecordReferenceChip';
@@ -52,6 +53,7 @@ import {
   prepareAnalysisCommand,
   type PreparedAnalysisCommand,
 } from '../../features/slash-command/analysisCommands';
+import { parseSlashCommandDisplayArguments } from '../../features/slash-command/slashCommandDisplay';
 import {
   Copy,
   ThumbsUp,
@@ -992,10 +994,14 @@ function UserMessageContent({ content }: { content: string }) {
   if (!parsed || !command || command.presentation.selection !== 'COMPOSE') {
     return <div className={styles.userMessage}>{content}</div>;
   }
+  const display = parseSlashCommandDisplayArguments(parsed.args);
   return (
     <div className={`${styles.userMessage} ${styles.slashUserMessage}`}>
       <SlashCommandChip command={command} />
-      {parsed.args && <span>{parsed.args}</span>}
+      {display.referenceTitles.map((title, index) => (
+        <RecordReferenceTag key={`${title}-${index}`} title={title} />
+      ))}
+      {display.prompt && <span>{display.prompt}</span>}
     </div>
   );
 }

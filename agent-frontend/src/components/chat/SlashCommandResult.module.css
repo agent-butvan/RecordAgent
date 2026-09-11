@@ -281,6 +281,10 @@
   transition: background-color var(--transition-fast);
 }
 
+.recordResults li > svg {
+  color: var(--reference-color);
+}
+
 .recordResults li:hover {
   background: #f4f4f5;
 }
@@ -359,4 +363,3 @@
   .recordResults li { grid-template-columns: 18px minmax(0, 1fr); }
   .recordResults em { display: none; }
 }
-

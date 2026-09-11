@@ -1,7 +1,9 @@
 import {
-  Activity, BookOpenText, CalendarClock, CalendarDays, CircleHelp,
+  Activity, CalendarClock, CalendarDays, CircleHelp,
   GraduationCap, LoaderCircle, Search, WalletCards, X,
 } from 'lucide-react';
+import type { CSSProperties } from 'react';
+import { RECORD_REFERENCE_PRESENTATIONS } from '../../features/record/recordReferencePresentation';
 import type { SlashCommandDefinition } from '../../features/slash-command/slashCommands';
 import type { DailyInsight } from '../../types/dailyInsight';
 import type { DailyDay, ScheduleDailyEvent, TodoDailyEvent } from '../../types/dailyEvent';
@@ -9,7 +11,7 @@ import type { FinanceExpenseChart } from '../../types/finance';
 import type { RecordReferenceOption } from '../../types/record';
 import type { StudyStatistics } from '../../types/study';
 import type { SlashQueryPeriod } from '../../features/slash-command/slashCommandArguments';
-import { RECORD_REFERENCE_TYPE_LABELS } from './RecordReferencePicker';
+import { RecordReferenceIcon } from './RecordReferenceIcon';
 import { formatTokenCount } from './tokenUsageFormat';
 import styles from './SlashCommandResult.module.css';
 
@@ -240,11 +242,14 @@ function RecordSearchContent({ data, query, hasMore }: {
       <p className={styles.insightDate}>“{query}” · {data.length} 条结果</p>
       {data.length === 0 ? <p className={styles.empty}>没有找到匹配的资料。</p> : (
         <ul className={styles.recordResults}>
-          {data.map((record) => <li key={record.id}>
-            <BookOpenText size={15} aria-hidden="true" />
-            <span><b>{record.title || '无标题资料'}</b><small>{record.summary || '暂无正文摘要'}</small></span>
-            <em>{RECORD_REFERENCE_TYPE_LABELS[record.type]} · {record.recordDate}</em>
-          </li>)}
+          {data.map((record) => {
+            const presentation = RECORD_REFERENCE_PRESENTATIONS[record.type];
+            return <li key={record.id} style={{ '--reference-color': presentation.color } as CSSProperties}>
+              <RecordReferenceIcon icon={presentation.icon} size={15} />
+              <span><b>{record.title || '无标题资料'}</b><small>{record.summary || '暂无正文摘要'}</small></span>
+              <em>{presentation.label} · {record.recordDate}</em>
+            </li>;
+          })}
         </ul>
       )}
       {hasMore && <p className={styles.queryNote}>结果较多，当前显示前 {data.length} 条；请补充关键词缩小范围。</p>}

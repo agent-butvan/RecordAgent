@@ -1,5 +1,8 @@
 import { BookOpenText } from 'lucide-react';
-import type { RecordReferenceOption, RecordType } from '../../types/record';
+import type { CSSProperties } from 'react';
+import { RECORD_REFERENCE_PRESENTATIONS } from '../../features/record/recordReferencePresentation';
+import type { RecordReferenceOption } from '../../types/record';
+import { RecordReferenceIcon } from './RecordReferenceIcon';
 import styles from './RecordReferencePicker.module.css';
 
 interface RecordReferencePickerProps {
@@ -12,14 +15,6 @@ interface RecordReferencePickerProps {
   onSelect: (option: RecordReferenceOption) => void;
   onLoadMore: () => void;
 }
-
-const TYPE_LABELS: Record<RecordType, string> = {
-  quick: '随记',
-  learning: '每日学习',
-  weekly_review: '每周复盘',
-  reading: '读书心得',
-  journal: '每日手记',
-};
 
 /** `?` 触发的资料引用列表，仅展示后端返回的轻量元数据。 */
 export function RecordReferencePicker({
@@ -38,24 +33,30 @@ export function RecordReferencePicker({
             ? error ? <p className={styles.error} role="alert">{error}</p>
               : <p className={styles.state}>没有找到可引用的资料</p>
             : <>
-              {options.map((option, index) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  role="option"
-                  aria-selected={index === selectedIndex}
-                  className={`${styles.option} ${index === selectedIndex ? styles.optionSelected : ''}`}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => onSelect(option)}
-                >
-                  <BookOpenText size={14} strokeWidth={1.6} aria-hidden="true" />
-                  <span className={styles.content}>
-                    <span className={styles.title}>{option.title || '无标题资料'}</span>
-                    <span className={styles.summary}>{option.summary || '暂无正文摘要'}</span>
-                  </span>
-                  <span className={styles.meta}>{TYPE_LABELS[option.type]} · {option.recordDate}</span>
-                </button>
-              ))}
+              {options.map((option, index) => {
+                const presentation = RECORD_REFERENCE_PRESENTATIONS[option.type];
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    role="option"
+                    aria-selected={index === selectedIndex}
+                    className={`${styles.option} ${index === selectedIndex ? styles.optionSelected : ''}`}
+                    style={{ '--reference-color': presentation.color } as CSSProperties}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => onSelect(option)}
+                  >
+                    <span className={styles.optionIcon}>
+                      <RecordReferenceIcon icon={presentation.icon} size={14} />
+                    </span>
+                    <span className={styles.content}>
+                      <span className={styles.title}>{option.title || '无标题资料'}</span>
+                      <span className={styles.summary}>{option.summary || '暂无正文摘要'}</span>
+                    </span>
+                    <span className={styles.meta}>{presentation.label} · {option.recordDate}</span>
+                  </button>
+                );
+              })}
               {error && <p className={styles.error} role="alert">{error}</p>}
               {hasMore && (
                 <button type="button" className={styles.loadMore} onClick={onLoadMore} disabled={loadingMore}>
@@ -67,5 +68,3 @@ export function RecordReferencePicker({
     </section>
   );
 }
-
-export { TYPE_LABELS as RECORD_REFERENCE_TYPE_LABELS };

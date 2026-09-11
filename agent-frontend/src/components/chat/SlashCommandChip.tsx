@@ -9,7 +9,7 @@ interface SlashCommandChipProps {
   onRemove?: () => void;
 }
 
-/** 输入框内已附加的 Slash Command；移除后保留用户已输入的 Prompt。 */
+/** 输入框与用户消息共用的 Slash Command 标签；编辑态可移除。 */
 export function SlashCommandChip({ command, onRemove }: SlashCommandChipProps) {
   return (
     <span
@@ -19,7 +19,7 @@ export function SlashCommandChip({ command, onRemove }: SlashCommandChipProps) {
       style={{ '--command-color': command.presentation.color } as CSSProperties}
     >
       <SlashCommandIcon icon={command.presentation.icon} size={16} />
-      <span>/{command.name}</span>
+      <span>{command.name}</span>
       {onRemove && (
         <button type="button" onClick={onRemove} aria-label={`移除命令 /${command.name}`}>
           <X size={13} strokeWidth={1.8} aria-hidden="true" />
