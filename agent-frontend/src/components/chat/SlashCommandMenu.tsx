@@ -1,9 +1,6 @@
 import { useEffect, useRef } from 'react';
-import {
-  Activity, BookOpenText, CalendarClock, CalendarDays, ChartNoAxesColumnIncreasing,
-  CircleHelp, GraduationCap, Pencil, Search, WalletCards,
-} from 'lucide-react';
 import type { SlashCommandDefinition } from '../../features/slash-command/slashCommands';
+import { SlashCommandIcon } from './SlashCommandIcon';
 import styles from './SlashCommandMenu.module.css';
 
 interface SlashCommandMenuProps {
@@ -11,27 +8,6 @@ interface SlashCommandMenuProps {
   selectedIndex: number;
   onSelect: (command: SlashCommandDefinition) => void;
 }
-
-const ICONS = {
-  help: CircleHelp,
-  rename: Pencil,
-  status: Activity,
-  tokens: ChartNoAxesColumnIncreasing,
-  today: CalendarDays,
-  agenda: CalendarClock,
-  spending: WalletCards,
-  'study-report': GraduationCap,
-  'find-record': Search,
-  'ask-record': BookOpenText,
-  'summarize-record': BookOpenText,
-  'compare-records': BookOpenText,
-  'daily-review': CalendarDays,
-  'weekly-review': CalendarDays,
-  'todo-review': CalendarClock,
-  'finance-review': WalletCards,
-  'study-review': GraduationCap,
-  'study-plan': GraduationCap,
-} as const;
 
 /** 输入框上方的命令建议列表，键盘焦点始终保留在 textarea。 */
 export function SlashCommandMenu({ commands, selectedIndex, onSelect }: SlashCommandMenuProps) {
@@ -48,7 +24,6 @@ export function SlashCommandMenu({ commands, selectedIndex, onSelect }: SlashCom
   return (
     <div id="slash-command-menu" className={styles.menu} role="listbox" aria-label="Slash Command 建议">
       {commands.map((command, index) => {
-        const Icon = ICONS[command.name];
         const selected = index === selectedIndex;
         return (
           <button
@@ -62,7 +37,7 @@ export function SlashCommandMenu({ commands, selectedIndex, onSelect }: SlashCom
             onClick={() => onSelect(command)}
           >
             <span className={styles.iconWrap} aria-hidden="true">
-              <Icon size={15} strokeWidth={1.6} />
+              <SlashCommandIcon command={command.name} />
             </span>
             <span className={styles.name}>/{command.name}</span>
             <span className={styles.description}>{command.description}</span>

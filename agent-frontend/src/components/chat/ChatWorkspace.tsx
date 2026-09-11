@@ -17,6 +17,7 @@ import { SubagentTaskPanel } from './SubagentTaskPanel';
 import { ProjectFileTree } from './ProjectFileTree';
 import { RightSidePanel, type RightPanelTab } from './RightSidePanel';
 import { SlashCommandMenu } from './SlashCommandMenu';
+import { SlashCommandMessage } from './SlashCommandMessage';
 import { SlashCommandResult, type SlashCommandResultData } from './SlashCommandResult';
 import { RecordReferencePicker } from './RecordReferencePicker';
 import { RecordReferenceChip } from './RecordReferenceChip';
@@ -864,7 +865,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
                     {messages.map((msg) => (
                       <div key={msg.id} data-msg-id={msg.id} className={styles.messageRow}>
                         {msg.role === 'user' ? (
-                          <div className={styles.userMessage}>{msg.content}</div>
+                          <UserMessageContent content={msg.content} />
                         ) : (
                           <AssistantMessageItem
                             msg={msg}
@@ -918,6 +919,14 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
 
 function commandError(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
+}
+
+function UserMessageContent({ content }: { content: string }) {
+  const parsed = parseSlashCommand(content);
+  const command = parsed ? findSlashCommand(parsed.name) : undefined;
+  return command
+    ? <SlashCommandMessage content={content} command={command} />
+    : <div className={styles.userMessage}>{content}</div>;
 }
 
 export default ChatWorkspace;
