@@ -1,5 +1,5 @@
 import { getApiBaseUrl, type ApiResponse } from './api';
-import type { RecordAttachment, RecordDaySummary, RecordEntry, RecordTab, SaveRecordInput } from '../types/record';
+import type { RecordAttachment, RecordDaySummary, RecordEntry, RecordReferenceOption, RecordTab, SaveRecordInput } from '../types/record';
 
 async function recordRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${getApiBaseUrl()}${path}`, init);
@@ -28,6 +28,16 @@ export function fetchRecords(from: string, to: string, filters: { type?: string;
 /** 查询月历轻量摘要。 */
 export function fetchRecordDays(from: string, to: string) {
   return recordRequest<RecordDaySummary[]>(`/agent/records/days?from=${encode(from)}&to=${encode(to)}`);
+}
+
+/** 查询资料引用候选；响应不包含完整正文。 */
+export function fetchRecordReferences(query = '', limit = 50) {
+  const params = new URLSearchParams({ query, limit: String(limit) });
+  return recordRequest<RecordReferenceOption[]>(`/agent/records/references?${params}`);
+}
+
+export function fetchRecord(id: string) {
+  return recordRequest<RecordEntry>(`/agent/records/${encode(id)}`);
 }
 
 export function createRecord(input: SaveRecordInput) {

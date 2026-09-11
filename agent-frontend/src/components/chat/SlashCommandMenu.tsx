@@ -1,4 +1,4 @@
-import { Activity, ChartNoAxesColumnIncreasing, CircleHelp, Pencil } from 'lucide-react';
+import { Activity, BookOpenText, ChartNoAxesColumnIncreasing, CircleHelp, Pencil } from 'lucide-react';
 import type { SlashCommandDefinition } from '../../features/slash-command/slashCommands';
 import styles from './SlashCommandMenu.module.css';
 
@@ -13,6 +13,7 @@ const ICONS = {
   rename: Pencil,
   status: Activity,
   tokens: ChartNoAxesColumnIncreasing,
+  'ask-record': BookOpenText,
 } as const;
 
 /** 输入框上方的命令建议列表，键盘焦点始终保留在 textarea。 */

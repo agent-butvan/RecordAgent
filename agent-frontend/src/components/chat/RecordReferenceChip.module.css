@@ -1,0 +1,20 @@
+.chip {
+  width: fit-content;
+  max-width: min(420px, 100%);
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 7px 6px 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  color: var(--text-secondary);
+}
+
+.content { min-width: 0; display: grid; }
+.title { overflow: hidden; color: var(--text-primary); font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.meta { color: var(--text-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.remove { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--text-muted); }
+.remove:hover { background: var(--bg-surface-hover); color: var(--text-primary); }

@@ -438,7 +438,7 @@ export const MainLayout: React.FC<{
   };
 
   // 8. 发送消息发起 SSE 流
-  const handleSendMessage = async (prompt: string) => {
+  const handleSendMessage = async (prompt: string, modelContext = prompt) => {
     let currentSessionId = activeSessionId;
     let targetSession = sessions.find((s) => s.id === currentSessionId);
 
@@ -502,6 +502,7 @@ export const MainLayout: React.FC<{
       {
         sessionId: currentSessionId,
         content: prompt,
+        context: modelContext,
       },
       (chunkText) => {
         setSessions((prev) =>

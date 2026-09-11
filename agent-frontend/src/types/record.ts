@@ -53,3 +53,14 @@ export interface RecordAttachment {
   sizeBytes: number;
   createdAt: string;
 }
+
+/** Slash Command 引用选择器使用的轻量资料信息。 */
+export interface RecordReferenceOption {
+  id: string;
+  recordDate: string;
+  type: RecordType;
+  title: string | null;
+  summary: string;
+  tags: string[];
+  updatedAt: string;
+}

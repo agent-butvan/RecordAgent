@@ -81,10 +81,14 @@ public class AgentService {
 
             // 1. 防止客户端伪造或使用已删除的会话
             sessionCatalogService.requireActive(request.sessionId());
-            String input = requireContent(request.context());
+            String requestedContext = request.context() == null || request.context().isBlank()
+                    ? request.content() : request.context();
+            String input = requireContent(requestedContext);
+            String displayContent = request.content() == null || request.content().isBlank()
+                    ? input : request.content().strip();
 
             // 2. 用户消息只在初始化请求时保存一次，回复确认时不再重复保存
-            String turnId = transcriptService.appendUserMessage(request.sessionId(), input);
+            String turnId = transcriptService.appendUserMessage(request.sessionId(), displayContent);
             String userId = currentUserProvider.currentUserId();
             RuntimeContext context = createRuntimeContext(request.sessionId());
             run = new AgentRun(request.sessionId(), userId, turnId, context);

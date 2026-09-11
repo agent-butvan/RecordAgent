@@ -1,4 +1,4 @@
-export type SlashCommandName = 'help' | 'rename' | 'status' | 'tokens';
+export type SlashCommandName = 'help' | 'rename' | 'status' | 'tokens' | 'ask-record';
 
 export interface SlashCommandDefinition {
   name: SlashCommandName;
@@ -38,6 +38,13 @@ export const SLASH_COMMANDS: readonly SlashCommandDefinition[] = [
     aliases: ['usage'],
     description: '打开当前会话的 Token 用量面板',
     usage: '/tokens',
+  },
+  {
+    name: 'ask-record',
+    aliases: [],
+    description: '引用一篇资料并根据其内容回答问题',
+    usage: '/ask-record ? <问题>',
+    requiresArgs: true,
   },
 ] as const;
 

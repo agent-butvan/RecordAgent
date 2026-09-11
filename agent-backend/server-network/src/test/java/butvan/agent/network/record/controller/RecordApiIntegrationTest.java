@@ -44,6 +44,23 @@ class RecordApiIntegrationTest {
     static void databaseProperties(DynamicPropertyRegistry registry) { registry.add("butvan.database.path", DATABASE_PATH::toString); }
 
     @Test
+    void listsLightweightReferenceOptionsAndFiltersByContent() throws Exception {
+        mockMvc.perform(post("/agent/records").contentType("application/json").content("""
+                {"recordDate":"2026-09-11","type":"reading","title":"Slash Command 架构",
+                 "contentHtml":"<p>引用选择器应保存稳定 ID</p>","contentText":"引用选择器应保存稳定 ID",
+                 "tags":["命令框架"]}
+                """))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/agent/records/references").param("query", "稳定 ID").param("limit", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].title").value("Slash Command 架构"))
+                .andExpect(jsonPath("$.data[0].summary").value("引用选择器应保存稳定 ID"))
+                .andExpect(jsonPath("$.data[0].contentText").doesNotExist());
+    }
+
+    @Test
     void createsSearchesAndTrashesWeeklyReview() throws Exception {
         String response = mockMvc.perform(post("/agent/records").contentType("application/json").content("""
                 {"recordDate":"2026-09-04","type":"weekly_review","title":"第 36 周复盘",

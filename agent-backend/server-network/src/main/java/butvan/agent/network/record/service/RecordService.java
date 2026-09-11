@@ -4,6 +4,7 @@ import butvan.agent.network.record.model.RecordModels.DaySummary;
 import butvan.agent.network.record.model.RecordModels.RecordCommand;
 import butvan.agent.network.record.model.RecordModels.RecordEntry;
 import butvan.agent.network.record.model.RecordModels.RecordType;
+import butvan.agent.network.record.model.RecordModels.RecordReference;
 import butvan.agent.network.record.repository.RecordRepository;
 import butvan.agent.network.daily.service.DailyEventService;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,13 @@ public class RecordService {
         requireRange(from, to);
         if (type != null && !type.isBlank()) RecordType.parse(type);
         return repository.search(ownerId, from, to, type, tag, query, tabId);
+    }
+
+    /** 查询 Slash Command 可引用的资料；上限保护避免一次加载完整资料库。 */
+    public List<RecordReference> searchReferences(String ownerId, String query, int limit) {
+        if (query != null && query.length() > 100) throw new IllegalArgumentException("资料搜索词不能超过 100 个字符");
+        if (limit < 1 || limit > 100) throw new IllegalArgumentException("资料候选数量必须在 1 到 100 之间");
+        return repository.searchReferences(ownerId, query, limit);
     }
 
     /** 查询日历摘要。 */

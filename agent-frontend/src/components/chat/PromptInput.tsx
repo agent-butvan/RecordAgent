@@ -24,7 +24,7 @@ interface PromptInputProps {
   isPermissionModeDisabled?: boolean;
   isPermissionModeSaving?: boolean;
   onInputKeyDown?: (event: React.KeyboardEvent<HTMLTextAreaElement>) => boolean;
-  commandMenuOpen?: boolean;
+  suggestionListId?: string;
 }
 
 /**
@@ -43,7 +43,7 @@ export const PromptInput: React.FC<PromptInputProps> = ({
   isPermissionModeDisabled = false,
   isPermissionModeSaving = false,
   onInputKeyDown,
-  commandMenuOpen = false,
+  suggestionListId,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const speechRecognitionRef = useRef<SpeechRecognitionController | null>(null);
@@ -137,8 +137,8 @@ export const PromptInput: React.FC<PromptInputProps> = ({
         value={value}
         onChange={(e) => onValueChange(e.target.value)}
         onKeyDown={handleKeyDown}
-        aria-expanded={commandMenuOpen}
-        aria-controls={commandMenuOpen ? 'slash-command-menu' : undefined}
+        aria-expanded={Boolean(suggestionListId)}
+        aria-controls={suggestionListId}
       />
 
       <div className={styles.toolbar}>

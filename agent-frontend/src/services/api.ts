@@ -282,6 +282,7 @@ export async function streamAgentChat(
 ): Promise<void> {
   try {
     const payloadContent = params.content || params.context || '';
+    const modelContext = params.context || params.content || '';
     const isResume = Boolean(params.approvalId);
     const response = await fetch(
       `${apiBaseUrl}/agent/chat${isResume ? '/permission/resume' : '/stream'}`,
@@ -292,7 +293,7 @@ export async function streamAgentChat(
       },
         body: JSON.stringify(isResume
           ? { sessionId: params.sessionId, approvalId: params.approvalId }
-          : { sessionId: params.sessionId, context: payloadContent, content: payloadContent }),
+          : { sessionId: params.sessionId, context: modelContext, content: payloadContent }),
       }
     );
 
