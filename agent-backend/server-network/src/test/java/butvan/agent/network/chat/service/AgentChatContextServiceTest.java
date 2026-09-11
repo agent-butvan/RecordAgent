@@ -49,6 +49,8 @@ class AgentChatContextServiceTest {
         assertEquals("/ask-record 这篇资料讲了什么？", call.content());
         assertEquals(List.of("资料正文"), call.ragContexts());
         assertTrue(call.context().contains("资料 ID：" + record.id()));
+        assertTrue(call.context().contains("资料编号：[1]"));
+        assertTrue(call.context().contains("回答末尾增加“引用资料”"));
         assertTrue(call.context().contains("用户问题：这篇资料讲了什么？"));
     }
 
@@ -80,6 +82,7 @@ class AgentChatContextServiceTest {
         assertEquals(25_000, call.ragContexts().get(1).length());
         assertTrue(call.context().contains("资料标题：第一篇"));
         assertTrue(call.context().contains("资料标题：第二篇"));
+        assertTrue(call.context().contains("资料编号：[2]"));
     }
 
     @Test
