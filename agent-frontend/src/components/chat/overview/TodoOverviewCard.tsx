@@ -1,21 +1,17 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { DotsThree } from '@phosphor-icons/react';
 import { fetchDailyDay, setDailyTodoCompleted } from '../../../services/dailyEvents';
+import { DailyTodoList } from '../../calendar/DailyTodoList';
+import type { CalendarTodo } from '../../../types/calendar';
 import { overviewTodos } from './overviewData';
 import { useOverviewResource } from './useOverviewResource';
 import styles from './SessionOverview.module.css';
-
-const recurrenceLabels = {
-  daily: '每天',
-  weekly: '每周',
-  monthly: '每月',
-} as const;
 
 export interface TodoTilesProps {
   date: string;
   refreshKey: number;
   onOpenCalendar: () => void;
-  onCompose: (prompt: string) => void;
+  onCompose?: (prompt: string) => void;
 }
 
 export function TodoSummaryTile({ date, refreshKey, onOpenCalendar }: Omit<TodoTilesProps, 'onCompose'>) {
@@ -59,22 +55,35 @@ export function TodoSummaryTile({ date, refreshKey, onOpenCalendar }: Omit<TodoT
   );
 }
 
-export function TodoListTile({ date, refreshKey, onCompose }: Pick<TodoTilesProps, 'date' | 'refreshKey' | 'onCompose'>) {
+export function TodoListTile({ date, refreshKey }: Pick<TodoTilesProps, 'date' | 'refreshKey' | 'onCompose'>) {
   const load = useCallback(() => fetchDailyDay(new Date(`${date}T12:00:00`)), [date]);
   const { data, loading, error, reload } = useOverviewResource(load, refreshKey);
   const pending = useRef(new Set<string>());
-  const [, setPendingIds] = useState<ReadonlySet<string>>(new Set());
+  const [pendingIds, setPendingIds] = useState<ReadonlySet<string>>(new Set());
   const [saveError, setSaveError] = useState<string | null>(null);
-  const todos = data ? overviewTodos(data) : [];
+
+  const calendarTodos: CalendarTodo[] = useMemo(() => {
+    if (!data) return [];
+    const todos = overviewTodos(data);
+    return todos.slice(0, 5).map((todo) => ({
+      id: todo.id,
+      title: todo.title,
+      time: todo.details.time ?? undefined,
+      priority: todo.details.priority,
+      completed: todo.details.completed,
+      recurrence: todo.details.recurrence,
+      version: todo.version,
+    }));
+  }, [data]);
 
   const toggle = async (id: string) => {
-    const todo = todos.find((item) => item.id === id);
+    const todo = calendarTodos.find((item) => item.id === id);
     if (!todo || pending.current.has(id)) return;
     pending.current.add(id);
     setPendingIds(new Set(pending.current));
     setSaveError(null);
     try {
-      await setDailyTodoCompleted(id, !todo.details.completed, todo.version, new Date(`${date}T12:00:00`));
+      await setDailyTodoCompleted(id, !todo.completed, todo.version ?? 0, new Date(`${date}T12:00:00`));
     } catch (cause) {
       setSaveError(cause instanceof Error ? cause.message : '待办更新失败');
     } finally {
@@ -83,8 +92,6 @@ export function TodoListTile({ date, refreshKey, onCompose }: Pick<TodoTilesProp
       setPendingIds(new Set(pending.current));
     }
   };
-
-  const planPrompt = '根据剩余时间，帮我重新安排今天的待办顺序。';
 
   return (
     <section className={`${styles.tile} ${styles.todoList}`}>
@@ -101,51 +108,16 @@ export function TodoListTile({ date, refreshKey, onCompose }: Pick<TodoTilesProp
         <p className={styles.empty}>正在加载待办列表…</p>
       ) : error ? (
         <p className={styles.error} onClick={() => void reload()}>{error}</p>
-      ) : todos.length === 0 ? (
+      ) : calendarTodos.length === 0 ? (
         <p className={styles.empty}>今天暂无待办事项。</p>
       ) : (
-        <div className={styles.todoItems}>
-          {todos.slice(0, 5).map((todo) => {
-            const isDone = todo.details.completed;
-            const recurrenceText = todo.details.recurrence && todo.details.recurrence !== 'none'
-              ? recurrenceLabels[todo.details.recurrence]
-              : '每天';
-            return (
-              <div key={todo.id} className={styles.todoRow}>
-                <div
-                  className={`${styles.check} ${isDone ? styles.done : ''}`}
-                  onClick={() => void toggle(todo.id)}
-                  title={isDone ? '取消完成' : '完成待办'}
-                  role="checkbox"
-                  aria-checked={isDone}
-                >
-                  {isDone ? '✓' : ''}
-                </div>
-                <div>
-                  <div className={isDone ? styles.todoNameDone : styles.todoName}>{todo.title}</div>
-                  <div className={styles.todoSub}>
-                    {isDone ? (todo.details.time ? `${todo.details.time} 已完成` : '今日已完成') : `计划 · ${recurrenceText}`}
-                  </div>
-                </div>
-                {isDone ? (
-                  <span className={styles.pill}>已完成</span>
-                ) : todo.details.priority === 'high' ? (
-                  <span className={`${styles.pill} ${styles.pillBlue}`}>优先</span>
-                ) : (
-                  <span className={styles.pill}>待完成</span>
-                )}
-              </div>
-            );
-          })}
-        </div>
+        <DailyTodoList
+          todos={calendarTodos}
+          onToggle={toggle}
+          compact
+          pendingIds={pendingIds}
+        />
       )}
-
-      <div className={styles.agentNote} onClick={() => onCompose(planPrompt)} title="点击直接咨询 Agent 重新规划待办">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <path d="M12 3v4M12 17v4M4.2 6.2l2.8 2.8M17 15l2.8 2.8M3 12h4M17 12h4M4.2 17.8 7 15M17 9l2.8-2.8" />
-        </svg>
-        <span>可以直接说：<b>“根据剩余时间，帮我重新安排今天的待办顺序。”</b></span>
-      </div>
     </section>
   );
 }
@@ -158,3 +130,4 @@ export function TodoOverviewCard(props: TodoTilesProps) {
     </>
   );
 }
+

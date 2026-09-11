@@ -8,12 +8,10 @@
   border: 1px solid rgba(226, 232, 240, 0.7);
   border-radius: 16px !important;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02), 0 4px 14px rgba(0, 0, 0, 0.025);
-  transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .card:hover {
-  border-color: rgba(203, 213, 225, 0.85);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03), 0 8px 20px rgba(0, 0, 0, 0.035);
+  /* 移除鼠标悬浮时的额外阴影与效果 */
 }
 
 .header {
