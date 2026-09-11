@@ -29,7 +29,15 @@ import {
   updateSessionPermissionMode,
 } from './services/api';
 import type { PermissionToolPayload } from './services/api';
-import type { ChatSession, ChatMessage, Project, SessionSummaryDto, TranscriptMessageDto, SessionPermissionMode } from './types/chat';
+import type {
+  AgentAnalysisContextRequest,
+  ChatSession,
+  ChatMessage,
+  Project,
+  SessionSummaryDto,
+  TranscriptMessageDto,
+  SessionPermissionMode,
+} from './types/chat';
 import type { SubagentProgressDto, TaskDto } from './types/team';
 import {
   cancelSubagentTask,
@@ -442,6 +450,7 @@ export const MainLayout: React.FC<{
     prompt: string,
     modelContext = prompt,
     recordReferenceIds: string[] = [],
+    analysisContext?: AgentAnalysisContextRequest,
   ) => {
     let currentSessionId = activeSessionId;
     let targetSession = sessions.find((s) => s.id === currentSessionId);
@@ -508,6 +517,7 @@ export const MainLayout: React.FC<{
         content: prompt,
         context: modelContext,
         recordReferenceIds,
+        analysisContext,
       },
       (chunkText) => {
         setSessions((prev) =>

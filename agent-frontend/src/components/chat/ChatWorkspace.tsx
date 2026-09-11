@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import type { ChatMessage, SessionPermissionMode, TokenUsageSummary } from '../../types/chat';
+import type { AgentAnalysisContextRequest, ChatMessage, SessionPermissionMode, TokenUsageSummary } from '../../types/chat';
 import type { TaskDto } from '../../types/team';
 import { LoadingTree } from '../common/LoadingTree';
 import { PermissionRequestCard } from './PermissionRequestCard';
@@ -20,6 +20,7 @@ import { SlashCommandMenu } from './SlashCommandMenu';
 import { SlashCommandResult, type SlashCommandResultData } from './SlashCommandResult';
 import { RecordReferencePicker } from './RecordReferencePicker';
 import { RecordReferenceChip } from './RecordReferenceChip';
+import { AnalysisPrivacyCard } from './AnalysisPrivacyCard';
 import type { PermissionToolPayload } from '../../services/api';
 import { fetchRecordReferences } from '../../services/recordApi';
 import { fetchDailyInsight } from '../../services/dailyInsightApi';
@@ -46,6 +47,11 @@ import {
   queryPeriodRange,
 } from '../../features/slash-command/slashCommandArguments';
 import {
+  isAnalysisCommand,
+  prepareAnalysisCommand,
+  type PreparedAnalysisCommand,
+} from '../../features/slash-command/analysisCommands';
+import {
   Copy,
   ThumbsUp,
   ThumbsDown,
@@ -68,7 +74,12 @@ interface ChatWorkspaceProps {
   isSessionLoading?: boolean;
   sessionLoadError?: string | null;
   onRetrySessionLoad?: () => void;
-  onSendMessage: (prompt: string, modelContext?: string, recordReferenceIds?: string[]) => void;
+  onSendMessage: (
+    prompt: string,
+    modelContext?: string,
+    recordReferenceIds?: string[],
+    analysisContext?: AgentAnalysisContextRequest,
+  ) => void;
   onOpenSettings: () => void;
   onRenameSession: (title: string) => Promise<{ success: boolean; message?: string }>;
   pendingPermission?: { assistantMessageId: string; tool: PermissionToolPayload } | null;
@@ -196,6 +207,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   const [commandSelectedIndex, setCommandSelectedIndex] = useState(0);
   const [commandMenuDismissed, setCommandMenuDismissed] = useState(false);
   const [commandResult, setCommandResult] = useState<SlashCommandResultData | null>(null);
+  const [pendingAnalysis, setPendingAnalysis] = useState<PreparedAnalysisCommand | null>(null);
   const [recordReferences, setRecordReferences] = useState<RecordReferenceOption[]>([]);
   const [recordReferenceIndex, setRecordReferenceIndex] = useState(0);
   const [recordReferenceSelection, setRecordReferenceSelection] = useState<{
@@ -399,6 +411,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
 
   const handleInputValueChange = (value: string) => {
     setInputPrompt(value);
+    if (pendingAnalysis) setPendingAnalysis(null);
     const nextCommand = asRecordReferenceCommand(parseSlashCommand(value)?.name ?? '');
     setRecordReferenceSelection((current) => current.command && current.command !== nextCommand
       ? { command: null, items: [] }
@@ -545,6 +558,21 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
       return;
     }
 
+    if (isAnalysisCommand(command.name)) {
+      try {
+        const prepared = prepareAnalysisCommand(command.name, parsed.args);
+        setCommandResult(null);
+        if (prepared.privacyRequired) {
+          setPendingAnalysis(prepared);
+        } else {
+          onSendMessage(prepared.displayPrompt, prepared.displayPrompt, [], prepared.request);
+        }
+      } catch (error) {
+        setCommandResult({ kind: 'error', message: commandError(error, '分析命令参数不合法。') });
+      }
+      return;
+    }
+
     const activeModel = getActiveModel();
     const activeProvider = getActiveProvider();
     const latestUsage = [...messages].reverse().find((message) => message.role === 'assistant' && message.usage)?.usage;
@@ -686,7 +714,20 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     </div>
   ) : (
     <div className={`${styles.bottomContainer} ${isOverview ? styles.bottomContainerOverview : ''}`}>
-      {commandSuggestions.length > 0 ? (
+      {pendingAnalysis ? (
+        <AnalysisPrivacyCard
+          analysis={pendingAnalysis}
+          onCancel={() => setPendingAnalysis(null)}
+          onConfirm={() => {
+            const confirmed = {
+              ...pendingAnalysis.request,
+              privacyConfirmed: true,
+            };
+            onSendMessage(pendingAnalysis.displayPrompt, pendingAnalysis.displayPrompt, [], confirmed);
+            setPendingAnalysis(null);
+          }}
+        />
+      ) : commandSuggestions.length > 0 ? (
         <SlashCommandMenu
           commands={commandSuggestions}
           selectedIndex={commandSelectedIndex}

@@ -24,6 +24,7 @@ test('命令建议支持名称和别名，并在参数阶段关闭', () => {
   assert.deepEqual(suggestSlashCommands('/').map((command) => command.name), [
     'help', 'rename', 'status', 'tokens', 'today', 'agenda', 'spending', 'study-report', 'find-record', 'ask-record',
     'summarize-record', 'compare-records',
+    'daily-review', 'weekly-review', 'todo-review', 'finance-review', 'study-review', 'study-plan',
   ]);
   assert.deepEqual(suggestSlashCommands('/u').map((command) => command.name), ['tokens']);
   assert.deepEqual(suggestSlashCommands('/rename 新名称'), []);
@@ -32,7 +33,7 @@ test('命令建议支持名称和别名，并在参数阶段关闭', () => {
 
 test('今日汇总命令不接收参数', () => {
   assert.equal(findSlashCommand('today')?.requiresArgs, undefined);
-  assert.deepEqual(suggestSlashCommands('/to').map((command) => command.name), ['tokens', 'today']);
+  assert.deepEqual(suggestSlashCommands('/to').map((command) => command.name), ['tokens', 'today', 'todo-review']);
 });
 
 test('资料检索声明必填关键词，其余数据命令接受可选范围', () => {
@@ -56,7 +57,13 @@ test('资料 AI 命令声明引用选择器用法和稳定的引用数量', () =
 
 test('注册阶段拒绝命令名或别名冲突', () => {
   assert.throws(() => validateSlashCommandRegistry([
-    { name: 'help', aliases: ['h'], description: '', usage: '' },
-    { name: 'status', aliases: ['h'], description: '', usage: '' },
+    { name: 'help', aliases: ['h'], description: '', usage: '', execution: 'LOCAL' },
+    { name: 'status', aliases: ['h'], description: '', usage: '', execution: 'LOCAL' },
   ]), /名称冲突/);
+});
+
+test('命令注册表区分本地、确定性查询和模型上下文命令', () => {
+  assert.equal(findSlashCommand('status')?.execution, 'LOCAL');
+  assert.equal(findSlashCommand('today')?.execution, 'QUERY');
+  assert.equal(findSlashCommand('daily-review')?.execution, 'CONTEXT_PROMPT');
 });

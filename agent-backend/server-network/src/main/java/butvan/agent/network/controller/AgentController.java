@@ -10,6 +10,7 @@ import butvan.agent.network.annotation.ApiLog;
 import butvan.agent.network.dto.PlanResponse;
 import butvan.agent.network.chat.dto.AgentChatRequest;
 import butvan.agent.network.chat.service.AgentChatContextService;
+import butvan.agent.network.chat.service.AgentAnalysisContextService;
 import butvan.agent.agents.identity.CurrentUserProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +33,7 @@ public class AgentController {
 
     private final AgentService agentService;
     private final AgentChatContextService agentChatContextService;
+    private final AgentAnalysisContextService agentAnalysisContextService;
     private final CurrentUserProvider currentUserProvider;
 
     @ApiLog("提交单条工具权限确认")
@@ -54,7 +56,10 @@ public class AgentController {
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamChat(@RequestBody AgentChatRequest request) {
         // 初始对话流和确认后的恢复流共用同一套 SSE 发送/断开逻辑。
-        AgentUserCall call = agentChatContextService.prepare(currentUserProvider.currentUserId(), request);
+        String ownerId = currentUserProvider.currentUserId();
+        AgentUserCall call = request.analysisContext() == null
+                ? agentChatContextService.prepare(ownerId, request)
+                : agentAnalysisContextService.prepare(ownerId, request);
         return createEmitter(agentService.streamAgent(call));
     }
 

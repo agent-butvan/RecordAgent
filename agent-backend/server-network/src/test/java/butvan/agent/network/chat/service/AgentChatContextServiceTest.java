@@ -44,7 +44,7 @@ class AgentChatContextServiceTest {
                 "<p>资料正文</p>", "资料正文", List.of("架构"), null));
 
         var call = contextService.prepare("owner", new AgentChatRequest(
-                "session-1", "/ask-record 这篇资料讲了什么？", "这篇资料讲了什么？", List.of(record.id())));
+                "session-1", "/ask-record 这篇资料讲了什么？", "这篇资料讲了什么？", List.of(record.id()), null));
 
         assertEquals("/ask-record 这篇资料讲了什么？", call.content());
         assertEquals(List.of("资料正文"), call.ragContexts());
@@ -55,7 +55,7 @@ class AgentChatContextServiceTest {
     @Test
     void keepsOrdinaryChatRequestsUnexpanded() {
         var call = contextService.prepare("owner",
-                new AgentChatRequest("session-1", "你好", "你好", List.of()));
+                new AgentChatRequest("session-1", "你好", "你好", List.of(), null));
 
         assertEquals("你好", call.context());
         assertTrue(call.ragContexts().isEmpty());
@@ -73,7 +73,7 @@ class AgentChatContextServiceTest {
                 "<p>第二篇</p>", secondContent, List.of(), null));
 
         var call = contextService.prepare("owner", new AgentChatRequest(
-                "session-1", "/compare-records", "请比较两篇资料", List.of(first.id(), second.id())));
+                "session-1", "/compare-records", "请比较两篇资料", List.of(first.id(), second.id()), null));
 
         assertEquals(2, call.ragContexts().size());
         assertEquals(25_000, call.ragContexts().get(0).length());
@@ -90,7 +90,7 @@ class AgentChatContextServiceTest {
         recordService.updateFlags("owner", record.id(), record.version(), null, null, true);
 
         assertThrows(IllegalArgumentException.class, () -> contextService.prepare("owner",
-                new AgentChatRequest("session-1", "/ask-record 问题", "问题", List.of(record.id()))));
+                new AgentChatRequest("session-1", "/ask-record 问题", "问题", List.of(record.id()), null)));
     }
 
     private static Path createDatabasePath() {

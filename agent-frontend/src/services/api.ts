@@ -1,4 +1,5 @@
 import type {
+  AgentAnalysisContextRequest,
   SessionSummaryDto,
   SessionDetailDto,
   SessionKind,
@@ -275,6 +276,7 @@ export async function streamAgentChat(
     content?: string;
     context?: string;
     recordReferenceIds?: string[];
+    analysisContext?: AgentAnalysisContextRequest;
     approvalId?: string;
   },
   onChunk: (text: string) => void,
@@ -304,6 +306,7 @@ export async function streamAgentChat(
               context: modelContext,
               content: payloadContent,
               recordReferenceIds: params.recordReferenceIds ?? [],
+              analysisContext: params.analysisContext,
             }),
       }
     );

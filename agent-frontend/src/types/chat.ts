@@ -161,6 +161,15 @@ export interface ChatMessage {
   subagentProgress?: SubagentProgressDto[];
 }
 
+/** 服务端按当前用户读取业务数据，前端只提交受控分析意图。 */
+export interface AgentAnalysisContextRequest {
+  command: 'daily-review' | 'weekly-review' | 'todo-review'
+    | 'finance-review' | 'study-review' | 'study-plan';
+  argument: string;
+  timezone: string;
+  privacyConfirmed: boolean;
+}
+
 export interface Project {
   id: string;
   name: string;

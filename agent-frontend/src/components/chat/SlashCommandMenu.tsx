@@ -25,6 +25,12 @@ const ICONS = {
   'ask-record': BookOpenText,
   'summarize-record': BookOpenText,
   'compare-records': BookOpenText,
+  'daily-review': CalendarDays,
+  'weekly-review': CalendarDays,
+  'todo-review': CalendarClock,
+  'finance-review': WalletCards,
+  'study-review': GraduationCap,
+  'study-plan': GraduationCap,
 } as const;
 
 /** 输入框上方的命令建议列表，键盘焦点始终保留在 textarea。 */
@@ -69,4 +75,3 @@ export function SlashCommandMenu({ commands, selectedIndex, onSelect }: SlashCom
     </div>
   );
 }
-

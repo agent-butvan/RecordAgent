@@ -7,5 +7,6 @@ public record AgentChatRequest(
         String sessionId,
         String content,
         String context,
-        List<String> recordReferenceIds) {
+        List<String> recordReferenceIds,
+        AgentAnalysisContextRequest analysisContext) {
 }

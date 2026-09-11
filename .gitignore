@@ -1,10 +1,11 @@
 # macOS
 .DS_Store
 
-# 本地教程文档不入库；正式发布指南例外，作为交付契约随代码维护。
+# 本地教程文档不入库；正式发布指南与 Slash Command 架构说明作为交付契约随代码维护。
 docs/*
 !docs/
 !docs/RELEASE.md
+!docs/Slash-Command-架构与使用说明.md
 
 # 本地工具状态与缓存（不提交）
 .codex/

@@ -1,8 +1,10 @@
 export type SlashCommandName = 'help' | 'rename' | 'status' | 'tokens' | 'today'
   | 'agenda' | 'spending' | 'study-report' | 'find-record' | 'ask-record'
-  | 'summarize-record' | 'compare-records';
+  | 'summarize-record' | 'compare-records' | 'daily-review' | 'weekly-review'
+  | 'todo-review' | 'finance-review' | 'study-review' | 'study-plan';
 
 export type RecordReferenceCommandName = 'ask-record' | 'summarize-record' | 'compare-records';
+export type SlashCommandExecution = 'LOCAL' | 'QUERY' | 'CONTEXT_PROMPT';
 
 export const RECORD_REFERENCE_LIMITS: Record<RecordReferenceCommandName, number> = {
   'ask-record': 1,
@@ -15,6 +17,7 @@ export interface SlashCommandDefinition {
   aliases: string[];
   description: string;
   usage: string;
+  execution: SlashCommandExecution;
   requiresArgs?: boolean;
 }
 
@@ -29,12 +32,14 @@ export const SLASH_COMMANDS: readonly SlashCommandDefinition[] = [
     aliases: ['h'],
     description: '查询当前已有的命令以及描述',
     usage: '/help [命令名]',
+    execution: 'LOCAL',
   },
   {
     name: 'rename',
     aliases: [],
     description: '修改当前会话的名称',
     usage: '/rename <新名称>',
+    execution: 'LOCAL',
     requiresArgs: true,
   },
   {
@@ -42,42 +47,49 @@ export const SLASH_COMMANDS: readonly SlashCommandDefinition[] = [
     aliases: ['s'],
     description: '显示模型、会话、权限、Token 与上下文状态',
     usage: '/status',
+    execution: 'LOCAL',
   },
   {
     name: 'tokens',
     aliases: ['usage'],
     description: '打开当前会话的 Token 用量面板',
     usage: '/tokens',
+    execution: 'LOCAL',
   },
   {
     name: 'today',
     aliases: [],
     description: '汇总今日待办、日程、资料、花销与学习情况',
     usage: '/today [YYYY-MM-DD]',
+    execution: 'QUERY',
   },
   {
     name: 'agenda',
     aliases: [],
     description: '查看指定日期的待办和日程',
     usage: '/agenda [YYYY-MM-DD]',
+    execution: 'QUERY',
   },
   {
     name: 'spending',
     aliases: [],
     description: '统计今日、本周或本月的收支与支出分类',
     usage: '/spending [today|week|month]',
+    execution: 'QUERY',
   },
   {
     name: 'study-report',
     aliases: [],
     description: '统计今日、本周或本月的学习投入',
     usage: '/study-report [today|week|month]',
+    execution: 'QUERY',
   },
   {
     name: 'find-record',
     aliases: [],
     description: '按标题、正文和标签检索资料',
     usage: '/find-record <关键词>',
+    execution: 'QUERY',
     requiresArgs: true,
   },
   {
@@ -85,6 +97,7 @@ export const SLASH_COMMANDS: readonly SlashCommandDefinition[] = [
     aliases: [],
     description: '引用一篇资料并根据其内容回答问题',
     usage: '/ask-record ? <问题>',
+    execution: 'CONTEXT_PROMPT',
     requiresArgs: true,
   },
   {
@@ -92,12 +105,57 @@ export const SLASH_COMMANDS: readonly SlashCommandDefinition[] = [
     aliases: [],
     description: '引用一篇资料并生成结构化摘要',
     usage: '/summarize-record ?',
+    execution: 'CONTEXT_PROMPT',
   },
   {
     name: 'compare-records',
     aliases: [],
     description: '引用两篇资料并比较共同点与差异',
     usage: '/compare-records ? ?',
+    execution: 'CONTEXT_PROMPT',
+  },
+  {
+    name: 'daily-review',
+    aliases: [],
+    description: '结合当日业务数据生成复盘与行动建议',
+    usage: '/daily-review [YYYY-MM-DD]',
+    execution: 'CONTEXT_PROMPT',
+  },
+  {
+    name: 'weekly-review',
+    aliases: [],
+    description: '结合指定自然周数据生成周复盘',
+    usage: '/weekly-review [YYYY-MM-DD]',
+    execution: 'CONTEXT_PROMPT',
+  },
+  {
+    name: 'todo-review',
+    aliases: [],
+    description: '分析今日或本周待办完成情况',
+    usage: '/todo-review [today|week]',
+    execution: 'CONTEXT_PROMPT',
+  },
+  {
+    name: 'finance-review',
+    aliases: [],
+    description: '确认后分析本周或本月收支',
+    usage: '/finance-review [week|month]',
+    execution: 'CONTEXT_PROMPT',
+  },
+  {
+    name: 'study-review',
+    aliases: [],
+    description: '分析本周或本月学习投入',
+    usage: '/study-review [week|month]',
+    execution: 'CONTEXT_PROMPT',
+  },
+  {
+    name: 'study-plan',
+    aliases: [],
+    description: '结合近期学习记录为目标制定计划',
+    usage: '/study-plan <目标>',
+    execution: 'CONTEXT_PROMPT',
+    requiresArgs: true,
   },
 ] as const;
 
