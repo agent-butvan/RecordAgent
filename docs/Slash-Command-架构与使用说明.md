@@ -16,7 +16,7 @@ Slash Command 是聊天输入框的本地路由层。它在普通消息进入 SS
 | --- | --- | --- |
 | LOCAL | `/help [命令]` | 动态读取 Registry 并展示帮助。 |
 | LOCAL | `/rename <新名称>` | 修改当前会话名称。 |
-| LOCAL | `/status` | 展示模型、会话、权限、累计 Token 和最近一次上下文估算。 |
+| LOCAL | `/status` | 展示模型、会话、权限、运行态、累计 Token、最近一次上下文估算和压缩状态。 |
 | LOCAL | `/tokens`、`/usage` | 打开 Token 用量面板。 |
 | QUERY | `/today [日期]` | 聚合待办、日程、资料、花销和学习。 |
 | QUERY | `/agenda [日期]` | 查看指定日期的待办与日程。 |
@@ -67,4 +67,4 @@ Registry、解析和参数规则位于 `agent-frontend/src/features/slash-comman
 ## 当前限制
 
 - 资料附件、图片 OCR、PDF 分段检索尚未进入引用上下文。
-- `/status` 的上下文值来自最近一次调用；模型未配置上下文上限时会明确显示“上限未知”。当前尚无独立的压缩运行状态字段。
+- `/status` 的上下文值来自最近一次调用；模型未配置上下文上限时会明确显示“上限未知”。自动压缩已启用，但 AgentScope 尚未暴露最近一次压缩结果，因此界面会明确标记该状态暂不可用。

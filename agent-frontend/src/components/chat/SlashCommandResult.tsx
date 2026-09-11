@@ -30,6 +30,8 @@ export interface SlashStatusData {
   providerName: string;
   modelName: string;
   permissionMode: string;
+  runtimeState: string;
+  compactionState: string;
   totalTokens: number;
   contextTokens?: number;
   contextWindow?: number;
@@ -114,7 +116,9 @@ function StatusContent({ data }: { data: SlashStatusData }) {
       <div><dt>模型</dt><dd>{data.providerName} · {data.modelName}</dd></div>
       <div><dt>会话</dt><dd title={data.sessionId}>{data.sessionTitle} · {data.sessionId.slice(0, 8)}</dd></div>
       <div><dt>权限模式</dt><dd>{data.permissionMode}</dd></div>
+      <div><dt>运行状态</dt><dd>{data.runtimeState}</dd></div>
       <div><dt>会话 Token</dt><dd>{formatTokenCount(data.totalTokens)}</dd></div>
+      <div><dt>上下文压缩</dt><dd>{data.compactionState}</dd></div>
       <div className={styles.contextRow}>
         <dt>上下文窗口</dt>
         <dd>

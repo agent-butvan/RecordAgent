@@ -817,6 +817,7 @@ export const MainLayout: React.FC<{
               sessionTitle={activeSession?.title || '新对话'}
               sessionUsageSummary={activeSession?.usageSummary}
               isSessionLoading={Boolean(activeSession && !activeSession.isLoaded && !activeSessionLoadError)}
+              isSessionStreaming={streamingSessionIds.has(activeSessionId)}
               sessionLoadError={activeSessionLoadError}
               onRetrySessionLoad={() => {
                 if (activeSessionId) void syncSessionDetail(activeSessionId);

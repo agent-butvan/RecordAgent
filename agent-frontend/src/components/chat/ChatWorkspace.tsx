@@ -72,6 +72,7 @@ interface ChatWorkspaceProps {
   sessionTitle?: string;
   sessionUsageSummary?: TokenUsageSummary;
   isSessionLoading?: boolean;
+  isSessionStreaming?: boolean;
   sessionLoadError?: string | null;
   onRetrySessionLoad?: () => void;
   onSendMessage: (
@@ -181,6 +182,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   sessionTitle = '新对话',
   sessionUsageSummary,
   isSessionLoading = false,
+  isSessionStreaming = false,
   sessionLoadError = null,
   onRetrySessionLoad,
   onSendMessage,
@@ -585,6 +587,8 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
         providerName: activeProvider?.name || activeProvider?.id || '未配置',
         modelName: activeModel?.name || activeModel?.id || '未配置',
         permissionMode: permissionMode === 'ASK' ? '逐次询问' : permissionMode === 'AUTO_EDIT' ? '自动编辑' : '完全访问',
+        runtimeState: pendingPermission ? '等待权限确认' : isSessionStreaming ? '运行中' : '空闲',
+        compactionState: '自动压缩已启用；最近一次压缩状态暂不可用',
         totalTokens: sessionUsageSummary?.totalTokens ?? 0,
         contextTokens: latestCall?.inputTokens ?? latestCall?.estimatedInputTokens,
         contextWindow: activeModel?.contextWindow,
