@@ -17,7 +17,7 @@ import { SubagentTaskPanel } from './SubagentTaskPanel';
 import { ProjectFileTree } from './ProjectFileTree';
 import { RightSidePanel, type RightPanelTab } from './RightSidePanel';
 import { SlashCommandMenu } from './SlashCommandMenu';
-import { SlashCommandMessage } from './SlashCommandMessage';
+import { SlashCommandChip } from './SlashCommandChip';
 import { SlashCommandResult, type SlashCommandResultData } from './SlashCommandResult';
 import { RecordReferencePicker } from './RecordReferencePicker';
 import { RecordReferenceChip } from './RecordReferenceChip';
@@ -207,6 +207,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   const { showMessage } = useMessage();
   const { getActiveModel, getActiveProvider } = useModel();
   const [inputPrompt, setInputPrompt] = useState('');
+  const [selectedCommand, setSelectedCommand] = useState<SlashCommandDefinition | null>(null);
   const [commandSelectedIndex, setCommandSelectedIndex] = useState(0);
   const [commandMenuDismissed, setCommandMenuDismissed] = useState(false);
   const [commandResult, setCommandResult] = useState<SlashCommandResultData | null>(null);
@@ -229,18 +230,28 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   const messagesAreaRef = useRef<HTMLDivElement>(null);
   const recordReferenceQueryRef = useRef<string | null>(null);
   const commandSuggestions = useMemo(
-    () => commandMenuDismissed ? [] : suggestSlashCommands(inputPrompt),
-    [commandMenuDismissed, inputPrompt],
+    () => commandMenuDismissed || selectedCommand ? [] : suggestSlashCommands(inputPrompt),
+    [commandMenuDismissed, inputPrompt, selectedCommand],
   );
-  const activeRecordReferenceCommand = asRecordReferenceCommand(parseSlashCommand(inputPrompt)?.name ?? '');
+  const composedInputPrompt = selectedCommand
+    ? `/${selectedCommand.name}${inputPrompt.trim() ? ` ${inputPrompt.trim()}` : ''}`
+    : inputPrompt;
+  const activeRecordReferenceCommand = asRecordReferenceCommand(
+    selectedCommand?.name ?? parseSlashCommand(inputPrompt)?.name ?? '',
+  );
   const selectedRecordReferences = useMemo(
     () => recordReferenceSelection.command === activeRecordReferenceCommand
       ? recordReferenceSelection.items : [],
     [activeRecordReferenceCommand, recordReferenceSelection],
   );
+  const selectedReferenceCommand = asRecordReferenceCommand(selectedCommand?.name ?? '');
+  const selectedCommandCanSend = Boolean(selectedCommand)
+    && (!selectedCommand?.requiresArgs || inputPrompt.trim().length > 0)
+    && (!selectedReferenceCommand
+      || selectedRecordReferences.length === RECORD_REFERENCE_LIMITS[selectedReferenceCommand]);
   const recordReferenceQuery = useMemo(() => {
-    return parseRecordReferencePickerQuery(inputPrompt, selectedRecordReferences.length);
-  }, [inputPrompt, selectedRecordReferences.length]);
+    return parseRecordReferencePickerQuery(composedInputPrompt, selectedRecordReferences.length);
+  }, [composedInputPrompt, selectedRecordReferences.length]);
   const availableRecordReferences = useMemo(() => {
     const selectedIds = new Set(selectedRecordReferences.map((item) => item.id));
     return recordReferences.filter((item) => !selectedIds.has(item.id));
@@ -415,7 +426,9 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   const handleInputValueChange = (value: string) => {
     setInputPrompt(value);
     if (pendingAnalysis) setPendingAnalysis(null);
-    const nextCommand = asRecordReferenceCommand(parseSlashCommand(value)?.name ?? '');
+    const nextCommand = asRecordReferenceCommand(
+      selectedCommand?.name ?? parseSlashCommand(value)?.name ?? '',
+    );
     setRecordReferenceSelection((current) => current.command && current.command !== nextCommand
       ? { command: null, items: [] }
       : current);
@@ -552,8 +565,8 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
       const modelContext = referenceCommand === 'ask-record'
         ? parsed.args
         : referenceCommand === 'summarize-record'
-          ? '请为引用资料生成结构化摘要，包括核心主题、关键观点、重要细节和可执行结论；只依据资料内容，不确定之处请明确说明。'
-          : '请比较两篇引用资料，分别概括核心观点，并列出共同点、关键差异、可能的互补关系与可执行结论；只依据资料内容。';
+          ? `请为引用资料生成结构化摘要，包括核心主题、关键观点、重要细节和可执行结论；只依据资料内容，不确定之处请明确说明。${parsed.args ? `\n\n用户补充要求：${parsed.args}` : ''}`
+          : `请比较两篇引用资料，分别概括核心观点，并列出共同点、关键差异、可能的互补关系与可执行结论；只依据资料内容。${parsed.args ? `\n\n用户补充要求：${parsed.args}` : ''}`;
       const displayPrompt = `/${referenceCommand} [${referenceLabels}]${parsed.args ? ` ${parsed.args}` : ''}`;
       setRecordReferenceSelection({ command: null, items: [] });
       setCommandResult(null);
@@ -599,23 +612,25 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
 
   const selectCommand = (command: SlashCommandDefinition) => {
     const referenceCommand = asRecordReferenceCommand(command.name);
+    setSelectedCommand(command);
+    setCommandMenuDismissed(true);
+    setCommandResult(null);
     if (referenceCommand) {
       setRecordReferenceSelection({ command: referenceCommand, items: [] });
-      setInputPrompt(referenceCommand === 'compare-records'
-        ? '/compare-records ? ?'
-        : `/${referenceCommand} ?`);
-      setCommandMenuDismissed(true);
-      setCommandResult(null);
+      setInputPrompt('?');
       return;
     }
-    if (command.requiresArgs) {
-      setInputPrompt(`/${command.name} `);
-      setCommandMenuDismissed(true);
-      return;
-    }
+    setRecordReferenceSelection({ command: null, items: [] });
     setInputPrompt('');
-    setCommandMenuDismissed(true);
-    void executeSlashCommand(`/${command.name}`);
+  };
+
+  const removeSelectedCommand = () => {
+    if (asRecordReferenceCommand(selectedCommand?.name ?? '') && inputPrompt.trim() === '?') {
+      setInputPrompt('');
+    }
+    setSelectedCommand(null);
+    setRecordReferenceSelection({ command: null, items: [] });
+    setCommandMenuDismissed(false);
   };
 
   const selectRecordReference = (reference: RecordReferenceOption) => {
@@ -625,7 +640,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
       .filter((item, index, items) => items.findIndex((candidate) => candidate.id === item.id) === index)
       .slice(0, RECORD_REFERENCE_LIMITS[command]);
     setRecordReferenceSelection({ command, items: nextItems });
-    setInputPrompt(nextItems.length < RECORD_REFERENCE_LIMITS[command] ? `/${command} ?` : `/${command} `);
+    setInputPrompt(nextItems.length < RECORD_REFERENCE_LIMITS[command] ? '?' : '');
     setRecordReferenceIndex(0);
     setRecordReferencesError(null);
   };
@@ -654,11 +669,25 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
       }
       if (event.key === 'Escape') {
         event.preventDefault();
-        setInputPrompt(`/${activeRecordReferenceCommand ?? 'ask-record'} `);
+        setInputPrompt('');
         return true;
       }
     }
+    if (selectedCommand && !inputPrompt && (event.key === 'Backspace' || event.key === 'Escape')) {
+      event.preventDefault();
+      removeSelectedCommand();
+      return true;
+    }
     if (commandSuggestions.length === 0) return false;
+    if (event.key === ' ') {
+      const parsed = parseSlashCommand(inputPrompt);
+      const exactCommand = parsed && !parsed.args ? findSlashCommand(parsed.name) : undefined;
+      if (exactCommand) {
+        event.preventDefault();
+        selectCommand(exactCommand);
+        return true;
+      }
+    }
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
       const offset = event.key === 'ArrowDown' ? 1 : -1;
@@ -681,9 +710,11 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   };
 
   const handleSend = () => {
-    if (!inputPrompt.trim()) return;
-    const prompt = inputPrompt.trim();
+    if (!selectedCommand && !inputPrompt.trim()) return;
+    if (selectedCommand && !selectedCommandCanSend) return;
+    const prompt = selectedCommand ? composedInputPrompt : inputPrompt.trim();
     setInputPrompt('');
+    setSelectedCommand(null);
     setCommandMenuDismissed(false);
     void executeSlashCommand(prompt);
   };
@@ -765,7 +796,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
                   command,
                   items: current.items.filter((item) => item.id !== reference.id),
                 }));
-                setInputPrompt(`/${command} ?`);
+                setInputPrompt('?');
               }}
             />
           ))}
@@ -781,6 +812,11 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
         isPermissionModeDisabled={isPermissionModeDisabled}
         isPermissionModeSaving={isPermissionModeSaving}
         onInputKeyDown={handleComposerKeyDown}
+        leadingContent={selectedCommand ? (
+          <SlashCommandChip command={selectedCommand} onRemove={removeSelectedCommand} />
+        ) : undefined}
+        canSend={selectedCommand ? selectedCommandCanSend : inputPrompt.trim().length > 0}
+        placeholder={selectedCommand ? commandPromptPlaceholder(selectedCommand) : undefined}
         suggestionListId={commandSuggestions.length > 0
           ? 'slash-command-menu'
           : recordReferenceQuery !== null ? 'record-reference-list' : undefined}
@@ -865,7 +901,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
                     {messages.map((msg) => (
                       <div key={msg.id} data-msg-id={msg.id} className={styles.messageRow}>
                         {msg.role === 'user' ? (
-                          <UserMessageContent content={msg.content} />
+                          <div className={styles.userMessage}>{msg.content}</div>
                         ) : (
                           <AssistantMessageItem
                             msg={msg}
@@ -921,12 +957,25 @@ function commandError(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
-function UserMessageContent({ content }: { content: string }) {
-  const parsed = parseSlashCommand(content);
-  const command = parsed ? findSlashCommand(parsed.name) : undefined;
-  return command
-    ? <SlashCommandMessage content={content} command={command} />
-    : <div className={styles.userMessage}>{content}</div>;
+function commandPromptPlaceholder(command: SlashCommandDefinition): string {
+  if (command.name === 'help') return '输入要查询的命令名（可选）';
+  if (command.name === 'rename') return '输入新的会话名称';
+  if (command.name === 'find-record') return '输入资料关键词';
+  if (command.name === 'ask-record') return '选择资料后输入你的问题';
+  if (command.name === 'summarize-record' || command.name === 'compare-records') {
+    return '选择资料后补充要求（可选）';
+  }
+  if (command.name === 'study-plan') return '输入你的学习目标';
+  if (command.name === 'today' || command.name === 'agenda'
+      || command.name === 'daily-review' || command.name === 'weekly-review') {
+    return '输入日期 YYYY-MM-DD（可选）';
+  }
+  if (command.name === 'spending' || command.name === 'study-report'
+      || command.name === 'todo-review' || command.name === 'finance-review'
+      || command.name === 'study-review') {
+    return '输入时间范围（可选）';
+  }
+  return '可直接发送';
 }
 
 export default ChatWorkspace;

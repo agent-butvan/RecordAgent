@@ -25,10 +25,12 @@ interface PromptInputProps {
   isPermissionModeSaving?: boolean;
   onInputKeyDown?: (event: React.KeyboardEvent<HTMLTextAreaElement>) => boolean;
   suggestionListId?: string;
+  leadingContent?: React.ReactNode;
+  canSend?: boolean;
 }
 
 /**
- * AI 对话输入框：大圆角容器 + 自动增高文本域 + 工具条。
+ * AI 对话输入框：可组合前置标签、自动增高文本域与底部工具条。
  * 工具条左侧保留附件占位与 AI 模型选择，右侧为语音听写与发送按钮。
  */
 export const PromptInput: React.FC<PromptInputProps> = ({
@@ -44,6 +46,8 @@ export const PromptInput: React.FC<PromptInputProps> = ({
   isPermissionModeSaving = false,
   onInputKeyDown,
   suggestionListId,
+  leadingContent,
+  canSend,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const speechRecognitionRef = useRef<SpeechRecognitionController | null>(null);
@@ -126,9 +130,11 @@ export const PromptInput: React.FC<PromptInputProps> = ({
   };
 
   const hasValue = value.trim().length > 0;
+  const isSendEnabled = canSend ?? hasValue;
 
   return (
     <div className={`${styles.container} ${className || ''}`}>
+      {leadingContent && <div className={styles.leadingContent}>{leadingContent}</div>}
       <textarea
         ref={textareaRef}
         rows={1}
@@ -180,11 +186,11 @@ export const PromptInput: React.FC<PromptInputProps> = ({
 
           <button
             type="button"
-            className={`${styles.sendBtn} ${hasValue ? styles.sendBtnActive : ''}`}
+            className={`${styles.sendBtn} ${isSendEnabled ? styles.sendBtnActive : ''}`}
             onClick={onSend}
             title="发送消息 (Enter)"
             aria-label="发送消息"
-            disabled={!hasValue}
+            disabled={!isSendEnabled}
           >
             <ArrowUp size={16} />
           </button>

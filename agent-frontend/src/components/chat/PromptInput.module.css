@@ -20,6 +20,13 @@
   box-shadow: 0 14px 34px rgba(16, 24, 40, 0.09);
 }
 
+.leadingContent {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 7px 10px 0;
+}
+
 .textarea {
   width: 100%;
   min-height: 48px;
