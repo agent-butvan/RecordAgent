@@ -20,14 +20,22 @@
   box-shadow: 0 14px 34px rgba(16, 24, 40, 0.09);
 }
 
-.leadingContent {
+.editor {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 7px 10px 0;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.leadingContent {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  padding: 12px 0 0 14px;
 }
 
 .textarea {
+  flex: 1;
+  min-width: 0;
   width: 100%;
   min-height: 48px;
   max-height: 200px;
@@ -40,6 +48,10 @@
   font-family: var(--font-sans);
   font-size: 14px;
   line-height: 1.5;
+}
+
+.leadingContent + .textarea {
+  padding-left: 7px;
 }
 
 .textarea::placeholder {

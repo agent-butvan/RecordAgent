@@ -42,17 +42,17 @@
   width: 18px;
   height: 18px;
   flex-shrink: 0;
-  color: #71717a;
+  color: var(--command-color);
   transition: color var(--transition-fast);
 }
 
 .option:hover .iconWrap,
 .optionSelected .iconWrap {
-  color: #3f3f46;
+  color: var(--command-color);
 }
 
 .name {
-  color: #18181b;
+  color: var(--command-color);
   font-size: 12.5px;
   font-weight: 500;
   flex-shrink: 0;
@@ -88,4 +88,3 @@
     display: none;
   }
 }
-

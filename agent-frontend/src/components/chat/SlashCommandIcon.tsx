@@ -10,37 +10,29 @@ import {
   Search,
   WalletCards,
 } from 'lucide-react';
-import type { SlashCommandName } from '../../features/slash-command/slashCommands';
+import type { SlashCommandIconName } from '../../features/slash-command/slashCommands';
 
 const ICONS = {
   help: CircleHelp,
-  rename: Pencil,
-  status: Activity,
+  edit: Pencil,
+  activity: Activity,
   tokens: ChartNoAxesColumnIncreasing,
-  today: CalendarDays,
+  calendar: CalendarDays,
   agenda: CalendarClock,
-  spending: WalletCards,
-  'study-report': GraduationCap,
-  'find-record': Search,
-  'ask-record': BookOpenText,
-  'summarize-record': BookOpenText,
-  'compare-records': BookOpenText,
-  'daily-review': CalendarDays,
-  'weekly-review': CalendarDays,
-  'todo-review': CalendarClock,
-  'finance-review': WalletCards,
-  'study-review': GraduationCap,
-  'study-plan': GraduationCap,
+  finance: WalletCards,
+  study: GraduationCap,
+  search: Search,
+  record: BookOpenText,
 } as const;
 
 interface SlashCommandIconProps {
-  command: SlashCommandName;
+  icon: SlashCommandIconName;
   size?: number;
   strokeWidth?: number;
 }
 
-/** Slash Command 在菜单与消息卡片中共用的图标映射。 */
-export function SlashCommandIcon({ command, size = 15, strokeWidth = 1.6 }: SlashCommandIconProps) {
-  const Icon = ICONS[command];
+/** Slash Command 在建议菜单与行内标签中共用的图标映射。 */
+export function SlashCommandIcon({ icon, size = 15, strokeWidth = 1.6 }: SlashCommandIconProps) {
+  const Icon = ICONS[icon];
   return <Icon size={size} strokeWidth={strokeWidth} aria-hidden="true" />;
 }

@@ -220,6 +220,18 @@
   user-select: text;
 }
 
+.slashUserMessage {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 3px 7px;
+}
+
+.slashUserMessage > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .assistantMessage {
   align-self: flex-start;
   width: 100%;

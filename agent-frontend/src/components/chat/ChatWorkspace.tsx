@@ -611,6 +611,14 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   };
 
   const selectCommand = (command: SlashCommandDefinition) => {
+    if (command.presentation.selection === 'IMMEDIATE') {
+      setSelectedCommand(null);
+      setRecordReferenceSelection({ command: null, items: [] });
+      setInputPrompt('');
+      setCommandMenuDismissed(true);
+      void executeSlashCommand(`/${command.name}`);
+      return;
+    }
     const referenceCommand = asRecordReferenceCommand(command.name);
     setSelectedCommand(command);
     setCommandMenuDismissed(true);
@@ -682,7 +690,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     if (event.key === ' ') {
       const parsed = parseSlashCommand(inputPrompt);
       const exactCommand = parsed && !parsed.args ? findSlashCommand(parsed.name) : undefined;
-      if (exactCommand) {
+      if (exactCommand?.presentation.selection === 'COMPOSE') {
         event.preventDefault();
         selectCommand(exactCommand);
         return true;
@@ -901,7 +909,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
                     {messages.map((msg) => (
                       <div key={msg.id} data-msg-id={msg.id} className={styles.messageRow}>
                         {msg.role === 'user' ? (
-                          <div className={styles.userMessage}>{msg.content}</div>
+                          <UserMessageContent content={msg.content} />
                         ) : (
                           <AssistantMessageItem
                             msg={msg}
@@ -976,6 +984,20 @@ function commandPromptPlaceholder(command: SlashCommandDefinition): string {
     return '输入时间范围（可选）';
   }
   return '可直接发送';
+}
+
+function UserMessageContent({ content }: { content: string }) {
+  const parsed = parseSlashCommand(content);
+  const command = parsed ? findSlashCommand(parsed.name) : undefined;
+  if (!parsed || !command || command.presentation.selection !== 'COMPOSE') {
+    return <div className={styles.userMessage}>{content}</div>;
+  }
+  return (
+    <div className={`${styles.userMessage} ${styles.slashUserMessage}`}>
+      <SlashCommandChip command={command} />
+      {parsed.args && <span>{parsed.args}</span>}
+    </div>
+  );
 }
 
 export default ChatWorkspace;

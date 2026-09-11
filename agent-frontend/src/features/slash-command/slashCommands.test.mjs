@@ -67,3 +67,11 @@ test('命令注册表区分本地、确定性查询和模型上下文命令', ()
   assert.equal(findSlashCommand('today')?.execution, 'QUERY');
   assert.equal(findSlashCommand('daily-review')?.execution, 'CONTEXT_PROMPT');
 });
+
+test('面板命令立即执行，Prompt 命令携带独立图标与颜色进入编辑态', () => {
+  assert.equal(findSlashCommand('help')?.presentation.selection, 'IMMEDIATE');
+  assert.equal(findSlashCommand('today')?.presentation.selection, 'IMMEDIATE');
+  assert.equal(findSlashCommand('ask-record')?.presentation.selection, 'COMPOSE');
+  assert.equal(findSlashCommand('study-review')?.presentation.icon, 'study');
+  assert.match(findSlashCommand('study-review')?.presentation.color ?? '', /^#[0-9a-f]{6}$/i);
+});

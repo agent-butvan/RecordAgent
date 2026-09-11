@@ -5,6 +5,9 @@ export type SlashCommandName = 'help' | 'rename' | 'status' | 'tokens' | 'today'
 
 export type RecordReferenceCommandName = 'ask-record' | 'summarize-record' | 'compare-records';
 export type SlashCommandExecution = 'LOCAL' | 'QUERY' | 'CONTEXT_PROMPT';
+export type SlashCommandSelection = 'IMMEDIATE' | 'COMPOSE';
+export type SlashCommandIconName = 'help' | 'edit' | 'activity' | 'tokens' | 'calendar'
+  | 'agenda' | 'finance' | 'study' | 'search' | 'record';
 
 export const RECORD_REFERENCE_LIMITS: Record<RecordReferenceCommandName, number> = {
   'ask-record': 1,
@@ -19,6 +22,12 @@ export interface SlashCommandDefinition {
   usage: string;
   execution: SlashCommandExecution;
   requiresArgs?: boolean;
+  /** 每条命令独立声明选择行为与行内标签视觉，避免组件按命令名硬编码。 */
+  presentation: {
+    selection: SlashCommandSelection;
+    icon: SlashCommandIconName;
+    color: string;
+  };
 }
 
 export interface ParsedSlashCommand {
@@ -33,6 +42,7 @@ export const SLASH_COMMANDS: readonly SlashCommandDefinition[] = [
     description: '查询当前已有的命令以及描述',
     usage: '/help [命令名]',
     execution: 'LOCAL',
+    presentation: { selection: 'IMMEDIATE', icon: 'help', color: '#596579' },
   },
   {
     name: 'rename',
@@ -41,6 +51,7 @@ export const SLASH_COMMANDS: readonly SlashCommandDefinition[] = [
     usage: '/rename <新名称>',
     execution: 'LOCAL',
     requiresArgs: true,
+    presentation: { selection: 'COMPOSE', icon: 'edit', color: '#7657b6' },
   },
   {
     name: 'status',
@@ -48,6 +59,7 @@ export const SLASH_COMMANDS: readonly SlashCommandDefinition[] = [
     description: '显示模型、会话、权限、Token 与上下文状态',
     usage: '/status',
     execution: 'LOCAL',
+    presentation: { selection: 'IMMEDIATE', icon: 'activity', color: '#39766f' },
   },
   {
     name: 'tokens',
@@ -55,6 +67,7 @@ export const SLASH_COMMANDS: readonly SlashCommandDefinition[] = [
     description: '打开当前会话的 Token 用量面板',
     usage: '/tokens',
     execution: 'LOCAL',
+    presentation: { selection: 'IMMEDIATE', icon: 'tokens', color: '#3267b1' },
   },
   {
     name: 'today',
@@ -62,6 +75,7 @@ export const SLASH_COMMANDS: readonly SlashCommandDefinition[] = [
     description: '汇总今日待办、日程、资料、花销与学习情况',
     usage: '/today [YYYY-MM-DD]',
     execution: 'QUERY',
+    presentation: { selection: 'IMMEDIATE', icon: 'calendar', color: '#3267b1' },
   },
   {
     name: 'agenda',
@@ -69,6 +83,7 @@ export const SLASH_COMMANDS: readonly SlashCommandDefinition[] = [
     description: '查看指定日期的待办和日程',
     usage: '/agenda [YYYY-MM-DD]',
     execution: 'QUERY',
+    presentation: { selection: 'IMMEDIATE', icon: 'agenda', color: '#39766f' },
   },
   {
     name: 'spending',
@@ -76,6 +91,7 @@ export const SLASH_COMMANDS: readonly SlashCommandDefinition[] = [
     description: '统计今日、本周或本月的收支与支出分类',
     usage: '/spending [today|week|month]',
     execution: 'QUERY',
+    presentation: { selection: 'IMMEDIATE', icon: 'finance', color: '#a56324' },
   },
   {
     name: 'study-report',
@@ -83,6 +99,7 @@ export const SLASH_COMMANDS: readonly SlashCommandDefinition[] = [
     description: '统计今日、本周或本月的学习投入',
     usage: '/study-report [today|week|month]',
     execution: 'QUERY',
+    presentation: { selection: 'IMMEDIATE', icon: 'study', color: '#7657b6' },
   },
   {
     name: 'find-record',
@@ -91,6 +108,7 @@ export const SLASH_COMMANDS: readonly SlashCommandDefinition[] = [
     usage: '/find-record <关键词>',
     execution: 'QUERY',
     requiresArgs: true,
+    presentation: { selection: 'COMPOSE', icon: 'search', color: '#3267b1' },
   },
   {
     name: 'ask-record',
@@ -99,6 +117,7 @@ export const SLASH_COMMANDS: readonly SlashCommandDefinition[] = [
     usage: '/ask-record ? <问题>',
     execution: 'CONTEXT_PROMPT',
     requiresArgs: true,
+    presentation: { selection: 'COMPOSE', icon: 'record', color: '#3267b1' },
   },
   {
     name: 'summarize-record',
@@ -106,6 +125,7 @@ export const SLASH_COMMANDS: readonly SlashCommandDefinition[] = [
     description: '引用一篇资料并生成结构化摘要',
     usage: '/summarize-record ?',
     execution: 'CONTEXT_PROMPT',
+    presentation: { selection: 'COMPOSE', icon: 'record', color: '#3267b1' },
   },
   {
     name: 'compare-records',
@@ -113,6 +133,7 @@ export const SLASH_COMMANDS: readonly SlashCommandDefinition[] = [
     description: '引用两篇资料并比较共同点与差异',
     usage: '/compare-records ? ?',
     execution: 'CONTEXT_PROMPT',
+    presentation: { selection: 'COMPOSE', icon: 'record', color: '#3267b1' },
   },
   {
     name: 'daily-review',
@@ -120,6 +141,7 @@ export const SLASH_COMMANDS: readonly SlashCommandDefinition[] = [
     description: '结合当日业务数据生成复盘与行动建议',
     usage: '/daily-review [YYYY-MM-DD]',
     execution: 'CONTEXT_PROMPT',
+    presentation: { selection: 'COMPOSE', icon: 'calendar', color: '#3267b1' },
   },
   {
     name: 'weekly-review',
@@ -127,6 +149,7 @@ export const SLASH_COMMANDS: readonly SlashCommandDefinition[] = [
     description: '结合指定自然周数据生成周复盘',
     usage: '/weekly-review [YYYY-MM-DD]',
     execution: 'CONTEXT_PROMPT',
+    presentation: { selection: 'COMPOSE', icon: 'calendar', color: '#5364bb' },
   },
   {
     name: 'todo-review',
@@ -134,6 +157,7 @@ export const SLASH_COMMANDS: readonly SlashCommandDefinition[] = [
     description: '分析今日或本周待办完成情况',
     usage: '/todo-review [today|week]',
     execution: 'CONTEXT_PROMPT',
+    presentation: { selection: 'COMPOSE', icon: 'agenda', color: '#39766f' },
   },
   {
     name: 'finance-review',
@@ -141,6 +165,7 @@ export const SLASH_COMMANDS: readonly SlashCommandDefinition[] = [
     description: '确认后分析本周或本月收支',
     usage: '/finance-review [week|month]',
     execution: 'CONTEXT_PROMPT',
+    presentation: { selection: 'COMPOSE', icon: 'finance', color: '#a56324' },
   },
   {
     name: 'study-review',
@@ -148,6 +173,7 @@ export const SLASH_COMMANDS: readonly SlashCommandDefinition[] = [
     description: '分析本周或本月学习投入',
     usage: '/study-review [week|month]',
     execution: 'CONTEXT_PROMPT',
+    presentation: { selection: 'COMPOSE', icon: 'study', color: '#7657b6' },
   },
   {
     name: 'study-plan',
@@ -156,6 +182,7 @@ export const SLASH_COMMANDS: readonly SlashCommandDefinition[] = [
     usage: '/study-plan <目标>',
     execution: 'CONTEXT_PROMPT',
     requiresArgs: true,
+    presentation: { selection: 'COMPOSE', icon: 'study', color: '#7657b6' },
   },
 ] as const;
 

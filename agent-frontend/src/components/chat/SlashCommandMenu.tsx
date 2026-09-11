@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type CSSProperties } from 'react';
 import type { SlashCommandDefinition } from '../../features/slash-command/slashCommands';
 import { SlashCommandIcon } from './SlashCommandIcon';
 import styles from './SlashCommandMenu.module.css';
@@ -33,11 +33,12 @@ export function SlashCommandMenu({ commands, selectedIndex, onSelect }: SlashCom
             role="option"
             aria-selected={selected}
             className={`${styles.option} ${selected ? styles.optionSelected : ''}`}
+            style={{ '--command-color': command.presentation.color } as CSSProperties}
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => onSelect(command)}
           >
             <span className={styles.iconWrap} aria-hidden="true">
-              <SlashCommandIcon command={command.name} />
+              <SlashCommandIcon icon={command.presentation.icon} />
             </span>
             <span className={styles.name}>/{command.name}</span>
             <span className={styles.description}>{command.description}</span>

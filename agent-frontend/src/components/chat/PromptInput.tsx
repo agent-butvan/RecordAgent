@@ -134,18 +134,20 @@ export const PromptInput: React.FC<PromptInputProps> = ({
 
   return (
     <div className={`${styles.container} ${className || ''}`}>
-      {leadingContent && <div className={styles.leadingContent}>{leadingContent}</div>}
-      <textarea
-        ref={textareaRef}
-        rows={1}
-        className={styles.textarea}
-        placeholder={placeholder}
-        value={value}
-        onChange={(e) => onValueChange(e.target.value)}
-        onKeyDown={handleKeyDown}
-        aria-expanded={Boolean(suggestionListId)}
-        aria-controls={suggestionListId}
-      />
+      <div className={styles.editor}>
+        {leadingContent && <div className={styles.leadingContent}>{leadingContent}</div>}
+        <textarea
+          ref={textareaRef}
+          rows={1}
+          className={styles.textarea}
+          placeholder={placeholder}
+          value={value}
+          onChange={(e) => onValueChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+          aria-expanded={Boolean(suggestionListId)}
+          aria-controls={suggestionListId}
+        />
+      </div>
 
       <div className={styles.toolbar}>
         <div className={styles.toolbarLeft}>
