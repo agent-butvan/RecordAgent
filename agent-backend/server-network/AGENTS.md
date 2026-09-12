@@ -2,6 +2,12 @@
 
 本目录承载 Spring Boot 组合根、HTTP 协议适配和单机业务数据的 SQLite 持久化。除根目录 `AGENTS.md` 外，修改本模块还必须遵守以下规则。
 
+## Agent 业务工具
+
+- 日历、财务、资料和学习等业务 Agent Tool Adapter 归属本模块，通过对应领域 Service 复用业务规则；不得调用 Controller、绕过 Service 直接访问 Repository，或在 Tool 中复制领域校验。
+- `server-agents` 只提供 Tool 注册 seam 与通用执行契约；业务 Tool 通过该 seam 自动注册，禁止为注册业务 Tool 建立 `server-agents` 到 `server-network` 的反向依赖。
+- Tool 不接受调用方传入的 `ownerId`，必须通过 `CurrentUserProvider` 获取当前用户；读取 Tool 才能加入安全白名单，任何业务写入在非完全访问模式下都必须进入统一确认流程。
+
 ## 本地数据库
 
 - 业务数据库固定存放于 `~/.butvan-agent/data/butvan.db`；测试必须覆盖路径并使用临时目录，禁止触碰用户真实数据。
