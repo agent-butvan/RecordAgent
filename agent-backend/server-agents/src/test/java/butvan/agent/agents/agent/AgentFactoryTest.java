@@ -24,6 +24,7 @@ import reactor.core.publisher.Flux;
 import java.nio.file.Path;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AgentFactoryTest {
@@ -32,7 +33,7 @@ class AgentFactoryTest {
     Path temporaryDirectory;
 
     @Test
-    void currentAgentDoesNotAutomaticallyInjectWorkspaceContext() {
+    void currentAgentDoesNotAutomaticallyInjectWorkspaceContext() throws Exception {
         Model model = new StubModel();
         ModelHolder modelHolder = new ModelHolder() {
             @Override
@@ -64,7 +65,25 @@ class AgentFactoryTest {
         try (HarnessAgent agent = factory.currentAgent()) {
             assertTrue(agent.getDelegate().getMiddlewares().stream()
                     .noneMatch(WorkspaceContextMiddleware.class::isInstance));
+            assertEquals(List.of("reset_equipped_tools"), agent.getToolkit().getToolSchemas().stream()
+                    .map(ToolSchema::getName).toList());
+            assertTrue(schemaTokens(agent.getToolkit().getToolSchemas()) < 800,
+                    "默认 Tool Schema 应保持在 800 个估算 Token 以内");
         }
+    }
+
+    private int schemaTokens(List<ToolSchema> schemas) throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        ApproximateTokenCounter counter = new ApproximateTokenCounter();
+        int total = 0;
+        for (ToolSchema schema : schemas) {
+            total += counter.count(mapper.writeValueAsString(java.util.Map.of(
+                    "name", schema.getName(),
+                    "description", schema.getDescription(),
+                    "parameters", schema.getParameters()
+            )));
+        }
+        return total;
     }
 
     private static final class StubModel implements Model {

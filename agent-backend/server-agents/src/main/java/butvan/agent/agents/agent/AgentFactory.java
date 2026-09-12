@@ -82,7 +82,7 @@ public class AgentFactory {
                 System.getProperty("user.dir")
         );
         // 组装 HarnessAgent：计划模式、工具集、权限、工作区、状态存储、上下文压缩
-        return HarnessAgent.builder()
+        HarnessAgent agent = HarnessAgent.builder()
                 .name("butvan_agent")
                 .sysPrompt(systemPrompt)
                 .model(model)
@@ -103,5 +103,7 @@ public class AgentFactory {
                         //.triggerTokens(131072)   // 固定 token 阈值，禁用动态 contextWindowSize 探测（避免框架向 DashScope 发送非法 URL 的探测请求）
                         .build())
                 .build();
+        toolRegistry.enableOnDemandSchemas(agent.getToolkit());
+        return agent;
     }
 }

@@ -118,6 +118,7 @@ public final class PromptsSections {
 
     static final String USING_TOOLS_CONTENT = """
             # 工具调度规范
+            - 工具按能力组延迟加载。需要的工具尚未显示时，先调用 reset_equipped_tools，传入当前任务所需能力组的最终集合；不需要工具即可回答时不要调用。
             - 优先使用专用工具而非 Shell/Bash 命令：
               - 读文件优先用 ReadFile 而非 cat, head, tail；
               - 编辑文件优先用 EditFile / MultiReplace 而非 sed, awk；

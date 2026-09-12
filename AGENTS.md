@@ -71,6 +71,7 @@
 - 所有 REST Controller 方法必须标注 `@ApiLog("接口作用描述")`，由 `ApiLogAspect` 输出包含 Description、参数、客户端 IP、状态和毫秒级 Cost 的 `[API-LOG] START/END/ERROR` 日志。
 - 新增 API 必须同步明确 HTTP 方法、URL、请求字段、响应结构、异常语义和权限要求；对前端有影响时同步更新前端类型与服务层。
 - Agent 运行时默认不得将项目 `AGENTS.md`、完整 `MEMORY.md` 或整个 Knowledge 内容注入每次模型调用；项目规则、历史记忆和领域资料通过对应工具按任务需要检索。若重新启用自动 Workspace Context，必须设置真实 Token 预算并补充用量回归测试。
+- Agent 工具 Schema 默认按 `ToolSchemaRoutingPolicy` 中的能力组延迟暴露，只常驻轻量元工具；新增或重命名工具时必须同步确认其分组，未知工具仅作为兼容兜底保持常驻，禁止无评估地恢复全量 Schema 注入。
 
 ### 代码质量与安全
 
