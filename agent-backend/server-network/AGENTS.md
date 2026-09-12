@@ -7,6 +7,7 @@
 - 日历、财务、资料和学习等业务 Agent Tool Adapter 归属本模块，通过对应领域 Service 复用业务规则；不得调用 Controller、绕过 Service 直接访问 Repository，或在 Tool 中复制领域校验。
 - `server-agents` 只提供 Tool 注册 seam 与通用执行契约；业务 Tool 通过该 seam 自动注册，禁止为注册业务 Tool 建立 `server-agents` 到 `server-network` 的反向依赖。
 - Tool 不接受调用方传入的 `ownerId`，必须通过 `CurrentUserProvider` 获取当前用户；读取 Tool 才能加入安全白名单，任何业务写入在非完全访问模式下都必须进入统一确认流程。
+- 业务写 Tool 使用 `agent_tool_operation` 保存按用户、Tool 名称和幂等键隔离的执行结果，并与领域写入处于同一事务；该表只用于防止重复执行，不得成为业务事实来源。
 
 ## 本地数据库
 

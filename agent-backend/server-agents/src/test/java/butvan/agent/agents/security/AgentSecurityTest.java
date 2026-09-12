@@ -23,6 +23,13 @@ class AgentSecurityTest {
         assertTrue(context.getAllowRules().containsKey("web_search"));
         assertTrue(context.getAllowRules().containsKey("agent_spawn"));
         assertTrue(context.getAllowRules().containsKey("acceptance_report"));
+        assertTrue(context.getAllowRules().containsKey("calendar_query"));
+        assertTrue(context.getAllowRules().containsKey("finance_query"));
+        assertTrue(context.getAllowRules().containsKey("library_search"));
+        assertTrue(context.getAllowRules().containsKey("library_get"));
+        assertTrue(context.getAllowRules().containsKey("study_query"));
+        assertFalse(context.getAllowRules().containsKey("calendar_create"));
+        assertFalse(context.getAllowRules().containsKey("finance_record_transaction"));
         assertFalse(context.getAllowRules().containsKey("execute"));
         assertFalse(context.getAllowRules().containsKey("custom_bash"));
         assertFalse(context.getAllowRules().containsKey("task_cancel"));
