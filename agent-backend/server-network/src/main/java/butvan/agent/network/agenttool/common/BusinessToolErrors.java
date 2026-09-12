@@ -11,7 +11,9 @@ public final class BusinessToolErrors {
         String message = exception.getMessage() == null || exception.getMessage().isBlank()
                 ? "工具执行失败"
                 : exception.getMessage();
-        if (message.contains("已被其他操作修改")) return ToolResult.failure("VERSION_CONFLICT", message);
+        if (message.contains("已被修改") || message.contains("已被其他操作修改")) {
+            return ToolResult.failure("VERSION_CONFLICT", message);
+        }
         if (message.contains("余额不足")) return ToolResult.failure("INSUFFICIENT_BALANCE", message);
         if (message.contains("正在进行")) return ToolResult.failure("ACTIVE_SESSION_EXISTS", message);
         if (message.contains("重叠")) return ToolResult.failure("TIME_RANGE_OVERLAP", message);
