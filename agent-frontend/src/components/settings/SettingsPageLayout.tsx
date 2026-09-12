@@ -5,13 +5,23 @@ interface SettingsPageLayoutProps {
   title: string;
   description: string;
   actions?: ReactNode;
+  density?: 'default' | 'compact';
   children: ReactNode;
 }
 
 /** 设置详情页统一骨架：对齐模型配置页的内容宽度、标题层级和操作区。 */
-export function SettingsPageLayout({ title, description, actions, children }: SettingsPageLayoutProps) {
+export function SettingsPageLayout({
+  title,
+  description,
+  actions,
+  density = 'default',
+  children,
+}: SettingsPageLayoutProps) {
   return (
-    <section className={styles.page} aria-labelledby="settings-page-title">
+    <section
+      className={`${styles.page} ${density === 'compact' ? styles.compact : ''}`}
+      aria-labelledby="settings-page-title"
+    >
       <header className={styles.header}>
         <div>
           <h1 id="settings-page-title">{title}</h1>

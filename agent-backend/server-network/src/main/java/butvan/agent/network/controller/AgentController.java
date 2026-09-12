@@ -8,6 +8,10 @@ import butvan.agent.agents.agent.permission.PermissionResumeRequest;
 import butvan.agent.agents.session.AgentStreamSession;
 import butvan.agent.network.annotation.ApiLog;
 import butvan.agent.network.dto.PlanResponse;
+import butvan.agent.network.chat.dto.AgentChatRequest;
+import butvan.agent.network.chat.service.AgentChatContextService;
+import butvan.agent.network.chat.service.AgentAnalysisContextService;
+import butvan.agent.agents.identity.CurrentUserProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -28,6 +32,9 @@ import java.io.IOException;
 public class AgentController {
 
     private final AgentService agentService;
+    private final AgentChatContextService agentChatContextService;
+    private final AgentAnalysisContextService agentAnalysisContextService;
+    private final CurrentUserProvider currentUserProvider;
 
     @ApiLog("提交单条工具权限确认")
     @PostMapping("/permission/decision")
@@ -47,9 +54,13 @@ public class AgentController {
 
     @ApiLog("Agent对话SSE流式推流")
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter streamChat(@RequestBody AgentUserCall request) {
+    public SseEmitter streamChat(@RequestBody AgentChatRequest request) {
         // 初始对话流和确认后的恢复流共用同一套 SSE 发送/断开逻辑。
-        return createEmitter(agentService.streamAgent(request));
+        String ownerId = currentUserProvider.currentUserId();
+        AgentUserCall call = request.analysisContext() == null
+                ? agentChatContextService.prepare(ownerId, request)
+                : agentAnalysisContextService.prepare(ownerId, request);
+        return createEmitter(agentService.streamAgent(call));
     }
 
     @ApiLog("读取当前会话的任务计划书")

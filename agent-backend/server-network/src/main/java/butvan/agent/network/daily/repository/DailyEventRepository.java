@@ -63,8 +63,15 @@ public class DailyEventRepository {
                 LEFT JOIN todo_detail t ON t.event_id = e.id
                 WHERE e.owner_id = ?
                   AND (
-                    e.event_date = ?
-                    OR (e.event_type = 'todo' AND e.event_date <= ? AND COALESCE(t.recurrence, 'none') <> 'none')
+                    (e.event_type <> 'todo' AND e.event_date = ?)
+                    OR (e.event_type = 'todo' AND e.event_date <= ? AND (
+                      COALESCE(t.recurrence, 'none') = 'daily'
+                      OR (COALESCE(t.recurrence, 'none') = 'none' AND e.event_date = ?)
+                      OR (t.recurrence = 'weekly' AND
+                          ((CAST(strftime('%w', ?) AS INTEGER) + 6) % 7) + 1 = COALESCE(t.recurrence_weekday, 1))
+                      OR (t.recurrence = 'monthly' AND
+                          CAST(strftime('%d', ?) AS INTEGER) = COALESCE(t.recurrence_month_day, 1))
+                    ))
                   )
                 ORDER BY created_at ASC, id ASC
                 """, (resultSet, rowNumber) -> new DailyEventRow(
@@ -76,7 +83,8 @@ public class DailyEventRepository {
                 resultSet.getString("status"),
                 resultSet.getInt("version"),
                 Instant.parse(resultSet.getString("created_at")),
-                Instant.parse(resultSet.getString("updated_at"))), ownerId, date.toString(), date.toString());
+                Instant.parse(resultSet.getString("updated_at"))), ownerId,
+                date.toString(), date.toString(), date.toString(), date.toString(), date.toString());
     }
 
     /** 按所有者读取一条日记录，防止跨用户修改。 */
@@ -207,8 +215,10 @@ public class DailyEventRepository {
                 JOIN todo_detail t ON t.event_id = e.id
                   AND (
                     t.recurrence = 'daily'
-                    OR (t.recurrence = 'weekly' AND (dates.event_date = e.event_date OR strftime('%w', dates.event_date) = '1'))
-                    OR (t.recurrence = 'monthly' AND (dates.event_date = e.event_date OR strftime('%d', dates.event_date) = '01'))
+                    OR (t.recurrence = 'weekly' AND
+                        ((CAST(strftime('%w', dates.event_date) AS INTEGER) + 6) % 7) + 1 = COALESCE(t.recurrence_weekday, 1))
+                    OR (t.recurrence = 'monthly' AND
+                        CAST(strftime('%d', dates.event_date) AS INTEGER) = COALESCE(t.recurrence_month_day, 1))
                   )
                 GROUP BY dates.event_date
                 ORDER BY dates.event_date

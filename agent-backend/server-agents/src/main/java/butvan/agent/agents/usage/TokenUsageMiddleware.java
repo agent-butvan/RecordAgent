@@ -86,6 +86,7 @@ public class TokenUsageMiddleware implements MiddlewareBase {
         long history = 0;
         long currentUser = 0;
         long toolResult = 0;
+        long ragContext = 0;
         Map<String, ToolTokenUsage> tools = new LinkedHashMap<>();
 
         for (int index = 0; index < messages.size(); index++) {
@@ -107,7 +108,12 @@ public class TokenUsageMiddleware implements MiddlewareBase {
                 continue;
             }
             if (index == currentUserIndex) {
-                currentUser += countBlocks(message.getContent());
+                long messageTokens = countBlocks(message.getContent());
+                long referencedTokens = round.ragContexts().stream()
+                        .mapToLong(tokenCounter::count).sum();
+                long attributedRagTokens = Math.min(messageTokens, referencedTokens);
+                ragContext += attributedRagTokens;
+                currentUser += messageTokens - attributedRagTokens;
             } else if (currentUserIndex >= 0 && index < currentUserIndex
                     && (message.getRole() == MsgRole.USER || message.getRole() == MsgRole.ASSISTANT)) {
                 history += countBlocks(message.getContent());
@@ -125,7 +131,7 @@ public class TokenUsageMiddleware implements MiddlewareBase {
         }
 
         InputTokenBreakdown breakdown = new InputTokenBreakdown(
-                system, history, currentUser, toolSchema, toolResult, 0, 0);
+                system, history, currentUser, toolSchema, toolResult, ragContext, 0);
         return new ModelInputEstimate(tokenCounter.id(), breakdown, List.copyOf(tools.values()));
     }
 

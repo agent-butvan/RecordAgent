@@ -81,17 +81,21 @@ public class AgentService {
 
             // 1. 防止客户端伪造或使用已删除的会话
             sessionCatalogService.requireActive(request.sessionId());
-            String input = requireContent(request.context());
+            String requestedContext = request.context() == null || request.context().isBlank()
+                    ? request.content() : request.context();
+            String input = requireContent(requestedContext);
+            String displayContent = request.content() == null || request.content().isBlank()
+                    ? input : request.content().strip();
 
             // 2. 用户消息只在初始化请求时保存一次，回复确认时不再重复保存
-            String turnId = transcriptService.appendUserMessage(request.sessionId(), input);
+            String turnId = transcriptService.appendUserMessage(request.sessionId(), displayContent);
             String userId = currentUserProvider.currentUserId();
             RuntimeContext context = createRuntimeContext(request.sessionId());
             run = new AgentRun(request.sessionId(), userId, turnId, context);
             checkpointService.save(run);
 
             // 3. 初始调用将用户消息交给 AgentScope；后续回复会传入确认消息
-            runAgentStream(run, List.of(run.currentUserMessage(input)), streamSession);
+            runAgentStream(run, List.of(run.currentUserMessage(input, request.ragContexts())), streamSession);
         } catch (Exception e) {
             // 客户端已断开，按照取消收尾
             if (streamSession.isCancelled() || Thread.currentThread().isInterrupted()) {

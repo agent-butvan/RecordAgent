@@ -68,6 +68,14 @@ public class AgentRun {
 
     /** 创建带当前轮次标记的用户消息，供 Middleware 区分历史消息。 */
     public Msg currentUserMessage(String input) {
+        return currentUserMessage(input, List.of());
+    }
+
+    /** 创建当前用户消息，并登记其中由检索资料贡献的上下文片段。 */
+    public Msg currentUserMessage(String input, List<String> ragContexts) {
+        if (runtimeContext != null) {
+            runtimeContext.put(TokenUsageRoundContext.class, new TokenUsageRoundContext(turnId, ragContexts));
+        }
         return UserMessage.builder()
                 .textContent(input)
                 .metadata(Map.of(TokenUsageRoundContext.TURN_METADATA_KEY, turnId))

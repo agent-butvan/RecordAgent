@@ -22,6 +22,7 @@ import java.nio.file.Path;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
@@ -30,6 +31,7 @@ import java.util.stream.Collectors;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** 通过公开领域接口和真实临时 SQLite 验证日记录行为。 */
@@ -101,38 +103,58 @@ class DailyEventServiceIntegrationTest {
     }
 
     @Test
-    void recurringTodosShareCompletionWithinTheirConfiguredPeriod() {
+    void recurringTodosOnlyAppearOnTheirConfiguredWeekdayOrMonthDay() {
         LocalDate start = LocalDate.of(2026, 9, 1);
         DailyEvent daily = dailyEventService.create(
                 "recurring-user", new TodoCommand(start, "学习一个知识点", null, "medium", "daily"));
         DailyEvent weekly = dailyEventService.create(
-                "recurring-user", new TodoCommand(start, "完成一次复盘", null, "high", "weekly"));
+                "recurring-user", new TodoCommand(start, "完成一次复盘", null, "high", "weekly", 3, null));
         DailyEvent monthly = dailyEventService.create(
-                "recurring-user", new TodoCommand(start, "读完一本书", null, "low", "monthly"));
+                "recurring-user", new TodoCommand(start, "读完一本书", null, "low", "monthly", null, 5));
 
         LocalDate wednesday = LocalDate.of(2026, 9, 2);
         DailyEvent completedWeekly = dailyEventService.setTodoCompleted(
                 "recurring-user", weekly.id(), true, weekly.version(), wednesday);
         dailyEventService.setTodoCompleted(
                 "recurring-user", daily.id(), true, daily.version(), wednesday);
-        dailyEventService.setTodoCompleted(
-                "recurring-user", monthly.id(), true, monthly.version(), wednesday);
 
-        var sameWeek = dailyEventService.getDay("recurring-user", LocalDate.of(2026, 9, 6));
-        assertTrue(todoDetails(sameWeek.events(), weekly.id()).completed());
-        assertTrue(todoDetails(sameWeek.events(), monthly.id()).completed());
-        assertFalse(todoDetails(sameWeek.events(), daily.id()).completed());
-        assertEquals("weekly", assertInstanceOf(TodoDetails.class, completedWeekly.details()).recurrence());
+        TodoDetails weeklyDetails = assertInstanceOf(TodoDetails.class, completedWeekly.details());
+        assertEquals("weekly", weeklyDetails.recurrence());
+        assertEquals(3, weeklyDetails.recurrenceWeekday());
+        assertEquals(null, weeklyDetails.recurrenceMonthDay());
 
-        var nextWeek = dailyEventService.getDay("recurring-user", LocalDate.of(2026, 9, 7));
+        var thursday = dailyEventService.getDay("recurring-user", LocalDate.of(2026, 9, 3));
+        assertEquals(List.of(daily.id()), thursday.events().stream().map(DailyEvent::id).toList());
+
+        LocalDate monthDay = LocalDate.of(2026, 9, 5);
+        var fifth = dailyEventService.getDay("recurring-user", monthDay);
+        assertEquals(Set.of(daily.id(), monthly.id()), fifth.events().stream().map(DailyEvent::id).collect(Collectors.toSet()));
+        DailyEvent completedMonthly = dailyEventService.setTodoCompleted(
+                "recurring-user", monthly.id(), true, monthly.version(), monthDay);
+        assertEquals(5, assertInstanceOf(TodoDetails.class, completedMonthly.details()).recurrenceMonthDay());
+
+        LocalDate nextWednesday = LocalDate.of(2026, 9, 9);
+        var nextWeek = dailyEventService.getDay("recurring-user", nextWednesday);
         assertFalse(todoDetails(nextWeek.events(), weekly.id()).completed());
-        assertTrue(todoDetails(nextWeek.events(), monthly.id()).completed());
-        assertEquals(3, nextWeek.events().size());
+        assertEquals(Set.of(daily.id(), weekly.id()), nextWeek.events().stream().map(DailyEvent::id).collect(Collectors.toSet()));
 
-        var summaries = dailyEventService.getDays("recurring-user", start, wednesday);
-        assertEquals(3, summaries.getFirst().todoCount());
-        assertEquals(1, summaries.get(1).todoCount());
-        assertEquals(1, summaries.get(1).completedTodoCount());
+        var summaries = dailyEventService.getDays("recurring-user", start, nextWednesday);
+        assertEquals(1, summaries.stream().filter(item -> item.date().equals(start)).findFirst().orElseThrow().todoCount());
+        assertEquals(2, summaries.stream().filter(item -> item.date().equals(wednesday)).findFirst().orElseThrow().todoCount());
+        assertEquals(2, summaries.stream().filter(item -> item.date().equals(monthDay)).findFirst().orElseThrow().todoCount());
+        assertEquals(2, summaries.stream().filter(item -> item.date().equals(nextWednesday)).findFirst().orElseThrow().todoCount());
+    }
+
+    @Test
+    void recurringTodoRejectsCompletionOutsideConfiguredDate() {
+        LocalDate start = LocalDate.of(2026, 9, 1);
+        DailyEvent weekly = dailyEventService.create(
+                "recurring-validation-user", new TodoCommand(start, "每周复盘", null, "high", "weekly", 5, null));
+
+        assertThrows(IllegalArgumentException.class, () -> dailyEventService.setTodoCompleted(
+                "recurring-validation-user", weekly.id(), true, weekly.version(), LocalDate.of(2026, 9, 2)));
+        assertThrows(IllegalArgumentException.class, () -> dailyEventService.create(
+                "recurring-validation-user", new TodoCommand(start, "错误日期", null, "low", "monthly", null, 32)));
     }
 
     @Test

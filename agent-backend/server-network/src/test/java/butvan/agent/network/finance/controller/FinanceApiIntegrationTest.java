@@ -19,6 +19,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -97,6 +98,12 @@ class FinanceApiIntegrationTest {
                 .andExpect(jsonPath("$.data.range").value("month"))
                 .andExpect(jsonPath("$.data.totalIncome").value(500.00))
                 .andExpect(jsonPath("$.data.days").isArray());
+
+        mockMvc.perform(get("/agent/finance/expense-chart").param("range", "today"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.range").value("today"))
+                .andExpect(jsonPath("$.data.from").value(LocalDate.now().toString()))
+                .andExpect(jsonPath("$.data.to").value(LocalDate.now().toString()));
     }
 
     private static Path createDatabasePath() {

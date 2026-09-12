@@ -1,8 +1,9 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DotsThree } from '@phosphor-icons/react';
 import { fetchDailyDay, setDailyTodoCompleted } from '../../../services/dailyEvents';
 import { DailyTodoList } from '../../calendar/DailyTodoList';
 import type { CalendarTodo } from '../../../types/calendar';
+import type { TodoDailyEvent } from '../../../types/dailyEvent';
 import { overviewTodos } from './overviewData';
 import { useOverviewResource } from './useOverviewResource';
 import styles from './SessionOverview.module.css';
@@ -14,10 +15,47 @@ export interface TodoTilesProps {
   onCompose?: (prompt: string) => void;
 }
 
-export function TodoSummaryTile({ date, refreshKey, onOpenCalendar }: Omit<TodoTilesProps, 'onCompose'>) {
-  const load = useCallback(() => fetchDailyDay(new Date(`${date}T12:00:00`)), [date]);
-  const { data, loading, error, reload } = useOverviewResource(load, refreshKey);
-  const todos = data ? overviewTodos(data) : [];
+export interface TodoSummaryTileProps {
+  date?: string;
+  refreshKey?: number;
+  onOpenCalendar: () => void;
+  todos?: TodoDailyEvent[];
+  loading?: boolean;
+  error?: string | null;
+  onReload?: () => void;
+}
+
+export interface TodoListTileProps {
+  date?: string;
+  refreshKey?: number;
+  onCompose?: (prompt: string) => void;
+  todos?: CalendarTodo[];
+  loading?: boolean;
+  error?: string | null;
+  saveError?: string | null;
+  pendingIds?: ReadonlySet<string>;
+  onToggle?: (id: string) => void;
+  onReload?: () => void;
+}
+
+export function TodoSummaryTile({
+  date,
+  refreshKey,
+  onOpenCalendar,
+  todos: controlledTodos,
+  loading: controlledLoading,
+  error: controlledError,
+  onReload: controlledReload,
+}: TodoSummaryTileProps) {
+  const isControlled = controlledTodos !== undefined;
+  const load = useCallback(() => fetchDailyDay(new Date(`${date ?? ''}T12:00:00`)), [date]);
+  const resource = useOverviewResource(load, isControlled ? 0 : (refreshKey ?? 0));
+
+  const loading = isControlled ? (controlledLoading ?? false) : resource.loading;
+  const error = isControlled ? (controlledError ?? null) : resource.error;
+  const reload = isControlled ? (controlledReload ?? (() => {})) : resource.reload;
+  const todos = isControlled ? controlledTodos : (resource.data ? overviewTodos(resource.data) : []);
+
   const completed = todos.filter((todo) => todo.details.completed).length;
   const remaining = todos.length - completed;
   const completion = todos.length ? Math.round((completed / todos.length) * 100) : 0;
@@ -55,16 +93,34 @@ export function TodoSummaryTile({ date, refreshKey, onOpenCalendar }: Omit<TodoT
   );
 }
 
-export function TodoListTile({ date, refreshKey }: Pick<TodoTilesProps, 'date' | 'refreshKey' | 'onCompose'>) {
-  const load = useCallback(() => fetchDailyDay(new Date(`${date}T12:00:00`)), [date]);
-  const { data, loading, error, reload } = useOverviewResource(load, refreshKey);
-  const pending = useRef(new Set<string>());
-  const [pendingIds, setPendingIds] = useState<ReadonlySet<string>>(new Set());
-  const [saveError, setSaveError] = useState<string | null>(null);
+export function TodoListTile({
+  date,
+  refreshKey,
+  todos: controlledTodos,
+  loading: controlledLoading,
+  error: controlledError,
+  saveError: controlledSaveError,
+  pendingIds: controlledPendingIds,
+  onToggle: controlledToggle,
+  onReload: controlledReload,
+}: TodoListTileProps) {
+  const isControlled = controlledTodos !== undefined;
+  const load = useCallback(() => fetchDailyDay(new Date(`${date ?? ''}T12:00:00`)), [date]);
+  const resource = useOverviewResource(load, isControlled ? 0 : (refreshKey ?? 0));
+  const fallbackPending = useRef(new Set<string>());
+  const [fallbackPendingIds, setFallbackPendingIds] = useState<ReadonlySet<string>>(new Set());
+  const [fallbackSaveError, setFallbackSaveError] = useState<string | null>(null);
 
-  const calendarTodos: CalendarTodo[] = useMemo(() => {
-    if (!data) return [];
-    const todos = overviewTodos(data);
+  const loading = isControlled ? (controlledLoading ?? false) : resource.loading;
+  const error = isControlled ? (controlledError ?? null) : resource.error;
+  const reload = isControlled ? (controlledReload ?? (() => {})) : resource.reload;
+  const saveError = isControlled ? (controlledSaveError ?? null) : fallbackSaveError;
+  const pendingIds = isControlled ? (controlledPendingIds ?? new Set()) : fallbackPendingIds;
+
+  const internalCalendarTodos: CalendarTodo[] = useMemo(() => {
+    if (isControlled) return [];
+    if (!resource.data) return [];
+    const todos = overviewTodos(resource.data);
     return todos.slice(0, 5).map((todo) => ({
       id: todo.id,
       title: todo.title,
@@ -72,26 +128,32 @@ export function TodoListTile({ date, refreshKey }: Pick<TodoTilesProps, 'date' |
       priority: todo.details.priority,
       completed: todo.details.completed,
       recurrence: todo.details.recurrence,
+      recurrenceWeekday: todo.details.recurrenceWeekday ?? undefined,
+      recurrenceMonthDay: todo.details.recurrenceMonthDay ?? undefined,
       version: todo.version,
     }));
-  }, [data]);
+  }, [isControlled, resource.data]);
 
-  const toggle = async (id: string) => {
+  const calendarTodos = isControlled ? (controlledTodos ?? []) : internalCalendarTodos;
+
+  const fallbackToggle = async (id: string) => {
     const todo = calendarTodos.find((item) => item.id === id);
-    if (!todo || pending.current.has(id)) return;
-    pending.current.add(id);
-    setPendingIds(new Set(pending.current));
-    setSaveError(null);
+    if (!todo || fallbackPending.current.has(id)) return;
+    fallbackPending.current.add(id);
+    setFallbackPendingIds(new Set(fallbackPending.current));
+    setFallbackSaveError(null);
     try {
-      await setDailyTodoCompleted(id, !todo.completed, todo.version ?? 0, new Date(`${date}T12:00:00`));
+      await setDailyTodoCompleted(id, !todo.completed, todo.version ?? 0, new Date(`${date ?? ''}T12:00:00`));
     } catch (cause) {
-      setSaveError(cause instanceof Error ? cause.message : '待办更新失败');
+      setFallbackSaveError(cause instanceof Error ? cause.message : '待办更新失败');
     } finally {
       await reload();
-      pending.current.delete(id);
-      setPendingIds(new Set(pending.current));
+      fallbackPending.current.delete(id);
+      setFallbackPendingIds(new Set(fallbackPending.current));
     }
   };
+
+  const handleToggle = isControlled ? (controlledToggle ?? (() => {})) : fallbackToggle;
 
   return (
     <section className={`${styles.tile} ${styles.todoList}`}>
@@ -113,7 +175,7 @@ export function TodoListTile({ date, refreshKey }: Pick<TodoTilesProps, 'date' |
       ) : (
         <DailyTodoList
           todos={calendarTodos}
-          onToggle={toggle}
+          onToggle={handleToggle}
           compact
           pendingIds={pendingIds}
         />
@@ -122,11 +184,99 @@ export function TodoListTile({ date, refreshKey }: Pick<TodoTilesProps, 'date' |
   );
 }
 
-export function TodoOverviewCard(props: TodoTilesProps) {
+/** 组合 DAILY TODO 汇总与 TODAY 清单，两张卡片共享唯一样本与乐观更新事务。 */
+export function TodoOverviewCard({ date, refreshKey, onOpenCalendar, onCompose }: TodoTilesProps) {
+  const load = useCallback(() => fetchDailyDay(new Date(`${date}T12:00:00`)), [date]);
+  const { data, loading, error, reload } = useOverviewResource(load, refreshKey);
+  const pending = useRef(new Set<string>());
+  const [pendingIds, setPendingIds] = useState<ReadonlySet<string>>(new Set());
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [localOverrides, setLocalOverrides] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    setLocalOverrides({});
+  }, [data]);
+
+  const rawTodos = useMemo(() => (data ? overviewTodos(data) : []), [data]);
+
+  const todos = useMemo(() => {
+    if (!rawTodos.length) return [];
+    if (Object.keys(localOverrides).length === 0) return rawTodos;
+    return rawTodos.map((todo) => {
+      if (todo.id in localOverrides) {
+        return {
+          ...todo,
+          details: {
+            ...todo.details,
+            completed: localOverrides[todo.id],
+          },
+        };
+      }
+      return todo;
+    });
+  }, [rawTodos, localOverrides]);
+
+  const calendarTodos: CalendarTodo[] = useMemo(() => {
+    return todos.slice(0, 5).map((todo) => ({
+      id: todo.id,
+      title: todo.title,
+      time: todo.details.time ?? undefined,
+      priority: todo.details.priority,
+      completed: todo.details.completed,
+      recurrence: todo.details.recurrence,
+      recurrenceWeekday: todo.details.recurrenceWeekday ?? undefined,
+      recurrenceMonthDay: todo.details.recurrenceMonthDay ?? undefined,
+      version: todo.version,
+    }));
+  }, [todos]);
+
+  const toggle = async (id: string) => {
+    const currentTodo = todos.find((item) => item.id === id);
+    if (!currentTodo || pending.current.has(id)) return;
+    const nextCompleted = !currentTodo.details.completed;
+
+    // 1. 立即乐观更新本地状态，两张卡片毫秒级联动
+    setLocalOverrides((prev) => ({ ...prev, [id]: nextCompleted }));
+    pending.current.add(id);
+    setPendingIds(new Set(pending.current));
+    setSaveError(null);
+
+    try {
+      await setDailyTodoCompleted(id, nextCompleted, currentTodo.version ?? 0, new Date(`${date}T12:00:00`));
+      await reload();
+    } catch (cause) {
+      // 2. 失败时回滚本地乐观覆盖
+      setLocalOverrides((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      setSaveError(cause instanceof Error ? cause.message : '待办更新失败');
+    } finally {
+      pending.current.delete(id);
+      setPendingIds(new Set(pending.current));
+    }
+  };
+
   return (
     <>
-      <TodoSummaryTile date={props.date} refreshKey={props.refreshKey} onOpenCalendar={props.onOpenCalendar} />
-      <TodoListTile date={props.date} refreshKey={props.refreshKey} onCompose={props.onCompose} />
+      <TodoSummaryTile
+        todos={todos}
+        loading={loading}
+        error={error}
+        onReload={reload}
+        onOpenCalendar={onOpenCalendar}
+      />
+      <TodoListTile
+        todos={calendarTodos}
+        loading={loading}
+        error={error}
+        saveError={saveError}
+        pendingIds={pendingIds}
+        onToggle={toggle}
+        onReload={reload}
+        onCompose={onCompose}
+      />
     </>
   );
 }

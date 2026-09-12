@@ -5,6 +5,7 @@ import butvan.agent.network.record.model.RecordModels.RecordEntry;
 import butvan.agent.network.record.model.RecordModels.RecordType;
 import butvan.agent.network.record.model.RecordModels.RecordAttachment;
 import butvan.agent.network.record.model.RecordModels.RecordTab;
+import butvan.agent.network.record.model.RecordModels.RecordReference;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -36,6 +37,29 @@ public class RecordRepository {
                 ORDER BY r.pinned DESC, r.record_date DESC, r.updated_at DESC
                 """, (rs, rowNum) -> map(rs, findTags(rs.getString("id"))), ownerId, from.toString(), to.toString(),
                 safe(type), safe(type), safe(tabId), safe(tabId), safe(tag), safe(tag), like, like, like);
+    }
+
+    /** 查询资料引用候选，只读取选择器需要的轻量字段。 */
+    public List<RecordReference> searchReferences(String ownerId, String query, int limit, int offset) {
+        String normalized = query == null ? "" : query.trim();
+        String like = "%" + normalized + "%";
+        return jdbcTemplate.query("""
+                SELECT r.id, r.record_date, r.record_type, r.title,
+                       substr(r.content_text, 1, 120) AS summary, r.updated_at
+                FROM record_entry r
+                WHERE r.owner_id = ? AND r.trashed_at IS NULL AND r.archived = 0
+                  AND (? = '' OR r.title LIKE ? OR r.content_text LIKE ? OR EXISTS (
+                    SELECT 1 FROM record_entry_tag rt JOIN record_tag t ON t.id = rt.tag_id
+                    WHERE rt.record_id = r.id AND t.name LIKE ?
+                  ))
+                ORDER BY r.pinned DESC, r.updated_at DESC, r.id
+                LIMIT ? OFFSET ?
+                """, (rs, rowNum) -> new RecordReference(
+                        rs.getString("id"), LocalDate.parse(rs.getString("record_date")),
+                        RecordType.parse(rs.getString("record_type")), rs.getString("title"),
+                        rs.getString("summary"), findTags(rs.getString("id")),
+                        Instant.parse(rs.getString("updated_at"))),
+                ownerId, normalized, like, like, like, limit, offset);
     }
 
     /** 查询回收站记录。 */

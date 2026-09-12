@@ -54,6 +54,15 @@ public class RecordController {
         return Result.success(recordService.summarizeDays(owner(), from, to).stream().map(RecordDtos::from).toList());
     }
 
+    @ApiLog("查询可引用的资料候选")
+    @GetMapping("/references")
+    public Result<RecordDtos.ReferencePageResponse> references(
+            @RequestParam(defaultValue = "") String query,
+            @RequestParam(defaultValue = "30") int limit,
+            @RequestParam(defaultValue = "0") int offset) {
+        return Result.success(RecordDtos.from(recordService.searchReferences(owner(), query, limit, offset)));
+    }
+
     @ApiLog("查询单条资料")
     @GetMapping("/{id}")
     public Result<RecordResponse> get(@PathVariable String id) { return Result.success(RecordDtos.from(recordService.get(owner(), id))); }

@@ -12,6 +12,7 @@ import { FeatureSettingsPage, type FeatureSettingsTab } from '../settings/Featur
 import { SettingsPageLayout } from '../settings/SettingsPageLayout';
 import { TokenUsageSettingsPage } from '../settings/TokenUsageSettingsPage';
 import { ProfileSettingsPage } from '../settings/ProfileSettingsPage';
+import { SlashCommandSettingsPage } from '../settings/SlashCommandSettingsPage';
 import { getFeaturePreferences, setStudyWindowMode } from '../../services/featurePreferences';
 import type { StudyWindowMode } from '../../types/preferences';
 import {
@@ -25,6 +26,7 @@ import {
   Inbox,
   WalletCards,
   ChartNoAxesColumnIncreasing,
+  Command,
 } from 'lucide-react';
 import styles from './ModelSettingsPage.module.css';
 
@@ -172,6 +174,12 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
           >
             <ChartNoAxesColumnIncreasing size={14} /> Token 用量
           </button>
+          <button
+            className={`${styles.navItem} ${activeTab === 'commands' ? styles.navItemActive : ''}`}
+            onClick={() => setActiveTab('commands')}
+          >
+            <Command size={14} /> 指令配置
+          </button>
         </div>
 
         <div className={styles.navGroup}>
@@ -311,6 +319,8 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
         {activeTab === 'account' && <ProfileSettingsPage accountStatus={accountStatus} />}
 
         {activeTab === 'usage' && <TokenUsageSettingsPage />}
+
+        {activeTab === 'commands' && <SlashCommandSettingsPage />}
 
         {isFeatureTab(activeTab) && (
           <FeatureSettingsPage

@@ -5,6 +5,7 @@ export interface ToggleProps {
   checked: boolean;
   onChange: (checked: boolean) => void;
   label?: string;
+  showLabel?: boolean;
   disabled?: boolean;
 }
 
@@ -12,6 +13,7 @@ export const Toggle: React.FC<ToggleProps> = ({
   checked,
   onChange,
   label,
+  showLabel = true,
   disabled = false,
 }) => {
   const handleClick = () => {
@@ -42,7 +44,7 @@ export const Toggle: React.FC<ToggleProps> = ({
       <div className={`${styles.switch} ${checked ? styles.checked : ''}`}>
         <div className={`${styles.thumb} ${checked ? styles.thumbChecked : ''}`} />
       </div>
-      {label && <span className={styles.label}>{label}</span>}
+      {label && showLabel && <span className={styles.label}>{label}</span>}
     </div>
   );
 };

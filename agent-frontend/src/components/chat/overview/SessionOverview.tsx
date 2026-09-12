@@ -7,7 +7,7 @@ import type { RecordEntry, RecordType } from '../../../types/record';
 import { CalendarQuickCreate } from '../../calendar/CalendarQuickCreate';
 import { TransactionModal } from '../../finance/TransactionModal';
 import { useMessage } from '../../common/Message';
-import { TodoSummaryTile, TodoListTile } from './TodoOverviewCard';
+import { TodoOverviewCard } from './TodoOverviewCard';
 import { FinanceTile, FinanceMiniTile } from './FinanceOverviewCard';
 import { DocsTile, DocsListTile } from './RecordsOverviewCard';
 import { LearningTile } from './StudyOverviewCard';
@@ -87,8 +87,13 @@ export function SessionOverview({ onOpenFeature, onOpenRecords, onCompose }: Ses
 
       <div className={styles.bento}>
         <div className={styles.bentoCol}>
-          <TodoSummaryTile key={`todo-summary-${date}`} date={date} refreshKey={refreshKey} onOpenCalendar={() => onOpenFeature('calendar')} />
-          <TodoListTile key={`todo-list-${date}`} date={date} refreshKey={refreshKey} onCompose={onCompose} />
+          <TodoOverviewCard
+            key={`todo-${date}`}
+            date={date}
+            refreshKey={refreshKey}
+            onOpenCalendar={() => onOpenFeature('calendar')}
+            onCompose={onCompose}
+          />
         </div>
         <div className={styles.bentoCol}>
           <FinanceTile key={`finance-${date}`} date={date} refreshKey={refreshKey} onCreate={() => void openFinance()} />

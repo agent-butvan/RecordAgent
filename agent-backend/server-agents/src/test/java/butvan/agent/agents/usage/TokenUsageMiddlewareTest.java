@@ -188,6 +188,34 @@ class TokenUsageMiddlewareTest {
         );
     }
 
+    @Test
+    void attributesReferencedRecordTextToRagContext() {
+        TokenUsageMiddleware middleware = new TokenUsageMiddleware(
+                new LengthTokenCounter(), new ObjectMapper());
+        TurnUsageAccumulator accumulator = new TurnUsageAccumulator();
+        RuntimeContext context = RuntimeContext.builder()
+                .put(TurnUsageAccumulator.class, accumulator)
+                .put(TokenUsageRoundContext.class,
+                        new TokenUsageRoundContext("turn-current", List.of("record text")))
+                .build();
+        var currentUser = UserMessage.builder().textContent("question + record text")
+                .metadata(Map.of(TokenUsageRoundContext.TURN_METADATA_KEY, "turn-current"))
+                .build();
+
+        middleware.onModelCall(null, context,
+                new ModelCallInput(List.of(currentUser), List.of(), null, null),
+                ignored -> Flux.just(
+                        new ModelCallStartEvent("call-rag"),
+                        new ModelCallEndEvent("call-rag", ChatUsage.builder()
+                                .inputTokens(22).outputTokens(1).build())))
+                .collectList().block();
+
+        assertAll(
+                () -> assertEquals(11, accumulator.snapshot().breakdown().ragContextTokens()),
+                () -> assertEquals(11, accumulator.snapshot().breakdown().currentUserTokens())
+        );
+    }
+
     private static final class FixtureTokenCounter implements TokenCounter {
         @Override
         public int count(String text) {

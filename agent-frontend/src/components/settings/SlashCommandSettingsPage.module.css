@@ -1,0 +1,125 @@
+.legend {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 10px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.commandList {
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-main);
+}
+
+.commandRow {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.8fr) minmax(260px, 1.8fr) auto;
+  align-items: center;
+  gap: 16px;
+  min-height: 68px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  transition: background-color var(--transition-fast), opacity var(--transition-fast);
+}
+
+.commandRow:last-child { border-bottom: 0; }
+.commandRow:hover { background: var(--bg-surface); }
+.commandRowDisabled { opacity: 0.56; }
+.commandRowDisabled:hover { opacity: 0.72; }
+
+.commandIdentity,
+.commandCopy {
+  min-width: 0;
+}
+
+.commandIdentity > code {
+  color: var(--text-primary);
+  font: 600 12px/1.35 var(--font-mono);
+}
+
+.commandMeta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 5px;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.commandCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.commandCopy strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commandCopy code {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font: 500 10.5px/1.4 var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commandActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.editForm {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.usageInput { font-family: var(--font-mono); }
+
+.editActions,
+.primaryActions {
+  display: flex;
+  align-items: center;
+}
+
+.editActions {
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 2px;
+}
+
+.primaryActions { gap: 8px; }
+
+@media (max-width: 900px) {
+  .commandRow {
+    grid-template-columns: minmax(140px, 0.8fr) minmax(220px, 1.4fr);
+    gap: 8px 14px;
+  }
+
+  .commandActions { grid-column: 1 / -1; justify-content: space-between; }
+}
+
+@media (max-width: 720px) {
+  .legend { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .commandRow { grid-template-columns: 1fr; }
+  .commandActions { grid-column: auto; }
+  .commandCopy strong,
+  .commandCopy code { overflow: visible; white-space: normal; }
+  .editActions { align-items: stretch; flex-direction: column; }
+  .primaryActions { justify-content: flex-end; }
+}

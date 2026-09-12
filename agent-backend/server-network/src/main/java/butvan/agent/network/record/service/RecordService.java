@@ -4,6 +4,8 @@ import butvan.agent.network.record.model.RecordModels.DaySummary;
 import butvan.agent.network.record.model.RecordModels.RecordCommand;
 import butvan.agent.network.record.model.RecordModels.RecordEntry;
 import butvan.agent.network.record.model.RecordModels.RecordType;
+import butvan.agent.network.record.model.RecordModels.RecordReference;
+import butvan.agent.network.record.model.RecordModels.RecordReferencePage;
 import butvan.agent.network.record.repository.RecordRepository;
 import butvan.agent.network.daily.service.DailyEventService;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +35,17 @@ public class RecordService {
         return repository.search(ownerId, from, to, type, tag, query, tabId);
     }
 
+    /** 查询 Slash Command 可引用的资料；上限保护避免一次加载完整资料库。 */
+    public RecordReferencePage searchReferences(String ownerId, String query, int limit, int offset) {
+        if (query != null && query.length() > 100) throw new IllegalArgumentException("资料搜索词不能超过 100 个字符");
+        if (limit < 1 || limit > 100) throw new IllegalArgumentException("资料候选数量必须在 1 到 100 之间");
+        if (offset < 0) throw new IllegalArgumentException("资料候选偏移量不能小于零");
+        List<RecordReference> matches = repository.searchReferences(ownerId, query, limit + 1, offset);
+        boolean hasMore = matches.size() > limit;
+        List<RecordReference> items = hasMore ? List.copyOf(matches.subList(0, limit)) : List.copyOf(matches);
+        return new RecordReferencePage(items, hasMore, offset + items.size());
+    }
+
     /** 查询日历摘要。 */
     public List<DaySummary> summarizeDays(String ownerId, LocalDate from, LocalDate to) {
         requireRange(from, to);
@@ -42,6 +55,16 @@ public class RecordService {
     /** 查询一条记录。 */
     public RecordEntry get(String ownerId, String id) {
         return repository.find(ownerId, id).orElseThrow(() -> new IllegalArgumentException("资料不存在"));
+    }
+
+    /** 返回可发送给模型的资料；归档或回收状态不会被旁路引用。 */
+    public RecordEntry getReference(String ownerId, String id) {
+        if (id == null || id.isBlank()) throw new IllegalArgumentException("资料引用不能为空");
+        RecordEntry record = get(ownerId, id);
+        if (record.archived() || record.trashedAt() != null) {
+            throw new IllegalArgumentException("资料已归档或进入回收站，当前不可引用");
+        }
+        return record;
     }
 
     /** 创建记录并原子写入标签。 */

@@ -48,7 +48,21 @@ const RECURRENCE_OPTIONS = [
   { value: 'monthly', label: '每月' },
 ] as const;
 
+const WEEKDAY_OPTIONS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'].map((label, index) => ({
+  value: String(index + 1),
+  label,
+}));
+
+const MONTH_DAY_OPTIONS = Array.from({ length: 31 }, (_, index) => ({
+  value: String(index + 1),
+  label: `${index + 1} 号`,
+}));
+
 const valueOf = (formData: FormData, key: string): string => String(formData.get(key) ?? '').trim();
+const optionalNumberOf = (formData: FormData, key: string): number | undefined => {
+  const value = valueOf(formData, key);
+  return value ? Number(value) : undefined;
+};
 
 /** 日历顶栏快捷记录入口：在当前选中日期内创建四类日记录。 */
 export const CalendarQuickCreate: React.FC<CalendarQuickCreateProps> = ({ selectedDate, onCreate, onWriteJournal, onCreateFinance }) => {
@@ -56,12 +70,14 @@ export const CalendarQuickCreate: React.FC<CalendarQuickCreateProps> = ({ select
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeKind, setActiveKind] = useState<ModalRecordKind | null>(null);
+  const [todoRecurrence, setTodoRecurrence] = useState<TodoRecurrence>('none');
   const selectedDateLabel = `${selectedDate.getMonth() + 1}月${selectedDate.getDate()}日`;
 
   const closeModal = () => {
     if (saving) return;
     setIsOpen(false);
     setActiveKind(null);
+    setTodoRecurrence('none');
     setError(null);
   };
 
@@ -78,6 +94,8 @@ export const CalendarQuickCreate: React.FC<CalendarQuickCreateProps> = ({ select
         time: valueOf(formData, 'time') || undefined,
         priority: (valueOf(formData, 'priority') || 'medium') as TodoPriority,
         recurrence: (valueOf(formData, 'recurrence') || 'none') as TodoRecurrence,
+        recurrenceWeekday: optionalNumberOf(formData, 'recurrenceWeekday'),
+        recurrenceMonthDay: optionalNumberOf(formData, 'recurrenceMonthDay'),
       };
     } else if (activeKind === 'schedule') {
       draft = {
@@ -135,8 +153,40 @@ export const CalendarQuickCreate: React.FC<CalendarQuickCreateProps> = ({ select
               <div className={styles.fieldRowThree}>
                 <div className={styles.field}><span>时间（选填）</span><TimeWheelPicker name="time" ariaLabel="待办时间" /></div>
                 <Select name="priority" label="优先级" options={PRIORITY_OPTIONS} defaultValue="medium" fieldSize="md" fullWidth />
-                <Select name="recurrence" label="重复" options={RECURRENCE_OPTIONS} defaultValue="none" fieldSize="md" fullWidth />
+                <Select
+                  name="recurrence"
+                  label="重复"
+                  options={RECURRENCE_OPTIONS}
+                  value={todoRecurrence}
+                  onChange={(event) => setTodoRecurrence(event.target.value as TodoRecurrence)}
+                  fieldSize="md"
+                  fullWidth
+                />
               </div>
+              {todoRecurrence === 'weekly' && (
+                <Select
+                  name="recurrenceWeekday"
+                  label="每周星期"
+                  options={WEEKDAY_OPTIONS}
+                  defaultValue={String(selectedDate.getDay() || 7)}
+                  description={`从 ${selectedDateLabel} 起，仅在所选星期显示`}
+                  fieldSize="md"
+                  fullWidth
+                  containerClassName={styles.recurrenceRule}
+                />
+              )}
+              {todoRecurrence === 'monthly' && (
+                <Select
+                  name="recurrenceMonthDay"
+                  label="每月日期"
+                  options={MONTH_DAY_OPTIONS}
+                  defaultValue={String(selectedDate.getDate())}
+                  description="当月没有所选日期时，该月不会生成此待办"
+                  fieldSize="md"
+                  fullWidth
+                  containerClassName={styles.recurrenceRule}
+                />
+              )}
             </>}
 
             {activeKind === 'schedule' && <>
@@ -173,6 +223,7 @@ export const CalendarQuickCreate: React.FC<CalendarQuickCreateProps> = ({ select
                       onCreateFinance();
                       return;
                     }
+                    setTodoRecurrence('none');
                     setActiveKind(kind);
                   }}
                 >

@@ -29,7 +29,15 @@ import {
   updateSessionPermissionMode,
 } from './services/api';
 import type { PermissionToolPayload } from './services/api';
-import type { ChatSession, ChatMessage, Project, SessionSummaryDto, TranscriptMessageDto, SessionPermissionMode } from './types/chat';
+import type {
+  AgentAnalysisContextRequest,
+  ChatSession,
+  ChatMessage,
+  Project,
+  SessionSummaryDto,
+  TranscriptMessageDto,
+  SessionPermissionMode,
+} from './types/chat';
 import type { SubagentProgressDto, TaskDto } from './types/team';
 import {
   cancelSubagentTask,
@@ -401,10 +409,16 @@ export const MainLayout: React.FC<{
 
   // 7. 修改会话标题
   const handleUpdateSessionTitle = async (id: string, newTitle: string) => {
+    const previousTitle = sessions.find((session) => session.id === id)?.title;
     setSessions((prev) =>
       prev.map((s) => (s.id === id ? { ...s, title: newTitle } : s))
     );
-    await updateSessionTitleApi(id, newTitle);
+    const result = await updateSessionTitleApi(id, newTitle);
+    if (!result.success && previousTitle !== undefined) {
+      setSessions((prev) => prev.map((session) =>
+        session.id === id ? { ...session, title: previousTitle } : session));
+    }
+    return result;
   };
 
   // 7.5 选择会话：切换到对应会话并确保回到对话视图（日历模式下点击会话可跳回）
@@ -432,7 +446,12 @@ export const MainLayout: React.FC<{
   };
 
   // 8. 发送消息发起 SSE 流
-  const handleSendMessage = async (prompt: string) => {
+  const handleSendMessage = async (
+    prompt: string,
+    modelContext = prompt,
+    recordReferenceIds: string[] = [],
+    analysisContext?: AgentAnalysisContextRequest,
+  ) => {
     let currentSessionId = activeSessionId;
     let targetSession = sessions.find((s) => s.id === currentSessionId);
 
@@ -496,6 +515,9 @@ export const MainLayout: React.FC<{
       {
         sessionId: currentSessionId,
         content: prompt,
+        context: modelContext,
+        recordReferenceIds,
+        analysisContext,
       },
       (chunkText) => {
         setSessions((prev) =>
@@ -795,11 +817,13 @@ export const MainLayout: React.FC<{
               sessionTitle={activeSession?.title || '新对话'}
               sessionUsageSummary={activeSession?.usageSummary}
               isSessionLoading={Boolean(activeSession && !activeSession.isLoaded && !activeSessionLoadError)}
+              isSessionStreaming={streamingSessionIds.has(activeSessionId)}
               sessionLoadError={activeSessionLoadError}
               onRetrySessionLoad={() => {
                 if (activeSessionId) void syncSessionDetail(activeSessionId);
               }}
               onSendMessage={handleSendMessage}
+              onRenameSession={(title) => handleUpdateSessionTitle(activeSessionId, title)}
               onOpenSettings={() => setIsSettingsOpen(true)}
               pendingPermission={pendingPermission}
               isPermissionSubmitting={isPermissionSubmitting}

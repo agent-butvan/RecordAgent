@@ -15,6 +15,8 @@ export function toCalendarDayEntry(day: DailyDay): CalendarDayEntry {
         priority: event.details.priority,
         completed: event.details.completed,
         recurrence: event.details.recurrence,
+        recurrenceWeekday: event.details.recurrenceWeekday ?? undefined,
+        recurrenceMonthDay: event.details.recurrenceMonthDay ?? undefined,
         version: event.version,
       });
     } else if (event.eventType === 'schedule') {
