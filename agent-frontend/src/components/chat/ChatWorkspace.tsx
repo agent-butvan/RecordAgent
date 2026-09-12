@@ -34,15 +34,17 @@ import { useMessage } from '../common/Message';
 import { useModel } from '../../context/ModelContext';
 import {
   asRecordReferenceCommand,
+  findConfiguredSlashCommand,
   findSlashCommand,
+  getEnabledSlashCommands,
   parseSlashCommand,
   parseRecordReferencePickerQuery,
   RECORD_REFERENCE_LIMITS,
-  SLASH_COMMANDS,
   suggestSlashCommands,
   type RecordReferenceCommandName,
   type SlashCommandDefinition,
 } from '../../features/slash-command/slashCommands';
+import { subscribeSlashCommandPreferences } from '../../features/slash-command/slashCommandPreferences';
 import {
   parseOptionalDateArgument,
   parseQueryPeriod,
@@ -212,6 +214,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   const [selectedCommand, setSelectedCommand] = useState<SlashCommandDefinition | null>(null);
   const [commandSelectedIndex, setCommandSelectedIndex] = useState(0);
   const [commandMenuDismissed, setCommandMenuDismissed] = useState(false);
+  const [enabledSlashCommands, setEnabledSlashCommands] = useState(() => getEnabledSlashCommands());
   const [commandResult, setCommandResult] = useState<SlashCommandResultData | null>(null);
   const [pendingAnalysis, setPendingAnalysis] = useState<PreparedAnalysisCommand | null>(null);
   const [recordReferences, setRecordReferences] = useState<RecordReferenceOption[]>([]);
@@ -232,9 +235,16 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   const messagesAreaRef = useRef<HTMLDivElement>(null);
   const recordReferenceQueryRef = useRef<string | null>(null);
   const commandSuggestions = useMemo(
-    () => commandMenuDismissed || selectedCommand ? [] : suggestSlashCommands(inputPrompt),
-    [commandMenuDismissed, inputPrompt, selectedCommand],
+    () => commandMenuDismissed || selectedCommand
+      ? []
+      : suggestSlashCommands(inputPrompt, enabledSlashCommands),
+    [commandMenuDismissed, enabledSlashCommands, inputPrompt, selectedCommand],
   );
+
+  useEffect(() => subscribeSlashCommandPreferences(() => {
+    setEnabledSlashCommands(getEnabledSlashCommands());
+    setSelectedCommand((current) => current ? findSlashCommand(current.name) ?? null : null);
+  }), []);
   const composedInputPrompt = selectedCommand
     ? `/${selectedCommand.name}${inputPrompt.trim() ? ` ${inputPrompt.trim()}` : ''}`
     : inputPrompt;
@@ -445,13 +455,19 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
       return;
     }
     if (!parsed.name) {
-      setCommandResult({ kind: 'help', commands: SLASH_COMMANDS });
+      setCommandResult({ kind: 'help', commands: enabledSlashCommands });
       return;
     }
 
     const command = findSlashCommand(parsed.name);
     if (!command) {
-      setCommandResult({ kind: 'error', message: `未知命令：/${parsed.name}。输入 /help 查看可用命令。` });
+      const configured = findConfiguredSlashCommand(parsed.name);
+      setCommandResult({
+        kind: 'error',
+        message: configured && !configured.enabled
+          ? `命令 /${configured.command.name} 已在设置中禁用。`
+          : `未知命令：/${parsed.name}。输入 /help 查看可用命令。`,
+      });
       return;
     }
     if (command.requiresArgs && !parsed.args) {
@@ -465,7 +481,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
       if (targetName && !target) {
         setCommandResult({ kind: 'error', message: `没有找到命令：/${targetName}` });
       } else {
-        setCommandResult({ kind: 'help', commands: SLASH_COMMANDS, command: target });
+        setCommandResult({ kind: 'help', commands: enabledSlashCommands, command: target });
       }
       return;
     }

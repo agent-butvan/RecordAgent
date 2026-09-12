@@ -1,3 +1,9 @@
+import {
+  applySlashCommandPreferences,
+  getSlashCommandPreferences,
+  type SlashCommandState,
+} from './slashCommandPreferences.ts';
+
 export type SlashCommandName = 'help' | 'rename' | 'status' | 'tokens' | 'today'
   | 'agenda' | 'spending' | 'study-report' | 'find-record' | 'ask-record'
   | 'summarize-record' | 'compare-records' | 'daily-review' | 'weekly-review'
@@ -206,7 +212,23 @@ export function parseSlashCommand(input: string): ParsedSlashCommand | null {
 
 export function findSlashCommand(name: string): SlashCommandDefinition | undefined {
   const normalized = name.toLowerCase();
-  return SLASH_COMMANDS.find((command) =>
+  return getEnabledSlashCommands().find((command) =>
+    command.name === normalized || command.aliases.includes(normalized));
+}
+
+export function getSlashCommandStates(): SlashCommandState[] {
+  return applySlashCommandPreferences(SLASH_COMMANDS, getSlashCommandPreferences());
+}
+
+export function getEnabledSlashCommands(): SlashCommandDefinition[] {
+  return getSlashCommandStates()
+    .filter((state) => state.enabled)
+    .map((state) => state.command);
+}
+
+export function findConfiguredSlashCommand(name: string): SlashCommandState | undefined {
+  const normalized = name.toLowerCase();
+  return getSlashCommandStates().find(({ command }) =>
     command.name === normalized || command.aliases.includes(normalized));
 }
 
@@ -224,12 +246,15 @@ export function parseRecordReferencePickerQuery(input: string, selectedCount: nu
 }
 
 /** 输入仍处于命令名阶段时返回建议；出现参数后由具体命令接管。 */
-export function suggestSlashCommands(input: string): SlashCommandDefinition[] {
+export function suggestSlashCommands(
+  input: string,
+  commands: readonly SlashCommandDefinition[] = getEnabledSlashCommands(),
+): SlashCommandDefinition[] {
   if (!input.startsWith('/') || input.startsWith('//')) return [];
   const query = input.slice(1);
   if (/\s/.test(query) || !/^[a-zA-Z0-9-]*$/.test(query)) return [];
   const normalized = query.toLowerCase();
-  return SLASH_COMMANDS.filter((command) =>
+  return commands.filter((command) =>
     command.name.startsWith(normalized)
       || command.aliases.some((alias) => alias.startsWith(normalized)));
 }
