@@ -20,11 +20,18 @@ const priorityLabels = {
   low: '生活',
 } as const;
 
-const recurrenceLabels = {
-  daily: '每天',
-  weekly: '每周',
-  monthly: '每月',
-} as const;
+const weekdayLabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'] as const;
+
+const recurrenceLabel = (todo: CalendarTodo): string => {
+  if (todo.recurrence === 'daily') return '每天';
+  if (todo.recurrence === 'weekly') {
+    return todo.recurrenceWeekday ? `每${weekdayLabels[todo.recurrenceWeekday - 1]}` : '每周';
+  }
+  if (todo.recurrence === 'monthly') {
+    return todo.recurrenceMonthDay ? `每月 ${todo.recurrenceMonthDay} 号` : '每月';
+  }
+  return '今天';
+};
 
 /** 带手绘划线反馈的当日待办清单。 */
 export const DailyTodoList: React.FC<DailyTodoListProps> = ({ todos, onToggle, onDelete, compact = false, pendingIds }) => {
@@ -86,13 +93,13 @@ export const DailyTodoList: React.FC<DailyTodoListProps> = ({ todos, onToggle, o
                 todo.completed ? (
                   <span>{todo.time ? `${todo.time} 已完成` : '今日已完成'}</span>
                 ) : (
-                  <span>计划 · {todo.recurrence && todo.recurrence !== 'none' ? recurrenceLabels[todo.recurrence] : '今天'}</span>
+                  <span>计划 · {recurrenceLabel(todo)}</span>
                 )
               ) : (
                 <>
                   <span className={`${styles.priority} ${styles[`priority${todo.priority[0].toUpperCase()}${todo.priority.slice(1)}`]}`}>{priorityLabels[todo.priority]}</span>
                   {todo.recurrence && todo.recurrence !== 'none' && (
-                    <span className={styles.recurrence}>{recurrenceLabels[todo.recurrence]}</span>
+                    <span className={styles.recurrence}>{recurrenceLabel(todo)}</span>
                   )}
                   {todo.time && <span>{todo.time}</span>}
                 </>

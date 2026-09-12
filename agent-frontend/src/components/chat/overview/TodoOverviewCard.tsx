@@ -128,6 +128,8 @@ export function TodoListTile({
       priority: todo.details.priority,
       completed: todo.details.completed,
       recurrence: todo.details.recurrence,
+      recurrenceWeekday: todo.details.recurrenceWeekday ?? undefined,
+      recurrenceMonthDay: todo.details.recurrenceMonthDay ?? undefined,
       version: todo.version,
     }));
   }, [isControlled, resource.data]);
@@ -222,6 +224,8 @@ export function TodoOverviewCard({ date, refreshKey, onOpenCalendar, onCompose }
       priority: todo.details.priority,
       completed: todo.details.completed,
       recurrence: todo.details.recurrence,
+      recurrenceWeekday: todo.details.recurrenceWeekday ?? undefined,
+      recurrenceMonthDay: todo.details.recurrenceMonthDay ?? undefined,
       version: todo.version,
     }));
   }, [todos]);
@@ -276,5 +280,4 @@ export function TodoOverviewCard({ date, refreshKey, onOpenCalendar, onCompose }
     </>
   );
 }
-
 

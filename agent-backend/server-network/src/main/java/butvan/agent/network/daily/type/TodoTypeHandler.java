@@ -32,20 +32,32 @@ public class TodoTypeHandler implements DailyEventTypeHandler<TodoCommand> {
         if (!Set.of("none", "daily", "weekly", "monthly").contains(normalizeRecurrence(command.recurrence()))) {
             throw new IllegalArgumentException("待办周期不合法");
         }
+        normalizeRecurrenceWeekday(command.recurrence(), command.recurrenceWeekday());
+        normalizeRecurrenceMonthDay(command.recurrence(), command.recurrenceMonthDay());
         parseOptionalTime(command.time(), "待办时间不合法");
     }
 
     @Override
     public void insert(String eventId, TodoCommand command) {
-        jdbcTemplate.update("INSERT INTO todo_detail (event_id, todo_time, priority, completed, recurrence) VALUES (?, ?, ?, 0, ?)",
-                eventId, blankToNull(command.time()), command.priority(), normalizeRecurrence(command.recurrence()));
+        jdbcTemplate.update("""
+                INSERT INTO todo_detail (
+                    event_id, todo_time, priority, completed, recurrence, recurrence_weekday, recurrence_month_day
+                ) VALUES (?, ?, ?, 0, ?, ?, ?)
+                """, eventId, blankToNull(command.time()), command.priority(), normalizeRecurrence(command.recurrence()),
+                normalizeRecurrenceWeekday(command.recurrence(), command.recurrenceWeekday()),
+                normalizeRecurrenceMonthDay(command.recurrence(), command.recurrenceMonthDay()));
     }
 
     @Override
     public void update(String eventId, TodoCommand command) {
         int updated = jdbcTemplate.update(
-                "UPDATE todo_detail SET todo_time = ?, priority = ?, recurrence = ? WHERE event_id = ?",
-                blankToNull(command.time()), command.priority(), normalizeRecurrence(command.recurrence()), eventId);
+                """
+                UPDATE todo_detail
+                SET todo_time = ?, priority = ?, recurrence = ?, recurrence_weekday = ?, recurrence_month_day = ?
+                WHERE event_id = ?
+                """, blankToNull(command.time()), command.priority(), normalizeRecurrence(command.recurrence()),
+                normalizeRecurrenceWeekday(command.recurrence(), command.recurrenceWeekday()),
+                normalizeRecurrenceMonthDay(command.recurrence(), command.recurrenceMonthDay()), eventId);
         if (updated != 1) throw new IllegalArgumentException("待办不存在");
     }
 
@@ -65,24 +77,41 @@ public class TodoTypeHandler implements DailyEventTypeHandler<TodoCommand> {
     }
 
     /** 读取待办周期，供完成状态按日定位所属周期。 */
-    public String findRecurrence(String eventId) {
-        List<String> values = jdbcTemplate.query(
-                "SELECT recurrence FROM todo_detail WHERE event_id = ?",
-                (resultSet, rowNumber) -> resultSet.getString("recurrence"), eventId);
+    public TodoRecurrenceRule findRecurrenceRule(String eventId) {
+        List<TodoRecurrenceRule> values = jdbcTemplate.query(
+                "SELECT recurrence, recurrence_weekday, recurrence_month_day FROM todo_detail WHERE event_id = ?",
+                (resultSet, rowNumber) -> new TodoRecurrenceRule(
+                        normalizeRecurrence(resultSet.getString("recurrence")),
+                        nullableInteger(resultSet, "recurrence_weekday"),
+                        nullableInteger(resultSet, "recurrence_month_day")), eventId);
         if (values.isEmpty()) throw new IllegalArgumentException("待办不存在");
-        return normalizeRecurrence(values.getFirst());
+        return values.getFirst();
+    }
+
+    /** 判断目标日期是否属于待办的有效重复规则。 */
+    public boolean occursOn(LocalDate startDate, LocalDate occurrenceDate, TodoRecurrenceRule rule) {
+        if (occurrenceDate.isBefore(startDate)) return false;
+        return switch (rule.recurrence()) {
+            case "none" -> occurrenceDate.equals(startDate);
+            case "daily" -> true;
+            case "weekly" -> occurrenceDate.getDayOfWeek().getValue() == rule.recurrenceWeekday();
+            case "monthly" -> occurrenceDate.getDayOfMonth() == rule.recurrenceMonthDay();
+            default -> false;
+        };
     }
 
     /** 按查询日期加载待办详情，周期待办的完成状态由所属日、周或月独立计算。 */
     public Map<String, Object> loadDetailsForOccurrence(List<String> eventIds, LocalDate occurrenceDate) {
         if (eventIds.isEmpty()) return Map.of();
         List<TodoRow> todos = namedJdbcTemplate.query("""
-                SELECT event_id, todo_time, priority, recurrence
+                SELECT event_id, todo_time, priority, recurrence, recurrence_weekday, recurrence_month_day
                 FROM todo_detail
                 WHERE event_id IN (:ids)
                 """, Map.of("ids", eventIds), (resultSet, rowNumber) -> new TodoRow(
                 resultSet.getString("event_id"), resultSet.getString("todo_time"),
-                resultSet.getString("priority"), normalizeRecurrence(resultSet.getString("recurrence"))));
+                resultSet.getString("priority"), normalizeRecurrence(resultSet.getString("recurrence")),
+                nullableInteger(resultSet, "recurrence_weekday"),
+                nullableInteger(resultSet, "recurrence_month_day")));
         Map<String, Set<String>> completions = namedJdbcTemplate.query("""
                 SELECT event_id, period_start
                 FROM todo_completion
@@ -100,7 +129,8 @@ public class TodoTypeHandler implements DailyEventTypeHandler<TodoCommand> {
             String key = periodStart(occurrenceDate, todo.recurrence()).toString();
             boolean completed = completions.getOrDefault(todo.eventId(), Set.of()).contains(key);
             result.put(todo.eventId(), new TodoDetails(
-                    todo.time(), todo.priority(), completed, todo.recurrence()));
+                    todo.time(), todo.priority(), completed, todo.recurrence(),
+                    todo.recurrenceWeekday(), todo.recurrenceMonthDay()));
         }
         return result;
     }
@@ -108,12 +138,17 @@ public class TodoTypeHandler implements DailyEventTypeHandler<TodoCommand> {
     @Override
     public Map<String, Object> loadDetails(List<String> eventIds) {
         if (eventIds.isEmpty()) return Map.of();
-        return namedJdbcTemplate.query("SELECT event_id, todo_time, priority, recurrence FROM todo_detail WHERE event_id IN (:ids)",
+        return namedJdbcTemplate.query("""
+                SELECT event_id, todo_time, priority, recurrence, recurrence_weekday, recurrence_month_day
+                FROM todo_detail WHERE event_id IN (:ids)
+                """,
                 Map.of("ids", eventIds), resultSet -> {
                     Map<String, Object> result = new java.util.LinkedHashMap<>();
                     while (resultSet.next()) result.put(resultSet.getString("event_id"), new TodoDetails(
                             resultSet.getString("todo_time"), resultSet.getString("priority"), false,
-                            normalizeRecurrence(resultSet.getString("recurrence"))));
+                            normalizeRecurrence(resultSet.getString("recurrence")),
+                            nullableInteger(resultSet, "recurrence_weekday"),
+                            nullableInteger(resultSet, "recurrence_month_day")));
                     return result;
                 });
     }
@@ -130,7 +165,36 @@ public class TodoTypeHandler implements DailyEventTypeHandler<TodoCommand> {
         return recurrence == null || recurrence.isBlank() ? "none" : recurrence.trim();
     }
 
-    private record TodoRow(String eventId, String time, String priority, String recurrence) {
+    private Integer normalizeRecurrenceWeekday(String recurrence, Integer weekday) {
+        if (!"weekly".equals(normalizeRecurrence(recurrence))) return null;
+        int value = weekday == null ? 1 : weekday;
+        if (value < 1 || value > 7) throw new IllegalArgumentException("每周重复日期必须在周一到周日之间");
+        return value;
+    }
+
+    private Integer normalizeRecurrenceMonthDay(String recurrence, Integer monthDay) {
+        if (!"monthly".equals(normalizeRecurrence(recurrence))) return null;
+        int value = monthDay == null ? 1 : monthDay;
+        if (value < 1 || value > 31) throw new IllegalArgumentException("每月重复日期必须在 1 到 31 号之间");
+        return value;
+    }
+
+    private Integer nullableInteger(java.sql.ResultSet resultSet, String column) throws java.sql.SQLException {
+        int value = resultSet.getInt(column);
+        return resultSet.wasNull() ? null : value;
+    }
+
+    /** 待办重复方式及其具体发生日期。 */
+    public record TodoRecurrenceRule(String recurrence, Integer recurrenceWeekday, Integer recurrenceMonthDay) {
+    }
+
+    private record TodoRow(
+            String eventId,
+            String time,
+            String priority,
+            String recurrence,
+            Integer recurrenceWeekday,
+            Integer recurrenceMonthDay) {
     }
 
     private String blankToNull(String value) { return value == null || value.isBlank() ? null : value.trim(); }

@@ -60,6 +60,8 @@ function parseEvent(raw: RawEvent): DailyEvent {
       recurrence: details.recurrence === 'daily' || details.recurrence === 'weekly' || details.recurrence === 'monthly'
         ? details.recurrence
         : 'none',
+      recurrenceWeekday: typeof details.recurrenceWeekday === 'number' ? details.recurrenceWeekday : null,
+      recurrenceMonthDay: typeof details.recurrenceMonthDay === 'number' ? details.recurrenceMonthDay : null,
     } } satisfies TodoDailyEvent;
   }
   if (raw.eventType === 'schedule') {
@@ -132,6 +134,8 @@ export async function createDailyRecord(date: Date, draft: CalendarRecordDraft):
       time: draft.time,
       priority: draft.priority,
       recurrence: draft.recurrence,
+      recurrenceWeekday: draft.recurrenceWeekday,
+      recurrenceMonthDay: draft.recurrenceMonthDay,
     };
   } else if (draft.kind === 'schedule') {
     path = '/agent/daily-events/schedules';

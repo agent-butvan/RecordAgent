@@ -10,7 +10,14 @@ public final class DailyEventRequests {
     }
 
     /** 创建待办请求。 */
-    public record CreateTodoRequest(LocalDate eventDate, String title, String time, String priority, String recurrence) {
+    public record CreateTodoRequest(
+            LocalDate eventDate,
+            String title,
+            String time,
+            String priority,
+            String recurrence,
+            Integer recurrenceWeekday,
+            Integer recurrenceMonthDay) {
     }
 
     /** 创建日程请求。 */

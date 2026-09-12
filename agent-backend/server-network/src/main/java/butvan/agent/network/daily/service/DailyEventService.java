@@ -49,10 +49,7 @@ public class DailyEventService {
         if (command instanceof JournalCommand journal) {
             recordJournalProjectionService.upsertFromCalendar(ownerId, id, journal.eventDate(), title, journal.body());
         }
-        return getDay(ownerId, command.eventDate()).events().stream()
-                .filter(event -> event.id().equals(id))
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("待办创建后无法读取"));
+        return readStoredEvent(ownerId, id, command.eventDate());
     }
 
     /** 将记录资料库中的每日手记幂等同步到日历，稳定来源引用可避免重复创建。 */
@@ -187,12 +184,12 @@ public class DailyEventService {
             String ownerId, String eventId, boolean completed, int expectedVersion, LocalDate occurrenceDate) {
         DailyEventRow row = requireEvent(ownerId, eventId);
         if (!"todo".equals(row.eventType())) throw new IllegalArgumentException("指定日记录不是待办");
-        String recurrence = todoTypeHandler.findRecurrence(eventId);
+        TodoTypeHandler.TodoRecurrenceRule recurrenceRule = todoTypeHandler.findRecurrenceRule(eventId);
         LocalDate effectiveDate = occurrenceDate == null ? row.eventDate() : occurrenceDate;
-        if (effectiveDate.isBefore(row.eventDate()) || ("none".equals(recurrence) && !effectiveDate.equals(row.eventDate()))) {
+        if (!todoTypeHandler.occursOn(row.eventDate(), effectiveDate, recurrenceRule)) {
             throw new IllegalArgumentException("待办完成日期不属于该待办");
         }
-        todoTypeHandler.setCompleted(eventId, effectiveDate, recurrence, completed);
+        todoTypeHandler.setCompleted(eventId, effectiveDate, recurrenceRule.recurrence(), completed);
         if (!repository.advanceVersion(ownerId, eventId, expectedVersion, Instant.now())) {
             throw new IllegalStateException("日记录已被其他操作修改，请刷新后重试");
         }
@@ -241,10 +238,18 @@ public class DailyEventService {
         if (command instanceof JournalCommand journal && "manual".equals(row.source())) {
             recordJournalProjectionService.upsertFromCalendar(ownerId, eventId, journal.eventDate(), title, journal.body());
         }
-        return getDay(ownerId, command.eventDate()).events().stream()
-                .filter(event -> event.id().equals(eventId))
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("手记修改后无法读取"));
+        return readStoredEvent(ownerId, eventId, command.eventDate());
+    }
+
+    /** 读取刚写入的稳定记录，不要求周期待办在生效日当天发生。 */
+    private DailyEvent readStoredEvent(String ownerId, String eventId, LocalDate occurrenceDate) {
+        DailyEventRow row = requireEvent(ownerId, eventId);
+        Object details = "todo".equals(row.eventType())
+                ? todoTypeHandler.loadDetailsForOccurrence(List.of(eventId), occurrenceDate).get(eventId)
+                : typeRegistry.loadDetails(Map.of(row.eventType(), List.of(eventId))).get(eventId);
+        return new DailyEvent(
+                row.id(), row.eventDate(), row.eventType(), row.title(), row.source(), row.status(),
+                row.version(), row.createdAt(), row.updatedAt(), details);
     }
 
     private DailyEventRow requireEvent(String ownerId, String eventId) {

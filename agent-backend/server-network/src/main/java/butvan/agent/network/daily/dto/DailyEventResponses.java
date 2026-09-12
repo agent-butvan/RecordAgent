@@ -51,7 +51,13 @@ public final class DailyEventResponses {
     }
 
     /** 待办详情响应。 */
-    public record TodoDetailResponse(String time, String priority, boolean completed, String recurrence) {
+    public record TodoDetailResponse(
+            String time,
+            String priority,
+            boolean completed,
+            String recurrence,
+            Integer recurrenceWeekday,
+            Integer recurrenceMonthDay) {
     }
 
     /** 日程详情响应。 */
@@ -97,7 +103,9 @@ public final class DailyEventResponses {
 
     private static Object mapDetails(Object details) {
         if (details instanceof TodoDetails todo) {
-            return new TodoDetailResponse(todo.time(), todo.priority(), todo.completed(), todo.recurrence());
+            return new TodoDetailResponse(
+                    todo.time(), todo.priority(), todo.completed(), todo.recurrence(),
+                    todo.recurrenceWeekday(), todo.recurrenceMonthDay());
         }
         if (details instanceof ScheduleDetails schedule) {
             return new ScheduleDetailResponse(
