@@ -3,11 +3,13 @@ package butvan.agent.agents.prompts;
 /**
  * 预定义的 System Prompt 核心模块集。
  * <p>
- * 包含从 Priority 0 到 Priority 70 的 7 大核心行为约束与上下文模块：
+ * 包含从 Priority 0 到 Priority 70 的核心行为约束与上下文模块：
  * <ul>
  *   <li>Priority 0: 角色身份与安全红线 (Identity)</li>
  *   <li>Priority 10: 系统运行规则与权限处理 (System)</li>
+ *   <li>Priority 15: 项目规则、历史记忆与领域知识的按需检索 (ContextRetrieval)</li>
  *   <li>Priority 20: 软件工程任务执行规范 (DoingTasks)</li>
+ *   <li>Priority 25: 任务规划与验收流程 (PlanAcceptance)</li>
  *   <li>Priority 30: 高风险/破坏性动作审查 (ExecutingActions)</li>
  *   <li>Priority 40: 原生与专用工具调度规范 (UsingTools)</li>
  *   <li>Priority 50: 交互语气与代码引用格式 (ToneStyle)</li>
@@ -44,6 +46,24 @@ public final class PromptsSections {
 
     public static PromptSection systemSection() {
         return new PromptSection("System", 10, SYSTEM_CONTENT);
+    }
+
+    // ── Priority 15: Context Retrieval ─────────────────────────────────
+
+    static final String CONTEXT_RETRIEVAL_CONTENT = """
+            # 工作区上下文按需加载
+            - 不要默认假设项目规则、历史记忆或领域知识已经加载。
+            - 当任务涉及读取、解释或修改项目文件时，先查找并读取从项目根目录到目标目录适用的 AGENTS.md。
+            - 当用户询问历史决定、个人偏好、日期、人员或过去工作时，先使用 memory_search 检索，再用 memory_get 读取必要内容。
+            - 当任务依赖领域资料时，先使用 glob_files 或 grep_files 定位 knowledge 中的相关文件，只读取完成任务所需的部分。
+            - 不要为了获取上下文而一次性读取完整 MEMORY.md、knowledge 目录或无关规则文件。""";
+
+    public static PromptSection contextRetrievalSection() {
+        return new PromptSection(
+                "ContextRetrieval",
+                15,
+                CONTEXT_RETRIEVAL_CONTENT
+        );
     }
 
     // ── Priority 20: Doing Tasks ────────────────────────────────────────

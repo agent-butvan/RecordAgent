@@ -92,6 +92,7 @@ public class AgentFactory {
                 .toolkit(toolRegistry.getToolkit())
                 .permissionContext(agentSecurity.createPermissionContext(permissionChecker))
                 .workspace(storageProperties.getWorkspaceDirectory())
+                .disableWorkspaceContext()
                 .stateStore(agentStateStore)
                 .taskRepository(subagentTaskRepository)
                 .messageBus(subagentMessageBus)
