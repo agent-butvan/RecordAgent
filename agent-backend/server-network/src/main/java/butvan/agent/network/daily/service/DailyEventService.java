@@ -150,6 +150,16 @@ public class DailyEventService {
         return new DailyDay(date, events);
     }
 
+    /** 查询一条日记录的持久化定义，周期待办返回生效日而不是某次发生日。 */
+    @Transactional(readOnly = true)
+    public DailyEvent getEventDefinition(String ownerId, String eventId) {
+        DailyEventRow row = requireEvent(ownerId, eventId);
+        Object details = typeRegistry.loadDetails(Map.of(row.eventType(), List.of(eventId))).get(eventId);
+        return new DailyEvent(
+                row.id(), row.eventDate(), row.eventType(), row.title(), row.source(), row.status(),
+                row.version(), row.createdAt(), row.updatedAt(), details);
+    }
+
     /** 查询日期范围摘要。 */
     @Transactional(readOnly = true)
     public List<DailyDaySummary> getDays(String ownerId, LocalDate from, LocalDate to) {
