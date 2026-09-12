@@ -80,6 +80,7 @@ export function SlashCommandSettingsPage() {
       title="指令配置"
       description="查看聊天中可用的 Slash Command，并管理每条指令的状态和帮助信息。"
       actions={<Badge variant="default">{enabledCount} / {states.length} 已启用</Badge>}
+      density="compact"
     >
       <div className={styles.legend}>
         <span>命令名是执行标识，暂不支持修改。</span>
@@ -122,6 +123,7 @@ export function SlashCommandSettingsPage() {
                 checked={enabled}
                 onChange={(next) => handleEnabledChange(command, next)}
                 label={enabled ? '已启用' : '已禁用'}
+                showLabel={false}
               />
             </div>
           </article>

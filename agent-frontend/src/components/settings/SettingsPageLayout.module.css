@@ -5,6 +5,11 @@
 .actions { display: flex; align-items: center; gap: 12px; }
 .content { width: 100%; }
 
+.compact .header { gap: 16px; margin-bottom: 18px; }
+.compact .header h1 { font-size: 20px; }
+.compact .header p { margin-top: 4px; font-size: 12px; }
+.compact .actions { gap: 8px; }
+
 @media (max-width: 720px) {
   .header { flex-direction: column; }
   .actions { width: 100%; justify-content: space-between; }
