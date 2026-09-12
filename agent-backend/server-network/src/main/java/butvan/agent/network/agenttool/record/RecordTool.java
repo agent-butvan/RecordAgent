@@ -24,11 +24,11 @@ import java.util.Locale;
 @Component
 @RequiredArgsConstructor
 public class RecordTool implements AgentToolModule {
-    private static final String SEARCH = "record_search";
-    private static final String READ = "record_read";
-    private static final String CREATE = "record_create";
-    private static final String UPDATE = "record_update";
-    private static final String RECYCLE = "record_recycle";
+    private static final String SEARCH = "library_search";
+    private static final String READ = "library_get";
+    private static final String CREATE = "library_create";
+    private static final String UPDATE = "library_update";
+    private static final String RECYCLE = "library_recycle";
     private static final int MAX_RESULTS = 100;
 
     private final RecordService recordService;

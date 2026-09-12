@@ -61,7 +61,7 @@ class RecordToolIntegrationTest {
     void exposesRecordToolSchemas() {
         Toolkit toolkit = new Toolkit();
         toolkit.registerTool(recordTool);
-        assertEquals(Set.of("record_search", "record_read", "record_create", "record_update", "record_recycle"),
+        assertEquals(Set.of("library_search", "library_get", "library_create", "library_update", "library_recycle"),
                 toolkit.getToolNames());
     }
 
