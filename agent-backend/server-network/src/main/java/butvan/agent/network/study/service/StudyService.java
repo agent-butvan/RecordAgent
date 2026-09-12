@@ -138,6 +138,13 @@ public class StudyService {
         return studyRepository.findActive(ownerId, Instant.now()).orElse(null);
     }
 
+    /** 按所有者和稳定 ID 查询单条学习时段。 */
+    @Transactional(readOnly = true)
+    public StudySession getSession(String ownerId, String eventId) {
+        validateOwner(ownerId);
+        return requireSession(ownerId, eventId, Instant.now());
+    }
+
     /** 查询用户使用过的学习分类。 */
     @Transactional(readOnly = true)
     public List<String> getCategories(String ownerId) {

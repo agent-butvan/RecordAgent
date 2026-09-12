@@ -15,7 +15,9 @@ public final class BusinessToolErrors {
             return ToolResult.failure("VERSION_CONFLICT", message);
         }
         if (message.contains("余额不足")) return ToolResult.failure("INSUFFICIENT_BALANCE", message);
-        if (message.contains("正在进行")) return ToolResult.failure("ACTIVE_SESSION_EXISTS", message);
+        if (message.contains("正在进行") || message.contains("进行中")) {
+            return ToolResult.failure("ACTIVE_SESSION_EXISTS", message);
+        }
         if (message.contains("重叠")) return ToolResult.failure("TIME_RANGE_OVERLAP", message);
         if (message.contains("不存在")) return ToolResult.failure("NOT_FOUND", message);
         if (exception instanceof IllegalArgumentException) return ToolResult.failure("INVALID_ARGUMENT", message);
