@@ -1,5 +1,6 @@
 package butvan.agent.agents.prompts;
 
+import butvan.agent.agents.usage.ApproximateTokenCounter;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -29,6 +30,13 @@ class PromptBuilderTest {
     @Test
     void defaultPromptDoesNotDuplicateToneStyleSection() {
         assertEquals(1, occurrences(buildDefaultPrompt(), "# 语气与格式"));
+    }
+
+    @Test
+    void defaultPromptStaysWithinHardTokenBudget() {
+        int tokens = new ApproximateTokenCounter().count(buildDefaultPrompt());
+
+        assertTrue(tokens <= 1_200, "System Prompt 超过 1200 Token，实际为 " + tokens);
     }
 
     private String buildDefaultPrompt() {
