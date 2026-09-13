@@ -61,6 +61,31 @@ class TranscriptTokenUsageTest {
     }
 
     @Test
+    void persistsCancelledMessageWhenProducerWasInterrupted() {
+        Fixture fixture = fixture("data-cancelled");
+        String sessionId = fixture.catalog().create(
+                new CreateSessionRequest(SessionKind.GENERAL, "新对话")
+        ).id();
+        AgentRun run = new AgentRun(sessionId, "local-default", "turn-cancelled",
+                RuntimeContext.builder().userId("local-default").sessionId(sessionId).build());
+        AgentRunCompleter completer = new AgentRunCompleter(
+                fixture.transcript(), fixture.catalog(),
+                new AgentRunCheckpointService(fixture.storage(), fixture.mapper())
+        );
+
+        Thread.currentThread().interrupt();
+        try {
+            completer.complete(run, TranscriptMessageDto.MessageStatus.CANCELLED);
+        } finally {
+            // 不把本测试的中断标记泄漏给同一 JUnit worker 线程。
+            Thread.interrupted();
+        }
+
+        assertEquals(TranscriptMessageDto.MessageStatus.CANCELLED,
+                fixture.transcript().list(sessionId).getFirst().status());
+    }
+
+    @Test
     void readsLegacyTranscriptWithoutUsageField() throws Exception {
         Fixture fixture = fixture("data-2");
         String sessionId = "legacy-session";

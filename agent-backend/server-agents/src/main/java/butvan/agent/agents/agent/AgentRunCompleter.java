@@ -31,6 +31,17 @@ public class AgentRunCompleter {
      * @param status
      */
     public void complete(AgentRun run, TranscriptMessageDto.MessageStatus status) {
+        // 取消路径通常先中断生产线程；清掉本次中断标记，避免 Files.lines 等可中断 I/O
+        // 在读取 transcript 时抛出 ClosedByInterruptException。收尾完成后恢复原标记。
+        boolean interrupted = Thread.interrupted();
+        try {
+            completeInternal(run, status);
+        } finally {
+            if (interrupted) Thread.currentThread().interrupt();
+        }
+    }
+
+    private void completeInternal(AgentRun run, TranscriptMessageDto.MessageStatus status) {
         if (!run.beginCompletion()) return;
 
         // 防止系统时钟微笑回拨产生负数

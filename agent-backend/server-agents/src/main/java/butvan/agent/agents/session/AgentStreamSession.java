@@ -93,9 +93,11 @@ public final class AgentStreamSession {
      */
     public boolean requestCancellation() {
         boolean accepted = cancellationRequested.compareAndSet(false, true);
-        if (accepted) invokeCancellationAction();
-        Thread producer = producerThread;
-        if (producer != null) producer.interrupt();
+        if (accepted) {
+            invokeCancellationAction();
+            Thread producer = producerThread;
+            if (producer != null) producer.interrupt();
+        }
         return accepted;
     }
 

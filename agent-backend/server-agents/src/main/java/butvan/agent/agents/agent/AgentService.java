@@ -446,8 +446,15 @@ public class AgentService {
 
     /** 先持久化 partial assistant，再将取消终态交给 SSE。 */
     private void finishCancelled(AgentRun run, AgentStreamSession streamSession) {
-        agentRunCompleter.complete(run, TranscriptMessageDto.MessageStatus.CANCELLED);
-        streamSession.offerTerminal(new AgentStreamEvent.Cancelled(streamSession.runId()));
+        // Thread.interrupt 会让 Files.lines 直接抛出 ClosedByInterruptException；
+        // 取消只应终止模型/工具，不应打断最后一次 transcript 收尾。
+        boolean interrupted = Thread.interrupted();
+        try {
+            agentRunCompleter.complete(run, TranscriptMessageDto.MessageStatus.CANCELLED);
+        } finally {
+            streamSession.offerTerminal(new AgentStreamEvent.Cancelled(streamSession.runId()));
+            if (interrupted) Thread.currentThread().interrupt();
+        }
     }
 
 
