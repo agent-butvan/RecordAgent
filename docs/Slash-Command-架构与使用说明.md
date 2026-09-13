@@ -16,7 +16,7 @@ Slash Command 是聊天输入框的本地路由层。它在普通消息进入 SS
 | --- | --- | --- |
 | LOCAL | `/help [命令]` | 动态读取 Registry 并展示帮助。 |
 | LOCAL | `/rename <新名称>` | 修改当前会话名称。 |
-| LOCAL | `/status` | 展示模型、会话、权限、运行态、累计 Token、最近一次上下文估算和压缩状态。 |
+| LOCAL | `/status` | 展示模型、会话、权限、运行态、累计 Token、最近一次上下文估算和压缩状态；面板保持打开时随当前会话实时更新。 |
 | LOCAL | `/tokens`、`/usage` | 打开 Token 用量面板。 |
 | QUERY | `/today [日期]` | 聚合待办、日程、资料、花销和学习。 |
 | QUERY | `/agenda [日期]` | 查看指定日期的待办与日程。 |

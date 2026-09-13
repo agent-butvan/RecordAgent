@@ -56,6 +56,7 @@ import {
   type PreparedAnalysisCommand,
 } from '../../features/slash-command/analysisCommands';
 import { parseSlashCommandDisplayArguments } from '../../features/slash-command/slashCommandDisplay';
+import { buildSlashStatusData } from '../../features/slash-command/slashCommandStatus';
 import {
   Copy,
   ThumbsUp,
@@ -283,6 +284,19 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     const selectedIds = new Set(selectedRecordReferences.map((item) => item.id));
     return recordReferences.filter((item) => !selectedIds.has(item.id));
   }, [recordReferences, selectedRecordReferences]);
+  const activeModel = getActiveModel();
+  const activeProvider = getActiveProvider();
+  const statusData = buildSlashStatusData({
+    sessionId,
+    sessionTitle,
+    messages,
+    sessionUsageSummary,
+    activeProvider,
+    activeModel,
+    permissionMode,
+    isSessionStreaming,
+    isWaitingForPermission: Boolean(pendingPermission),
+  });
 
   useEffect(() => {
     setCommandSelectedIndex((index) => Math.min(index, Math.max(0, commandSuggestions.length - 1)));
@@ -622,25 +636,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
       return;
     }
 
-    const activeModel = getActiveModel();
-    const activeProvider = getActiveProvider();
-    const latestUsage = [...messages].reverse().find((message) => message.role === 'assistant' && message.usage)?.usage;
-    const latestCall = latestUsage?.calls.at(-1);
-    setCommandResult({
-      kind: 'status',
-      data: {
-        sessionId,
-        sessionTitle,
-        providerName: activeProvider?.name || activeProvider?.id || '未配置',
-        modelName: activeModel?.name || activeModel?.id || '未配置',
-        permissionMode: permissionMode === 'ASK' ? '逐次询问' : permissionMode === 'AUTO_EDIT' ? '自动编辑' : '完全访问',
-        runtimeState: pendingPermission ? '等待权限确认' : isSessionStreaming ? '运行中' : '空闲',
-        compactionState: '自动压缩已启用；最近一次压缩状态暂不可用',
-        totalTokens: sessionUsageSummary?.totalTokens ?? 0,
-        contextTokens: latestCall?.inputTokens ?? latestCall?.estimatedInputTokens,
-        contextWindow: activeModel?.contextWindow,
-      },
-    });
+    setCommandResult({ kind: 'status' });
   };
 
   const selectCommand = (command: SlashCommandDefinition) => {
@@ -822,7 +818,11 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
           onLoadMore={() => { void loadMoreRecordReferences(); }}
         />
       ) : commandResult ? (
-        <SlashCommandResult result={commandResult} onClose={() => setCommandResult(null)} />
+        <SlashCommandResult
+          result={commandResult}
+          statusData={statusData}
+          onClose={() => setCommandResult(null)}
+        />
       ) : null}
       {selectedRecordReferences.length > 0 && (
         <div className={styles.recordReferenceChips} aria-label="已选择的资料引用">
