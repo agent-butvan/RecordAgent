@@ -87,6 +87,8 @@ public class TokenUsageMiddleware implements MiddlewareBase {
         long history = 0;
         long currentUser = 0;
         long toolResult = 0;
+        long profileContext = 0;
+        long memoryRecall = 0;
         long ragContext = 0;
         Map<String, ToolTokenUsage> tools = new LinkedHashMap<>();
 
@@ -94,7 +96,14 @@ public class TokenUsageMiddleware implements MiddlewareBase {
             Msg message = messages.get(index);
             if (message == null) continue;
             if (isManagedContext(message)) {
-                ragContext += countBlocks(message.getContent());
+                long messageTokens = countBlocks(message.getContent());
+                long attributedProfile = Math.min(messageTokens,
+                        metadataTokens(message, ContextInjectionMiddleware.PROFILE_TOKENS_METADATA_KEY));
+                long attributedMemory = Math.min(messageTokens - attributedProfile,
+                        metadataTokens(message, ContextInjectionMiddleware.MEMORY_TOKENS_METADATA_KEY));
+                profileContext += attributedProfile;
+                memoryRecall += attributedMemory;
+                ragContext += messageTokens - attributedProfile - attributedMemory;
                 continue;
             }
             if (message.getRole() == MsgRole.SYSTEM) {
@@ -136,7 +145,8 @@ public class TokenUsageMiddleware implements MiddlewareBase {
         }
 
         InputTokenBreakdown breakdown = new InputTokenBreakdown(
-                system, history, currentUser, toolSchema, toolResult, ragContext, 0);
+                system, history, currentUser, toolSchema, toolResult,
+                profileContext, memoryRecall, ragContext, 0);
         return new ModelInputEstimate(tokenCounter.id(), breakdown, List.copyOf(tools.values()));
     }
 
@@ -153,6 +163,11 @@ public class TokenUsageMiddleware implements MiddlewareBase {
         return message.getMetadata() != null
                 && Boolean.TRUE.equals(message.getMetadata().get(
                         ContextInjectionMiddleware.CONTEXT_METADATA_KEY));
+    }
+
+    private long metadataTokens(Msg message, String key) {
+        Object value = message.getMetadata() == null ? null : message.getMetadata().get(key);
+        return value instanceof Number number ? Math.max(0, number.longValue()) : 0;
     }
 
     private int countSchema(ToolSchema schema) {
@@ -230,6 +245,8 @@ public class TokenUsageMiddleware implements MiddlewareBase {
                 Current User: {}
                 Tool Schema: {}
                 Tool Result: {}
+                Profile Context: {}
+                Memory Recall: {}
                 RAG Context: {}
                 Estimated Input: {}
                 Actual Input: {}
@@ -244,7 +261,8 @@ public class TokenUsageMiddleware implements MiddlewareBase {
                 context.getSessionId(), round.turnId(), usage.modelCallIndex(), usage.invocationId(),
                 usage.model(), value.systemPromptTokens(), value.historyTokens(),
                 value.currentUserTokens(), value.toolSchemaTokens(), value.toolResultTokens(),
-                value.ragContextTokens(), usage.estimatedInputTokens(), usage.inputTokens(),
+                value.profileContextTokens(), value.memoryRecallTokens(), value.ragContextTokens(),
+                usage.estimatedInputTokens(), usage.inputTokens(),
                 value.otherTokens(), usage.outputTokens(), usage.totalTokens(),
                 usage.durationMillis(), toolLines);
     }

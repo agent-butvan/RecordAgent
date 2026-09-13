@@ -60,6 +60,8 @@ function UsageContent({ overview }: { overview: TokenUsageOverview }) {
     { key: 'user', label: '当前提问', tokens: breakdown.currentUserTokens },
     { key: 'schema', label: '工具定义', tokens: breakdown.toolSchemaTokens },
     { key: 'result', label: '工具返回', tokens: breakdown.toolResultTokens },
+    { key: 'profile', label: '个人画像', tokens: breakdown.profileContextTokens ?? 0 },
+    { key: 'memory', label: '相关记忆', tokens: breakdown.memoryRecallTokens ?? 0 },
     { key: 'rag', label: '检索上下文', tokens: breakdown.ragContextTokens },
     { key: 'other', label: '其他 / 协议', tokens: breakdown.otherTokens },
   ];

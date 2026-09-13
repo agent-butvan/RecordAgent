@@ -33,7 +33,6 @@ import java.util.stream.Stream;
 public class ConversationContextAssembler {
 
     private static final String MEMORY_FILE = "MEMORY.md";
-    private static final String PROFILE_FILE = "profile/PROFILE.md";
     private static final int MAX_MEMORY_FILES = 128;
     private static final long MAX_FILE_BYTES = 1_000_000;
     private static final Pattern HEADING_PATTERN = Pattern.compile("(?m)^#{1,4}\\s+(.+?)\\s*$");
@@ -44,6 +43,7 @@ public class ConversationContextAssembler {
 
     private final AgentStorageProperties storageProperties;
     private final TokenCounter tokenCounter;
+    private final PersonalContextService personalContextService;
 
     /**
      * 组装当前轮次的上下文；读取失败时降级为空或部分结果，不阻断对话。
@@ -54,11 +54,13 @@ public class ConversationContextAssembler {
     public ContextEnvelope assemble(ContextRequest request) {
         if (request == null || request.totalBudget() == 0) return ContextEnvelope.empty();
         long startedAt = System.nanoTime();
-        Path userWorkspace = resolveUserWorkspace(request.userId());
+        PersonalContextProfile personalContext = personalContextService.get(request.userId());
+        if (!personalContext.enabled()) return ContextEnvelope.empty();
+        Path userWorkspace = storageProperties.userWorkspaceDirectory(request.userId());
         List<ContextBlock> blocks = new ArrayList<>();
         int remaining = request.totalBudget();
 
-        ContextBlock profile = loadProfile(userWorkspace,
+        ContextBlock profile = loadProfile(personalContext,
                 Math.min(remaining, request.profileBudget()));
         if (profile != null) {
             blocks.add(profile);
@@ -83,23 +85,11 @@ public class ConversationContextAssembler {
         return envelope;
     }
 
-    private Path resolveUserWorkspace(String userId) {
-        Path root = storageProperties.getWorkspaceDirectory().toAbsolutePath().normalize();
-        Path resolved = root.resolve(userId).normalize();
-        if (!resolved.startsWith(root)) throw new IllegalArgumentException("上下文工作区越界");
-        return resolved;
-    }
-
-    private ContextBlock loadProfile(Path userWorkspace, int budget) {
+    private ContextBlock loadProfile(PersonalContextProfile profile, int budget) {
         if (budget <= 0) return null;
-        Path explicitProfile = userWorkspace.resolve(PROFILE_FILE);
-        String content = readSmallFile(explicitProfile);
-        String source = PROFILE_FILE;
-        if (content == null || content.isBlank()) {
-            source = MEMORY_FILE + "#User Profile";
-            content = extractSection(readSmallFile(userWorkspace.resolve(MEMORY_FILE)), "User Profile");
-        }
-        return block(ContextKind.PROFILE, source, content, budget);
+        String source = "legacy".equals(profile.source())
+                ? MEMORY_FILE + "#User Profile" : "profile/PROFILE.md";
+        return block(ContextKind.PROFILE, source, profile.content(), budget);
     }
 
     private List<ContextBlock> recallMemory(Path userWorkspace, String query, int budget, int topK) {
@@ -236,14 +226,6 @@ public class ConversationContextAssembler {
             log.warn("读取上下文文件失败：path={}", path, exception);
             return null;
         }
-    }
-
-    private String extractSection(String markdown, String heading) {
-        if (markdown == null) return null;
-        Pattern sectionPattern = Pattern.compile(
-                "(?ms)^##\\s+" + Pattern.quote(heading) + "\\s*$\\R(.*?)(?=^##\\s+|\\z)");
-        Matcher matcher = sectionPattern.matcher(markdown);
-        return matcher.find() ? matcher.group(1).strip() : null;
     }
 
     private String removeSection(String markdown, String heading) {

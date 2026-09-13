@@ -20,6 +20,8 @@ const SEGMENT_DEFINITIONS: Array<Omit<ChartSegment, 'value'>> = [
   { key: 'currentUserTokens', label: 'Current User', color: 'var(--chart-current-user)' },
   { key: 'toolSchemaTokens', label: 'Tool Schema', color: 'var(--chart-tool-schema)' },
   { key: 'toolResultTokens', label: 'Tool Result', color: 'var(--chart-tool-result)' },
+  { key: 'profileContextTokens', label: 'Personal Profile', color: 'var(--chart-profile)' },
+  { key: 'memoryRecallTokens', label: 'Memory Recall', color: 'var(--chart-memory)' },
   { key: 'ragContextTokens', label: 'RAG Context', color: 'var(--chart-rag)' },
   { key: 'otherTokens', label: 'Other / Protocol', color: 'var(--chart-other)' },
 ];

@@ -15,6 +15,8 @@ export interface InputTokenBreakdown {
   currentUserTokens: number;
   toolSchemaTokens: number;
   toolResultTokens: number;
+  profileContextTokens: number;
+  memoryRecallTokens: number;
   ragContextTokens: number;
   otherTokens: number;
 }

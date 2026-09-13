@@ -22,6 +22,8 @@ import java.util.function.Function;
 public class ContextInjectionMiddleware implements MiddlewareBase {
 
     public static final String CONTEXT_METADATA_KEY = "butvan_managed_context";
+    public static final String PROFILE_TOKENS_METADATA_KEY = "butvan_profile_tokens";
+    public static final String MEMORY_TOKENS_METADATA_KEY = "butvan_memory_tokens";
 
     @Override
     public Flux<AgentEvent> onModelCall(
@@ -45,7 +47,9 @@ public class ContextInjectionMiddleware implements MiddlewareBase {
                 .metadata(Map.of(
                         Msg.METADATA_SYNTHETIC, true,
                         Msg.METADATA_REMINDER_KIND, CONTEXT_METADATA_KEY,
-                        CONTEXT_METADATA_KEY, true))
+                        CONTEXT_METADATA_KEY, true,
+                        PROFILE_TOKENS_METADATA_KEY, envelope.profileTokens(),
+                        MEMORY_TOKENS_METADATA_KEY, envelope.memoryTokens()))
                 .build());
         return next.apply(new ModelCallInput(messages, input.tools(), input.options(), input.model()));
     }

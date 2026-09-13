@@ -19,4 +19,16 @@ public record ContextEnvelope(String rendered, List<ContextBlock> blocks, int es
         return rendered.isBlank();
     }
 
+    /** 画像正文的本地估算 Token，不包含信封标签等协议开销。 */
+    public int profileTokens() {
+        return blocks.stream().filter(block -> block.kind() == ContextKind.PROFILE)
+                .mapToInt(ContextBlock::estimatedTokens).sum();
+    }
+
+    /** 召回记忆正文的本地估算 Token，不包含信封标签等协议开销。 */
+    public int memoryTokens() {
+        return blocks.stream().filter(block -> block.kind() == ContextKind.MEMORY)
+                .mapToInt(ContextBlock::estimatedTokens).sum();
+    }
+
 }

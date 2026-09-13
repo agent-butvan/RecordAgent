@@ -33,6 +33,8 @@ public final class TokenUsageResponses {
             long currentUserTokens,
             long toolSchemaTokens,
             long toolResultTokens,
+            long profileContextTokens,
+            long memoryRecallTokens,
             long ragContextTokens,
             long otherTokens
     ) {

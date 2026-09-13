@@ -227,7 +227,10 @@ class TokenUsageMiddlewareTest {
                 .put(TokenUsageRoundContext.class, new TokenUsageRoundContext("turn-current"))
                 .build();
         var managedContext = UserMessage.builder().textContent("profile-memory")
-                .metadata(Map.of(ContextInjectionMiddleware.CONTEXT_METADATA_KEY, true))
+                .metadata(Map.of(
+                        ContextInjectionMiddleware.CONTEXT_METADATA_KEY, true,
+                        ContextInjectionMiddleware.PROFILE_TOKENS_METADATA_KEY, 4,
+                        ContextInjectionMiddleware.MEMORY_TOKENS_METADATA_KEY, 6))
                 .build();
         var currentUser = UserMessage.builder().textContent("question")
                 .metadata(Map.of(TokenUsageRoundContext.TURN_METADATA_KEY, "turn-current"))
@@ -242,7 +245,9 @@ class TokenUsageMiddlewareTest {
                 .collectList().block();
 
         assertAll(
-                () -> assertEquals(14, accumulator.snapshot().breakdown().ragContextTokens()),
+                () -> assertEquals(4, accumulator.snapshot().breakdown().profileContextTokens()),
+                () -> assertEquals(6, accumulator.snapshot().breakdown().memoryRecallTokens()),
+                () -> assertEquals(4, accumulator.snapshot().breakdown().ragContextTokens()),
                 () -> assertEquals(8, accumulator.snapshot().breakdown().currentUserTokens()),
                 () -> assertEquals(0, accumulator.snapshot().breakdown().historyTokens())
         );

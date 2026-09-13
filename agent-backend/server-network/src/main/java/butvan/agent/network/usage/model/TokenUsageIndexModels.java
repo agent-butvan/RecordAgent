@@ -25,6 +25,7 @@ public final class TokenUsageIndexModels {
             int modelCallIndex, String tokenCounterId, long estimatedInputTokens,
             Long estimationDeltaTokens, long systemPromptTokens, long historyTokens,
             long currentUserTokens, long toolSchemaTokens, long toolResultTokens,
+            long profileContextTokens, long memoryRecallTokens,
             long ragContextTokens, long otherTokens
     ) {
     }
@@ -44,6 +45,7 @@ public final class TokenUsageIndexModels {
     public record BreakdownAggregate(
             long estimatedInputTokens, long systemPromptTokens, long historyTokens,
             long currentUserTokens, long toolSchemaTokens, long toolResultTokens,
+            long profileContextTokens, long memoryRecallTokens,
             long ragContextTokens, long otherTokens
     ) {
     }

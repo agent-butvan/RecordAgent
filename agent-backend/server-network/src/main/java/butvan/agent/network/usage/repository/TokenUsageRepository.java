@@ -72,8 +72,8 @@ public class TokenUsageRepository {
                     model_call_index, token_counter_id, estimated_input_tokens,
                     estimation_delta_tokens, system_prompt_tokens, history_tokens,
                     current_user_tokens, tool_schema_tokens, tool_result_tokens,
-                    rag_context_tokens, other_tokens
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    profile_context_tokens, memory_recall_tokens, rag_context_tokens, other_tokens
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, invocations, invocations.size(), (statement, entry) -> {
             statement.setString(1, entry.id());
             statement.setString(2, entry.ownerId());
@@ -102,8 +102,10 @@ public class TokenUsageRepository {
             statement.setLong(25, entry.currentUserTokens());
             statement.setLong(26, entry.toolSchemaTokens());
             statement.setLong(27, entry.toolResultTokens());
-            statement.setLong(28, entry.ragContextTokens());
-            statement.setLong(29, entry.otherTokens());
+            statement.setLong(28, entry.profileContextTokens());
+            statement.setLong(29, entry.memoryRecallTokens());
+            statement.setLong(30, entry.ragContextTokens());
+            statement.setLong(31, entry.otherTokens());
         });
         jdbcTemplate.batchUpdate("""
                 INSERT INTO token_usage_tool (
@@ -157,6 +159,8 @@ public class TokenUsageRepository {
                        COALESCE(SUM(current_user_tokens), 0) current_user_tokens,
                        COALESCE(SUM(tool_schema_tokens), 0) tool_schema_tokens,
                        COALESCE(SUM(tool_result_tokens), 0) tool_result_tokens,
+                       COALESCE(SUM(profile_context_tokens), 0) profile_context_tokens,
+                       COALESCE(SUM(memory_recall_tokens), 0) memory_recall_tokens,
                        COALESCE(SUM(rag_context_tokens), 0) rag_context_tokens,
                        COALESCE(SUM(other_tokens), 0) other_tokens
                 FROM token_usage_invocation
@@ -166,6 +170,7 @@ public class TokenUsageRepository {
                         rs.getLong("estimated_input_tokens"), rs.getLong("system_prompt_tokens"),
                         rs.getLong("history_tokens"), rs.getLong("current_user_tokens"),
                         rs.getLong("tool_schema_tokens"), rs.getLong("tool_result_tokens"),
+                        rs.getLong("profile_context_tokens"), rs.getLong("memory_recall_tokens"),
                         rs.getLong("rag_context_tokens"), rs.getLong("other_tokens")));
     }
 

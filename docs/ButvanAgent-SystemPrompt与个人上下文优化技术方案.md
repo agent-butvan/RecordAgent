@@ -1,6 +1,6 @@
 # ButvanAgent System Prompt 与个人上下文优化技术方案
 
-> 状态：Phase 1～2 核心链路已实现；Profile 用户控制与精细归因待后续阶段
+> 状态：Phase 1～3 核心链路与用户控制已实现；低频画像自动维护、revision 缓存与 40 条质量回归集待后续补齐
 > 日期：2026-09-13
 
 ## 1. 结论
@@ -227,6 +227,8 @@ context.allowSensitiveRecall = false
 - 每次组装记录候选数、命中数、丢弃原因、各块 Token、来源和 profile revision；日志只记录路径与数字，不记录个人正文。
 - Profile 提供查看、编辑、暂停和清空入口；敏感信息默认不自动召回到云模型。
 
+已实现的设置接口为：`GET /agent/personal-context` 查询状态，`PUT /agent/personal-context/profile` 保存画像，`PUT /agent/personal-context/enabled` 更新开关，`DELETE /agent/personal-context/profile` 清空画像。接口只作用于 `CurrentUserProvider` 解析出的当前本地用户，不接受调用方传入用户 ID。
+
 ## 10. 分阶段实施
 
 ### Phase 0：基线与计数统一
@@ -254,6 +256,8 @@ context.allowSensitiveRecall = false
 
 - 接入低频 profile 维护和 revision 缓存。
 - 增加候选 Profile 的确认、编辑、暂停和清空，以及个人上下文开关和用量明细 UI。
+
+当前已交付查看、编辑、暂停、清空、兼容来源提示与个人上下文总开关；Profile 与 Memory Recall 已在聊天轮次、SQLite 读模型和前端用量页中独立归因。低频自动维护和 revision 缓存未随本阶段启用，避免未经用户确认的模型调用自动改写画像，待质量回归集建立后再单独评审。
 
 每个 Phase 独立提交、独立回滚，不一次性重写 AgentScope 会话或记忆持久化。
 

@@ -71,7 +71,7 @@
 - 所有 REST Controller 方法必须标注 `@ApiLog("接口作用描述")`，由 `ApiLogAspect` 输出包含 Description、参数、客户端 IP、状态和毫秒级 Cost 的 `[API-LOG] START/END/ERROR` 日志。
 - 新增 API 必须同步明确 HTTP 方法、URL、请求字段、响应结构、异常语义和权限要求；对前端有影响时同步更新前端类型与服务层。
 - Agent 运行时默认不得将项目 `AGENTS.md`、完整 `MEMORY.md` 或整个 Knowledge 内容注入每次模型调用；项目规则和领域资料通过对应工具按任务需要检索，个人历史只允许由下述有界上下文模块自动召回或由记忆工具显式读取。若重新启用自动 Workspace Context，必须设置真实 Token 预算并补充用量回归测试。
-- 主 Agent 保持禁用 AgentScope 默认 Workspace Context；常驻 System Core 必须通过测试限制在 1,200 个 `TokenCounter` 估算 Token 内。个人上下文统一由 `server-agents/context` 的 `ConversationContextAssembler` 组装，默认总预算 850（Profile 300、Memory 500、Top-K 4），并由 `ContextInjectionMiddleware` 仅在 Model Call 前临时注入，禁止写入 AgentState 或 transcript；新增上下文来源必须接入该唯一 seam、设置硬预算并补充注入与归因测试。
+- 主 Agent 保持禁用 AgentScope 默认 Workspace Context；常驻 System Core 必须通过测试限制在 1,200 个 `TokenCounter` 估算 Token 内。个人上下文统一由 `server-agents/context` 的 `ConversationContextAssembler` 组装，默认总预算 850（Profile 300、Memory 500、Top-K 4），并由 `ContextInjectionMiddleware` 仅在 Model Call 前临时注入，禁止写入 AgentState 或 transcript；个人画像和开关分别保存于用户工作区的 `profile/PROFILE.md` 与 `profile/settings.json`，显式空画像必须阻止 `MEMORY.md#User Profile` 回退，暂停只停止自动注入而不得删除数据；新增上下文来源必须接入该唯一 seam、设置硬预算并补充注入与归因测试。
 - Agent 工具 Schema 默认按 `ToolSchemaRoutingPolicy` 中的能力组延迟暴露，只常驻轻量元工具；新增或重命名工具时必须同步确认其分组，未知工具仅作为兼容兜底保持常驻，禁止无评估地恢复全量 Schema 注入。
 
 ### 代码质量与安全
@@ -81,7 +81,7 @@
 - 禁止捕获异常后静默忽略；必须记录有上下文的日志，或转换为可识别的业务异常。
 - 禁止在日志、异常响应、配置文件和代码中输出 API Key、Token、密码或完整敏感请求体。
 - 用户模型配置统一持久化在 `~/.butvan-agent/config.json`，不得把用户密钥或个性化配置写入 `application.yml`、`application-vendor.yml` 或源码。
-- 聊天轮次 Token 用量随 assistant 消息写入 `~/.butvan-agent/transcripts/*.jsonl`；标题等非聊天模型调用写入 `~/.butvan-agent/usage/system-usage.jsonl`；未结束轮次仅暂存在 `~/.butvan-agent/runs/*.json`，终态落盘或重启恢复后必须清理。供应商 Usage 是实际总量，System、History、Current User、Tool Schema、Tool Result、RAG 与 Other 是携带计数器版本的本地归因估算，两者不得混淆或互相补齐。SQLite 中的 Token 用量表仅作为可从上述文件重建的统计读模型，不得取代原始记录。
+- 聊天轮次 Token 用量随 assistant 消息写入 `~/.butvan-agent/transcripts/*.jsonl`；标题等非聊天模型调用写入 `~/.butvan-agent/usage/system-usage.jsonl`；未结束轮次仅暂存在 `~/.butvan-agent/runs/*.json`，终态落盘或重启恢复后必须清理。供应商 Usage 是实际总量，System、History、Current User、Tool Schema、Tool Result、Profile Context、Memory Recall、RAG 与 Other 是携带计数器版本的本地归因估算，两者不得混淆或互相补齐。SQLite 中的 Token 用量表仅作为可从上述文件重建的统计读模型，不得取代原始记录。
 - AgentScope 工作区、工具权限、文件与网络访问必须按最小权限设计；任何可能执行本机操作的能力都应具备明确的审批、范围和错误反馈。
 
 ## 四、前端工程与 UI 组件规范

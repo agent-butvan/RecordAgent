@@ -194,6 +194,8 @@ function aggregateSessionUsage(
     currentUserTokens: total.currentUserTokens + usage.breakdown.currentUserTokens,
     toolSchemaTokens: total.toolSchemaTokens + usage.breakdown.toolSchemaTokens,
     toolResultTokens: total.toolResultTokens + usage.breakdown.toolResultTokens,
+    profileContextTokens: total.profileContextTokens + (usage.breakdown.profileContextTokens ?? 0),
+    memoryRecallTokens: total.memoryRecallTokens + (usage.breakdown.memoryRecallTokens ?? 0),
     ragContextTokens: total.ragContextTokens + usage.breakdown.ragContextTokens,
     otherTokens: total.otherTokens + usage.breakdown.otherTokens,
   }), emptyBreakdown());
@@ -241,6 +243,8 @@ function emptyBreakdown(): InputTokenBreakdown {
     currentUserTokens: 0,
     toolSchemaTokens: 0,
     toolResultTokens: 0,
+    profileContextTokens: 0,
+    memoryRecallTokens: 0,
     ragContextTokens: 0,
     otherTokens: 0,
   };

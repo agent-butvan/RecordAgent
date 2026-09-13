@@ -22,7 +22,9 @@ class ContextInjectionMiddlewareTest {
     @Test
     void injectsSyntheticContextOnlyIntoTheForwardedModelInput() {
         ContextEnvelope envelope = new ContextEnvelope(
-                "<context-envelope>profile</context-envelope>", List.of(), 10);
+                "<context-envelope>profile memory</context-envelope>", List.of(
+                        new ContextBlock(ContextKind.PROFILE, "profile/PROFILE.md", "profile", 3),
+                        new ContextBlock(ContextKind.MEMORY, "memory/today.md", "memory", 4)), 10);
         RuntimeContext context = RuntimeContext.builder()
                 .put(ContextEnvelope.class, envelope)
                 .put(TokenUsageRoundContext.class, new TokenUsageRoundContext("turn-1"))
@@ -45,6 +47,8 @@ class ContextInjectionMiddlewareTest {
         Msg injected = forwarded.get().messages().get(1);
         assertEquals("managed_context", injected.getName());
         assertTrue(Boolean.TRUE.equals(injected.getMetadata().get(Msg.METADATA_SYNTHETIC)));
+        assertEquals(3, injected.getMetadata().get(ContextInjectionMiddleware.PROFILE_TOKENS_METADATA_KEY));
+        assertEquals(4, injected.getMetadata().get(ContextInjectionMiddleware.MEMORY_TOKENS_METADATA_KEY));
         assertEquals(currentUser, forwarded.get().messages().get(2));
     }
 }

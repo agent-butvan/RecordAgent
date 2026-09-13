@@ -2,6 +2,7 @@ package butvan.agent.agents.context;
 
 import butvan.agent.agents.storage.AgentStorageProperties;
 import butvan.agent.agents.usage.ApproximateTokenCounter;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -109,8 +110,10 @@ class ConversationContextAssemblerTest {
     }
 
     private ConversationContextAssembler assembler() {
-        return new ConversationContextAssembler(
-                new AgentStorageProperties(temporaryDirectory), new ApproximateTokenCounter());
+        AgentStorageProperties storage = new AgentStorageProperties(temporaryDirectory);
+        ApproximateTokenCounter counter = new ApproximateTokenCounter();
+        return new ConversationContextAssembler(storage, counter,
+                new PersonalContextService(storage, counter, new ObjectMapper()));
     }
 
     private Path userWorkspace() throws IOException {

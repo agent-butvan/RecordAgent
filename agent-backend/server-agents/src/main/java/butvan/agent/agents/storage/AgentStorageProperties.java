@@ -88,6 +88,28 @@ public class AgentStorageProperties {
         return runCheckpointDirectory.resolve(turnId + ".json");
     }
 
+    /** 返回隔离后的用户工作区，供个人上下文与记忆模块统一取址。 */
+    public Path userWorkspaceDirectory(String userId) {
+        if (userId == null || !userId.matches("[a-zA-Z0-9-]+")) {
+            throw new IllegalArgumentException("用户ID 格式非法");
+        }
+        Path directory = workspaceDirectory.resolve(userId);
+        if (Files.isSymbolicLink(directory)) {
+            throw new IllegalArgumentException("用户工作区不能是符号链接");
+        }
+        return directory;
+    }
+
+    /** 返回用户显式维护的画像文件。 */
+    public Path personalContextProfileFile(String userId) {
+        return userWorkspaceDirectory(userId).resolve("profile").resolve("PROFILE.md");
+    }
+
+    /** 返回个人上下文开关设置文件。 */
+    public Path personalContextSettingsFile(String userId) {
+        return userWorkspaceDirectory(userId).resolve("profile").resolve("settings.json");
+    }
+
     private void createDirectories(Path directory) {
         try {
             Files.createDirectories(directory);

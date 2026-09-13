@@ -99,6 +99,7 @@ public class TokenUsageIndexService {
                 usage.modelCallIndex(), usage.tokenCounterId(), usage.estimatedInputTokens(),
                 usage.estimationDeltaTokens(), breakdown.systemPromptTokens(), breakdown.historyTokens(),
                 breakdown.currentUserTokens(), breakdown.toolSchemaTokens(), breakdown.toolResultTokens(),
+                breakdown.profileContextTokens(), breakdown.memoryRecallTokens(),
                 breakdown.ragContextTokens(), breakdown.otherTokens()
         );
     }
@@ -114,6 +115,7 @@ public class TokenUsageIndexService {
                 usage.modelCallIndex(), usage.tokenCounterId(), usage.estimatedInputTokens(),
                 usage.estimationDeltaTokens(), breakdown.systemPromptTokens(), breakdown.historyTokens(),
                 breakdown.currentUserTokens(), breakdown.toolSchemaTokens(), breakdown.toolResultTokens(),
+                breakdown.profileContextTokens(), breakdown.memoryRecallTokens(),
                 breakdown.ragContextTokens(), breakdown.otherTokens()
         );
     }
