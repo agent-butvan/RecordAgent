@@ -73,6 +73,7 @@
 - Agent 运行时默认不得将项目 `AGENTS.md`、完整 `MEMORY.md` 或整个 Knowledge 内容注入每次模型调用；项目规则和领域资料通过对应工具按任务需要检索，个人历史只允许由下述有界上下文模块自动召回或由记忆工具显式读取。若重新启用自动 Workspace Context，必须设置真实 Token 预算并补充用量回归测试。
 - 主 Agent 保持禁用 AgentScope 默认 Workspace Context；常驻 System Core 必须通过测试限制在 1,200 个 `TokenCounter` 估算 Token 内。个人上下文统一由 `server-agents/context` 的 `ConversationContextAssembler` 组装，默认总预算 850（Profile 300、Memory 500、Top-K 4），并由 `ContextInjectionMiddleware` 仅在 Model Call 前临时注入，禁止写入 AgentState 或 transcript；个人画像和开关分别保存于用户工作区的 `profile/PROFILE.md` 与 `profile/settings.json`，显式空画像必须阻止 `MEMORY.md#User Profile` 回退，暂停只停止自动注入而不得删除数据；新增上下文来源必须接入该唯一 seam、设置硬预算并补充注入与归因测试。
 - Agent 工具 Schema 默认按 `ToolSchemaRoutingPolicy` 中的能力组延迟暴露，只常驻轻量元工具；新增或重命名工具时必须同步确认其分组，未知工具仅作为兼容兜底保持常驻，禁止无评估地恢复全量 Schema 注入。
+- Agent 聊天运行必须使用稳定 `runId` 贯穿请求、SSE、运行注册表和终态收尾关联；显式取消必须通过后端取消接口向 AgentScope、生产线程、模型适配器和工具传播。传输层断开与用户显式取消必须区分；取消后必须保留 partial assistant、工具状态和 usage，且只有一个终态路径可写入。真正可恢复的暂停只能在有明确 checkpoint、待恢复动作和工具幂等语义后开放，不得用 Java 线程 suspend/resume 冒充。
 
 ### 代码质量与安全
 

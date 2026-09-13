@@ -149,3 +149,32 @@
 .sendBtnActive:hover {
   background-color: #27272a;
 }
+
+.stopBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: var(--radius-full);
+  background-color: var(--accent-dark);
+  color: #ffffff;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), opacity var(--transition-fast);
+}
+
+.stopBtn:hover:not(:disabled) {
+  background-color: #27272a;
+}
+
+.stopBtn:focus-visible,
+.sendBtn:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.stopBtn:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}

@@ -310,6 +310,14 @@
   min-width: 0;
 }
 
+.cancelledStatus {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 10px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
 /* 消息底部动作工具栏 */
 .messageActions {
   display: flex;

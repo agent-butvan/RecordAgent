@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Plus, ArrowUp, Mic } from 'lucide-react';
+import { Plus, ArrowUp, Mic, Square } from 'lucide-react';
 import { ModelSelector } from '../model/ModelSelector';
 import { PermissionModeSelector } from './PermissionModeSelector';
 import type { SessionPermissionMode } from '../../types/chat';
@@ -16,6 +16,9 @@ interface PromptInputProps {
   value: string;
   onValueChange: (value: string) => void;
   onSend: () => void;
+  onStop?: () => void;
+  isStreaming?: boolean;
+  isStopping?: boolean;
   onOpenSettings: () => void;
   className?: string;
   placeholder?: string;
@@ -37,6 +40,9 @@ export const PromptInput: React.FC<PromptInputProps> = ({
   value,
   onValueChange,
   onSend,
+  onStop,
+  isStreaming = false,
+  isStopping = false,
   onOpenSettings,
   className,
   placeholder = '随心输入',
@@ -71,6 +77,7 @@ export const PromptInput: React.FC<PromptInputProps> = ({
     if (onInputKeyDown?.(e)) return;
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
+      if (isStreaming) return;
       onSend();
     }
   };
@@ -186,16 +193,29 @@ export const PromptInput: React.FC<PromptInputProps> = ({
             <Mic size={18} />
           </button>
 
-          <button
-            type="button"
-            className={`${styles.sendBtn} ${isSendEnabled ? styles.sendBtnActive : ''}`}
-            onClick={onSend}
-            title="发送消息 (Enter)"
-            aria-label="发送消息"
-            disabled={!isSendEnabled}
-          >
-            <ArrowUp size={16} />
-          </button>
+          {isStreaming ? (
+            <button
+              type="button"
+              className={styles.stopBtn}
+              onClick={onStop}
+              title={isStopping ? '正在停止…' : '停止当前回复'}
+              aria-label={isStopping ? '正在停止当前回复' : '停止当前回复'}
+              disabled={isStopping || !onStop}
+            >
+              <Square size={12} fill="currentColor" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className={`${styles.sendBtn} ${isSendEnabled ? styles.sendBtnActive : ''}`}
+              onClick={onSend}
+              title="发送消息 (Enter)"
+              aria-label="发送消息"
+              disabled={!isSendEnabled}
+            >
+              <ArrowUp size={16} />
+            </button>
+          )}
         </div>
       </div>
     </div>

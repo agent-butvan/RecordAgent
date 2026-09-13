@@ -4,6 +4,7 @@ import butvan.agent.agents.agent.event.AgentStreamEvent;
 import butvan.agent.agents.agent.permission.*;
 import butvan.agent.agents.agent.run.AgentRun;
 import butvan.agent.agents.agent.run.AgentRunCheckpointService;
+import butvan.agent.agents.agent.run.ActiveAgentRunRegistry;
 import butvan.agent.agents.context.ContextEnvelope;
 import butvan.agent.agents.context.ContextRequest;
 import butvan.agent.agents.context.ConversationContextAssembler;
@@ -54,6 +55,7 @@ public class AgentService {
     private final AgentRunCompleter agentRunCompleter;
     private final AgentRunCheckpointService checkpointService;
     private final ConversationContextAssembler contextAssembler;
+    private final ActiveAgentRunRegistry activeRunRegistry;
 
     /**
      * 创建一次 HTTP 流对应的队列和生产虚拟线程。
@@ -61,10 +63,21 @@ public class AgentService {
      * <p>此方法立即返回，不能在 Controller 线程中等待模型结果。</p>
      */
     public AgentStreamSession streamAgent(AgentUserCall request) {
-        AgentStreamSession streamSession = new AgentStreamSession();
-        Thread producer = Thread.startVirtualThread(() -> produceEvents(request, streamSession));
-        streamSession.bindProducer(producer);
-        return streamSession;
+        if (request == null) throw new IllegalArgumentException("聊天请求不能为空");
+        String userId = currentUserProvider.currentUserId();
+        String runId = normalizeRunId(request.runId());
+        AgentStreamSession streamSession = new AgentStreamSession(runId);
+        activeRunRegistry.register(userId, request.sessionId(), streamSession);
+        streamSession.queue().offer(new AgentStreamEvent.RunStarted(runId));
+        try {
+            Thread producer = Thread.startVirtualThread(
+                    () -> produceEvents(request, userId, streamSession));
+            streamSession.bindProducer(producer);
+            return streamSession;
+        } catch (RuntimeException exception) {
+            activeRunRegistry.unregister(userId, request.sessionId(), streamSession);
+            throw exception;
+        }
     }
 
     /**
@@ -73,11 +86,15 @@ public class AgentService {
      * @param request
      * @param streamSession
      */
-    private void produceEvents(AgentUserCall request, AgentStreamSession streamSession) {
+    private void produceEvents(AgentUserCall request, String userId, AgentStreamSession streamSession) {
         AgentRun run = null;
 
         try {
             if (request == null) throw new IllegalArgumentException("聊天请求不能为空");
+            if (streamSession.isCancelled()) {
+                streamSession.offerTerminal(new AgentStreamEvent.Cancelled(streamSession.runId()));
+                return;
+            }
             if (!modelHolder.isInitialized()) {
                 putEvent(streamSession, new AgentStreamEvent.Failed("请先完成模型配置"));
                 return;
@@ -93,10 +110,9 @@ public class AgentService {
 
             // 2. 用户消息只在初始化请求时保存一次，回复确认时不再重复保存
             String turnId = transcriptService.appendUserMessage(request.sessionId(), displayContent);
-            String userId = currentUserProvider.currentUserId();
             ContextEnvelope contextEnvelope = contextAssembler.assemble(
                     new ContextRequest(userId, displayContent));
-            RuntimeContext context = createRuntimeContext(request.sessionId());
+            RuntimeContext context = createRuntimeContext(userId, request.sessionId());
             context.put(ContextEnvelope.class, contextEnvelope);
             run = new AgentRun(request.sessionId(), userId, turnId, context);
             checkpointService.save(run);
@@ -109,7 +125,9 @@ public class AgentService {
             if (streamSession.isCancelled() || Thread.currentThread().isInterrupted()) {
                 Thread.currentThread().interrupt();
                 if (run != null) {
-                    agentRunCompleter.complete(run, TranscriptMessageDto.MessageStatus.CANCELLED);
+                    finishCancelled(run, streamSession);
+                } else {
+                    streamSession.offerTerminal(new AgentStreamEvent.Cancelled(streamSession.runId()));
                 }
                 return;
             }
@@ -125,6 +143,8 @@ public class AgentService {
                 userMessage = "该会话仍有操作等待桌面端权限确认，请现在 ButvanAgent 桌面端处理后再继续";
             }
             putEvent(streamSession, new AgentStreamEvent.Failed(userMessage));
+        } finally {
+            activeRunRegistry.unregister(userId, request.sessionId(), streamSession);
         }
     }
 
@@ -152,6 +172,8 @@ public class AgentService {
      */
     private void runAgentStream(AgentRun run, List<Msg> inputMessages, AgentStreamSession streamSession) {
         HarnessAgent agent = agentFactory.currentAgent();
+        streamSession.bindCancellationAction(
+                () -> agent.getDelegate().interrupt(run.userId(), run.sessionId()));
         ModelIdentity modelIdentity = currentModelIdentity();
         SessionPermissionMode productMode = sessionCatalogService.getPermissionMode(run.sessionId());
         agent.getDelegate().getAgentState(run.userId(), run.sessionId())
@@ -166,7 +188,7 @@ public class AgentService {
 
             // 客户端断开：立即按取消收尾
             if (streamSession.isCancelled()) {
-                agentRunCompleter.complete(run, TranscriptMessageDto.MessageStatus.CANCELLED);
+                finishCancelled(run, streamSession);
                 return;
             }
 
@@ -190,9 +212,14 @@ public class AgentService {
                 return;
             }
             if (mapped != null && !putEvent(streamSession, mapped)) {
-                agentRunCompleter.complete(run, TranscriptMessageDto.MessageStatus.CANCELLED);
+                finishCancelled(run, streamSession);
                 return;
             }
+        }
+
+        if (streamSession.isCancelled()) {
+            finishCancelled(run, streamSession);
+            return;
         }
 
         // 事件流自然结束：正常收尾
@@ -309,30 +336,55 @@ public class AgentService {
     }
 
     public AgentStreamSession resumeAgent(String sessionId, String approvalId) {
+        return resumeAgent(sessionId, approvalId, null);
+    }
+
+    /** 使用原 runId 恢复权限确认后的同一轮运行。 */
+    public AgentStreamSession resumeAgent(String sessionId, String approvalId, String requestedRunId) {
         String userId = currentUserProvider.currentUserId();
         PendingApproval approval = pendingApprovalStore.require(approvalId, userId, sessionId);
         if (!approval.allDecided()) {
             throw new IllegalArgumentException("请先逐条完成所有工具确认");
         }
 
-        AgentStreamSession streamSession = new AgentStreamSession();
-        Thread producer = Thread.startVirtualThread(() -> {
-            try {
-                runAgentStream(approval.run(),
-                        List.of(buildResumeMessage(approval.toConfirmResults())), streamSession);
-            } catch (Exception exception) {
-                log.error("恢复 Agent 流失败: sessionId={}, approvalId={}", sessionId, approvalId, exception);
-
-                agentRunCompleter.complete(approval.run(), TranscriptMessageDto.MessageStatus.FAILED);
-
-                putEvent(streamSession, new AgentStreamEvent.Failed("恢复 Agent 处理失败，请重新发起任务。"));
-            } finally {
-                // 无论恢复成功还是失败，该批次都不能再次提交。
-                pendingApprovalStore.remove(approvalId);
-            }
-        });
+        String runId = normalizeRunId(requestedRunId);
+        AgentStreamSession streamSession = new AgentStreamSession(runId);
+        activeRunRegistry.register(userId, sessionId, streamSession);
+        streamSession.queue().offer(new AgentStreamEvent.RunStarted(runId));
+        Thread producer;
+        try {
+            producer = Thread.startVirtualThread(() -> {
+                try {
+                    runAgentStream(approval.run(),
+                            List.of(buildResumeMessage(approval.toConfirmResults())), streamSession);
+                } catch (Exception exception) {
+                    if (streamSession.isCancelled() || Thread.currentThread().isInterrupted()) {
+                        Thread.currentThread().interrupt();
+                        finishCancelled(approval.run(), streamSession);
+                    } else {
+                        log.error("恢复 Agent 流失败: sessionId={}, approvalId={}", sessionId, approvalId, exception);
+                        agentRunCompleter.complete(approval.run(), TranscriptMessageDto.MessageStatus.FAILED);
+                        putEvent(streamSession, new AgentStreamEvent.Failed("恢复 Agent 处理失败，请重新发起任务。"));
+                    }
+                } finally {
+                    // 无论恢复成功还是失败，该批次都不能再次提交。
+                    pendingApprovalStore.remove(approvalId);
+                    activeRunRegistry.unregister(userId, sessionId, streamSession);
+                }
+            });
+        } catch (RuntimeException exception) {
+            activeRunRegistry.unregister(userId, sessionId, streamSession);
+            throw exception;
+        }
         streamSession.bindProducer(producer);
         return streamSession;
+    }
+
+    /** 由当前用户取消指定会话中的精确 run。 */
+    public ActiveAgentRunRegistry.CancelResult cancelRun(String sessionId, String runId) {
+        sessionCatalogService.requireActive(sessionId);
+        if (runId == null || runId.isBlank()) throw new IllegalArgumentException("runId 不能为空");
+        return activeRunRegistry.cancel(currentUserProvider.currentUserId(), sessionId, runId.strip());
     }
 
     /**
@@ -345,7 +397,7 @@ public class AgentService {
         sessionCatalogService.requireActive(sessionId);
         if (!modelHolder.isInitialized()) return "";
         HarnessAgent agent = agentFactory.currentAgent();
-        RuntimeContext context = createRuntimeContext(sessionId);
+        RuntimeContext context = createRuntimeContext(currentUserProvider.currentUserId(), sessionId);
         // 计划文件默认位于工作区 plans/PLAN.md
         String planPath = PlanModeManager.DEFAULT_PLAN_DIR + "/PLAN.md";
         return agent.getWorkspaceManager()
@@ -355,9 +407,9 @@ public class AgentService {
 
 
     /** 只在此处构造 RuntimeContext，保证所有 Agent 调用都使用同一个用户身份规则。 */
-    private RuntimeContext createRuntimeContext(String sessionId) {
+    private RuntimeContext createRuntimeContext(String userId, String sessionId) {
         return RuntimeContext.builder()
-                .userId(currentUserProvider.currentUserId())
+                .userId(userId)
                 .sessionId(sessionId)
                 .build();
     }
@@ -383,6 +435,21 @@ public class AgentService {
         return normalized;
     }
 
+    private String normalizeRunId(String runId) {
+        String normalized = runId == null || runId.isBlank()
+                ? UUID.randomUUID().toString() : runId.strip();
+        if (normalized.length() > 100 || !normalized.matches("[A-Za-z0-9_-]+")) {
+            throw new IllegalArgumentException("runId 格式不正确");
+        }
+        return normalized;
+    }
+
+    /** 先持久化 partial assistant，再将取消终态交给 SSE。 */
+    private void finishCancelled(AgentRun run, AgentStreamSession streamSession) {
+        agentRunCompleter.complete(run, TranscriptMessageDto.MessageStatus.CANCELLED);
+        streamSession.offerTerminal(new AgentStreamEvent.Cancelled(streamSession.runId()));
+    }
+
 
     /**
      * 事件入队
@@ -392,6 +459,7 @@ public class AgentService {
      * @return
      */
     private boolean putEvent(AgentStreamSession streamSession, AgentStreamEvent event) {
+        if (event.isTerminal()) return streamSession.offerTerminal(event);
         try {
             streamSession.queue().put(event);
             return true;

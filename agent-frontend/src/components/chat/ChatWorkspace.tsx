@@ -78,6 +78,8 @@ interface ChatWorkspaceProps {
   sessionUsageSummary?: TokenUsageSummary;
   isSessionLoading?: boolean;
   isSessionStreaming?: boolean;
+  isSessionStopping?: boolean;
+  onStopSession?: () => void;
   sessionLoadError?: string | null;
   onRetrySessionLoad?: () => void;
   onSendMessage: (
@@ -149,6 +151,10 @@ const AssistantMessageItem: React.FC<AssistantMessageItemProps> = ({
         msg.content && <MarkdownContent content={msg.content} />
       )}
 
+      {msg.status === 'CANCELLED' && (
+        <div className={styles.cancelledStatus} role="status">已停止生成</div>
+      )}
+
       {(msg.content || msg.usage) && (
         <div className={styles.messageFooter}>
           {/* 消息底部操作工具栏：复制、赞、踩、全屏/分享 */}
@@ -188,6 +194,8 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   sessionUsageSummary,
   isSessionLoading = false,
   isSessionStreaming = false,
+  isSessionStopping = false,
+  onStopSession,
   sessionLoadError = null,
   onRetrySessionLoad,
   onSendMessage,
@@ -832,6 +840,9 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
         value={inputPrompt}
         onValueChange={handleInputValueChange}
         onSend={handleSend}
+        onStop={onStopSession}
+        isStreaming={isSessionStreaming}
+        isStopping={isSessionStopping}
         onOpenSettings={onOpenSettings}
         permissionMode={permissionMode}
         onPermissionModeChange={onPermissionModeChange}

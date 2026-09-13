@@ -27,6 +27,7 @@ import {
   generateSessionTitle,
   fetchSessionPermissionMode,
   updateSessionPermissionMode,
+  cancelAgentChatRun,
 } from './services/api';
 import type { PermissionToolPayload } from './services/api';
 import type {
@@ -78,6 +79,19 @@ function mapTranscriptToChatMessage(dto: TranscriptMessageDto): ChatMessage {
   };
 }
 
+interface ActiveChatRun {
+  runId: string;
+  assistantMessageId: string;
+  controller: AbortController;
+}
+
+function createRunId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `run_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+}
+
 export const MainLayout: React.FC<{
   isSettingsOpen: boolean;
   setIsSettingsOpen: (open: boolean) => void;
@@ -95,6 +109,7 @@ export const MainLayout: React.FC<{
     sessionId: string;
     assistantMessageId: string;
     approvalId: string;
+    runId: string;
     tool: PermissionToolPayload;
   } | null>(null);
   const [isPermissionSubmitting, setIsPermissionSubmitting] = useState(false);
@@ -105,6 +120,8 @@ export const MainLayout: React.FC<{
   const [permissionModes, setPermissionModes] = useState<Record<string, SessionPermissionMode>>({});
   const [savingPermissionSessionId, setSavingPermissionSessionId] = useState<string | null>(null);
   const [streamingSessionIds, setStreamingSessionIds] = useState<Set<string>>(() => new Set());
+  const [stoppingSessionIds, setStoppingSessionIds] = useState<Set<string>>(() => new Set());
+  const activeChatRunsRef = useRef<Map<string, ActiveChatRun>>(new Map());
   const [sessionLoadErrors, setSessionLoadErrors] = useState<Record<string, string>>({});
   const activeSessionIdRef = useRef(activeSessionId);
 
@@ -119,6 +136,34 @@ export const MainLayout: React.FC<{
       else next.delete(sessionId);
       return next;
     });
+  }, []);
+
+  const beginChatRun = useCallback((
+    sessionId: string,
+    runId: string,
+    assistantMessageId: string,
+  ) => {
+    const controller = new AbortController();
+    activeChatRunsRef.current.set(sessionId, { runId, assistantMessageId, controller });
+    setSessionStreaming(sessionId, true);
+    return controller;
+  }, [setSessionStreaming]);
+
+  const finishChatRun = useCallback((sessionId: string, runId: string) => {
+    if (activeChatRunsRef.current.get(sessionId)?.runId !== runId) return false;
+    activeChatRunsRef.current.delete(sessionId);
+    setSessionStreaming(sessionId, false);
+    setStoppingSessionIds((previous) => {
+      const next = new Set(previous);
+      next.delete(sessionId);
+      return next;
+    });
+    return true;
+  }, [setSessionStreaming]);
+
+  useEffect(() => () => {
+    activeChatRunsRef.current.forEach((run) => run.controller.abort());
+    activeChatRunsRef.current.clear();
   }, []);
 
   const syncSessionDetail = useCallback(async (sessionId: string, generateTitle = false) => {
@@ -477,6 +522,8 @@ export const MainLayout: React.FC<{
       }
     }
 
+    if (activeChatRunsRef.current.has(currentSessionId)) return;
+
     const userMsg: ChatMessage = {
       id: String(Date.now()),
       role: 'user',
@@ -486,6 +533,7 @@ export const MainLayout: React.FC<{
 
     const startTime = Date.now();
     const assistantMsgId = String(startTime + 1);
+    const runId = createRunId();
     const assistantMsg: ChatMessage = {
       id: assistantMsgId,
       role: 'assistant',
@@ -510,16 +558,19 @@ export const MainLayout: React.FC<{
     );
 
     // 发起 SSE 流式调用，发送 content 字段
-    setSessionStreaming(currentSessionId, true);
-    streamAgentChat(
+    const controller = beginChatRun(currentSessionId, runId, assistantMsgId);
+    void streamAgentChat(
       {
+        runId,
         sessionId: currentSessionId,
         content: prompt,
         context: modelContext,
         recordReferenceIds,
         analysisContext,
+        signal: controller.signal,
       },
       (chunkText) => {
+        if (activeChatRunsRef.current.get(currentSessionId)?.runId !== runId) return;
         setSessions((prev) =>
           prev.map((s) => {
             if (s.id === currentSessionId) {
@@ -537,7 +588,7 @@ export const MainLayout: React.FC<{
         );
       },
       () => {
-        setSessionStreaming(currentSessionId, false);
+        if (!finishChatRun(currentSessionId, runId)) return;
         // 流式对话完成后同步耗时并重新刷新后端的最新详情
         setSessions((prev) =>
           prev.map((s) => {
@@ -564,7 +615,7 @@ export const MainLayout: React.FC<{
         void syncSessionDetail(currentSessionId, targetSession?.title === '新对话');
       },
       (err) => {
-        setSessionStreaming(currentSessionId, false);
+        if (!finishChatRun(currentSessionId, runId)) return;
         console.error('Session 流式对话异常:', err);
         setSessions((prev) =>
           prev.map((s) => {
@@ -587,6 +638,7 @@ export const MainLayout: React.FC<{
         );
       },
       (toolCallPayload) => {
+        if (activeChatRunsRef.current.get(currentSessionId)?.runId !== runId) return;
         setSessions((prev) =>
           prev.map((s) => {
             if (s.id === currentSessionId) {
@@ -623,6 +675,7 @@ export const MainLayout: React.FC<{
         );
       },
       (toolResultPayload) => {
+        if (activeChatRunsRef.current.get(currentSessionId)?.runId !== runId) return;
         setSessions((prev) =>
           prev.map((s) => {
             if (s.id === currentSessionId) {
@@ -659,6 +712,7 @@ export const MainLayout: React.FC<{
         );
       },
       (thinkingChunk) => {
+        if (activeChatRunsRef.current.get(currentSessionId)?.runId !== runId) return;
         setSessions((prev) =>
           prev.map((s) => {
             if (s.id === currentSessionId) {
@@ -676,16 +730,33 @@ export const MainLayout: React.FC<{
         );
       },
       (permissionPayload) => {
-        setSessionStreaming(currentSessionId, false);
+        if (!finishChatRun(currentSessionId, runId)) return;
         setPendingPermission({
           sessionId: currentSessionId,
           assistantMessageId: assistantMsgId,
           approvalId: permissionPayload.approvalId,
+          runId,
           tool: permissionPayload.tool,
         });
       },
       (progress) => {
+        if (activeChatRunsRef.current.get(currentSessionId)?.runId !== runId) return;
         appendSubagentProgress(currentSessionId, assistantMsgId, progress);
+      },
+      () => {
+        if (!finishChatRun(currentSessionId, runId)) return;
+        updateAssistantMessage(currentSessionId, assistantMsgId, (message) => ({
+          ...message,
+          status: 'CANCELLED',
+          elapsedTime: Math.max(
+            1,
+            Math.floor((Date.now() - (message.startTime || message.createdAt)) / 1000),
+          ),
+          tools: message.tools?.map((tool) => tool.status === 'running'
+            ? { ...tool, status: 'cancelled' as const }
+            : tool),
+        }));
+        void syncSessionDetail(currentSessionId);
       },
     );
   };
@@ -722,13 +793,25 @@ export const MainLayout: React.FC<{
       }
 
       setPendingPermission(null);
-      setSessionStreaming(current.sessionId, true);
+      const controller = beginChatRun(
+        current.sessionId,
+        current.runId,
+        current.assistantMessageId,
+      );
       await streamAgentChat(
-        { sessionId: current.sessionId, approvalId: current.approvalId },
-        (text) => updateAssistantMessage(current.sessionId, current.assistantMessageId,
-          (message) => ({ ...message, content: message.content + text })),
+        {
+          runId: current.runId,
+          sessionId: current.sessionId,
+          approvalId: current.approvalId,
+          signal: controller.signal,
+        },
+        (text) => {
+          if (activeChatRunsRef.current.get(current.sessionId)?.runId !== current.runId) return;
+          updateAssistantMessage(current.sessionId, current.assistantMessageId,
+            (message) => ({ ...message, content: message.content + text }));
+        },
         () => {
-          setSessionStreaming(current.sessionId, false);
+          if (!finishChatRun(current.sessionId, current.runId)) return;
           updateAssistantMessage(current.sessionId, current.assistantMessageId, (message) => ({
             ...message,
             elapsedTime: Math.max(1, Math.floor((Date.now() - (message.startTime || message.createdAt)) / 1000)),
@@ -736,37 +819,63 @@ export const MainLayout: React.FC<{
           void syncSessionDetail(current.sessionId, true);
         },
         (error) => {
-          setSessionStreaming(current.sessionId, false);
+          if (!finishChatRun(current.sessionId, current.runId)) return;
           updateAssistantMessage(current.sessionId, current.assistantMessageId,
             (message) => ({ ...message, content: message.content || `恢复任务失败：${error.message}` }));
         },
-        (tool) => updateAssistantMessage(current.sessionId, current.assistantMessageId, (message) => ({
-          ...message,
-          tools: [...(message.tools || []), {
-            toolCallId: tool.toolCallId || `tool_${Date.now()}`,
-            toolName: tool.toolName || 'tool', command: tool.command || '', status: 'running',
-          }],
-        })),
-        (result) => updateAssistantMessage(current.sessionId, current.assistantMessageId, (message) => ({
-          ...message,
-          tools: (message.tools || []).map((tool) => tool.toolCallId === result.toolCallId
-            ? { ...tool, status: 'completed', output: (tool.output || '') + (result.result || '') }
-            : tool),
-        })),
-        (thinking) => updateAssistantMessage(current.sessionId, current.assistantMessageId,
-          (message) => ({ ...message, reasoning: (message.reasoning || '') + thinking })),
+        (tool) => {
+          if (activeChatRunsRef.current.get(current.sessionId)?.runId !== current.runId) return;
+          updateAssistantMessage(current.sessionId, current.assistantMessageId, (message) => ({
+            ...message,
+            tools: [...(message.tools || []), {
+              toolCallId: tool.toolCallId || `tool_${Date.now()}`,
+              toolName: tool.toolName || 'tool', command: tool.command || '', status: 'running',
+            }],
+          }));
+        },
+        (result) => {
+          if (activeChatRunsRef.current.get(current.sessionId)?.runId !== current.runId) return;
+          updateAssistantMessage(current.sessionId, current.assistantMessageId, (message) => ({
+            ...message,
+            tools: (message.tools || []).map((tool) => tool.toolCallId === result.toolCallId
+              ? { ...tool, status: 'completed', output: (tool.output || '') + (result.result || '') }
+              : tool),
+          }));
+        },
+        (thinking) => {
+          if (activeChatRunsRef.current.get(current.sessionId)?.runId !== current.runId) return;
+          updateAssistantMessage(current.sessionId, current.assistantMessageId,
+            (message) => ({ ...message, reasoning: (message.reasoning || '') + thinking }));
+        },
         (permissionPayload) => {
-          setSessionStreaming(current.sessionId, false);
+          if (!finishChatRun(current.sessionId, current.runId)) return;
           setPendingPermission({
             sessionId: current.sessionId,
             assistantMessageId: current.assistantMessageId,
             approvalId: permissionPayload.approvalId,
+            runId: current.runId,
             tool: permissionPayload.tool,
           });
         },
         (progress) => {
+          if (activeChatRunsRef.current.get(current.sessionId)?.runId !== current.runId) return;
           appendSubagentProgress(current.sessionId, current.assistantMessageId, progress);
           void refreshSubagentTasks(current.sessionId);
+        },
+        () => {
+          if (!finishChatRun(current.sessionId, current.runId)) return;
+          updateAssistantMessage(current.sessionId, current.assistantMessageId, (message) => ({
+            ...message,
+            status: 'CANCELLED',
+            elapsedTime: Math.max(
+              1,
+              Math.floor((Date.now() - (message.startTime || message.createdAt)) / 1000),
+            ),
+            tools: message.tools?.map((tool) => tool.status === 'running'
+              ? { ...tool, status: 'cancelled' as const }
+              : tool),
+          }));
+          void syncSessionDetail(current.sessionId);
         },
       );
     } catch {
@@ -776,6 +885,29 @@ export const MainLayout: React.FC<{
       }));
     } finally {
       setIsPermissionSubmitting(false);
+    }
+  };
+
+  const handleStopAgentRun = async () => {
+    if (!activeSessionId || stoppingSessionIds.has(activeSessionId)) return;
+    const activeRun = activeChatRunsRef.current.get(activeSessionId);
+    if (!activeRun) return;
+    const sessionId = activeSessionId;
+    setStoppingSessionIds((previous) => new Set(previous).add(sessionId));
+    try {
+      const result = await cancelAgentChatRun(sessionId, activeRun.runId);
+      if (result.status === 'NOT_FOUND') {
+        activeRun.controller.abort();
+        finishChatRun(sessionId, activeRun.runId);
+        await syncSessionDetail(sessionId);
+      }
+    } catch (error) {
+      setStoppingSessionIds((previous) => {
+        const next = new Set(previous);
+        next.delete(sessionId);
+        return next;
+      });
+      showMessage('error', error instanceof Error ? error.message : '停止请求失败，请重试。');
     }
   };
 
@@ -818,6 +950,8 @@ export const MainLayout: React.FC<{
               sessionUsageSummary={activeSession?.usageSummary}
               isSessionLoading={Boolean(activeSession && !activeSession.isLoaded && !activeSessionLoadError)}
               isSessionStreaming={streamingSessionIds.has(activeSessionId)}
+              isSessionStopping={stoppingSessionIds.has(activeSessionId)}
+              onStopSession={handleStopAgentRun}
               sessionLoadError={activeSessionLoadError}
               onRetrySessionLoad={() => {
                 if (activeSessionId) void syncSessionDetail(activeSessionId);

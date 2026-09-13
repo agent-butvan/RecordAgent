@@ -25,7 +25,8 @@ public class AgentChatContextService {
         if (request == null) throw new IllegalArgumentException("聊天请求不能为空");
         List<String> referenceIds = normalizedReferenceIds(request.recordReferenceIds());
         if (referenceIds.isEmpty()) {
-            return new AgentUserCall(request.sessionId(), request.content(), request.context());
+            return new AgentUserCall(
+                    request.sessionId(), request.content(), request.context(), List.of(), request.runId());
         }
 
         String question = request.context() == null || request.context().isBlank()
@@ -60,7 +61,8 @@ public class AgentChatContextService {
             expanded.append("\n--- 资料正文结束 ---\n\n");
         }
         expanded.append("用户问题：").append(question);
-        return new AgentUserCall(request.sessionId(), request.content(), expanded.toString(), ragContexts);
+        return new AgentUserCall(
+                request.sessionId(), request.content(), expanded.toString(), ragContexts, request.runId());
     }
 
     private List<String> normalizedReferenceIds(List<String> values) {

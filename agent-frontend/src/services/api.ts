@@ -272,12 +272,14 @@ export async function submitPermissionDecision(params: {
  */
 export async function streamAgentChat(
   params: {
+    runId: string;
     sessionId: string;
     content?: string;
     context?: string;
     recordReferenceIds?: string[];
     analysisContext?: AgentAnalysisContextRequest;
     approvalId?: string;
+    signal?: AbortSignal;
   },
   onChunk: (text: string) => void,
   onComplete?: () => void,
@@ -286,7 +288,8 @@ export async function streamAgentChat(
   onToolResult?: (payload: ToolResultPayload) => void,
   onThinking?: (thinkingText: string) => void,
   onPermissionRequired?: (payload: PermissionRequiredPayload) => void,
-  onSubagentProgress?: (payload: SubagentProgressDto) => void
+  onSubagentProgress?: (payload: SubagentProgressDto) => void,
+  onCancelled?: () => void
 ): Promise<void> {
   try {
     const payloadContent = params.content || params.context || '';
@@ -299,9 +302,11 @@ export async function streamAgentChat(
       headers: {
         'Content-Type': 'application/json',
       },
+        signal: params.signal,
         body: JSON.stringify(isResume
-          ? { sessionId: params.sessionId, approvalId: params.approvalId }
+          ? { sessionId: params.sessionId, approvalId: params.approvalId, runId: params.runId }
           : {
+              runId: params.runId,
               sessionId: params.sessionId,
               context: modelContext,
               content: payloadContent,
@@ -374,6 +379,9 @@ export async function streamAgentChat(
       } else if (eventName === 'error') {
         streamFinished = true;
         onError?.(new Error(dataStr || 'Agent 流式处理失败'));
+      } else if (eventName === 'cancelled') {
+        streamFinished = true;
+        onCancelled?.();
       } else if (eventName === 'done') {
         streamFinished = true;
         onComplete?.();
@@ -397,9 +405,30 @@ export async function streamAgentChat(
       }
     }
   } catch (error: unknown) {
+    if (error instanceof DOMException && error.name === 'AbortError') return;
     console.error('SSE 流数据解析失败:', error);
     onError?.(error instanceof Error ? error : new Error('SSE 流数据解析失败'));
   }
+}
+
+export interface AgentRunCancelResponse {
+  runId: string;
+  accepted: boolean;
+  status: 'CANCELLING' | 'NOT_FOUND';
+}
+
+/** 请求后端停止精确的 Agent run；最终结果以 SSE 终态为准。 */
+export async function cancelAgentChatRun(
+  sessionId: string,
+  runId: string,
+): Promise<AgentRunCancelResponse> {
+  const response = await fetch(`${apiBaseUrl}/agent/chat/runs/${encodeURIComponent(runId)}/cancel`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId }),
+  });
+  if (!response.ok) throw new Error(`停止请求失败（${response.status}）`);
+  return response.json() as Promise<AgentRunCancelResponse>;
 }
 
 /**
