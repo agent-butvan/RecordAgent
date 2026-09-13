@@ -391,8 +391,11 @@ export async function streamAgentChat(
     while (true) {
       const { done, value } = await reader.read();
       if (done) {
+        buffer += decoder.decode();
         if (buffer.trim()) dispatchSseEvent(buffer);
-        if (!streamFinished) onComplete?.();
+        if (!streamFinished) {
+          onError?.(new Error('Agent 流连接意外结束，未收到终态，请重试。'));
+        }
         break;
       }
 

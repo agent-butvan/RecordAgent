@@ -41,6 +41,22 @@ public class AgentRunCompleter {
         }
     }
 
+    /**
+     * 尝试写入终态，避免存储故障逃出异步生产线程。
+     *
+     * @return transcript 已存在或本次成功写入时返回 {@code true}
+     */
+    public boolean tryComplete(AgentRun run, TranscriptMessageDto.MessageStatus status) {
+        try {
+            complete(run, status);
+            return true;
+        } catch (RuntimeException exception) {
+            log.error("Agent 终态持久化失败：sessionId={}, turnId={}, status={}",
+                    run.sessionId(), run.turnId(), status, exception);
+            return false;
+        }
+    }
+
     private void completeInternal(AgentRun run, TranscriptMessageDto.MessageStatus status) {
         if (!run.beginCompletion()) return;
 
@@ -72,7 +88,12 @@ public class AgentRunCompleter {
             log.warn("清理已完成 Agent 运行检查点失败：turnId={}", run.turnId(), exception);
         }
 
-        // 侧边栏预览仍只使用最终正文
-        sessionCatalogService.touch(run.sessionId(), run.contentAsString());
+        // transcript 已是权威终态；目录册预览刷新失败不能推翻已完成状态。
+        try {
+            sessionCatalogService.touch(run.sessionId(), run.contentAsString());
+        } catch (RuntimeException exception) {
+            log.warn("刷新已完成 Agent 运行的会话摘要失败：sessionId={}, turnId={}",
+                    run.sessionId(), run.turnId(), exception);
+        }
     }
 }

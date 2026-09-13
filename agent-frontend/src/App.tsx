@@ -85,6 +85,26 @@ interface ActiveChatRun {
   controller: AbortController;
 }
 
+function markAssistantTerminal(
+  message: ChatMessage,
+  status: 'FAILED' | 'CANCELLED',
+  failureReason?: string,
+): ChatMessage {
+  const toolStatus = status === 'CANCELLED' ? 'cancelled' as const : 'failed' as const;
+  return {
+    ...message,
+    status,
+    failureReason: status === 'FAILED' ? failureReason : undefined,
+    elapsedTime: Math.max(
+      1,
+      Math.floor((Date.now() - (message.startTime || message.createdAt)) / 1000),
+    ),
+    tools: message.tools?.map((tool) => tool.status === 'running'
+      ? { ...tool, status: toolStatus }
+      : tool),
+  };
+}
+
 function createRunId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
@@ -179,7 +199,7 @@ export const MainLayout: React.FC<{
         ...previous,
         [sessionId]: '聊天记录读取失败，请检查网络连接后重试。',
       }));
-      return;
+      return false;
     }
     const hasUserMessage = detail.messages.some((message) => message.role === 'USER');
     if (detail.summary.title === '新对话' && (generateTitle || hasUserMessage)) {
@@ -190,7 +210,7 @@ export const MainLayout: React.FC<{
           ...previous,
           [sessionId]: '聊天记录读取失败，请检查网络连接后重试。',
         }));
-        return;
+        return false;
       }
     }
     const messages = detail.messages.map(mapTranscriptToChatMessage);
@@ -204,6 +224,7 @@ export const MainLayout: React.FC<{
           isLoaded: true,
         }
       : session));
+    return true;
   }, []);
 
   const refreshSubagentTasks = useCallback(async (sessionId = activeSessionId) => {
@@ -623,13 +644,9 @@ export const MainLayout: React.FC<{
               return {
                 ...s,
                 messages: s.messages.map((msg) =>
-                  msg.id === assistantMsgId && !msg.content
-                    ? {
-                        ...msg,
-                        content:
-                          '连接 Agent 对话服务失败或发生错误，请检查后端服务状态与 API Key 配置。',
-                      }
-                    : msg
+                  msg.id === assistantMsgId
+                    ? markAssistantTerminal(msg, 'FAILED', err.message)
+                    : msg,
                 ),
               };
             }
@@ -745,17 +762,8 @@ export const MainLayout: React.FC<{
       },
       () => {
         if (!finishChatRun(currentSessionId, runId)) return;
-        updateAssistantMessage(currentSessionId, assistantMsgId, (message) => ({
-          ...message,
-          status: 'CANCELLED',
-          elapsedTime: Math.max(
-            1,
-            Math.floor((Date.now() - (message.startTime || message.createdAt)) / 1000),
-          ),
-          tools: message.tools?.map((tool) => tool.status === 'running'
-            ? { ...tool, status: 'cancelled' as const }
-            : tool),
-        }));
+        updateAssistantMessage(currentSessionId, assistantMsgId,
+          (message) => markAssistantTerminal(message, 'CANCELLED'));
         void syncSessionDetail(currentSessionId);
       },
     );
@@ -821,7 +829,7 @@ export const MainLayout: React.FC<{
         (error) => {
           if (!finishChatRun(current.sessionId, current.runId)) return;
           updateAssistantMessage(current.sessionId, current.assistantMessageId,
-            (message) => ({ ...message, content: message.content || `恢复任务失败：${error.message}` }));
+            (message) => markAssistantTerminal(message, 'FAILED', `恢复任务失败：${error.message}`));
         },
         (tool) => {
           if (activeChatRunsRef.current.get(current.sessionId)?.runId !== current.runId) return;
@@ -864,17 +872,8 @@ export const MainLayout: React.FC<{
         },
         () => {
           if (!finishChatRun(current.sessionId, current.runId)) return;
-          updateAssistantMessage(current.sessionId, current.assistantMessageId, (message) => ({
-            ...message,
-            status: 'CANCELLED',
-            elapsedTime: Math.max(
-              1,
-              Math.floor((Date.now() - (message.startTime || message.createdAt)) / 1000),
-            ),
-            tools: message.tools?.map((tool) => tool.status === 'running'
-              ? { ...tool, status: 'cancelled' as const }
-              : tool),
-          }));
+          updateAssistantMessage(current.sessionId, current.assistantMessageId,
+            (message) => markAssistantTerminal(message, 'CANCELLED'));
           void syncSessionDetail(current.sessionId);
         },
       );
@@ -899,7 +898,15 @@ export const MainLayout: React.FC<{
       if (result.status === 'NOT_FOUND') {
         activeRun.controller.abort();
         finishChatRun(sessionId, activeRun.runId);
-        await syncSessionDetail(sessionId);
+        const reconciled = await syncSessionDetail(sessionId);
+        if (!reconciled) {
+          updateAssistantMessage(sessionId, activeRun.assistantMessageId,
+            (message) => markAssistantTerminal(
+              message,
+              'FAILED',
+              '未找到对应的 Agent 运行，且聊天记录同步失败，请重新发送。',
+            ));
+        }
       }
     } catch (error) {
       setStoppingSessionIds((previous) => {

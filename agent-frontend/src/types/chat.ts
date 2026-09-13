@@ -158,6 +158,7 @@ export interface ChatMessage {
   startTime?: number;
   elapsedTime?: number;
   status?: MessageStatus;
+  failureReason?: string;
   usage?: TurnTokenUsage | null;
   tools?: ToolExecution[];
   subagentProgress?: SubagentProgressDto[];

@@ -44,6 +44,9 @@ public final class AgentStreamSession {
     /** AgentScope 原生中断动作，在 Agent 实例确定后绑定。 */
     private volatile Runnable cancellationAction;
 
+    /** 原生中断动作最多执行一次，避免重复停止产生额外副作用。 */
+    private final AtomicBoolean cancellationActionInvoked = new AtomicBoolean(false);
+
     public AgentStreamSession(String runId) {
         if (runId == null || runId.isBlank()) throw new IllegalArgumentException("runId 不能为空");
         this.runId = runId;
@@ -70,13 +73,15 @@ public final class AgentStreamSession {
      */
     public void bindProducer(Thread producerThread) {
         this.producerThread = producerThread;
-        if (cancellationRequested.get()) producerThread.interrupt();
+        if (cancellationRequested.get() && cancellationActionInvoked.get()) {
+            producerThread.interrupt();
+        }
     }
 
     /** 绑定框架级取消动作，并处理“先取消、后绑定”竞态。 */
     public void bindCancellationAction(Runnable cancellationAction) {
         this.cancellationAction = cancellationAction;
-        if (cancellationRequested.get()) invokeCancellationAction();
+        if (cancellationRequested.get()) triggerBoundCancellation();
     }
 
     /**
@@ -93,11 +98,7 @@ public final class AgentStreamSession {
      */
     public boolean requestCancellation() {
         boolean accepted = cancellationRequested.compareAndSet(false, true);
-        if (accepted) {
-            invokeCancellationAction();
-            Thread producer = producerThread;
-            if (producer != null) producer.interrupt();
-        }
+        if (accepted) triggerBoundCancellation();
         return accepted;
     }
 
@@ -121,13 +122,17 @@ public final class AgentStreamSession {
         return queue.offer(event);
     }
 
-    private void invokeCancellationAction() {
+    /** 只在 AgentScope 已绑定后中断运行，避免取消信号打断初始化阶段的 transcript I/O。 */
+    private void triggerBoundCancellation() {
         Runnable action = cancellationAction;
         if (action == null) return;
+        if (!cancellationActionInvoked.compareAndSet(false, true)) return;
         try {
             action.run();
         } catch (RuntimeException exception) {
             log.warn("AgentScope 运行中断失败：runId={}", runId, exception);
         }
+        Thread producer = producerThread;
+        if (producer != null) producer.interrupt();
     }
 }

@@ -39,6 +39,7 @@ class ActiveAgentRunRegistryTest {
 
         registry.unregister("user-1", "session-1", first);
         registry.register("user-1", "session-1", second);
+        registry.unregister("user-1", "session-1", first);
         assertTrue(registry.cancel("user-1", "session-1", "run-2").accepted());
     }
 }

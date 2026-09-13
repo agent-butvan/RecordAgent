@@ -151,8 +151,15 @@ const AssistantMessageItem: React.FC<AssistantMessageItemProps> = ({
         msg.content && <MarkdownContent content={msg.content} />
       )}
 
-      {msg.status === 'CANCELLED' && (
-        <div className={styles.cancelledStatus} role="status">已停止生成</div>
+      {(msg.status === 'CANCELLED' || msg.status === 'FAILED') && (
+        <div
+          className={`${styles.terminalStatus} ${msg.status === 'FAILED' ? styles.failedStatus : ''}`}
+          role={msg.status === 'FAILED' ? 'alert' : 'status'}
+        >
+          {msg.status === 'CANCELLED'
+            ? '已停止生成'
+            : (msg.failureReason || '生成失败，请重试。')}
+        </div>
       )}
 
       {(msg.content || msg.usage) && (

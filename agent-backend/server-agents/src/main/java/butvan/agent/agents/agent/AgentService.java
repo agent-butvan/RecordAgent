@@ -91,10 +91,6 @@ public class AgentService {
 
         try {
             if (request == null) throw new IllegalArgumentException("聊天请求不能为空");
-            if (streamSession.isCancelled()) {
-                streamSession.offerTerminal(new AgentStreamEvent.Cancelled(streamSession.runId()));
-                return;
-            }
             if (!modelHolder.isInitialized()) {
                 putEvent(streamSession, new AgentStreamEvent.Failed("请先完成模型配置"));
                 return;
@@ -117,6 +113,12 @@ public class AgentService {
             run = new AgentRun(request.sessionId(), userId, turnId, context);
             checkpointService.save(run);
 
+            // 首 token 前收到停止请求时，也要保留用户消息和 CANCELLED assistant 终态。
+            if (streamSession.isCancelled()) {
+                finishCancelled(run, streamSession);
+                return;
+            }
+
             // 3. 初始调用将用户消息交给 AgentScope；后续回复会传入确认消息
             runAgentStream(run,
                     List.of(run.currentUserMessage(input, request.ragContexts())), streamSession);
@@ -135,12 +137,13 @@ public class AgentService {
             // 处理失败：按照失败收尾并回传安全错误文案
             String sessionId = request == null ? null : request.sessionId();
             log.error("Agent 流处理失败：sessionId={}",sessionId,e);
-            if (run != null) {
-                agentRunCompleter.complete(run, TranscriptMessageDto.MessageStatus.FAILED);
-            }
             String userMessage = e instanceof IllegalArgumentException ? e.getMessage() : "Agent处理失败，请稍后重试";
             if (run != null && isWaitingForPermission(run, e)) {
                 userMessage = "该会话仍有操作等待桌面端权限确认，请现在 ButvanAgent 桌面端处理后再继续";
+            }
+            if (run != null && !agentRunCompleter.tryComplete(
+                    run, TranscriptMessageDto.MessageStatus.FAILED)) {
+                userMessage = terminalPersistenceFailureMessage(false);
             }
             putEvent(streamSession, new AgentStreamEvent.Failed(userMessage));
         } finally {
@@ -207,8 +210,12 @@ public class AgentService {
             }
             if (mapped != null && mapped.isTerminal()) {
                 // 先持久化再发送终态，确保前端收到 done 后能立即读取完整消息与 usage。
-                agentRunCompleter.complete(run, TranscriptMessageDto.MessageStatus.COMPLETED);
-                putEvent(streamSession, mapped);
+                if (agentRunCompleter.tryComplete(run, TranscriptMessageDto.MessageStatus.COMPLETED)) {
+                    putEvent(streamSession, mapped);
+                } else {
+                    putEvent(streamSession,
+                            new AgentStreamEvent.Failed(terminalPersistenceFailureMessage(false)));
+                }
                 return;
             }
             if (mapped != null && !putEvent(streamSession, mapped)) {
@@ -223,8 +230,12 @@ public class AgentService {
         }
 
         // 事件流自然结束：正常收尾
-        agentRunCompleter.complete(run, TranscriptMessageDto.MessageStatus.COMPLETED);
-        putEvent(streamSession, new AgentStreamEvent.Completed());
+        if (agentRunCompleter.tryComplete(run, TranscriptMessageDto.MessageStatus.COMPLETED)) {
+            putEvent(streamSession, new AgentStreamEvent.Completed());
+        } else {
+            putEvent(streamSession,
+                    new AgentStreamEvent.Failed(terminalPersistenceFailureMessage(false)));
+        }
     }
 
     /** 将产品文案稳定映射到 AgentScope 的运行模式。 */
@@ -363,8 +374,11 @@ public class AgentService {
                         finishCancelled(approval.run(), streamSession);
                     } else {
                         log.error("恢复 Agent 流失败: sessionId={}, approvalId={}", sessionId, approvalId, exception);
-                        agentRunCompleter.complete(approval.run(), TranscriptMessageDto.MessageStatus.FAILED);
-                        putEvent(streamSession, new AgentStreamEvent.Failed("恢复 Agent 处理失败，请重新发起任务。"));
+                        String message = agentRunCompleter.tryComplete(
+                                approval.run(), TranscriptMessageDto.MessageStatus.FAILED)
+                                ? "恢复 Agent 处理失败，请重新发起任务。"
+                                : terminalPersistenceFailureMessage(false);
+                        putEvent(streamSession, new AgentStreamEvent.Failed(message));
                     }
                 } finally {
                     // 无论恢复成功还是失败，该批次都不能再次提交。
@@ -384,7 +398,11 @@ public class AgentService {
     public ActiveAgentRunRegistry.CancelResult cancelRun(String sessionId, String runId) {
         sessionCatalogService.requireActive(sessionId);
         if (runId == null || runId.isBlank()) throw new IllegalArgumentException("runId 不能为空");
-        return activeRunRegistry.cancel(currentUserProvider.currentUserId(), sessionId, runId.strip());
+        String normalizedRunId = runId.strip();
+        if (normalizedRunId.length() > 100 || !normalizedRunId.matches("[A-Za-z0-9_-]+")) {
+            throw new IllegalArgumentException("runId 格式不正确");
+        }
+        return activeRunRegistry.cancel(currentUserProvider.currentUserId(), sessionId, normalizedRunId);
     }
 
     /**
@@ -450,11 +468,21 @@ public class AgentService {
         // 取消只应终止模型/工具，不应打断最后一次 transcript 收尾。
         boolean interrupted = Thread.interrupted();
         try {
-            agentRunCompleter.complete(run, TranscriptMessageDto.MessageStatus.CANCELLED);
+            if (agentRunCompleter.tryComplete(run, TranscriptMessageDto.MessageStatus.CANCELLED)) {
+                streamSession.offerTerminal(new AgentStreamEvent.Cancelled(streamSession.runId()));
+            } else {
+                streamSession.offerTerminal(
+                        new AgentStreamEvent.Failed(terminalPersistenceFailureMessage(true)));
+            }
         } finally {
-            streamSession.offerTerminal(new AgentStreamEvent.Cancelled(streamSession.runId()));
             if (interrupted) Thread.currentThread().interrupt();
         }
+    }
+
+    private String terminalPersistenceFailureMessage(boolean stopped) {
+        return stopped
+                ? "Agent 已停止，但聊天记录保存失败。请检查磁盘空间与数据目录权限后重试。"
+                : "Agent 已结束，但聊天记录保存失败。请检查磁盘空间与数据目录权限后重试。";
     }
 
 
