@@ -1,5 +1,6 @@
 package butvan.agent.agents.agent;
 
+import butvan.agent.agents.context.ContextInjectionMiddleware;
 import butvan.agent.agents.model.ModelHolder;
 import butvan.agent.agents.security.AgentSecurity;
 import butvan.agent.agents.storage.AgentStorageProperties;
@@ -59,12 +60,18 @@ class AgentFactoryTest {
                 null,
                 null,
                 subagentCatalog,
-                new TokenUsageMiddleware(new ApproximateTokenCounter(), new ObjectMapper())
+                new TokenUsageMiddleware(new ApproximateTokenCounter(), new ObjectMapper()),
+                new ContextInjectionMiddleware()
         );
 
         try (HarnessAgent agent = factory.currentAgent()) {
             assertTrue(agent.getDelegate().getMiddlewares().stream()
                     .noneMatch(WorkspaceContextMiddleware.class::isInstance));
+            List<Class<?>> middlewareOrder = agent.getDelegate().getMiddlewares().stream()
+                    .map(Object::getClass).toList();
+            assertTrue(middlewareOrder.indexOf(ContextInjectionMiddleware.class)
+                            < middlewareOrder.indexOf(TokenUsageMiddleware.class),
+                    "上下文注入必须先于 Token 计数，使归因看到最终模型输入");
             assertEquals(List.of("reset_equipped_tools"), agent.getToolkit().getToolSchemas().stream()
                     .map(ToolSchema::getName).toList());
             assertTrue(schemaTokens(agent.getToolkit().getToolSchemas()) < 800,

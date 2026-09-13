@@ -1,5 +1,6 @@
 package butvan.agent.agents.usage;
 
+import butvan.agent.agents.context.ContextInjectionMiddleware;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.AgentEvent;
@@ -213,6 +214,37 @@ class TokenUsageMiddlewareTest {
         assertAll(
                 () -> assertEquals(11, accumulator.snapshot().breakdown().ragContextTokens()),
                 () -> assertEquals(11, accumulator.snapshot().breakdown().currentUserTokens())
+        );
+    }
+
+    @Test
+    void attributesSyntheticManagedContextWithoutTreatingItAsHistory() {
+        TokenUsageMiddleware middleware = new TokenUsageMiddleware(
+                new LengthTokenCounter(), new ObjectMapper());
+        TurnUsageAccumulator accumulator = new TurnUsageAccumulator();
+        RuntimeContext context = RuntimeContext.builder()
+                .put(TurnUsageAccumulator.class, accumulator)
+                .put(TokenUsageRoundContext.class, new TokenUsageRoundContext("turn-current"))
+                .build();
+        var managedContext = UserMessage.builder().textContent("profile-memory")
+                .metadata(Map.of(ContextInjectionMiddleware.CONTEXT_METADATA_KEY, true))
+                .build();
+        var currentUser = UserMessage.builder().textContent("question")
+                .metadata(Map.of(TokenUsageRoundContext.TURN_METADATA_KEY, "turn-current"))
+                .build();
+
+        middleware.onModelCall(null, context,
+                new ModelCallInput(List.of(managedContext, currentUser), List.of(), null, null),
+                ignored -> Flux.just(
+                        new ModelCallStartEvent("call-context"),
+                        new ModelCallEndEvent("call-context", ChatUsage.builder()
+                                .inputTokens(22).outputTokens(1).build())))
+                .collectList().block();
+
+        assertAll(
+                () -> assertEquals(14, accumulator.snapshot().breakdown().ragContextTokens()),
+                () -> assertEquals(8, accumulator.snapshot().breakdown().currentUserTokens()),
+                () -> assertEquals(0, accumulator.snapshot().breakdown().historyTokens())
         );
     }
 

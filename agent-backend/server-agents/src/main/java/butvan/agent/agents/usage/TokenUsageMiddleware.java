@@ -1,5 +1,6 @@
 package butvan.agent.agents.usage;
 
+import butvan.agent.agents.context.ContextInjectionMiddleware;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agentscope.core.agent.Agent;
@@ -92,6 +93,10 @@ public class TokenUsageMiddleware implements MiddlewareBase {
         for (int index = 0; index < messages.size(); index++) {
             Msg message = messages.get(index);
             if (message == null) continue;
+            if (isManagedContext(message)) {
+                ragContext += countBlocks(message.getContent());
+                continue;
+            }
             if (message.getRole() == MsgRole.SYSTEM) {
                 system += countBlocks(message.getContent());
                 continue;
@@ -142,6 +147,12 @@ public class TokenUsageMiddleware implements MiddlewareBase {
             if (turnId.equals(message.getMetadata().get(TokenUsageRoundContext.TURN_METADATA_KEY))) return index;
         }
         return -1;
+    }
+
+    private boolean isManagedContext(Msg message) {
+        return message.getMetadata() != null
+                && Boolean.TRUE.equals(message.getMetadata().get(
+                        ContextInjectionMiddleware.CONTEXT_METADATA_KEY));
     }
 
     private int countSchema(ToolSchema schema) {

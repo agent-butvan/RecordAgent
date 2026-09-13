@@ -1,5 +1,6 @@
 package butvan.agent.agents.agent;
 
+import butvan.agent.agents.context.ContextInjectionMiddleware;
 import butvan.agent.agents.model.ModelHolder;
 import butvan.agent.agents.prompts.PromptBuilder;
 import butvan.agent.agents.security.AgentSecurity;
@@ -40,6 +41,7 @@ public class AgentFactory {
     private final MessageBus subagentMessageBus;
     private final SubagentCatalog subagentCatalog;
     private final TokenUsageMiddleware tokenUsageMiddleware;
+    private final ContextInjectionMiddleware contextInjectionMiddleware;
 
     private final PermissionChecker permissionChecker = new PermissionChecker(
             PermissionMode.DEFAULT,
@@ -86,6 +88,7 @@ public class AgentFactory {
                 .name("butvan_agent")
                 .sysPrompt(systemPrompt)
                 .model(model)
+                .middleware(contextInjectionMiddleware)
                 .middleware(tokenUsageMiddleware)
                 .enablePlanMode() // 开启计划模式
                 .planFileDirectory("plans")

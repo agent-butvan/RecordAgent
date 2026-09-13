@@ -4,6 +4,9 @@ import butvan.agent.agents.agent.event.AgentStreamEvent;
 import butvan.agent.agents.agent.permission.*;
 import butvan.agent.agents.agent.run.AgentRun;
 import butvan.agent.agents.agent.run.AgentRunCheckpointService;
+import butvan.agent.agents.context.ContextEnvelope;
+import butvan.agent.agents.context.ContextRequest;
+import butvan.agent.agents.context.ConversationContextAssembler;
 import butvan.agent.agents.identity.CurrentUserProvider;
 import butvan.agent.agents.model.ModelHolder;
 import butvan.agent.agents.model.ModelSelector;
@@ -50,6 +53,7 @@ public class AgentService {
     private final AgentSecurity agentSecurity;
     private final AgentRunCompleter agentRunCompleter;
     private final AgentRunCheckpointService checkpointService;
+    private final ConversationContextAssembler contextAssembler;
 
     /**
      * 创建一次 HTTP 流对应的队列和生产虚拟线程。
@@ -90,12 +94,16 @@ public class AgentService {
             // 2. 用户消息只在初始化请求时保存一次，回复确认时不再重复保存
             String turnId = transcriptService.appendUserMessage(request.sessionId(), displayContent);
             String userId = currentUserProvider.currentUserId();
+            ContextEnvelope contextEnvelope = contextAssembler.assemble(
+                    new ContextRequest(userId, displayContent));
             RuntimeContext context = createRuntimeContext(request.sessionId());
+            context.put(ContextEnvelope.class, contextEnvelope);
             run = new AgentRun(request.sessionId(), userId, turnId, context);
             checkpointService.save(run);
 
             // 3. 初始调用将用户消息交给 AgentScope；后续回复会传入确认消息
-            runAgentStream(run, List.of(run.currentUserMessage(input, request.ragContexts())), streamSession);
+            runAgentStream(run,
+                    List.of(run.currentUserMessage(input, request.ragContexts())), streamSession);
         } catch (Exception e) {
             // 客户端已断开，按照取消收尾
             if (streamSession.isCancelled() || Thread.currentThread().isInterrupted()) {
