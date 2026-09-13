@@ -1,0 +1,142 @@
+.provider {
+  width: 100%;
+}
+
+.view {
+  width: 100%;
+  padding: 5px 0 12px;
+}
+
+.node {
+  min-width: 0;
+}
+
+.trigger {
+  position: relative;
+  width: calc(100% - 12px);
+  min-width: 0;
+  min-height: 29px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 1px 6px;
+  padding-top: 3px;
+  padding-right: 9px;
+  padding-bottom: 3px;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.trigger:hover {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+}
+
+.trigger:focus-visible {
+  outline: 1px solid var(--border-focus);
+  outline-offset: -1px;
+}
+
+.selected {
+  background: #eef4ff;
+  color: #1e3a5f;
+}
+
+.selected:hover {
+  background: #e8f0fd;
+}
+
+.lines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.ancestorLine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid #e4e8ed;
+}
+
+.branchLine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid #e4e8ed;
+}
+
+.branchLine::after {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  border-top: 1px solid #e4e8ed;
+  content: '';
+}
+
+.branchLineLast {
+  bottom: 50%;
+}
+
+.content {
+  overflow: hidden;
+}
+
+.expander {
+  width: 14px;
+  height: 16px;
+  display: inline-flex;
+  flex: 0 0 14px;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+}
+
+.chevron {
+  transition: transform var(--transition-fast);
+}
+
+.chevronOpen {
+  transform: rotate(90deg);
+}
+
+.icon {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  flex: 0 0 16px;
+  align-items: center;
+  justify-content: center;
+  color: #8a929e;
+}
+
+.folderIcon {
+  color: #4776aa;
+}
+
+.label {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trigger,
+  .chevron {
+    transition: none;
+  }
+}
