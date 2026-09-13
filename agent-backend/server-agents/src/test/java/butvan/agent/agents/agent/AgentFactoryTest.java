@@ -2,7 +2,11 @@ package butvan.agent.agents.agent;
 
 import butvan.agent.agents.context.ContextInjectionMiddleware;
 import butvan.agent.agents.model.ModelHolder;
-import butvan.agent.agents.security.AgentSecurity;
+import butvan.agent.agents.identity.CurrentUserProvider;
+import butvan.agent.agents.project.ProjectRegistry;
+import butvan.agent.agents.session.SessionCatalogService;
+import butvan.agent.agents.session.dto.CreateSessionRequest;
+import butvan.agent.agents.session.dto.SessionKind;
 import butvan.agent.agents.storage.AgentStorageProperties;
 import butvan.agent.agents.subagent.AgentDefinitionLoader;
 import butvan.agent.agents.subagent.SubagentCatalog;
@@ -23,9 +27,12 @@ import org.junit.jupiter.api.io.TempDir;
 import reactor.core.publisher.Flux;
 
 import java.nio.file.Path;
+import java.nio.file.Files;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AgentFactoryTest {
@@ -43,6 +50,11 @@ class AgentFactoryTest {
             }
         };
         AgentStorageProperties storage = new AgentStorageProperties(temporaryDirectory);
+        CurrentUserProvider currentUserProvider = new CurrentUserProvider();
+        ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+        ProjectRegistry projectRegistry = new ProjectRegistry(storage, currentUserProvider, objectMapper);
+        SessionCatalogService sessionCatalogService = new SessionCatalogService(
+                storage, currentUserProvider, objectMapper, projectRegistry);
         SubagentCatalog subagentCatalog = new SubagentCatalog(
                 new AgentDefinitionLoader(), storage) {
             @Override
@@ -54,14 +66,15 @@ class AgentFactoryTest {
         AgentFactory factory = new AgentFactory(
                 modelHolder,
                 new ToolRegistry(List.of()),
-                new AgentSecurity(),
                 storage,
                 new InMemoryAgentStateStore(),
                 null,
                 null,
                 subagentCatalog,
-                new TokenUsageMiddleware(new ApproximateTokenCounter(), new ObjectMapper()),
-                new ContextInjectionMiddleware()
+                new TokenUsageMiddleware(new ApproximateTokenCounter(), objectMapper),
+                new ContextInjectionMiddleware(),
+                sessionCatalogService,
+                projectRegistry
         );
 
         try (HarnessAgent agent = factory.currentAgent()) {
@@ -77,6 +90,56 @@ class AgentFactoryTest {
             assertTrue(schemaTokens(agent.getToolkit().getToolSchemas()) < 800,
                     "默认 Tool Schema 应保持在 800 个估算 Token 以内");
         }
+    }
+
+    @Test
+    void projectSessionsUseAgentsIsolatedByCanonicalRoot() throws Exception {
+        Model model = new StubModel();
+        ModelHolder modelHolder = new ModelHolder() {
+            @Override
+            public Model getModel() {
+                return model;
+            }
+        };
+        AgentStorageProperties storage = new AgentStorageProperties(temporaryDirectory.resolve("runtime"));
+        CurrentUserProvider user = new CurrentUserProvider();
+        ObjectMapper mapper = new ObjectMapper().findAndRegisterModules();
+        ProjectRegistry projects = new ProjectRegistry(storage, user, mapper);
+        SessionCatalogService sessions = new SessionCatalogService(storage, user, mapper, projects);
+        SubagentCatalog subagents = new SubagentCatalog(new AgentDefinitionLoader(), storage) {
+            @Override
+            public List<io.agentscope.harness.agent.subagent.SubagentDeclaration> declarations() {
+                return List.of();
+            }
+        };
+        AgentFactory factory = new AgentFactory(
+                modelHolder,
+                new ToolRegistry(List.of()),
+                storage,
+                new InMemoryAgentStateStore(),
+                null,
+                null,
+                subagents,
+                new TokenUsageMiddleware(new ApproximateTokenCounter(), mapper),
+                new ContextInjectionMiddleware(),
+                sessions,
+                projects
+        );
+        String firstProject = projects.importProject("first",
+                Files.createDirectories(temporaryDirectory.resolve("projects/first")).toString()).id();
+        String secondProject = projects.importProject("second",
+                Files.createDirectories(temporaryDirectory.resolve("projects/second")).toString()).id();
+        String firstSession = sessions.create(new CreateSessionRequest(SessionKind.PROJECT, "first", firstProject)).id();
+        String secondSession = sessions.create(new CreateSessionRequest(SessionKind.PROJECT, "second", secondProject)).id();
+
+        HarnessAgent first = factory.currentAgent(firstSession);
+        HarnessAgent firstAgain = factory.currentAgent(firstSession);
+        HarnessAgent second = factory.currentAgent(secondSession);
+
+        assertSame(first, firstAgain);
+        assertNotSame(first, second);
+        first.close();
+        second.close();
     }
 
     private int schemaTokens(List<ToolSchema> schemas) throws Exception {

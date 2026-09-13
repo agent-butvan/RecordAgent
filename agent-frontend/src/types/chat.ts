@@ -178,11 +178,21 @@ export interface Project {
   name: string;
   path: string;
   createdAt: number;
+  availability: 'AVAILABLE' | 'MISSING' | 'INACCESSIBLE';
+}
+
+export interface ProjectDto {
+  id: string;
+  name: string;
+  rootPath: string;
+  importedAt: string;
+  availability: Project['availability'];
 }
 
 export interface SessionSummaryDto {
   id: string;
   kind: SessionKind;
+  projectId?: string | null;
   title: string;
   lastMessagePreview: string;
   createdAt: string;

@@ -470,6 +470,7 @@ export async function fetchSessionDetail(sessionId: string): Promise<SessionDeta
 export async function createSessionApi(params?: {
   kind?: SessionKind;
   title?: string;
+  projectId?: string;
 }): Promise<{ success: boolean; data?: SessionSummaryDto; message?: string }> {
   try {
     const res = await fetch(`${apiBaseUrl}/agent/sessions`, {
@@ -478,6 +479,7 @@ export async function createSessionApi(params?: {
       body: JSON.stringify({
         kind: params?.kind || 'GENERAL',
         title: params?.title || '新对话',
+        projectId: params?.projectId,
       }),
     });
     const json: ApiResponse<SessionSummaryDto> = await res.json();

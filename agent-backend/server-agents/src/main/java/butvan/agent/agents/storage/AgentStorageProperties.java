@@ -24,6 +24,9 @@ public class AgentStorageProperties {
     /** 保存侧边栏会话摘要的目录册文件。 */
     private final Path sessionCatalogFile;
 
+    /** 保存本机已导入项目引用的目录册文件。 */
+    private final Path projectCatalogFile;
+
     /** 保存用户可见消息记录的目录。 */
     private final Path transcriptDirectory;
 
@@ -52,6 +55,7 @@ public class AgentStorageProperties {
         if (rootDirectory == null) throw new IllegalArgumentException("数据根目录不能为空");
         this.rootDirectory = rootDirectory.toAbsolutePath().normalize();
         sessionCatalogFile = this.rootDirectory.resolve("sessions").resolve("catalog.json");
+        projectCatalogFile = this.rootDirectory.resolve("projects").resolve("catalog.json");
         transcriptDirectory = this.rootDirectory.resolve("transcripts");
         systemUsageFile = this.rootDirectory.resolve("usage").resolve("system-usage.jsonl");
         runCheckpointDirectory = this.rootDirectory.resolve("runs");
@@ -60,6 +64,7 @@ public class AgentStorageProperties {
 
         // 应用启动的时候创建本项目明确拥有的目录
         createDirectories(sessionCatalogFile.getParent());
+        createDirectories(projectCatalogFile.getParent());
         createDirectories(transcriptDirectory);
         createDirectories(systemUsageFile.getParent());
         createDirectories(runCheckpointDirectory);

@@ -1,6 +1,7 @@
 package butvan.agent.network.usage.controller;
 
 import butvan.agent.agents.identity.CurrentUserProvider;
+import butvan.agent.agents.project.ProjectRegistry;
 import butvan.agent.agents.session.SessionCatalogService;
 import butvan.agent.agents.session.TranscriptService;
 import butvan.agent.agents.session.dto.CreateSessionRequest;
@@ -138,6 +139,7 @@ class TokenUsageApiIntegrationTest {
             TokenUsageController.class,
             ApiExceptionHandler.class,
             CurrentUserProvider.class,
+            ProjectRegistry.class,
             SessionCatalogService.class,
             TranscriptService.class,
             SystemUsageLedger.class

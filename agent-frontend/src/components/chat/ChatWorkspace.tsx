@@ -102,6 +102,7 @@ interface ChatWorkspaceProps {
   onCancelSubagentTask: (taskId: string) => void;
   /** 项目级聊天的项目根目录（非项目聊天为 null）。 */
   projectPath?: string | null;
+  projectId?: string | null;
   permissionMode: SessionPermissionMode;
   onPermissionModeChange: (mode: SessionPermissionMode) => void;
   isPermissionModeDisabled?: boolean;
@@ -219,6 +220,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   onRefreshSubagentTasks,
   onCancelSubagentTask,
   projectPath = null,
+  projectId = null,
   permissionMode,
   onPermissionModeChange,
   isPermissionModeDisabled = false,
@@ -988,8 +990,8 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
               sessionUsageSummary={sessionUsageSummary}
               selectedMessageId={tokenUsageMessageId}
             />
-          ) : projectPath ? (
-            <ProjectFileTree projectPath={projectPath} />
+          ) : projectPath && projectId ? (
+            <ProjectFileTree projectId={projectId} projectPath={projectPath} />
           ) : null}
         </RightSidePanel>
       </div>

@@ -45,6 +45,7 @@ import {
   fetchSubagentTasks,
   subscribeSubagentTaskEvents,
 } from './services/taskApi';
+import { fetchProjects, importProject } from './services/projectApi';
 
 function mapTranscriptToChatMessage(dto: TranscriptMessageDto): ChatMessage {
   const isUser = dto.role?.toUpperCase() === 'USER';
@@ -314,11 +315,16 @@ export const MainLayout: React.FC<{
 
   // 1. 初始化从后端 API 获取会话列表数据
   useEffect(() => {
+    fetchProjects()
+      .then(setProjects)
+      .catch((error) => showMessage('error', error instanceof Error ? error.message : '读取项目列表失败'));
+
     fetchSessions().then(async (data: SessionSummaryDto[]) => {
       if (Array.isArray(data) && data.length > 0) {
         const initialSessions: ChatSession[] = data.map((dto) => ({
           id: dto.id,
           kind: dto.kind,
+          projectId: dto.projectId ?? undefined,
           title: dto.title,
           lastMessagePreview: dto.lastMessagePreview,
           createdAt: new Date(dto.createdAt).getTime() || Date.now(),
@@ -335,6 +341,7 @@ export const MainLayout: React.FC<{
           const created: ChatSession = {
             id: res.data.id,
             kind: res.data.kind,
+            projectId: res.data.projectId ?? undefined,
             title: res.data.title,
             lastMessagePreview: res.data.lastMessagePreview,
             createdAt: new Date(res.data.createdAt).getTime() || Date.now(),
@@ -347,7 +354,7 @@ export const MainLayout: React.FC<{
         }
       }
     });
-  }, []);
+  }, [showMessage]);
 
   // 2. 切换当前激活会话时，若消息未加载，从后端 fetchSessionDetail 获取完整聊天记录
   useEffect(() => {
@@ -379,7 +386,7 @@ export const MainLayout: React.FC<{
     ? sessionLoadErrors[activeSession.id] ?? null
     : null;
   const activeProjectPath = activeSession?.projectId
-    ? (projects.find((project) => project.id === activeSession.projectId)?.path ?? null)
+    ? (projects.find((project) => project.id === activeSession.projectId && project.availability === 'AVAILABLE')?.path ?? null)
     : null;
 
   // 3. 新建普通独立会话（UUID 由后端统一生成）
@@ -389,6 +396,7 @@ export const MainLayout: React.FC<{
       const newSession: ChatSession = {
         id: res.data.id,
         kind: res.data.kind,
+        projectId: res.data.projectId ?? undefined,
         title: res.data.title,
         lastMessagePreview: res.data.lastMessagePreview,
         createdAt: new Date(res.data.createdAt).getTime() || Date.now(),
@@ -401,19 +409,23 @@ export const MainLayout: React.FC<{
     }
   };
 
-  // 4. 新建项目绑定会话（项目绑定目前采用 GENERAL 会话挂载）
-  const handleNewProjectChat = async (projectId: string) => {
+  // 4. 新建项目绑定会话
+  const handleNewProjectChat = async (projectId: string, knownProjectName?: string): Promise<boolean> => {
     const targetProject = projects.find((p) => p.id === projectId);
-    const titleName = targetProject ? `${targetProject.name} 会话` : '项目会话';
+    if (targetProject && targetProject.availability !== 'AVAILABLE') {
+      showMessage('error', '项目目录当前不可访问，请恢复目录后重试。');
+      return false;
+    }
+    const titleName = `${knownProjectName || targetProject?.name || '项目'} 会话`;
 
-    const res = await createSessionApi({ kind: 'GENERAL', title: titleName });
+    const res = await createSessionApi({ kind: 'PROJECT', projectId, title: titleName });
     if (res.success && res.data) {
       const newSession: ChatSession = {
         id: res.data.id,
         kind: res.data.kind,
         title: res.data.title,
         lastMessagePreview: res.data.lastMessagePreview,
-        projectId,
+        projectId: res.data.projectId ?? projectId,
         createdAt: new Date(res.data.createdAt).getTime() || Date.now(),
         updatedAt: new Date(res.data.updatedAt).getTime() || Date.now(),
         messages: [],
@@ -421,20 +433,27 @@ export const MainLayout: React.FC<{
       };
       setSessions((prev) => [newSession, ...prev]);
       setActiveSessionId(newSession.id);
+      setActiveFeature('chat');
+      return true;
     }
+    showMessage('error', res.message || '创建项目会话失败');
+    return false;
   };
 
   // 5. 导入本地项目
-  const handleImportProject = (name: string, path: string) => {
-    const newProjectId = String(Date.now());
-    const newProject: Project = {
-      id: newProjectId,
-      name,
-      path,
-      createdAt: Date.now(),
-    };
-    setProjects((prev) => [...prev, newProject]);
-    handleNewProjectChat(newProjectId);
+  const handleImportProject = async (name: string, path: string): Promise<{ success: boolean; message?: string }> => {
+    try {
+      const project = await importProject(name, path);
+      setProjects((previous) => [project, ...previous]);
+      const created = await handleNewProjectChat(project.id, project.name);
+      showMessage(
+        created ? 'success' : 'info',
+        created ? `已导入项目“${project.name}”` : `已导入项目“${project.name}”，请从项目旁的新建按钮重试会话。`,
+      );
+      return { success: true };
+    } catch (error) {
+      return { success: false, message: error instanceof Error ? error.message : '导入项目失败' };
+    }
   };
 
   // 6. 删除会话
@@ -976,6 +995,7 @@ export const MainLayout: React.FC<{
               onRefreshSubagentTasks={() => void refreshSubagentTasks()}
               onCancelSubagentTask={handleCancelSubagentTask}
               projectPath={activeProjectPath}
+              projectId={activeSession?.projectId ?? null}
               permissionMode={permissionModes[activeSessionId] ?? 'ASK'}
               onPermissionModeChange={handlePermissionModeChange}
               isPermissionModeDisabled={!activeSessionId

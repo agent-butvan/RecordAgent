@@ -174,7 +174,7 @@ public class AgentService {
      * @param streamSession
      */
     private void runAgentStream(AgentRun run, List<Msg> inputMessages, AgentStreamSession streamSession) {
-        HarnessAgent agent = agentFactory.currentAgent();
+        HarnessAgent agent = agentFactory.currentAgent(run.sessionId());
         streamSession.bindCancellationAction(
                 () -> agent.getDelegate().interrupt(run.userId(), run.sessionId()));
         ModelIdentity modelIdentity = currentModelIdentity();
@@ -414,7 +414,7 @@ public class AgentService {
         // 复用会话有效性校验，防止读取已删除会话的文件
         sessionCatalogService.requireActive(sessionId);
         if (!modelHolder.isInitialized()) return "";
-        HarnessAgent agent = agentFactory.currentAgent();
+        HarnessAgent agent = agentFactory.currentAgent(sessionId);
         RuntimeContext context = createRuntimeContext(currentUserProvider.currentUserId(), sessionId);
         // 计划文件默认位于工作区 plans/PLAN.md
         String planPath = PlanModeManager.DEFAULT_PLAN_DIR + "/PLAN.md";

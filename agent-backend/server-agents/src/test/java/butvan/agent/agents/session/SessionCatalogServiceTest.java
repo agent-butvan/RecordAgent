@@ -1,6 +1,7 @@
 package butvan.agent.agents.session;
 
 import butvan.agent.agents.identity.CurrentUserProvider;
+import butvan.agent.agents.project.ProjectRegistry;
 import butvan.agent.agents.session.dto.CreateSessionRequest;
 import butvan.agent.agents.session.dto.SessionKind;
 import butvan.agent.agents.session.dto.SessionPermissionMode;
@@ -11,8 +12,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.nio.file.Files;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class SessionCatalogServiceTest {
 
@@ -52,5 +55,25 @@ class SessionCatalogServiceTest {
         assertEquals("首个模型标题", service.updateGeneratedTitle(created.id(), "首个模型标题").title());
         assertEquals("首个模型标题", service.updateGeneratedTitle(created.id(), "第二个模型标题").title());
         assertEquals(SessionPermissionMode.ASK, service.getPermissionMode(created.id()));
+    }
+
+    @Test
+    void projectSessionRequiresRegisteredProjectAndPersistsBinding() throws Exception {
+        AgentStorageProperties storage = new AgentStorageProperties(temporaryDirectory.resolve("data-3"));
+        CurrentUserProvider user = new CurrentUserProvider();
+        ObjectMapper mapper = new ObjectMapper().findAndRegisterModules();
+        ProjectRegistry projects = new ProjectRegistry(storage, user, mapper);
+        SessionCatalogService service = new SessionCatalogService(storage, user, mapper, projects);
+        Path root = Files.createDirectories(temporaryDirectory.resolve("projects/demo"));
+        String projectId = projects.importProject("demo", root.toString()).id();
+
+        SessionSummaryDto created = service.create(
+                new CreateSessionRequest(SessionKind.PROJECT, "项目会话", projectId));
+
+        assertEquals(SessionKind.PROJECT, created.kind());
+        assertEquals(projectId, created.projectId());
+        assertEquals(projectId, service.listActive().getFirst().projectId());
+        assertThrows(IllegalArgumentException.class,
+                () -> service.create(new CreateSessionRequest(SessionKind.PROJECT, "错误会话", "missing")));
     }
 }

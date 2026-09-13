@@ -6,6 +6,7 @@ import { LoadingTree } from '../common/LoadingTree';
 import styles from './ProjectFileTree.module.css';
 
 interface ProjectFileTreeProps {
+  projectId: string;
   projectPath: string;
 }
 
@@ -63,7 +64,7 @@ function TreeList({ nodes, expanded, onToggle, depth }: TreeListProps) {
 }
 
 /** 项目文件树：只读展示项目目录结构，支持目录展开/收起与手动刷新。 */
-export const ProjectFileTree: React.FC<ProjectFileTreeProps> = ({ projectPath }) => {
+export const ProjectFileTree: React.FC<ProjectFileTreeProps> = ({ projectId, projectPath }) => {
   const [tree, setTree] = useState<FileTreeNode[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
@@ -73,7 +74,7 @@ export const ProjectFileTree: React.FC<ProjectFileTreeProps> = ({ projectPath })
     setIsLoading(true);
     setError(null);
     try {
-      const nodes = await fetchProjectFileTree(projectPath);
+      const nodes = await fetchProjectFileTree(projectId);
       setTree(nodes);
       setExpanded(new Set(nodes.filter((node) => node.type === 'dir').map((node) => node.path)));
     } catch (e) {
@@ -81,7 +82,7 @@ export const ProjectFileTree: React.FC<ProjectFileTreeProps> = ({ projectPath })
     } finally {
       setIsLoading(false);
     }
-  }, [projectPath]);
+  }, [projectId]);
 
   useEffect(() => {
     void load();

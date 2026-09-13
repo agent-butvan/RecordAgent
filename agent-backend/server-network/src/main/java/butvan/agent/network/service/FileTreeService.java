@@ -1,6 +1,8 @@
 package butvan.agent.network.service;
 
+import butvan.agent.agents.project.ProjectRegistry;
 import butvan.agent.network.dto.file.FileTreeNodeDto;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -25,7 +27,10 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class FileTreeService {
+
+    private final ProjectRegistry projectRegistry;
 
     /** 始终跳过的目录（构建产物、依赖、IDE 配置、版本库元数据等）。 */
     private static final Set<String> SKIPPED_DIRECTORIES = Set.of(
@@ -50,18 +55,12 @@ public class FileTreeService {
     /**
      * 列出项目根目录下的文件树。
      *
-     * @param rawPath 项目根目录绝对路径
+     * @param projectId 已登记项目 ID
      * @param depth   期望深度（1 到 {@link #MAX_DEPTH}，默认 3）
      * @return 排序后的顶层节点列表（目录优先、名称不区分大小写）
      */
-    public List<FileTreeNodeDto> list(String rawPath, int depth) {
-        if (rawPath == null || rawPath.isBlank()) {
-            throw new IllegalArgumentException("项目路径不能为空");
-        }
-        Path root = Paths.get(rawPath).toAbsolutePath().normalize();
-        if (!Files.isDirectory(root)) {
-            throw new IllegalArgumentException("项目目录不存在或不可访问：" + root);
-        }
+    public List<FileTreeNodeDto> list(String projectId, int depth) {
+        Path root = Paths.get(projectRegistry.resolve(projectId).rootPath());
 
         int effectiveDepth = Math.max(1, Math.min(depth, MAX_DEPTH));
         AtomicInteger nodeCount = new AtomicInteger(0);
@@ -93,6 +92,9 @@ public class FileTreeService {
                     continue;
                 }
                 String name = fileNamePath.toString();
+                if (Files.isSymbolicLink(entry)) {
+                    continue;
+                }
                 if (isSkipped(name, Files.isDirectory(entry))) {
                     continue;
                 }
