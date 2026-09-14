@@ -1,0 +1,98 @@
+.card {
+  max-width: 100%;
+  min-width: 0;
+  margin: 12px 0;
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 42px;
+  padding: 6px 10px 6px 14px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.label {
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.copyButton {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  color: #0f172a;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  transition: background-color 150ms ease;
+}
+
+.copyButton:hover {
+  background: #f1f5f9;
+}
+
+.copyButton:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
+}
+
+.diagram {
+  display: grid;
+  min-height: 180px;
+  padding: 20px;
+  overflow: auto;
+  place-items: center;
+}
+
+.loading {
+  background: #f8fafc;
+}
+
+.ready {
+  background: #ffffff;
+}
+
+.loadingText {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.svgWrap {
+  display: flex;
+  justify-content: center;
+  width: max-content;
+  min-width: 100%;
+}
+
+.svgWrap :global(svg) {
+  display: block;
+  width: auto;
+  max-width: none;
+  height: auto;
+  min-height: 80px;
+}
+
+.fallback > p {
+  margin: 12px 0 -4px;
+  color: #b42318;
+  font-size: 13px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .copyButton {
+    transition: none;
+  }
+}
