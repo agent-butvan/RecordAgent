@@ -1,7 +1,15 @@
 server:
   port: 8081
+  shutdown: graceful
 
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 5s
   config:
     import:
       - classpath:application-vendor.yml
+
+# 飞书 SDK 的 INFO 断连日志包含带临时凭证的完整 WebSocket URL，禁止输出。
+logging:
+  level:
+    com.lark.oapi.ws.Client: WARN
