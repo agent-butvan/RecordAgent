@@ -78,6 +78,7 @@ class AgentFactoryTest {
         );
 
         try (HarnessAgent agent = factory.currentAgent()) {
+            assertTrue(agent.getDelegate().isPendingToolRecoveryEnabled());
             assertTrue(agent.getDelegate().getMiddlewares().stream()
                     .noneMatch(WorkspaceContextMiddleware.class::isInstance));
             List<Class<?>> middlewareOrder = agent.getDelegate().getMiddlewares().stream()

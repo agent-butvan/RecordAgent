@@ -40,8 +40,7 @@ public class AgentSecurity {
             "library_search",
             "library_get",
             "study_query",
-            "acceptance_report",
-            "plan_exit"
+            "acceptance_report"
     );
 
     /** 自动批准编辑模式额外允许的工作区编辑与常规智能体协作工具。 */

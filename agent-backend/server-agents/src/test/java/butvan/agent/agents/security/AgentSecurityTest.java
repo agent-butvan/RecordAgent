@@ -28,6 +28,7 @@ class AgentSecurityTest {
         assertTrue(context.getAllowRules().containsKey("library_search"));
         assertTrue(context.getAllowRules().containsKey("library_get"));
         assertTrue(context.getAllowRules().containsKey("study_query"));
+        assertFalse(context.getAllowRules().containsKey("plan_exit"));
         assertFalse(context.getAllowRules().containsKey("calendar_create"));
         assertFalse(context.getAllowRules().containsKey("finance_record_transaction"));
         assertFalse(context.getAllowRules().containsKey("execute"));
@@ -45,5 +46,6 @@ class AgentSecurityTest {
         assertFalse(ask.getAllowRules().containsKey("write_file"));
         assertFalse(full.getAllowRules().containsKey("write_file"));
         assertTrue(ask.getAllowRules().containsKey("acceptance_report"));
+        assertFalse(ask.getAllowRules().containsKey("plan_exit"));
     }
 }

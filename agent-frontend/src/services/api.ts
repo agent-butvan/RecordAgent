@@ -228,7 +228,17 @@ export interface PermissionToolPayload {
 
 export interface PermissionRequiredPayload {
   approvalId: string;
+  runId: string;
+  turnId: string;
   tool: PermissionToolPayload;
+}
+
+export interface PendingApprovalPayload extends Omit<PermissionRequiredPayload, 'tool'> {
+  sessionId: string;
+  partialContent: string;
+  startedAt: string;
+  readyToResume: boolean;
+  tool: PermissionToolPayload | null;
 }
 
 export interface PermissionDecisionResponse {
@@ -264,6 +274,16 @@ export async function submitPermissionDecision(params: {
     throw new Error(`提交权限决定失败：HTTP ${response.status}`);
   }
   return response.json() as Promise<PermissionDecisionResponse>;
+}
+
+/** 查询会话当前待处理审批，供页面刷新或重新切换会话后恢复。 */
+export async function fetchPendingPermission(
+  sessionId: string,
+): Promise<PendingApprovalPayload | null> {
+  const response = await fetch(`${apiBaseUrl}/agent/chat/${sessionId}/permission/pending`);
+  if (response.status === 204) return null;
+  if (!response.ok) throw new Error(`读取待审批操作失败：HTTP ${response.status}`);
+  return response.json() as Promise<PendingApprovalPayload>;
 }
 
 /**

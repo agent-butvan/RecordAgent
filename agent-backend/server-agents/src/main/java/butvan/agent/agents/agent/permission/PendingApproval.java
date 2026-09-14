@@ -4,39 +4,42 @@ import butvan.agent.agents.agent.run.AgentRun;
 import io.agentscope.core.event.ConfirmResult;
 import io.agentscope.core.message.ToolUseBlock;
 
-import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * 一次 Permission Ask 产生的一批待审核的工具
- */
+/** 一次 Permission Ask 产生的一批待审核工具及其恢复状态。 */
 public final class PendingApproval {
 
     private final String approvalId = UUID.randomUUID().toString();
+    private final String runId;
     private final AgentRun run;
     private final List<ToolUseBlock> tools;
     private final Map<String, Decision> decisions = new LinkedHashMap<>();
-    private final Instant expiresAt = Instant.now().plusSeconds(600);
+    private State state = State.WAITING;
 
+    /** 兼容测试调用；生产代码必须显式传入客户端 runId。 */
     public PendingApproval(AgentRun run, List<ToolUseBlock> tools) {
+        this(run, tools, run.turnId());
+    }
+
+    public PendingApproval(AgentRun run, List<ToolUseBlock> tools, String runId) {
+        if (run == null) throw new IllegalArgumentException("Agent 运行不能为空");
+        if (tools == null || tools.isEmpty()) throw new IllegalArgumentException("待确认工具不能为空");
+        if (runId == null || runId.isBlank()) throw new IllegalArgumentException("runId 不能为空");
         this.run = run;
-        this.tools = tools;
+        this.tools = List.copyOf(tools);
+        this.runId = runId;
     }
 
     public String approvalId() { return approvalId; }
+    public String runId() { return runId; }
     public AgentRun run() { return run; }
-    public boolean expired() { return Instant.now().isAfter(expiresAt); }
 
-
-    /**
-     * 直接受当前批次中尚未决定的工具，防止重复提交或篡改 callId
-     * @param toolCallId
-     * @param approved
-     */
+    /** 只接受当前批次中尚未决定的工具，防止重复提交或篡改 callId。 */
     public synchronized void decide(String toolCallId, boolean approved) {
+        requireWaiting();
         boolean exists = tools.stream().anyMatch(tool -> tool.getId().equals(toolCallId));
         if (!exists || decisions.containsKey(toolCallId)) {
             throw new IllegalArgumentException("待确认工具不存在或已经处理");
@@ -45,6 +48,7 @@ public final class PendingApproval {
     }
 
     public synchronized PermissionToolDto nextTool() {
+        if (state != State.WAITING) return null;
         for (int i = 0; i < tools.size(); i++) {
             ToolUseBlock tool = tools.get(i);
             if (!decisions.containsKey(tool.getId())) {
@@ -58,29 +62,21 @@ public final class PendingApproval {
         return decisions.size() == tools.size();
     }
 
-    /**
-     * 自动批准本批次全部待确认工具。
-     *
-     * <p>仅供已显式授权的全权限渠道（如仅限本人使用的飞书机器人）调用，
-     * 调用方必须确认该渠道可信且风险可控。</p>
-     */
+    /** 仅供已显式授权的全权限渠道自动批准当前批次。 */
     public synchronized void approveAll() {
+        requireWaiting();
         for (ToolUseBlock tool : tools) {
             decisions.putIfAbsent(tool.getId(), new Decision(true));
         }
     }
 
-    /** 当前批次待确认工具数量。 */
     public synchronized int toolCount() {
         return tools.size();
     }
 
-
     /** 只有全部决定后才构造恢复 AgentScope 的 ConfirmResult 列表。 */
     public synchronized List<ConfirmResult> toConfirmResults() {
-        if (!allDecided()) {
-            throw new IllegalStateException("仍有工具尚未确认");
-        }
+        if (!allDecided()) throw new IllegalStateException("仍有工具尚未确认");
         return tools.stream()
                 .map(tool -> new ConfirmResult(decisions.get(tool.getId()).approved(), tool))
                 .toList();
@@ -93,8 +89,30 @@ public final class PendingApproval {
                 .orElseThrow(() -> new IllegalArgumentException("待确认工具不存在"));
     }
 
+    /** 原子领取恢复权，避免同一批工具被并发执行。 */
+    public synchronized void claimForResume(String requestedRunId) {
+        if (!runId.equals(requestedRunId)) {
+            throw new IllegalArgumentException("runId 与原始运行不匹配");
+        }
+        if (!allDecided()) throw new IllegalArgumentException("请先逐条完成所有工具确认");
+        requireWaiting();
+        state = State.RESUMING;
+    }
 
+    /** 恢复线程尚未启动时释放领取，允许客户端安全重试。 */
+    public synchronized void releaseResumeClaim() {
+        if (state == State.RESUMING) state = State.WAITING;
+    }
 
+    public synchronized boolean isWaiting() {
+        return state == State.WAITING;
+    }
 
-    private record Decision(boolean approved){}
+    private void requireWaiting() {
+        if (state != State.WAITING) throw new IllegalArgumentException("确认请求正在恢复或已经处理");
+    }
+
+    private enum State { WAITING, RESUMING }
+
+    private record Decision(boolean approved) {}
 }

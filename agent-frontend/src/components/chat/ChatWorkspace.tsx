@@ -4,6 +4,7 @@ import type { TaskDto } from '../../types/team';
 import { LoadingTree } from '../common/LoadingTree';
 import { PermissionRequestCard } from './PermissionRequestCard';
 import { PlanApprovalCard } from './PlanApprovalCard';
+import { PermissionResumeCard } from './PermissionResumeCard';
 import { AgentResponse } from './AgentResponse';
 import { TokenUsageTrigger } from './TokenUsageTrigger';
 import { TokenUsagePanel, type TokenUsageTurnOption } from './TokenUsagePanel';
@@ -92,9 +93,10 @@ interface ChatWorkspaceProps {
   ) => void;
   onOpenSettings: () => void;
   onRenameSession: (title: string) => Promise<{ success: boolean; message?: string }>;
-  pendingPermission?: { assistantMessageId: string; tool: PermissionToolPayload } | null;
+  pendingPermission?: { assistantMessageId: string; tool: PermissionToolPayload | null } | null;
   isPermissionSubmitting?: boolean;
   onPermissionDecision?: (approved: boolean, rememberForSession: boolean) => void;
+  onPermissionResume?: () => void;
   subagentTasks: TaskDto[];
   isSubagentTasksLoading: boolean;
   subagentTaskError: string | null;
@@ -214,6 +216,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   pendingPermission = null,
   isPermissionSubmitting = false,
   onPermissionDecision,
+  onPermissionResume,
   subagentTasks,
   isSubagentTasksLoading,
   subagentTaskError,
@@ -801,7 +804,12 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
 
   const inputArea = pendingPermission && onPermissionDecision ? (
     <div className={`${styles.permissionContainer} ${isOverview ? styles.bottomContainerOverview : ''}`}>
-      {pendingPermission.tool.toolName === 'plan_exit' ? (
+      {pendingPermission.tool === null ? (
+        <PermissionResumeCard
+          isSubmitting={Boolean(isPermissionSubmitting)}
+          onResume={() => onPermissionResume?.()}
+        />
+      ) : pendingPermission.tool.toolName === 'plan_exit' ? (
         <PlanApprovalCard
           sessionId={sessionId}
           isSubmitting={isPermissionSubmitting}

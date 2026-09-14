@@ -25,6 +25,7 @@ import {
   updateSessionTitleApi,
   deleteSessionApi,
   submitPermissionDecision,
+  fetchPendingPermission,
   generateSessionTitle,
   fetchSessionPermissionMode,
   updateSessionPermissionMode,
@@ -87,6 +88,14 @@ interface ActiveChatRun {
   controller: AbortController;
 }
 
+interface PendingPermissionState {
+  sessionId: string;
+  assistantMessageId: string;
+  approvalId: string;
+  runId: string;
+  tool: PermissionToolPayload | null;
+}
+
 function markAssistantTerminal(
   message: ChatMessage,
   status: 'FAILED' | 'CANCELLED',
@@ -127,13 +136,7 @@ export const MainLayout: React.FC<{
   const [recordInitialType, setRecordInitialType] = useState<RecordType>('quick');
   const [recordTarget, setRecordTarget] = useState<RecordEntry | null | undefined>(undefined);
   const [activeFeature, setActiveFeature] = useState<'chat' | 'calendar' | 'finance' | 'record' | 'study'>('chat');
-  const [pendingPermission, setPendingPermission] = useState<{
-    sessionId: string;
-    assistantMessageId: string;
-    approvalId: string;
-    runId: string;
-    tool: PermissionToolPayload;
-  } | null>(null);
+  const [pendingPermissions, setPendingPermissions] = useState<Record<string, PendingPermissionState>>({});
   const [isPermissionSubmitting, setIsPermissionSubmitting] = useState(false);
   const [subagentTasks, setSubagentTasks] = useState<TaskDto[]>([]);
   const [isSubagentTasksLoading, setIsSubagentTasksLoading] = useState(false);
@@ -382,6 +385,67 @@ export const MainLayout: React.FC<{
   }, [activeSessionId, permissionModes]);
 
   const activeSession = sessions.find((s) => s.id === activeSessionId);
+
+  // 待审批状态以服务端为准，刷新页面或切回会话时恢复审批卡片和 partial assistant。
+  useEffect(() => {
+    if (!activeSessionId || !activeSession?.isLoaded || streamingSessionIds.has(activeSessionId)) return;
+    const sessionId = activeSessionId;
+    let cancelled = false;
+    fetchPendingPermission(sessionId).then((pending) => {
+      if (cancelled) return;
+      if (!pending) {
+        setPendingPermissions((previous) => {
+          if (!previous[sessionId]) return previous;
+          const next = { ...previous };
+          delete next[sessionId];
+          return next;
+        });
+        return;
+      }
+
+      let assistantMessageId = `pending_${pending.turnId}`;
+      setSessions((previous) => previous.map((session) => {
+        if (session.id !== sessionId) return session;
+        const existing = session.messages.find(
+          (message) => message.role === 'assistant' && message.turnId === pending.turnId,
+        );
+        if (existing) {
+          assistantMessageId = existing.id;
+          return session;
+        }
+        return {
+          ...session,
+          messages: [...session.messages, {
+            id: assistantMessageId,
+            turnId: pending.turnId,
+            role: 'assistant',
+            modelName: 'ButvanAgent',
+            content: pending.partialContent || '',
+            createdAt: new Date(pending.startedAt).getTime() || Date.now(),
+            startTime: new Date(pending.startedAt).getTime() || Date.now(),
+          }],
+        };
+      }));
+      setPendingPermissions((previous) => {
+        if (previous[sessionId]?.approvalId === pending.approvalId) return previous;
+        return {
+          ...previous,
+          [sessionId]: {
+            sessionId,
+            assistantMessageId,
+            approvalId: pending.approvalId,
+            runId: pending.runId,
+            tool: pending.tool,
+          },
+        };
+      });
+    }).catch(() => {
+      // 会话详情仍可正常使用；下一次切换会话时会重新查询权威审批状态。
+    });
+    return () => { cancelled = true; };
+  }, [activeSessionId, activeSession?.isLoaded, streamingSessionIds]);
+
+  const activePendingPermission = activeSessionId ? pendingPermissions[activeSessionId] ?? null : null;
   const activeMessages = activeSession?.messages || [];
   const activeSessionLoadError = activeSession && !activeSession.isLoaded
     ? sessionLoadErrors[activeSession.id] ?? null
@@ -459,7 +523,7 @@ export const MainLayout: React.FC<{
 
   // 6. 删除会话
   const handleDeleteSession = async (id: string): Promise<{ success: boolean; message?: string }> => {
-    if (streamingSessionIds.has(id) || pendingPermission?.sessionId === id) {
+    if (streamingSessionIds.has(id) || pendingPermissions[id]) {
       return { success: false, message: '当前会话仍在运行或等待权限确认，请结束后再删除。' };
     }
     const res = await deleteSessionApi(id);
@@ -515,7 +579,7 @@ export const MainLayout: React.FC<{
 
   const handlePermissionModeChange = async (mode: SessionPermissionMode) => {
     if (!activeSessionId || savingPermissionSessionId || streamingSessionIds.has(activeSessionId)
-        || pendingPermission?.sessionId === activeSessionId) return;
+        || pendingPermissions[activeSessionId]) return;
     const sessionId = activeSessionId;
     const previous = permissionModes[sessionId] ?? 'ASK';
     setPermissionModes((current) => ({ ...current, [sessionId]: mode }));
@@ -768,13 +832,18 @@ export const MainLayout: React.FC<{
       },
       (permissionPayload) => {
         if (!finishChatRun(currentSessionId, runId)) return;
-        setPendingPermission({
-          sessionId: currentSessionId,
-          assistantMessageId: assistantMsgId,
-          approvalId: permissionPayload.approvalId,
-          runId,
-          tool: permissionPayload.tool,
-        });
+        updateAssistantMessage(currentSessionId, assistantMsgId,
+          (message) => ({ ...message, turnId: permissionPayload.turnId }));
+        setPendingPermissions((previous) => ({
+          ...previous,
+          [currentSessionId]: {
+            sessionId: currentSessionId,
+            assistantMessageId: assistantMsgId,
+            approvalId: permissionPayload.approvalId,
+            runId: permissionPayload.runId,
+            tool: permissionPayload.tool,
+          },
+        }));
       },
       (progress) => {
         if (activeChatRunsRef.current.get(currentSessionId)?.runId !== runId) return;
@@ -801,107 +870,143 @@ export const MainLayout: React.FC<{
       : session));
   };
 
-  /** 前端逐条提交决定；最后一条完成后建立新的 SSE 连接恢复 Agent。 */
+  /** 建立恢复 SSE；READY_TO_RESUME 状态保留在界面中，连接失败时可再次继续。 */
+  const resumePendingPermission = async (current: PendingPermissionState) => {
+    setPendingPermissions((previous) => ({
+      ...previous,
+      [current.sessionId]: { ...current, tool: null },
+    }));
+    const clearPending = () => setPendingPermissions((previous) => {
+      const next = { ...previous };
+      delete next[current.sessionId];
+      return next;
+    });
+
+    const controller = beginChatRun(
+      current.sessionId,
+      current.runId,
+      current.assistantMessageId,
+    );
+    await streamAgentChat(
+      {
+        runId: current.runId,
+        sessionId: current.sessionId,
+        approvalId: current.approvalId,
+        signal: controller.signal,
+      },
+      (text) => {
+        if (activeChatRunsRef.current.get(current.sessionId)?.runId !== current.runId) return;
+        updateAssistantMessage(current.sessionId, current.assistantMessageId,
+          (message) => ({ ...message, content: message.content + text }));
+      },
+      () => {
+        if (!finishChatRun(current.sessionId, current.runId)) return;
+        clearPending();
+        updateAssistantMessage(current.sessionId, current.assistantMessageId, (message) => ({
+          ...message,
+          elapsedTime: Math.max(1, Math.floor((Date.now() - (message.startTime || message.createdAt)) / 1000)),
+        }));
+        void syncSessionDetail(current.sessionId, true);
+      },
+      (error) => {
+        if (!finishChatRun(current.sessionId, current.runId)) return;
+        clearPending();
+        updateAssistantMessage(current.sessionId, current.assistantMessageId,
+          (message) => markAssistantTerminal(message, 'FAILED', `恢复任务失败：${error.message}`));
+      },
+      (tool) => {
+        if (activeChatRunsRef.current.get(current.sessionId)?.runId !== current.runId) return;
+        updateAssistantMessage(current.sessionId, current.assistantMessageId, (message) => ({
+          ...message,
+          tools: [...(message.tools || []), {
+            toolCallId: tool.toolCallId || `tool_${Date.now()}`,
+            toolName: tool.toolName || 'tool', command: tool.command || '', status: 'running',
+          }],
+        }));
+      },
+      (result) => {
+        if (activeChatRunsRef.current.get(current.sessionId)?.runId !== current.runId) return;
+        updateAssistantMessage(current.sessionId, current.assistantMessageId, (message) => ({
+          ...message,
+          tools: (message.tools || []).map((tool) => tool.toolCallId === result.toolCallId
+            ? { ...tool, status: 'completed', output: (tool.output || '') + (result.result || '') }
+            : tool),
+        }));
+      },
+      (thinking) => {
+        if (activeChatRunsRef.current.get(current.sessionId)?.runId !== current.runId) return;
+        updateAssistantMessage(current.sessionId, current.assistantMessageId,
+          (message) => ({ ...message, reasoning: (message.reasoning || '') + thinking }));
+      },
+      (permissionPayload) => {
+        if (!finishChatRun(current.sessionId, current.runId)) return;
+        updateAssistantMessage(current.sessionId, current.assistantMessageId,
+          (message) => ({ ...message, turnId: permissionPayload.turnId }));
+        setPendingPermissions((previous) => ({
+          ...previous,
+          [current.sessionId]: {
+            sessionId: current.sessionId,
+            assistantMessageId: current.assistantMessageId,
+            approvalId: permissionPayload.approvalId,
+            runId: permissionPayload.runId,
+            tool: permissionPayload.tool,
+          },
+        }));
+      },
+      (progress) => {
+        if (activeChatRunsRef.current.get(current.sessionId)?.runId !== current.runId) return;
+        appendSubagentProgress(current.sessionId, current.assistantMessageId, progress);
+        void refreshSubagentTasks(current.sessionId);
+      },
+      () => {
+        if (!finishChatRun(current.sessionId, current.runId)) return;
+        clearPending();
+        updateAssistantMessage(current.sessionId, current.assistantMessageId,
+          (message) => markAssistantTerminal(message, 'CANCELLED'));
+        void syncSessionDetail(current.sessionId);
+      },
+    );
+  };
+
+  /** 前端逐条提交决定；最后一条完成后恢复原 Agent 运行。 */
   const handlePermissionDecision = async (approved: boolean, rememberForSession: boolean) => {
-    if (!pendingPermission || isPermissionSubmitting) return;
-    const current = pendingPermission;
+    const currentTool = activePendingPermission?.tool;
+    if (!activePendingPermission || !currentTool || isPermissionSubmitting) return;
+    const current = activePendingPermission;
     setIsPermissionSubmitting(true);
     try {
       const result = await submitPermissionDecision({
         sessionId: current.sessionId,
         approvalId: current.approvalId,
-        toolCallId: current.tool.toolCallId,
+        toolCallId: currentTool.toolCallId,
         approved,
         rememberForSession,
       });
 
       if (!result.readyToResume && result.nextTool) {
-        setPendingPermission({ ...current, tool: result.nextTool });
+        setPendingPermissions((previous) => ({
+          ...previous,
+          [current.sessionId]: { ...current, tool: result.nextTool },
+        }));
         return;
       }
 
-      setPendingPermission(null);
-      const controller = beginChatRun(
-        current.sessionId,
-        current.runId,
-        current.assistantMessageId,
-      );
-      await streamAgentChat(
-        {
-          runId: current.runId,
-          sessionId: current.sessionId,
-          approvalId: current.approvalId,
-          signal: controller.signal,
-        },
-        (text) => {
-          if (activeChatRunsRef.current.get(current.sessionId)?.runId !== current.runId) return;
-          updateAssistantMessage(current.sessionId, current.assistantMessageId,
-            (message) => ({ ...message, content: message.content + text }));
-        },
-        () => {
-          if (!finishChatRun(current.sessionId, current.runId)) return;
-          updateAssistantMessage(current.sessionId, current.assistantMessageId, (message) => ({
-            ...message,
-            elapsedTime: Math.max(1, Math.floor((Date.now() - (message.startTime || message.createdAt)) / 1000)),
-          }));
-          void syncSessionDetail(current.sessionId, true);
-        },
-        (error) => {
-          if (!finishChatRun(current.sessionId, current.runId)) return;
-          updateAssistantMessage(current.sessionId, current.assistantMessageId,
-            (message) => markAssistantTerminal(message, 'FAILED', `恢复任务失败：${error.message}`));
-        },
-        (tool) => {
-          if (activeChatRunsRef.current.get(current.sessionId)?.runId !== current.runId) return;
-          updateAssistantMessage(current.sessionId, current.assistantMessageId, (message) => ({
-            ...message,
-            tools: [...(message.tools || []), {
-              toolCallId: tool.toolCallId || `tool_${Date.now()}`,
-              toolName: tool.toolName || 'tool', command: tool.command || '', status: 'running',
-            }],
-          }));
-        },
-        (result) => {
-          if (activeChatRunsRef.current.get(current.sessionId)?.runId !== current.runId) return;
-          updateAssistantMessage(current.sessionId, current.assistantMessageId, (message) => ({
-            ...message,
-            tools: (message.tools || []).map((tool) => tool.toolCallId === result.toolCallId
-              ? { ...tool, status: 'completed', output: (tool.output || '') + (result.result || '') }
-              : tool),
-          }));
-        },
-        (thinking) => {
-          if (activeChatRunsRef.current.get(current.sessionId)?.runId !== current.runId) return;
-          updateAssistantMessage(current.sessionId, current.assistantMessageId,
-            (message) => ({ ...message, reasoning: (message.reasoning || '') + thinking }));
-        },
-        (permissionPayload) => {
-          if (!finishChatRun(current.sessionId, current.runId)) return;
-          setPendingPermission({
-            sessionId: current.sessionId,
-            assistantMessageId: current.assistantMessageId,
-            approvalId: permissionPayload.approvalId,
-            runId: current.runId,
-            tool: permissionPayload.tool,
-          });
-        },
-        (progress) => {
-          if (activeChatRunsRef.current.get(current.sessionId)?.runId !== current.runId) return;
-          appendSubagentProgress(current.sessionId, current.assistantMessageId, progress);
-          void refreshSubagentTasks(current.sessionId);
-        },
-        () => {
-          if (!finishChatRun(current.sessionId, current.runId)) return;
-          updateAssistantMessage(current.sessionId, current.assistantMessageId,
-            (message) => markAssistantTerminal(message, 'CANCELLED'));
-          void syncSessionDetail(current.sessionId);
-        },
-      );
+      await resumePendingPermission(current);
     } catch {
       updateAssistantMessage(current.sessionId, current.assistantMessageId, (message) => ({
         ...message,
         content: message.content || '提交权限决定失败，请重试。',
       }));
+    } finally {
+      setIsPermissionSubmitting(false);
+    }
+  };
+
+  const handlePermissionResume = async () => {
+    if (!activePendingPermission || activePendingPermission.tool !== null || isPermissionSubmitting) return;
+    setIsPermissionSubmitting(true);
+    try {
+      await resumePendingPermission(activePendingPermission);
     } finally {
       setIsPermissionSubmitting(false);
     }
@@ -986,9 +1091,10 @@ export const MainLayout: React.FC<{
               onSendMessage={handleSendMessage}
               onRenameSession={(title) => handleUpdateSessionTitle(activeSessionId, title)}
               onOpenSettings={() => setIsSettingsOpen(true)}
-              pendingPermission={pendingPermission}
+              pendingPermission={activePendingPermission}
               isPermissionSubmitting={isPermissionSubmitting}
               onPermissionDecision={handlePermissionDecision}
+              onPermissionResume={handlePermissionResume}
               subagentTasks={subagentTasks}
               isSubagentTasksLoading={isSubagentTasksLoading}
               subagentTaskError={subagentTaskError}
@@ -1001,7 +1107,7 @@ export const MainLayout: React.FC<{
               onPermissionModeChange={handlePermissionModeChange}
               isPermissionModeDisabled={!activeSessionId
                 || streamingSessionIds.has(activeSessionId)
-                || pendingPermission?.sessionId === activeSessionId
+                || Boolean(activePendingPermission)
                 || savingPermissionSessionId === activeSessionId}
               isPermissionModeSaving={savingPermissionSessionId === activeSessionId}
             />

@@ -33,10 +33,14 @@ public record PermissionToolDto(
     private static String riskDescription(String toolName) {
         return switch (toolName) {
             case "write_file", "edit_file" -> "将修改本地文件内容";
-            case "execute" -> "将在本地 Shell 中执行命令";
-            case "http_request" -> "将向外部网络发送请求";
+            case "execute", "custom_bash" -> "将在本地 Shell 中执行命令";
+            case "http_request", "web_search" -> "将向外部网络发送请求";
             case "plan_exit" -> "将提交任务计划书，等待你审核批准后开始执行";
-            default -> "改工具属于需要确认的高风险操作";
+            default -> toolName.endsWith("_create") || toolName.endsWith("_update")
+                    || toolName.endsWith("_delete") || toolName.endsWith("_finish")
+                    || toolName.endsWith("_start") || toolName.endsWith("_record_transaction")
+                    ? "将修改你的业务数据，请核对操作参数"
+                    : "该工具属于需要确认的高风险操作";
         };
     }
 }

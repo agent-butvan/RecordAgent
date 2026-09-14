@@ -188,7 +188,12 @@ public sealed interface AgentStreamEvent permits AgentStreamEvent.RunStarted, Ag
     }
 
 
-    record PermissionRequired(String approvalId, PermissionToolDto firstTool) implements AgentStreamEvent{
+    record PermissionRequired(
+            String approvalId,
+            String runId,
+            String turnId,
+            PermissionToolDto firstTool
+    ) implements AgentStreamEvent{
 
         @Override
         public String eventName() {
@@ -197,7 +202,12 @@ public sealed interface AgentStreamEvent permits AgentStreamEvent.RunStarted, Ag
 
         @Override
         public Object payload() {
-            return Map.of("approvalId", approvalId, "tool", firstTool);
+            return Map.of(
+                    "approvalId", approvalId,
+                    "runId", runId,
+                    "turnId", turnId,
+                    "tool", firstTool
+            );
         }
 
         /** 结束当前 SSE；恢复会由前端建立新的 SSE 连接。 */

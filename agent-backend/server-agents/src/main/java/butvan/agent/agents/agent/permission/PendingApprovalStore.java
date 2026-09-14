@@ -15,22 +15,25 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 public class PendingApprovalStore {
     private final Map<String, PendingApproval> approvals = new ConcurrentHashMap<>();
+    private final Map<SessionKey, String> sessionApprovals = new ConcurrentHashMap<>();
     private final Map<String, Boolean> sessionDecisions = new ConcurrentHashMap<>();
     private final ObjectMapper canonicalJson = new ObjectMapper()
             .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
 
-    public void save(PendingApproval approval) {
+    public synchronized void save(PendingApproval approval) {
+        SessionKey sessionKey = new SessionKey(approval.run().userId(), approval.run().sessionId());
         approvals.put(approval.approvalId(), approval);
+        String existing = sessionApprovals.putIfAbsent(sessionKey, approval.approvalId());
+        if (existing != null) {
+            approvals.remove(approval.approvalId());
+            throw new IllegalArgumentException("当前会话已有操作等待确认");
+        }
     }
 
     /** 同时校验 approvalId、用户和会话，不能只相信前端传来的 UUID。 */
     public PendingApproval require(String approvalId, String userId, String sessionId) {
         PendingApproval approval = Optional.ofNullable(approvals.get(approvalId))
                 .orElseThrow(() -> new IllegalArgumentException("确认请求不存在或已失效"));
-        if (approval.expired()) {
-            approvals.remove(approvalId);
-            throw new IllegalArgumentException("确认请求已超时，请重新发起任务");
-        }
         AgentRun run = approval.run();
         if (!run.userId().equals(userId) || !run.sessionId().equals(sessionId)) {
             throw new IllegalArgumentException("无权操作此确认请求");
@@ -46,26 +49,51 @@ public class PendingApprovalStore {
         return Optional.ofNullable(sessionDecisions.get(key(userId, sessionId, tool)));
     }
 
-    public void remove(String approvalId) {
-        approvals.remove(approvalId);
+    public synchronized void remove(String approvalId) {
+        PendingApproval removed = approvals.remove(approvalId);
+        if (removed != null) {
+            sessionApprovals.remove(
+                    new SessionKey(removed.run().userId(), removed.run().sessionId()), approvalId);
+        }
     }
 
-    /** 判断某会话是否仍有未完成的权限确认（供飞书等非桌面渠道在运行前提示用户）。 */
+    /** 返回会话当前等待中的审批，供界面刷新后恢复。 */
+    public synchronized Optional<PendingApprovalView> current(String userId, String sessionId) {
+        String approvalId = sessionApprovals.get(new SessionKey(userId, sessionId));
+        PendingApproval approval = approvalId == null ? null : approvals.get(approvalId);
+        if (approval == null || !approval.isWaiting()) return Optional.empty();
+        return Optional.of(PendingApprovalView.from(approval));
+    }
+
+    /** 服务端阻止绕过界面直接在 ASKING 会话中发起新轮次。 */
+    public synchronized void requireNoPending(String userId, String sessionId) {
+        if (sessionApprovals.containsKey(new SessionKey(userId, sessionId))) {
+            throw new IllegalArgumentException("当前会话仍有操作等待确认，请先处理或拒绝该操作");
+        }
+    }
+
+    /** 原子领取审批恢复权。 */
+    public PendingApproval claimForResume(
+            String approvalId, String userId, String sessionId, String runId) {
+        PendingApproval approval = require(approvalId, userId, sessionId);
+        approval.claimForResume(runId);
+        return approval;
+    }
+
+    /** 判断某会话是否仍有未完成的权限确认。 */
     public boolean hasPending(String userId, String sessionId) {
-        return approvals.values().stream()
-                .anyMatch(approval -> !approval.expired()
-                        && approval.run().userId().equals(userId)
-                        && approval.run().sessionId().equals(sessionId));
+        return sessionApprovals.containsKey(new SessionKey(userId, sessionId));
     }
 
     /** 会话被删除或用户显式清空会话时必须调用，避免内存长期累积。 */
-    public void clearSession(String userId, String sessionId) {
+    public synchronized void clearSession(String userId, String sessionId) {
         String prefix = userId + ":" + sessionId + ":";
         sessionDecisions.keySet().removeIf(key -> key.startsWith(prefix));
         approvals.entrySet().removeIf(entry -> {
             AgentRun run = entry.getValue().run();
             return run.userId().equals(userId) && run.sessionId().equals(sessionId);
         });
+        sessionApprovals.remove(new SessionKey(userId, sessionId));
     }
 
     private String key(String userId, String sessionId, ToolUseBlock tool) {
@@ -78,4 +106,6 @@ public class PendingApprovalStore {
             throw new IllegalStateException("无法生成工具授权指纹", exception);
         }
     }
+
+    private record SessionKey(String userId, String sessionId) {}
 }

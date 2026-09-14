@@ -5,6 +5,7 @@ import butvan.agent.agents.agent.event.AgentStreamEvent;
 import butvan.agent.agents.agent.permission.PermissionDecisionRequest;
 import butvan.agent.agents.agent.permission.PermissionDecisionResponse;
 import butvan.agent.agents.agent.permission.PermissionResumeRequest;
+import butvan.agent.agents.agent.permission.PendingApprovalView;
 import butvan.agent.agents.session.AgentStreamSession;
 import butvan.agent.network.annotation.ApiLog;
 import butvan.agent.network.dto.PlanResponse;
@@ -44,6 +45,16 @@ public class AgentController {
             @RequestBody PermissionDecisionRequest request
     ) {
         return agentService.decidePermission(request);
+    }
+
+    @ApiLog("查询会话待处理的工具权限确认")
+    @GetMapping("/{sessionId}/permission/pending")
+    public ResponseEntity<PendingApprovalView> currentPendingPermission(
+            @PathVariable String sessionId
+    ) {
+        return agentService.currentPendingApproval(sessionId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
     @ApiLog("恢复已确认的Agent对话SSE流")
