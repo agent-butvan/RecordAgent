@@ -24,14 +24,14 @@ import {
   createSessionApi,
   updateSessionTitleApi,
   deleteSessionApi,
-  submitPermissionDecision,
+  submitPermissionDecisions,
   fetchPendingPermission,
   generateSessionTitle,
   fetchSessionPermissionMode,
   updateSessionPermissionMode,
   cancelAgentChatRun,
 } from './services/api';
-import type { PermissionToolPayload } from './services/api';
+import type { PermissionDecisionInput, PermissionToolPayload } from './services/api';
 import type {
   AgentAnalysisContextRequest,
   ChatSession,
@@ -93,7 +93,7 @@ interface PendingPermissionState {
   assistantMessageId: string;
   approvalId: string;
   runId: string;
-  tool: PermissionToolPayload | null;
+  tools: PermissionToolPayload[];
 }
 
 function markAssistantTerminal(
@@ -435,7 +435,7 @@ export const MainLayout: React.FC<{
             assistantMessageId,
             approvalId: pending.approvalId,
             runId: pending.runId,
-            tool: pending.tool,
+            tools: pending.tools,
           },
         };
       });
@@ -841,7 +841,7 @@ export const MainLayout: React.FC<{
             assistantMessageId: assistantMsgId,
             approvalId: permissionPayload.approvalId,
             runId: permissionPayload.runId,
-            tool: permissionPayload.tool,
+            tools: permissionPayload.tools,
           },
         }));
       },
@@ -949,7 +949,7 @@ export const MainLayout: React.FC<{
             assistantMessageId: current.assistantMessageId,
             approvalId: permissionPayload.approvalId,
             runId: permissionPayload.runId,
-            tool: permissionPayload.tool,
+            tools: permissionPayload.tools,
           },
         }));
       },
@@ -968,30 +968,19 @@ export const MainLayout: React.FC<{
     );
   };
 
-  /** 前端逐条提交决定；最后一条完成后恢复原 Agent 运行。 */
-  const handlePermissionDecision = async (approved: boolean, rememberForSession: boolean) => {
-    const currentTool = activePendingPermission?.tool;
-    if (!activePendingPermission || !currentTool || isPermissionSubmitting) return;
+  /** 一次提交整批决定；成功后恢复原 Agent 运行。 */
+  const handlePermissionDecision = async (decisions: PermissionDecisionInput[]) => {
+    if (!activePendingPermission || activePendingPermission.tools.length === 0
+        || decisions.length === 0 || isPermissionSubmitting) return;
     const current = activePendingPermission;
     setIsPermissionSubmitting(true);
     try {
-      const result = await submitPermissionDecision({
+      const result = await submitPermissionDecisions({
         sessionId: current.sessionId,
         approvalId: current.approvalId,
-        toolCallId: currentTool.toolCallId,
-        approved,
-        rememberForSession,
+        decisions,
       });
-
-      if (!result.readyToResume && result.nextTool) {
-        setPendingPermissions((previous) => ({
-          ...previous,
-          [current.sessionId]: { ...current, tool: result.nextTool },
-        }));
-        return;
-      }
-
-      await resumePendingPermission(current);
+      if (result.readyToResume) await resumePendingPermission(current);
     } catch {
       updateAssistantMessage(current.sessionId, current.assistantMessageId, (message) => ({
         ...message,
@@ -1003,7 +992,7 @@ export const MainLayout: React.FC<{
   };
 
   const handlePermissionResume = async () => {
-    if (!activePendingPermission || activePendingPermission.tool !== null || isPermissionSubmitting) return;
+    if (!activePendingPermission || activePendingPermission.tools.length > 0 || isPermissionSubmitting) return;
     setIsPermissionSubmitting(true);
     try {
       await resumePendingPermission(activePendingPermission);

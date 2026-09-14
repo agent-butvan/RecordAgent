@@ -4,9 +4,11 @@ import butvan.agent.agents.agent.run.AgentRun;
 import io.agentscope.core.event.ConfirmResult;
 import io.agentscope.core.message.ToolUseBlock;
 
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /** 一次 Permission Ask 产生的一批待审核工具及其恢复状态。 */
@@ -47,6 +49,30 @@ public final class PendingApproval {
         decisions.put(toolCallId, new Decision(approved));
     }
 
+    /** 原子保存前端对当前剩余工具的整批决定，避免部分提交造成审批状态不完整。 */
+    public synchronized void decideBatch(List<PermissionToolDecision> requestedDecisions) {
+        requireWaiting();
+        if (requestedDecisions == null || requestedDecisions.isEmpty()) {
+            throw new IllegalArgumentException("权限决定不能为空");
+        }
+        Set<String> pendingIds = pendingTools().stream()
+                .map(PermissionToolDto::toolCallId)
+                .collect(java.util.stream.Collectors.toSet());
+        Set<String> requestedIds = new HashSet<>();
+        for (PermissionToolDecision requested : requestedDecisions) {
+            if (requested == null || requested.toolCallId() == null
+                    || !pendingIds.contains(requested.toolCallId())
+                    || !requestedIds.add(requested.toolCallId())) {
+                throw new IllegalArgumentException("待确认工具不存在、已经处理或重复提交");
+            }
+        }
+        if (!requestedIds.equals(pendingIds)) {
+            throw new IllegalArgumentException("必须一次提交当前批次的全部待确认工具");
+        }
+        requestedDecisions.forEach(requested -> decisions.put(
+                requested.toolCallId(), new Decision(requested.approved())));
+    }
+
     public synchronized PermissionToolDto nextTool() {
         if (state != State.WAITING) return null;
         for (int i = 0; i < tools.size(); i++) {
@@ -56,6 +82,15 @@ public final class PendingApproval {
             }
         }
         return null;
+    }
+
+    /** 返回当前仍待用户决定的整批工具，保持 AgentScope 原始顺序。 */
+    public synchronized List<PermissionToolDto> pendingTools() {
+        if (state != State.WAITING) return List.of();
+        return java.util.stream.IntStream.range(0, tools.size())
+                .filter(index -> !decisions.containsKey(tools.get(index).getId()))
+                .mapToObj(index -> PermissionToolDto.from(tools.get(index), index + 1, tools.size()))
+                .toList();
     }
 
     public synchronized boolean allDecided() {

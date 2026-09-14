@@ -1,7 +1,7 @@
 package butvan.agent.agents.agent.permission;
 
 /**
- * 单条决定保存后的结果,前端据此展示下一条或开始恢复流
+ * 权限决定保存后的结果；旧单条接口可返回下一条，批量接口完成后直接允许恢复。
  */
 public record PermissionDecisionResponse(
         boolean readyToResume,

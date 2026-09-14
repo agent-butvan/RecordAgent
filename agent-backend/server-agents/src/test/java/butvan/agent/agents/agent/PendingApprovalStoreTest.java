@@ -2,6 +2,7 @@ package butvan.agent.agents.agent;
 
 import butvan.agent.agents.agent.permission.PendingApproval;
 import butvan.agent.agents.agent.permission.PendingApprovalStore;
+import butvan.agent.agents.agent.permission.PermissionToolDecision;
 import butvan.agent.agents.agent.run.AgentRun;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.message.ToolUseBlock;
@@ -74,18 +75,39 @@ class PendingApprovalStoreTest {
 
         var view = store.current("local-default", "session-1").orElseThrow();
         assertEquals("run-1", view.runId());
-        assertEquals("call-1", view.tool().toolCallId());
+        assertEquals("call-1", view.tools().getFirst().toolCallId());
         assertThrows(IllegalArgumentException.class,
                 () -> store.claimForResume(approval.approvalId(), "local-default", "session-1", "other-run"));
 
         approval.decide("call-1", true);
         var readyView = store.current("local-default", "session-1").orElseThrow();
         assertTrue(readyView.readyToResume());
-        assertTrue(readyView.tool() == null);
+        assertTrue(readyView.tools().isEmpty());
         store.claimForResume(approval.approvalId(), "local-default", "session-1", "run-1");
         assertFalse(approval.isWaiting());
         assertThrows(IllegalArgumentException.class,
                 () -> store.claimForResume(approval.approvalId(), "local-default", "session-1", "run-1"));
+    }
+
+    @Test
+    void batchDecisionRequiresEveryPendingToolAndCommitsAtomically() {
+        AgentRun run = new AgentRun("session-1", "local-default", "turn-1",
+                RuntimeContext.builder().userId("local-default").sessionId("session-1").build());
+        PendingApproval approval = new PendingApproval(run, List.of(
+                new ToolUseBlock("call-1", "execute", Map.of("command", "ls")),
+                new ToolUseBlock("call-2", "write_file", Map.of("path", "/tmp/a.txt"))));
+
+        assertThrows(IllegalArgumentException.class, () -> approval.decideBatch(List.of(
+                new PermissionToolDecision("call-1", true, false))));
+        assertFalse(approval.allDecided());
+        assertEquals(2, approval.pendingTools().size());
+
+        approval.decideBatch(List.of(
+                new PermissionToolDecision("call-1", true, false),
+                new PermissionToolDecision("call-2", false, false)));
+        assertTrue(approval.allDecided());
+        assertEquals(List.of(true, false), approval.toConfirmResults().stream()
+                .map(result -> result.isConfirmed()).toList());
     }
 
     @Test

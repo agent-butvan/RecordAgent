@@ -24,7 +24,7 @@ import { SlashCommandResult, type SlashCommandResultData } from './SlashCommandR
 import { RecordReferencePicker } from './RecordReferencePicker';
 import { RecordReferenceChip } from './RecordReferenceChip';
 import { AnalysisPrivacyCard } from './AnalysisPrivacyCard';
-import type { PermissionToolPayload } from '../../services/api';
+import type { PermissionDecisionInput, PermissionToolPayload } from '../../services/api';
 import { fetchRecordReferences } from '../../services/recordApi';
 import { fetchDailyInsight } from '../../services/dailyInsightApi';
 import { fetchDailyDay } from '../../services/dailyEvents';
@@ -93,9 +93,9 @@ interface ChatWorkspaceProps {
   ) => void;
   onOpenSettings: () => void;
   onRenameSession: (title: string) => Promise<{ success: boolean; message?: string }>;
-  pendingPermission?: { assistantMessageId: string; tool: PermissionToolPayload | null } | null;
+  pendingPermission?: { assistantMessageId: string; tools: PermissionToolPayload[] } | null;
   isPermissionSubmitting?: boolean;
-  onPermissionDecision?: (approved: boolean, rememberForSession: boolean) => void;
+  onPermissionDecision?: (decisions: PermissionDecisionInput[]) => void;
   onPermissionResume?: () => void;
   subagentTasks: TaskDto[];
   isSubagentTasksLoading: boolean;
@@ -804,20 +804,24 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
 
   const inputArea = pendingPermission && onPermissionDecision ? (
     <div className={`${styles.permissionContainer} ${isOverview ? styles.bottomContainerOverview : ''}`}>
-      {pendingPermission.tool === null ? (
+      {pendingPermission.tools.length === 0 ? (
         <PermissionResumeCard
           isSubmitting={Boolean(isPermissionSubmitting)}
           onResume={() => onPermissionResume?.()}
         />
-      ) : pendingPermission.tool.toolName === 'plan_exit' ? (
+      ) : pendingPermission.tools.length === 1 && pendingPermission.tools[0].toolName === 'plan_exit' ? (
         <PlanApprovalCard
           sessionId={sessionId}
           isSubmitting={isPermissionSubmitting}
-          onDecision={onPermissionDecision}
+          onDecision={(approved, rememberForSession) => onPermissionDecision([{
+            toolCallId: pendingPermission.tools[0].toolCallId,
+            approved,
+            rememberForSession,
+          }])}
         />
       ) : (
         <PermissionRequestCard
-          tool={pendingPermission.tool}
+          tools={pendingPermission.tools}
           isSubmitting={isPermissionSubmitting}
           onDecision={onPermissionDecision}
         />

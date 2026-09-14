@@ -83,6 +83,6 @@
 
 - Controller 只负责请求转换、当前用户解析与响应包装；领域规则必须位于 Service 或类型处理器。
 - Agent 聊天流必须使用稳定 `runId`；`POST /agent/chat/runs/{runId}/cancel` 只做身份、session 与 DTO 适配，实际取消行为必须委托 `server-agents` 的活动运行注册表。该接口应幂等，响应的 `accepted` 只表示服务端已接管，前端只能以 SSE `cancelled` 或详情同步判定终态。
-- HITL 使用 `POST /agent/chat/permission/decision` 逐项决定、`POST /agent/chat/permission/resume` 恢复原运行，并由 `GET /agent/chat/{sessionId}/permission/pending` 返回刷新恢复所需的权威快照；恢复请求的 `runId` 必须与审批创建时一致。
+- HITL 使用 `POST /agent/chat/permission/decisions` 原子提交当前批次的全部未决工具决定、`POST /agent/chat/permission/resume` 恢复原运行，并由 `GET /agent/chat/{sessionId}/permission/pending` 返回包含全部未决工具的权威快照；恢复请求的 `runId` 必须与审批创建时一致。旧的单条决定接口仅保留兼容，不得作为桌面端主流程。
 - 日历月视图只能读取轻量日期摘要；完整手记和类型详情按日加载。
 - SQLite 集成测试必须通过公开 Service 或 HTTP 接口验证行为，不得把私有 SQL 实现作为测试契约。

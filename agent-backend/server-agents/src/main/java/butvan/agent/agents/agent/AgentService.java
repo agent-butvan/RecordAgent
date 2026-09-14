@@ -292,12 +292,29 @@ public class AgentService {
         pendingApprovalStore.save(approval);
         checkpointService.save(run);
 
-        PermissionToolDto first = approval.nextTool();
         return putEvent(
                 streamSession,
                 new AgentStreamEvent.PermissionRequired(
-                        approval.approvalId(), approval.runId(), run.turnId(), first)
+                        approval.approvalId(), approval.runId(), run.turnId(), approval.pendingTools())
         );
+    }
+
+    /** 原子保存当前批次的全部审核决定，完成后由前端恢复原运行。 */
+    public PermissionDecisionResponse decidePermissions(PermissionBatchDecisionRequest request) {
+        String userId = currentUserProvider.currentUserId();
+        sessionCatalogService.requireActive(request.sessionId());
+        PendingApproval approval = pendingApprovalStore.require(
+                request.approvalId(), userId, request.sessionId());
+        approval.decideBatch(request.decisions());
+
+        for (PermissionToolDecision decision : request.decisions()) {
+            if (decision.rememberForSession()) {
+                ToolUseBlock tool = approval.findTool(decision.toolCallId());
+                pendingApprovalStore.remember(
+                        userId, request.sessionId(), tool, decision.approved());
+            }
+        }
+        return PermissionDecisionResponse.ready();
     }
 
     public PermissionDecisionResponse decidePermission(PermissionDecisionRequest request) {

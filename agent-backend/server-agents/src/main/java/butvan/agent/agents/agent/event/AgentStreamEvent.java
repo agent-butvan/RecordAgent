@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Map;
+import java.util.List;
 
 /**
  * Agent 对话流在业务层和网络层之间传递的标准事件。
@@ -192,7 +193,7 @@ public sealed interface AgentStreamEvent permits AgentStreamEvent.RunStarted, Ag
             String approvalId,
             String runId,
             String turnId,
-            PermissionToolDto firstTool
+            List<PermissionToolDto> tools
     ) implements AgentStreamEvent{
 
         @Override
@@ -206,7 +207,7 @@ public sealed interface AgentStreamEvent permits AgentStreamEvent.RunStarted, Ag
                     "approvalId", approvalId,
                     "runId", runId,
                     "turnId", turnId,
-                    "tool", firstTool
+                    "tools", tools
             );
         }
 

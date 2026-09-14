@@ -1,6 +1,7 @@
 package butvan.agent.agents.agent.permission;
 
 import java.time.Instant;
+import java.util.List;
 
 /** 前端恢复待审批界面所需的权威快照。 */
 public record PendingApprovalView(
@@ -11,7 +12,7 @@ public record PendingApprovalView(
         String partialContent,
         Instant startedAt,
         boolean readyToResume,
-        PermissionToolDto tool
+        List<PermissionToolDto> tools
 ) {
     public static PendingApprovalView from(PendingApproval approval) {
         return new PendingApprovalView(
@@ -22,7 +23,7 @@ public record PendingApprovalView(
                 approval.run().contentAsString(),
                 approval.run().startedAt(),
                 approval.allDecided(),
-                approval.nextTool()
+                approval.pendingTools()
         );
     }
 }

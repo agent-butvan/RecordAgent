@@ -216,7 +216,7 @@ export interface ToolResultPayload {
   result?: string;
 }
 
-/** 后端要求用户确认时返回的单条高风险工具。 */
+/** 后端要求用户确认时返回的高风险工具。 */
 export interface PermissionToolPayload {
   toolCallId: string;
   toolName: string;
@@ -230,15 +230,20 @@ export interface PermissionRequiredPayload {
   approvalId: string;
   runId: string;
   turnId: string;
-  tool: PermissionToolPayload;
+  tools: PermissionToolPayload[];
 }
 
-export interface PendingApprovalPayload extends Omit<PermissionRequiredPayload, 'tool'> {
+export interface PendingApprovalPayload extends PermissionRequiredPayload {
   sessionId: string;
   partialContent: string;
   startedAt: string;
   readyToResume: boolean;
-  tool: PermissionToolPayload | null;
+}
+
+export interface PermissionDecisionInput {
+  toolCallId: string;
+  approved: boolean;
+  rememberForSession: boolean;
 }
 
 export interface PermissionDecisionResponse {
@@ -257,15 +262,13 @@ function isSubagentProgressDto(value: unknown): value is SubagentProgressDto {
   );
 }
 
-/** 提交一条工具授权决定；本批全部完成时响应会标记 readyToResume。 */
-export async function submitPermissionDecision(params: {
+/** 原子提交同一审批批次的全部工具授权决定。 */
+export async function submitPermissionDecisions(params: {
   sessionId: string;
   approvalId: string;
-  toolCallId: string;
-  approved: boolean;
-  rememberForSession: boolean;
+  decisions: PermissionDecisionInput[];
 }): Promise<PermissionDecisionResponse> {
-  const response = await fetch(`${apiBaseUrl}/agent/chat/permission/decision`, {
+  const response = await fetch(`${apiBaseUrl}/agent/chat/permission/decisions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params),
