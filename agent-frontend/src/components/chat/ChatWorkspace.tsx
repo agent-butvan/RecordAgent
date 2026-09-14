@@ -57,6 +57,7 @@ import {
 } from '../../features/slash-command/analysisCommands';
 import { parseSlashCommandDisplayArguments } from '../../features/slash-command/slashCommandDisplay';
 import { buildSlashStatusData } from '../../features/slash-command/slashCommandStatus';
+import { parseDirectRecordReferenceQuery } from '../../features/record/recordReferenceInput';
 import {
   Copy,
   ThumbsUp,
@@ -238,9 +239,9 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   const [recordReferences, setRecordReferences] = useState<RecordReferenceOption[]>([]);
   const [recordReferenceIndex, setRecordReferenceIndex] = useState(0);
   const [recordReferenceSelection, setRecordReferenceSelection] = useState<{
-    command: RecordReferenceCommandName | null;
+    mode: RecordReferenceCommandName | 'direct' | null;
     items: RecordReferenceOption[];
-  }>({ command: null, items: [] });
+  }>({ mode: null, items: [] });
   const [recordReferencesLoading, setRecordReferencesLoading] = useState(false);
   const [recordReferencesLoadingMore, setRecordReferencesLoadingMore] = useState(false);
   const [recordReferencesError, setRecordReferencesError] = useState<string | null>(null);
@@ -269,10 +270,18 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   const activeRecordReferenceCommand = asRecordReferenceCommand(
     selectedCommand?.name ?? parseSlashCommand(inputPrompt)?.name ?? '',
   );
+  const directRecordReferenceQuery = !selectedCommand
+    ? parseDirectRecordReferenceQuery(
+      inputPrompt,
+      recordReferenceSelection.mode === 'direct' ? recordReferenceSelection.items.length : 0,
+    )
+    : null;
+  const activeRecordReferenceMode = activeRecordReferenceCommand
+    ?? (directRecordReferenceQuery !== null || recordReferenceSelection.mode === 'direct' ? 'direct' : null);
   const selectedRecordReferences = useMemo(
-    () => recordReferenceSelection.command === activeRecordReferenceCommand
+    () => recordReferenceSelection.mode === activeRecordReferenceMode
       ? recordReferenceSelection.items : [],
-    [activeRecordReferenceCommand, recordReferenceSelection],
+    [activeRecordReferenceMode, recordReferenceSelection],
   );
   const selectedReferenceCommand = asRecordReferenceCommand(selectedCommand?.name ?? '');
   const selectedCommandCanSend = Boolean(selectedCommand)
@@ -280,8 +289,9 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     && (!selectedReferenceCommand
       || selectedRecordReferences.length === RECORD_REFERENCE_LIMITS[selectedReferenceCommand]);
   const recordReferenceQuery = useMemo(() => {
-    return parseRecordReferencePickerQuery(composedInputPrompt, selectedRecordReferences.length);
-  }, [composedInputPrompt, selectedRecordReferences.length]);
+    return directRecordReferenceQuery
+      ?? parseRecordReferencePickerQuery(composedInputPrompt, selectedRecordReferences.length);
+  }, [composedInputPrompt, directRecordReferenceQuery, selectedRecordReferences.length]);
   const availableRecordReferences = useMemo(() => {
     const selectedIds = new Set(selectedRecordReferences.map((item) => item.id));
     return recordReferences.filter((item) => !selectedIds.has(item.id));
@@ -472,9 +482,15 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     const nextCommand = asRecordReferenceCommand(
       selectedCommand?.name ?? parseSlashCommand(value)?.name ?? '',
     );
-    setRecordReferenceSelection((current) => current.command && current.command !== nextCommand
-      ? { command: null, items: [] }
-      : current);
+    setRecordReferenceSelection((current) => {
+      if (current.mode === 'direct') {
+        if (selectedCommand || current.items.length > 0) return current;
+        return parseDirectRecordReferenceQuery(value, 0) !== null ? current : { mode: null, items: [] };
+      }
+      return current.mode && current.mode !== nextCommand
+        ? { mode: null, items: [] }
+        : current;
+    });
     setCommandMenuDismissed(false);
     setCommandSelectedIndex(0);
   };
@@ -601,7 +617,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     const referenceCommand = asRecordReferenceCommand(command.name);
     if (referenceCommand) {
       const requiredCount = RECORD_REFERENCE_LIMITS[referenceCommand];
-      if (recordReferenceSelection.command !== referenceCommand
+      if (recordReferenceSelection.mode !== referenceCommand
           || recordReferenceSelection.items.length !== requiredCount) {
         setCommandResult({
           kind: 'error',
@@ -617,7 +633,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
           ? `请为引用资料生成结构化摘要，包括核心主题、关键观点、重要细节和可执行结论；只依据资料内容，不确定之处请明确说明。${parsed.args ? `\n\n用户补充要求：${parsed.args}` : ''}`
           : `请比较两篇引用资料，分别概括核心观点，并列出共同点、关键差异、可能的互补关系与可执行结论；只依据资料内容。${parsed.args ? `\n\n用户补充要求：${parsed.args}` : ''}`;
       const displayPrompt = `/${referenceCommand} [${referenceLabels}]${parsed.args ? ` ${parsed.args}` : ''}`;
-      setRecordReferenceSelection({ command: null, items: [] });
+      setRecordReferenceSelection({ mode: null, items: [] });
       setCommandResult(null);
       onSendMessage(displayPrompt, modelContext, references.map((item) => item.id));
       return;
@@ -644,7 +660,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   const selectCommand = (command: SlashCommandDefinition) => {
     if (command.presentation.selection === 'IMMEDIATE') {
       setSelectedCommand(null);
-      setRecordReferenceSelection({ command: null, items: [] });
+      setRecordReferenceSelection({ mode: null, items: [] });
       setInputPrompt('');
       setCommandMenuDismissed(true);
       void executeSlashCommand(`/${command.name}`);
@@ -655,11 +671,11 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     setCommandMenuDismissed(true);
     setCommandResult(null);
     if (referenceCommand) {
-      setRecordReferenceSelection({ command: referenceCommand, items: [] });
+      setRecordReferenceSelection({ mode: referenceCommand, items: [] });
       setInputPrompt('?');
       return;
     }
-    setRecordReferenceSelection({ command: null, items: [] });
+    setRecordReferenceSelection({ mode: null, items: [] });
     setInputPrompt('');
   };
 
@@ -668,18 +684,19 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
       setInputPrompt('');
     }
     setSelectedCommand(null);
-    setRecordReferenceSelection({ command: null, items: [] });
+    setRecordReferenceSelection({ mode: null, items: [] });
     setCommandMenuDismissed(false);
   };
 
   const selectRecordReference = (reference: RecordReferenceOption) => {
-    if (!activeRecordReferenceCommand) return;
-    const command = activeRecordReferenceCommand;
+    if (!activeRecordReferenceMode) return;
+    const command = activeRecordReferenceMode;
+    const limit = command === 'direct' ? 1 : RECORD_REFERENCE_LIMITS[command];
     const nextItems = [...selectedRecordReferences, reference]
       .filter((item, index, items) => items.findIndex((candidate) => candidate.id === item.id) === index)
-      .slice(0, RECORD_REFERENCE_LIMITS[command]);
-    setRecordReferenceSelection({ command, items: nextItems });
-    setInputPrompt(nextItems.length < RECORD_REFERENCE_LIMITS[command] ? '?' : '');
+      .slice(0, limit);
+    setRecordReferenceSelection({ mode: command, items: nextItems });
+    setInputPrompt(nextItems.length < limit ? '?' : '');
     setRecordReferenceIndex(0);
     setRecordReferencesError(null);
   };
@@ -751,6 +768,17 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   const handleSend = () => {
     if (!selectedCommand && !inputPrompt.trim()) return;
     if (selectedCommand && !selectedCommandCanSend) return;
+    if (!selectedCommand && recordReferenceSelection.mode === 'direct'
+        && selectedRecordReferences.length === 1) {
+      const question = inputPrompt.trim();
+      const reference = selectedRecordReferences[0];
+      const displayPrompt = `[资料：${reference.title || '无标题资料'}] ${question}`;
+      setInputPrompt('');
+      setRecordReferenceSelection({ mode: null, items: [] });
+      setCommandMenuDismissed(false);
+      onSendMessage(displayPrompt, question, [reference.id]);
+      return;
+    }
     const prompt = selectedCommand ? composedInputPrompt : inputPrompt.trim();
     setInputPrompt('');
     setSelectedCommand(null);
@@ -833,10 +861,10 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
               key={reference.id}
               reference={reference}
               onRemove={() => {
-                const command = activeRecordReferenceCommand ?? recordReferenceSelection.command;
+                const command = activeRecordReferenceMode ?? recordReferenceSelection.mode;
                 if (!command) return;
                 setRecordReferenceSelection((current) => ({
-                  command,
+                  mode: command,
                   items: current.items.filter((item) => item.id !== reference.id),
                 }));
                 setInputPrompt('?');
@@ -1028,6 +1056,17 @@ function UserMessageContent({ content }: { content: string }) {
   const parsed = parseSlashCommand(content);
   const command = parsed ? findSlashCommand(parsed.name) : undefined;
   if (!parsed || !command || command.presentation.selection !== 'COMPOSE') {
+    const directDisplay = parseSlashCommandDisplayArguments(content);
+    if (directDisplay.referenceTitles.length > 0) {
+      return (
+        <div className={`${styles.userMessage} ${styles.slashUserMessage}`}>
+          {directDisplay.referenceTitles.map((title, index) => (
+            <RecordReferenceTag key={`${title}-${index}`} title={title} />
+          ))}
+          {directDisplay.prompt && <span>{directDisplay.prompt}</span>}
+        </div>
+      );
+    }
     return <div className={styles.userMessage}>{content}</div>;
   }
   const display = parseSlashCommandDisplayArguments(parsed.args);
