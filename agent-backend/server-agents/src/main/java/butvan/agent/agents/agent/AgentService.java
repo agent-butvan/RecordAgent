@@ -8,6 +8,7 @@ import butvan.agent.agents.agent.run.ActiveAgentRunRegistry;
 import butvan.agent.agents.context.ContextEnvelope;
 import butvan.agent.agents.context.ContextRequest;
 import butvan.agent.agents.context.ConversationContextAssembler;
+import butvan.agent.agents.context.ProfileMaintenanceScheduler;
 import butvan.agent.agents.identity.CurrentUserProvider;
 import butvan.agent.agents.model.ModelHolder;
 import butvan.agent.agents.model.ModelSelector;
@@ -55,6 +56,7 @@ public class AgentService {
     private final AgentRunCompleter agentRunCompleter;
     private final AgentRunCheckpointService checkpointService;
     private final ConversationContextAssembler contextAssembler;
+    private final ProfileMaintenanceScheduler profileMaintenanceScheduler;
     private final ActiveAgentRunRegistry activeRunRegistry;
 
     /**
@@ -211,6 +213,7 @@ public class AgentService {
             if (mapped != null && mapped.isTerminal()) {
                 // 先持久化再发送终态，确保前端收到 done 后能立即读取完整消息与 usage。
                 if (agentRunCompleter.tryComplete(run, TranscriptMessageDto.MessageStatus.COMPLETED)) {
+                    profileMaintenanceScheduler.consider(run.userId());
                     putEvent(streamSession, mapped);
                 } else {
                     putEvent(streamSession,
@@ -231,6 +234,7 @@ public class AgentService {
 
         // 事件流自然结束：正常收尾
         if (agentRunCompleter.tryComplete(run, TranscriptMessageDto.MessageStatus.COMPLETED)) {
+            profileMaintenanceScheduler.consider(run.userId());
             putEvent(streamSession, new AgentStreamEvent.Completed());
         } else {
             putEvent(streamSession,

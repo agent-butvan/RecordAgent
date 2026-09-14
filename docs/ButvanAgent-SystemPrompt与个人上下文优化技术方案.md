@@ -1,7 +1,7 @@
 # ButvanAgent System Prompt 与个人上下文优化技术方案
 
-> 状态：Phase 1～3 核心链路与用户控制已实现；低频画像自动维护、revision 缓存与 40 条质量回归集待后续补齐
-> 日期：2026-09-13
+> 状态：Phase 1～3 核心链路、低频画像辅助维护与用户审核闭环已实现；40 条质量回归集待后续补齐
+> 日期：2026-09-14
 
 ## 1. 结论
 
@@ -227,7 +227,9 @@ context.allowSensitiveRecall = false
 - 每次组装记录候选数、命中数、丢弃原因、各块 Token、来源和 profile revision；日志只记录路径与数字，不记录个人正文。
 - Profile 提供查看、编辑、暂停和清空入口；敏感信息默认不自动召回到云模型。
 
-已实现的设置接口为：`GET /agent/personal-context` 查询状态，`PUT /agent/personal-context/profile` 保存画像，`PUT /agent/personal-context/enabled` 更新开关，`DELETE /agent/personal-context/profile` 清空画像。接口只作用于 `CurrentUserProvider` 解析出的当前本地用户，不接受调用方传入用户 ID。
+已实现的设置接口为：`GET /agent/personal-context` 查询状态，`PUT /agent/personal-context/profile` 保存画像，`PUT /agent/personal-context/enabled` 更新注入开关，`DELETE /agent/personal-context/profile` 清空画像；`GET /agent/personal-context/maintenance` 查询维护状态，`PUT /agent/personal-context/maintenance/enabled` 更新维护开关，`POST /agent/personal-context/maintenance/check` 主动检查，`PUT /agent/personal-context/proposals/{id}/accept` 确认提案，`DELETE /agent/personal-context/proposals/{id}` 拒绝提案。接口只作用于 `CurrentUserProvider` 解析出的当前本地用户，不接受调用方传入用户 ID。
+
+辅助维护默认关闭。开启后仅在成功完成聊天、记忆指纹发生变化且距上次检查超过 24 小时时后台调用一次当前模型；输入记忆上限 1,200 Token，敏感片段先在本地过滤。模型只能返回带来源、置信度不低于 0.7 且完整画像不超过 300 Token 的结构化提案。提案不会进入 transcript 或 AgentState，也不会直接写画像；用户确认时必须通过 `baseRevision` 并发校验，成功后保留最近 20 个画像历史版本。维护模型调用以 `PROFILE_MAINTENANCE` 单独记入系统用量账本。
 
 ## 10. 分阶段实施
 
@@ -257,7 +259,7 @@ context.allowSensitiveRecall = false
 - 接入低频 profile 维护和 revision 缓存。
 - 增加候选 Profile 的确认、编辑、暂停和清空，以及个人上下文开关和用量明细 UI。
 
-当前已交付查看、编辑、暂停、清空、兼容来源提示与个人上下文总开关；Profile 与 Memory Recall 已在聊天轮次、SQLite 读模型和前端用量页中独立归因。低频自动维护和 revision 缓存未随本阶段启用，避免未经用户确认的模型调用自动改写画像，待质量回归集建立后再单独评审。
+当前已交付查看、编辑、暂停、清空、兼容来源提示、个人上下文总开关，以及默认关闭的画像辅助维护。Profile 与 Memory Recall 已在聊天轮次、SQLite 读模型和前端用量页中独立归因；低频维护调用使用独立系统用途。画像 revision、单待审提案、接受前编辑、确认/拒绝和历史版本已经形成闭环，后台检查不会未经用户确认改写画像。
 
 每个 Phase 独立提交、独立回滚，不一次性重写 AgentScope 会话或记忆持久化。
 

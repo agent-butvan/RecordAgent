@@ -115,6 +115,21 @@ public class AgentStorageProperties {
         return userWorkspaceDirectory(userId).resolve("profile").resolve("settings.json");
     }
 
+    /** 返回画像维护状态文件。 */
+    public Path personalContextMaintenanceFile(String userId) {
+        return userWorkspaceDirectory(userId).resolve("profile").resolve("maintenance.json");
+    }
+
+    /** 返回当前唯一待审核画像提案文件。 */
+    public Path personalContextPendingProposalFile(String userId) {
+        return userWorkspaceDirectory(userId).resolve("profile").resolve("proposals").resolve("pending.json");
+    }
+
+    /** 返回已确认画像的历史版本目录。 */
+    public Path personalContextHistoryDirectory(String userId) {
+        return userWorkspaceDirectory(userId).resolve("profile").resolve("history");
+    }
+
     private void createDirectories(Path directory) {
         try {
             Files.createDirectories(directory);

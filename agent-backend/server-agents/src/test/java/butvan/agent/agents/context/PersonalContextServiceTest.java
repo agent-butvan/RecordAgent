@@ -31,11 +31,14 @@ class PersonalContextServiceTest {
 
         assertEquals("legacy", service.get("local-default").source());
         assertEquals("偏好简短中文。", service.get("local-default").content());
+        assertFalse(service.get("local-default").maintenanceEnabled());
 
         assertEquals("显式画像", service.save("local-default", "  显式画像  ").content());
         assertEquals("explicit", service.get("local-default").source());
         assertFalse(service.setEnabled("local-default", false).enabled());
         assertTrue(service.setEnabled("local-default", true).enabled());
+        assertTrue(service.setMaintenanceEnabled("local-default", true).maintenanceEnabled());
+        assertTrue(service.get("local-default").enabled());
 
         PersonalContextProfile cleared = service.clear("local-default");
         assertEquals("", cleared.content());

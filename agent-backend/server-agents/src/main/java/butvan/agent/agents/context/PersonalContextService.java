@@ -14,6 +14,9 @@ import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -47,12 +50,13 @@ public class PersonalContextService {
             source = content == null || content.isBlank() ? "empty" : "legacy";
         }
         String normalized = content == null ? "" : content.strip();
-        return new PersonalContextProfile(isEnabled(userId), normalized, source,
-                tokenCounter.count(normalized));
+        Settings settings = readSettings(userId);
+        return new PersonalContextProfile(settings.enabled(), settings.maintenanceEnabled(),
+                normalized, source, tokenCounter.count(normalized), revision(normalized));
     }
 
     /** 保存显式画像，内容在注入时仍会受独立 Token 预算裁剪。 */
-    public PersonalContextProfile save(String userId, String content) {
+    public synchronized PersonalContextProfile save(String userId, String content) {
         String normalized = content == null ? "" : content.strip();
         if (normalized.length() > MAX_PROFILE_CHARS) {
             throw new IllegalArgumentException("个人画像不能超过 " + MAX_PROFILE_CHARS + " 个字符");
@@ -62,31 +66,60 @@ public class PersonalContextService {
     }
 
     /** 清空自动注入画像；保留显式空文件以避免兼容来源重新出现。 */
-    public PersonalContextProfile clear(String userId) {
+    public synchronized PersonalContextProfile clear(String userId) {
         writeAtomically(storageProperties.personalContextProfileFile(userId), "");
         return get(userId);
     }
 
     /** 开启或暂停画像与相关记忆自动注入，不删除已有内容。 */
-    public PersonalContextProfile setEnabled(String userId, boolean enabled) {
-        try {
-            writeAtomically(storageProperties.personalContextSettingsFile(userId),
-                    objectMapper.writeValueAsString(Map.of("enabled", enabled)));
-        } catch (IOException exception) {
-            throw new IllegalStateException("保存个人上下文设置失败", exception);
-        }
+    public synchronized PersonalContextProfile setEnabled(String userId, boolean enabled) {
+        Settings current = readSettings(userId);
+        writeSettings(userId, new Settings(enabled, current.maintenanceEnabled()));
         return get(userId);
     }
 
-    private boolean isEnabled(String userId) {
+    /** 开启或关闭“自动生成提案、用户确认后应用”的辅助维护。 */
+    public synchronized PersonalContextProfile setMaintenanceEnabled(String userId, boolean enabled) {
+        Settings current = readSettings(userId);
+        writeSettings(userId, new Settings(current.enabled(), enabled));
+        return get(userId);
+    }
+
+    private Settings readSettings(String userId) {
         String json = readSmallFile(userId, storageProperties.personalContextSettingsFile(userId));
-        if (json == null || json.isBlank()) return true;
+        if (json == null || json.isBlank()) return Settings.defaults();
         try {
-            JsonNode enabled = objectMapper.readTree(json).get("enabled");
-            return enabled == null || !enabled.isBoolean() || enabled.asBoolean();
+            JsonNode root = objectMapper.readTree(json);
+            JsonNode enabled = root.get("enabled");
+            JsonNode maintenanceEnabled = root.get("maintenanceEnabled");
+            return new Settings(
+                    enabled == null || !enabled.isBoolean() || enabled.asBoolean(),
+                    maintenanceEnabled != null && maintenanceEnabled.isBoolean()
+                            && maintenanceEnabled.asBoolean());
         } catch (IOException exception) {
             log.warn("读取个人上下文设置失败，按启用处理：userId={}", userId, exception);
-            return true;
+            return Settings.defaults();
+        }
+    }
+
+    private void writeSettings(String userId, Settings settings) {
+        try {
+            writeAtomically(storageProperties.personalContextSettingsFile(userId),
+                    objectMapper.writeValueAsString(Map.of(
+                            "enabled", settings.enabled(),
+                            "maintenanceEnabled", settings.maintenanceEnabled())));
+        } catch (IOException exception) {
+            throw new IllegalStateException("保存个人上下文设置失败", exception);
+        }
+    }
+
+    private String revision(String content) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(content.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest, 0, 12);
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("当前运行环境缺少 SHA-256", exception);
         }
     }
 
@@ -138,5 +171,11 @@ public class PersonalContextService {
                 && !Files.isSymbolicLink(path.getParent())
                 && !Files.isSymbolicLink(path)
                 && Files.isRegularFile(path);
+    }
+
+    private record Settings(boolean enabled, boolean maintenanceEnabled) {
+        private static Settings defaults() {
+            return new Settings(true, false);
+        }
     }
 }

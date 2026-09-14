@@ -4,6 +4,7 @@ package butvan.agent.agents.usage;
 public enum UsagePurpose {
     CHAT,
     SESSION_TITLE,
+    PROFILE_MAINTENANCE,
     CONTEXT_COMPACTION,
     BACKGROUND_AGENT
 }

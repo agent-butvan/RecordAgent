@@ -38,8 +38,6 @@ public class ConversationContextAssembler {
     private static final Pattern HEADING_PATTERN = Pattern.compile("(?m)^#{1,4}\\s+(.+?)\\s*$");
     private static final Pattern ASCII_WORD = Pattern.compile("[a-z0-9][a-z0-9._-]*");
     private static final Pattern HAN_SEQUENCE = Pattern.compile("[\\p{IsHan}]{2,}");
-    private static final Pattern SENSITIVE_CONTENT = Pattern.compile(
-            "(?i)(api[_ -]?key|access[_ -]?token|password|passwd|secret|密码|密钥|令牌|身份证|银行卡|账户余额|病历)");
 
     private final AgentStorageProperties storageProperties;
     private final TokenCounter tokenCounter;
@@ -104,7 +102,7 @@ public class ConversationContextAssembler {
                 content = removeSection(content, "User Profile");
             }
             for (String chunk : chunks(content)) {
-                if (SENSITIVE_CONTENT.matcher(chunk).find()) continue;
+                if (PersonalContextSafety.containsSensitive(chunk)) continue;
                 double score = score(chunk, query, queryTerms);
                 if (score > 0) {
                     candidates.add(new ScoredChunk(relativeSource(userWorkspace, path), chunk, score));
