@@ -58,6 +58,7 @@ public class AgentService {
     private final ConversationContextAssembler contextAssembler;
     private final ProfileMaintenanceScheduler profileMaintenanceScheduler;
     private final ActiveAgentRunRegistry activeRunRegistry;
+    private final OrphanedToolCallRecovery orphanedToolCallRecovery;
 
     /**
      * 创建一次 HTTP 流对应的队列和生产虚拟线程。
@@ -117,6 +118,9 @@ public class AgentService {
             run = new AgentRun(request.sessionId(), userId, turnId, context);
             checkpointService.save(run);
 
+            // 仅新用户轮次修复进程重启遗留调用；HITL 恢复必须让 AgentScope 原样消费 ConfirmResult。
+            recoverOrphanedToolCalls(userId, request.sessionId());
+
             // 首 token 前收到停止请求时，也要保留用户消息和 CANCELLED assistant 终态。
             if (streamSession.isCancelled()) {
                 finishCancelled(run, streamSession);
@@ -152,6 +156,16 @@ public class AgentService {
             putEvent(streamSession, new AgentStreamEvent.Failed(userMessage));
         } finally {
             activeRunRegistry.unregister(userId, request.sessionId(), streamSession);
+        }
+    }
+
+    private void recoverOrphanedToolCalls(String userId, String sessionId) {
+        HarnessAgent agent = agentFactory.currentAgent(sessionId);
+        int recovered = orphanedToolCallRecovery.recover(
+                agent.getDelegate().getAgentState(userId, sessionId), agent.getName());
+        if (recovered > 0) {
+            agent.getDelegate().saveAgentState(userId, sessionId);
+            log.warn("已安全收尾进程遗留工具调用：sessionId={}, 数量={}", sessionId, recovered);
         }
     }
 
@@ -382,37 +396,35 @@ public class AgentService {
                 approvalId, userId, sessionId, runId);
         AgentStreamSession streamSession = new AgentStreamSession(runId);
         streamSession.queue().offer(new AgentStreamEvent.RunStarted(runId));
-        Thread producer;
+        Thread producer = Thread.ofVirtual().unstarted(() -> {
+            try {
+                runAgentStream(approval.run(),
+                        List.of(buildResumeMessage(approval.toConfirmResults())), streamSession);
+            } catch (Exception exception) {
+                if (streamSession.isCancelled() || Thread.currentThread().isInterrupted()) {
+                    Thread.currentThread().interrupt();
+                    finishCancelled(approval.run(), streamSession);
+                } else {
+                    log.error("恢复 Agent 流失败: sessionId={}, approvalId={}", sessionId, approvalId, exception);
+                    String message = agentRunCompleter.tryComplete(
+                            approval.run(), TranscriptMessageDto.MessageStatus.FAILED)
+                            ? "恢复 Agent 处理失败，请重新发起任务。"
+                            : terminalPersistenceFailureMessage(false);
+                    putEvent(streamSession, new AgentStreamEvent.Failed(message));
+                }
+            } finally {
+                activeRunRegistry.unregister(userId, sessionId, streamSession);
+            }
+        });
         try {
             activeRunRegistry.register(userId, sessionId, streamSession);
-            producer = Thread.startVirtualThread(() -> {
-                try {
-                    runAgentStream(approval.run(),
-                            List.of(buildResumeMessage(approval.toConfirmResults())), streamSession);
-                } catch (Exception exception) {
-                    if (streamSession.isCancelled() || Thread.currentThread().isInterrupted()) {
-                        Thread.currentThread().interrupt();
-                        finishCancelled(approval.run(), streamSession);
-                    } else {
-                        log.error("恢复 Agent 流失败: sessionId={}, approvalId={}", sessionId, approvalId, exception);
-                        String message = agentRunCompleter.tryComplete(
-                                approval.run(), TranscriptMessageDto.MessageStatus.FAILED)
-                                ? "恢复 Agent 处理失败，请重新发起任务。"
-                                : terminalPersistenceFailureMessage(false);
-                        putEvent(streamSession, new AgentStreamEvent.Failed(message));
-                    }
-                } finally {
-                    // 无论恢复成功还是失败，该批次都不能再次提交。
-                    pendingApprovalStore.remove(approvalId);
-                    activeRunRegistry.unregister(userId, sessionId, streamSession);
-                }
-            });
+            streamSession.bindProducer(producer);
+            producer.start();
         } catch (RuntimeException exception) {
             activeRunRegistry.unregister(userId, sessionId, streamSession);
-            approval.releaseResumeClaim();
+            pendingApprovalStore.restoreAfterFailedResume(approval);
             throw exception;
         }
-        streamSession.bindProducer(producer);
         return streamSession;
     }
 

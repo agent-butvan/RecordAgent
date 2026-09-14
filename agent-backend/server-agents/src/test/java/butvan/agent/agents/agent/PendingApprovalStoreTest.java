@@ -123,4 +123,23 @@ class PendingApprovalStoreTest {
         assertThrows(IllegalArgumentException.class,
                 () -> store.requireNoPending("local-default", "session-1"));
     }
+
+    @Test
+    void claimingResumeReleasesSessionSlotForNextApprovalBatch() {
+        AgentRun run = new AgentRun("session-1", "local-default", "turn-1",
+                RuntimeContext.builder().userId("local-default").sessionId("session-1").build());
+        PendingApprovalStore store = new PendingApprovalStore();
+        PendingApproval first = new PendingApproval(run, List.of(
+                new ToolUseBlock("call-1", "execute", Map.of("command", "ls"))), "run-1");
+        store.save(first);
+        first.decide("call-1", true);
+
+        store.claimForResume(first.approvalId(), "local-default", "session-1", "run-1");
+        assertFalse(store.hasPending("local-default", "session-1"));
+
+        PendingApproval next = new PendingApproval(run, List.of(
+                new ToolUseBlock("call-2", "execute", Map.of("command", "pwd"))), "run-1");
+        store.save(next);
+        assertTrue(store.hasPending("local-default", "session-1"));
+    }
 }

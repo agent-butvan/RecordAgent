@@ -73,11 +73,18 @@ public class PendingApprovalStore {
     }
 
     /** 原子领取审批恢复权。 */
-    public PendingApproval claimForResume(
+    public synchronized PendingApproval claimForResume(
             String approvalId, String userId, String sessionId, String runId) {
         PendingApproval approval = require(approvalId, userId, sessionId);
         approval.claimForResume(runId);
+        remove(approvalId);
         return approval;
+    }
+
+    /** 恢复线程启动失败时，把已领取批次放回等待态，允许客户端重试。 */
+    public synchronized void restoreAfterFailedResume(PendingApproval approval) {
+        approval.releaseResumeClaim();
+        save(approval);
     }
 
     /** 判断某会话是否仍有未完成的权限确认。 */

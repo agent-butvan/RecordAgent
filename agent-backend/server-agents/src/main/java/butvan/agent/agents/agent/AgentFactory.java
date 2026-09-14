@@ -94,8 +94,8 @@ public class AgentFactory {
                 .toolkit(toolRegistry.getToolkit())
                 .workspace(storageProperties.getWorkspaceDirectory())
                 .disableWorkspaceContext()
-                // 进程重启后没有审批句柄时，将遗留工具调用写成错误结果，避免会话永久锁死。
-                .enablePendingToolRecovery(true)
+                // 框架自动恢复发生在 ConfirmResult 消费之前，会误伤正常 HITL；遗留调用由应用层恢复。
+                .enablePendingToolRecovery(false)
                 .stateStore(agentStateStore)
                 .taskRepository(subagentTaskRepository)
                 .messageBus(subagentMessageBus)
