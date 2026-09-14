@@ -9,7 +9,9 @@ import butvan.agent.network.study.dto.StudyDtos.UpdateStudyRequest;
 import butvan.agent.network.study.model.StudyModels.StudySession;
 import butvan.agent.network.study.model.StudyModels.StudyStatistics;
 import butvan.agent.network.study.service.StudyService;
+import butvan.agent.network.study.service.StudySessionStreamService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.DateTimeException;
 import java.time.LocalDate;
@@ -31,6 +34,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class StudyController {
     private final StudyService studyService;
+    private final StudySessionStreamService studySessionStreamService;
     private final CurrentUserProvider currentUserProvider;
 
     /** 开始一段项目内学习。 */
@@ -79,6 +83,13 @@ public class StudyController {
     @GetMapping("/active")
     public Result<StudySession> active() {
         return Result.success(studyService.getActive(currentUserId()));
+    }
+
+    /** 订阅当前用户的学习状态；建连和自动重连时首先返回权威快照。 */
+    @ApiLog("订阅学习状态实时事件")
+    @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter stream() {
+        return studySessionStreamService.subscribe(currentUserId());
     }
 
     /** 查询用户使用过的学习分类。 */

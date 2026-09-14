@@ -74,6 +74,7 @@
 - 主 Agent 保持禁用 AgentScope 默认 Workspace Context；常驻 System Core 必须通过测试限制在 1,200 个 `TokenCounter` 估算 Token 内。个人上下文统一由 `server-agents/context` 的 `ConversationContextAssembler` 组装，默认总预算 850（Profile 300、Memory 500、Top-K 4），并由 `ContextInjectionMiddleware` 仅在 Model Call 前临时注入，禁止写入 AgentState 或 transcript；个人画像和开关分别保存于用户工作区的 `profile/PROFILE.md` 与 `profile/settings.json`，显式空画像必须阻止 `MEMORY.md#User Profile` 回退，暂停只停止自动注入而不得删除数据。画像辅助维护默认关闭，只能在聊天完成后按记忆指纹和 24 小时间隔低频生成提案；提案、维护状态和确认历史分别保存于 `profile/proposals/pending.json`、`profile/maintenance.json` 与 `profile/history/`，必须携带来源与置信度，并通过画像 revision 校验后由用户显式确认才能写入，禁止后台静默改写。新增上下文来源必须接入该唯一 seam、设置硬预算并补充注入与归因测试。
 - Agent 工具 Schema 默认按 `ToolSchemaRoutingPolicy` 中的能力组延迟暴露，只常驻轻量元工具；新增或重命名工具时必须同步确认其分组，未知工具仅作为兼容兜底保持常驻，禁止无评估地恢复全量 Schema 注入。
 - Agent 聊天运行必须使用稳定 `runId` 贯穿请求、SSE、运行注册表和终态收尾关联；显式取消必须通过后端取消接口向 AgentScope、生产线程、模型适配器和工具传播。传输层断开与用户显式取消必须区分；取消后必须保留 partial assistant、工具状态和 usage，且只有一个终态路径可写入。真正可恢复的暂停只能在有明确 checkpoint、待恢复动作和工具幂等语义后开放，不得用 Java 线程 suspend/resume 冒充。
+- 学习状态跨窗口同步统一使用后端 SSE：所有写入在事务成功提交后发布领域事件，连接建立及自动重连时必须先下发当前权威快照；主窗口内只允许一个共享订阅，禁止使用定时 HTTP 轮询或仅依赖前端本地事件推断状态。
 
 ### 代码质量与安全
 

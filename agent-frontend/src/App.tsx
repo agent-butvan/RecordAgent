@@ -1,6 +1,7 @@
 import type { RecordEntry, RecordType } from './types/record';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ModelProviderContext } from './context/ModelContext';
+import { StudyRealtimeProvider } from './context/StudyRealtimeContext';
 import { Sidebar } from './components/layout/Sidebar';
 import { ChatWorkspace } from './components/chat/ChatWorkspace';
 import { CalendarView } from './components/calendar/CalendarView';
@@ -1089,9 +1090,11 @@ const PrimaryApp: React.FC = () => {
 };
 
 export const App: React.FC = () => (
-  new URLSearchParams(window.location.search).get('view') === 'study-widget'
-    ? <SystemStudyWindow />
-    : <PrimaryApp />
+  <StudyRealtimeProvider>
+    {new URLSearchParams(window.location.search).get('view') === 'study-widget'
+      ? <SystemStudyWindow />
+      : <PrimaryApp />}
+  </StudyRealtimeProvider>
 );
 
 export default App;

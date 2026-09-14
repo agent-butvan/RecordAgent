@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { getFeaturePreferences, subscribeFeaturePreferences } from '../../services/featurePreferences';
-import { fetchActiveStudySession, finishStudySession } from '../../services/studyApi';
-import { notifyStudySessionChanged, subscribeStudySessionChanges } from '../../services/studySessionEvents';
+import { finishStudySession } from '../../services/studyApi';
+import { useStudyRealtime } from '../../context/studyRealtimeState';
 import { hideDesktopStudyWindow, showDesktopStudyWindow } from '../../services/studyWindow';
 import type { StudyWindowMode } from '../../types/preferences';
-import type { StudySession } from '../../types/study';
 import { ActiveStudyCard } from './ActiveStudyCard';
 import { useMessage } from '../common/Message';
 import styles from './StudyWindowLayer.module.css';
@@ -66,8 +65,8 @@ function readGeometry(): WidgetGeometry {
 /** 主应用中的学习小窗协调层，负责模式切换、会话同步和应用内拖动。 */
 export function StudyWindowLayer() {
   const { showMessage } = useMessage();
+  const { activeSession: session } = useStudyRealtime();
   const [mode, setMode] = useState<StudyWindowMode>(() => getFeaturePreferences().studyWindowMode);
-  const [session, setSession] = useState<StudySession | null>(null);
   const [now, setNow] = useState(Date.now());
   const [saving, setSaving] = useState(false);
   const [finishError, setFinishError] = useState<string | null>(null);
@@ -85,24 +84,8 @@ export function StudyWindowLayer() {
   } | null>(null);
   const activeSessionId = session?.id;
 
-  const reload = useCallback(() => {
-    void fetchActiveStudySession().then((active) => {
-      setSession(active);
-      if (!active) setHiddenSessionId(null);
-    }).catch(() => undefined);
-  }, []);
-
-  useEffect(() => {
-    reload();
-    const interval = window.setInterval(reload, 5_000);
-    const unsubscribe = subscribeStudySessionChanges(reload);
-    return () => {
-      window.clearInterval(interval);
-      unsubscribe();
-    };
-  }, [reload]);
-
   useEffect(() => subscribeFeaturePreferences((preferences) => setMode(preferences.studyWindowMode)), []);
+  useEffect(() => { if (!session) setHiddenSessionId(null); }, [session]);
   useEffect(() => {
     if (!session) return;
     const interval = window.setInterval(() => setNow(Date.now()), 1_000);
@@ -187,8 +170,6 @@ export function StudyWindowLayer() {
     setFinishError(null);
     try {
       await finishStudySession(session.id, session.version);
-      setSession(null);
-      notifyStudySessionChanged();
     } catch (cause) {
       setFinishError(cause instanceof Error ? cause.message : '结束学习失败，请重试。');
     } finally {

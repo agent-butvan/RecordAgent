@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { DotsThree } from '@phosphor-icons/react';
-import { fetchActiveStudySession, fetchStudyCategories, fetchStudyStatistics, startStudySession } from '../../../services/studyApi';
+import { fetchStudyCategories, fetchStudyStatistics, startStudySession } from '../../../services/studyApi';
 import { formatLocalDate } from '../../../services/dailyEvents';
-import { notifyStudySessionChanged, subscribeStudySessionChanges } from '../../../services/studySessionEvents';
+import { useStudyRealtime } from '../../../context/studyRealtimeState';
 import { mergeCategoryOptions } from '../../common/categoryOptions';
 import { StudyStartModal } from '../../study/StudyStartModal';
 import { STUDY_CATEGORIES } from '../../study/studyCategories';
@@ -24,33 +24,39 @@ const weekday = (date: string) => new Intl.DateTimeFormat('zh-CN', { weekday: 's
   .format(new Date(`${date}T12:00:00`)).replace('周', '');
 
 export function LearningTile({ date, onOpenStudy }: StudyTileProps) {
+  const { activeSession, syncGeneration, updatedAt } = useStudyRealtime();
   const load = useCallback(async () => {
     const historyFrom = new Date(`${date}T12:00:00`);
     historyFrom.setFullYear(historyFrom.getFullYear() - 1);
-    const [active, history, categories] = await Promise.all([
-      fetchActiveStudySession(), fetchStudyStatistics(formatLocalDate(historyFrom), date, TIMEZONE), fetchStudyCategories(),
+    const [history, categories] = await Promise.all([
+      fetchStudyStatistics(formatLocalDate(historyFrom), date, TIMEZONE), fetchStudyCategories(),
     ]);
-    return { active, history, categories };
+    return { history, categories };
   }, [date]);
   const { data, loading, error, reload } = useOverviewResource(load);
+  const observedGeneration = useRef(syncGeneration);
+  const [now, setNow] = useState(Date.now());
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const busy = useRef(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const hasActiveStudy = Boolean(data?.active);
-
-  useEffect(() => subscribeStudySessionChanges(() => void reload()), [reload]);
   useEffect(() => {
-    if (!hasActiveStudy) return;
-    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void reload(); }, 60_000);
+    if (observedGeneration.current === syncGeneration) return;
+    observedGeneration.current = syncGeneration;
+    void reload();
+  }, [reload, syncGeneration]);
+  useEffect(() => {
+    if (!activeSession) return;
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 1_000);
     return () => window.clearInterval(timer);
-  }, [hasActiveStudy, reload]);
+  }, [activeSession]);
 
   const changeStudy = async (action: () => Promise<unknown>) => {
     if (busy.current) return;
     busy.current = true; setSaving(true); setSaveError(null);
     try {
-      await action(); setOpen(false); notifyStudySessionChanged(); await reload();
+      await action(); setOpen(false);
     } catch (cause) {
       setSaveError(cause instanceof Error ? cause.message : '学习状态更新失败，请重试。');
       await reload();
@@ -60,16 +66,20 @@ export function LearningTile({ date, onOpenStudy }: StudyTileProps) {
   const historyDays = data?.history.days ?? [];
   const weekDays = historyDays.slice(-7);
   const today = weekDays.find((day) => day.date === date);
-  const weekTotal = weekDays.reduce((sum, day) => sum + day.durationSeconds, 0);
+  const activeGrowth = activeSession && date === formatLocalDate(new Date(now))
+    ? Math.max(0, Math.floor((now - updatedAt) / 1_000))
+    : 0;
+  const todayDuration = (today?.durationSeconds ?? 0) + activeGrowth;
+  const weekTotal = weekDays.reduce((sum, day) => sum + day.durationSeconds, 0) + activeGrowth;
   const monthTotal = historyDays.filter((day) => day.date.startsWith(date.slice(0, 7)))
-    .reduce((sum, day) => sum + day.durationSeconds, 0);
+    .reduce((sum, day) => sum + day.durationSeconds, 0) + activeGrowth;
   let streak = 0;
   for (let index = historyDays.length - 1; index >= 0; index--) {
     if (historyDays[index].durationSeconds <= 0) break;
     streak++;
   }
-  const maximum = Math.max(1, ...weekDays.map((day) => day.durationSeconds));
-  const ringProgress = Math.min(100, Math.round(((today?.durationSeconds ?? 0) / maximum) * 100));
+  const maximum = Math.max(1, todayDuration, ...weekDays.map((day) => day.durationSeconds));
+  const ringProgress = Math.min(100, Math.round((todayDuration / maximum) * 100));
 
   return (
     <>
@@ -97,7 +107,7 @@ export function LearningTile({ date, onOpenStudy }: StudyTileProps) {
                   background: `conic-gradient(#2f6df6 0 ${ringProgress}%, #eef2f6 ${ringProgress}% 100%)`,
                 }}
               >
-                <div className={styles.ringLabel}>{compactDuration(today?.durationSeconds ?? 0)}</div>
+                <div className={styles.ringLabel}>{compactDuration(todayDuration)}</div>
               </div>
               <div className={styles.learnKpis}>
                 <div><span>近 7 天</span><b>{overviewDuration(weekTotal)}</b></div>
@@ -111,7 +121,7 @@ export function LearningTile({ date, onOpenStudy }: StudyTileProps) {
               {weekDays.map((day) => (
                 <div className={styles.day} key={day.date} title={`${day.date}：${overviewDuration(day.durationSeconds)}`}>
                   <div className={styles.bar}>
-                    <i style={{ height: `${maximum > 0 ? (day.durationSeconds / maximum) * 100 : 0}%` }} />
+                    <i style={{ height: `${maximum > 0 ? ((day.date === date ? day.durationSeconds + activeGrowth : day.durationSeconds) / maximum) * 100 : 0}%` }} />
                   </div>
                   <span>{weekday(day.date)}</span>
                 </div>

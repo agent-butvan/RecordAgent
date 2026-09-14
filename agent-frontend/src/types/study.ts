@@ -31,6 +31,16 @@ export interface StudyStatistics {
   days: StudyDayStat[];
 }
 
+export type StudyRealtimeReason = 'SNAPSHOT' | 'STARTED' | 'FINISHED' | 'CREATED' | 'UPDATED' | 'DELETED';
+
+/** 后端学习状态 SSE 推送的权威快照。 */
+export interface StudyRealtimeEvent {
+  revision: number;
+  reason: StudyRealtimeReason;
+  changedSessionId: string | null;
+  activeSession: StudySession | null;
+}
+
 export interface SaveStudySessionInput {
   content: string;
   location?: string | null;

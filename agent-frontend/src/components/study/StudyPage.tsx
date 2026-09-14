@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowRightIcon, BookOpenIcon, CaretLeftIcon, CaretRightIcon, ClockCounterClockwiseIcon, PlayIcon } from '@phosphor-icons/react';
-import { createManualStudySession, deleteStudySession, fetchActiveStudySession, fetchStudyCategories, fetchStudySessions, fetchStudyStatistics, finishStudySession, startStudySession, updateStudySession } from '../../services/studyApi';
+import { createManualStudySession, deleteStudySession, fetchStudyCategories, fetchStudySessions, fetchStudyStatistics, finishStudySession, startStudySession, updateStudySession } from '../../services/studyApi';
 import { formatLocalDate } from '../../services/dailyEvents';
-import { notifyStudySessionChanged, subscribeStudySessionChanges } from '../../services/studySessionEvents';
+import { useStudyRealtime } from '../../context/studyRealtimeState';
 import type { SaveStudySessionInput, StudySession, StudyStatistics } from '../../types/study';
 import { Button } from '../common/Button';
 import { mergeCategoryOptions } from '../common/categoryOptions';
@@ -50,7 +50,7 @@ function formatTimelineDate(dateKey: string, todayKey: string): string {
 /** 学习记录工作台：将即时打卡、时间轴、历史维护和统计集中在单一页面。 */
 export function StudyPage() {
   const { showMessage } = useMessage();
-  const [active, setActive] = useState<StudySession | null>(null);
+  const { activeSession: active, syncGeneration, updatedAt } = useStudyRealtime();
   const [sessions, setSessions] = useState<StudySession[]>([]);
   const [weekStats, setWeekStats] = useState<StudyStatistics | null>(null);
   const [previousWeekStats, setPreviousWeekStats] = useState<StudyStatistics | null>(null);
@@ -69,8 +69,8 @@ export function StudyPage() {
   const reload = useCallback(async () => {
     setError(null); setHeatmapError(null); const today = formatLocalDate(new Date());
     try {
-      const [nextActive, recent, nextWeek, previousWeek, nextMonth, nextHeatmap, categories] = await Promise.all([
-        fetchActiveStudySession(), fetchStudySessions(formatLocalDate(shiftedDate(-30)), today, TIMEZONE),
+      const [recent, nextWeek, previousWeek, nextMonth, nextHeatmap, categories] = await Promise.all([
+        fetchStudySessions(formatLocalDate(shiftedDate(-30)), today, TIMEZONE),
         fetchStudyStatistics(formatLocalDate(shiftedDate(-6)), today, TIMEZONE),
         fetchStudyStatistics(formatLocalDate(shiftedDate(-13)), formatLocalDate(shiftedDate(-7)), TIMEZONE),
         fetchStudyStatistics(formatLocalDate(startOfMonth()), today, TIMEZONE),
@@ -79,12 +79,11 @@ export function StudyPage() {
           .catch((cause: unknown) => ({ value: null, error: cause instanceof Error ? cause.message : '热力图加载失败' })),
         fetchStudyCategories(),
       ]);
-      setActive(nextActive); setSessions(recent); setWeekStats(nextWeek); setPreviousWeekStats(previousWeek); setMonthStats(nextMonth); setHeatmapStats(nextHeatmap.value); setHeatmapError(nextHeatmap.error); setRememberedCategories(categories);
+      setSessions(recent); setWeekStats(nextWeek); setPreviousWeekStats(previousWeek); setMonthStats(nextMonth); setHeatmapStats(nextHeatmap.value); setHeatmapError(nextHeatmap.error); setRememberedCategories(categories);
     } catch (cause) { setError(cause instanceof Error ? cause.message : '学习记录加载失败，请稍后重试。'); }
     finally { setLoading(false); }
   }, []);
-  useEffect(() => { void reload(); }, [reload]);
-  useEffect(() => subscribeStudySessionChanges(() => void reload()), [reload]);
+  useEffect(() => { void reload(); }, [reload, syncGeneration]);
   useEffect(() => { if (!active) return; setNow(Date.now()); const timer = window.setInterval(() => setNow(Date.now()), 1_000); return () => window.clearInterval(timer); }, [active]);
   useEffect(() => {
     let current = true;
@@ -94,11 +93,12 @@ export function StudyPage() {
       .catch((cause: unknown) => { if (current) setTimelineError(cause instanceof Error ? cause.message : '轨迹加载失败，请稍后重试。'); })
       .finally(() => { if (current) setTimelineLoading(false); });
     return () => { current = false; };
-  }, [timelineDate, timelineRefresh]);
+  }, [timelineDate, timelineRefresh, syncGeneration]);
 
   const elapsed = active ? Math.max(0, Math.floor((now - new Date(active.startedAt).getTime()) / 1_000)) : 0;
   const todayStat = weekStats?.days.find((day) => day.date === todayKey);
-  const todaySeconds = (todayStat?.durationSeconds ?? 0) + (active ? Math.max(0, elapsed - active.durationSeconds) : 0);
+  const activeGrowth = active ? Math.max(0, Math.floor((now - updatedAt) / 1_000)) : 0;
+  const todaySeconds = (todayStat?.durationSeconds ?? 0) + activeGrowth;
   const completedSessions = sessions.filter((session) => session.endedAt !== null);
   const timelineDaySessions = useMemo(() => {
     const timelineStart = new Date(`${timelineDate}T00:00:00`).getTime();
@@ -107,9 +107,16 @@ export function StudyPage() {
       && (!session.endedAt || new Date(session.endedAt).getTime() > timelineStart))
       .sort((first, second) => new Date(first.startedAt).getTime() - new Date(second.startedAt).getTime());
   }, [timelineDate, timelineSessions]);
-  const chartMax = Math.max(1, ...(weekStats?.days.map((day) => day.durationSeconds) ?? [1]));
+  const liveWeekTotal = (weekStats?.totalDurationSeconds ?? 0) + activeGrowth;
+  const liveMonthTotal = (monthStats?.totalDurationSeconds ?? 0) + activeGrowth;
+  const liveWeekAverage = weekStats
+    ? Math.floor(liveWeekTotal / Math.max(1, weekStats.days.length))
+    : 0;
+  const liveDayDuration = (day: StudyStatistics['days'][number]) => day.durationSeconds
+    + (day.date === todayKey ? activeGrowth : 0);
+  const chartMax = Math.max(1, ...(weekStats?.days.map(liveDayDuration) ?? [1]));
   const previousTotal = previousWeekStats?.totalDurationSeconds ?? 0;
-  const weekChange = previousTotal > 0 ? Math.round(((weekStats?.totalDurationSeconds ?? 0) - previousTotal) / previousTotal * 100) : null;
+  const weekChange = previousTotal > 0 ? Math.round((liveWeekTotal - previousTotal) / previousTotal * 100) : null;
   const topCategory = useMemo(() => {
     const totals = new Map<string, number>(); completedSessions.forEach((session) => totals.set(session.category, (totals.get(session.category) ?? 0) + session.durationSeconds));
     return [...totals.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
@@ -118,24 +125,24 @@ export function StudyPage() {
 
   const begin = async (content: string, category: string) => {
     setSaving(true); setStartError(null);
-    try { await startStudySession(content, category, TIMEZONE); setStartModalOpen(false); await reload(); notifyStudySessionChanged(); setTimelineRefresh((value) => value + 1); showMessage('success', '学习已开始'); }
+    try { await startStudySession(content, category, TIMEZONE); setStartModalOpen(false); showMessage('success', '学习已开始'); }
     catch (cause) { setStartError(cause instanceof Error ? cause.message : '开始学习失败'); } finally { setSaving(false); }
   };
   const finish = async () => {
     if (!active) return; setSaving(true);
-    try { await finishStudySession(active.id, active.version); await reload(); notifyStudySessionChanged(); setTimelineRefresh((value) => value + 1); showMessage('success', '本次学习已记录'); }
+    try { await finishStudySession(active.id, active.version); showMessage('success', '本次学习已记录'); }
     catch (cause) { showMessage('error', cause instanceof Error ? cause.message : '结束学习失败'); } finally { setSaving(false); }
   };
   const openManual = () => { setEditing(null); setRecordError(null); setModalOpen(true); };
   const openEdit = (session: StudySession) => { setEditing(session); setRecordError(null); setModalOpen(true); };
   const saveRecord = async (input: SaveStudySessionInput) => {
     setSaving(true); setRecordError(null);
-    try { if (editing) await updateStudySession(editing.id, editing.version, input); else await createManualStudySession(input); setModalOpen(false); setEditing(null); await reload(); setTimelineRefresh((value) => value + 1); showMessage('success', editing ? '学习记录已更新' : '补卡完成'); }
+    try { if (editing) await updateStudySession(editing.id, editing.version, input); else await createManualStudySession(input); setModalOpen(false); setEditing(null); showMessage('success', editing ? '学习记录已更新' : '补卡完成'); }
     catch (cause) { setRecordError(cause instanceof Error ? cause.message : '学习记录保存失败'); } finally { setSaving(false); }
   };
   const remove = async (session: StudySession) => {
     if (confirmDeleteId !== session.id) { setConfirmDeleteId(session.id); return; } setSaving(true);
-    try { await deleteStudySession(session.id, session.version); setConfirmDeleteId(null); await reload(); setTimelineRefresh((value) => value + 1); showMessage('success', '学习记录已删除'); }
+    try { await deleteStudySession(session.id, session.version); setConfirmDeleteId(null); showMessage('success', '学习记录已删除'); }
     catch (cause) { showMessage('error', cause instanceof Error ? cause.message : '删除失败'); } finally { setSaving(false); }
   };
 
@@ -149,7 +156,7 @@ export function StudyPage() {
       {error && <div className={styles.dataError} role="alert"><span>{error}</span><button onClick={() => void reload()}>重新加载</button></div>}
       <section className={styles.overview} aria-label="学习概览">
         <div className={styles.todayBlock}><span>今天已学习</span><strong>{formatDuration(todaySeconds)}</strong><small>{todayStat?.sessionCount ?? 0} 段已完成记录</small></div>
-        <dl className={styles.periodStats}><div><dt>近 7 天</dt><dd>{formatDuration(weekStats?.totalDurationSeconds ?? 0)}</dd></div><div><dt>本月累计</dt><dd>{formatDuration(monthStats?.totalDurationSeconds ?? 0)}</dd></div><div><dt>学习天数</dt><dd>{monthStats?.studyDays ?? 0} 天</dd></div></dl>
+        <dl className={styles.periodStats}><div><dt>近 7 天</dt><dd>{formatDuration(liveWeekTotal)}</dd></div><div><dt>本月累计</dt><dd>{formatDuration(liveMonthTotal)}</dd></div><div><dt>学习天数</dt><dd>{monthStats?.studyDays ?? 0} 天</dd></div></dl>
       </section>
       <div className={styles.mainLayout}><div className={styles.primaryColumn}>
         {active && <section className={styles.section}><Heading title="正在学习" subtitle="这段时间会持续计入今天的学习记录" />
@@ -167,8 +174,8 @@ export function StudyPage() {
           {loading ? <div className={styles.loading}>正在读取学习记录…</div> : completedSessions.length ? <RecentSessions sessions={completedSessions.slice(0, 3)} onSelect={openEdit} /> : <div className={styles.empty}><ClockCounterClockwiseIcon size={19} /><strong>还没有学习记录</strong><span>开始一次学习，或使用右上角补卡。</span></div>}
         </section>
       </div><aside className={styles.insightColumn}>
-        <section className={styles.sideSection}><Heading title="近 7 天节奏" subtitle="每天的有效学习时长" /><div className={styles.chart}>{weekStats?.days.map((day) => <div className={styles.chartDay} key={day.date}><strong>{day.durationSeconds ? Math.round(day.durationSeconds / 60) : '—'}</strong><div className={styles.barArea}><i className={day.date === todayKey ? styles.todayBar : ''} style={{ height: `${Math.max(day.durationSeconds ? 7 : 0, day.durationSeconds / chartMax * 100)}%` }} /></div><span>{weekday(day.date)}</span></div>)}</div><dl className={styles.smallStats}><div><dt>日均时长</dt><dd>{formatDuration(weekStats?.averageDailySeconds ?? 0)}</dd></div><div><dt>学习天数</dt><dd>{weekStats?.studyDays ?? 0} / 7 天</dd></div><div><dt>较上周</dt><dd>{weekChange === null ? '暂无对比' : `${weekChange >= 0 ? '↑' : '↓'} ${Math.abs(weekChange)}%`}</dd></div><div><dt>完成次数</dt><dd>{weekStats?.sessionCount ?? 0} 次</dd></div></dl></section>
-        <section className={styles.sideSection}><Heading title="本周观察" /><p className={styles.insight}>这周已经学习 <em>{weekStats?.studyDays ?? 0} 天</em>{weekChange !== null && <>，相比上周{weekChange >= 0 ? '增加' : '减少'}了 <em>{formatDuration(Math.abs((weekStats?.totalDurationSeconds ?? 0) - previousTotal))}</em></>}。{topCategory ? <>最近投入最多的是“<em>{topCategory}</em>”。</> : '完成第一段学习后，这里会生成观察。'}</p></section>
+        <section className={styles.sideSection}><Heading title="近 7 天节奏" subtitle="每天的有效学习时长" /><div className={styles.chart}>{weekStats?.days.map((day) => { const duration = liveDayDuration(day); return <div className={styles.chartDay} key={day.date}><strong>{duration ? Math.round(duration / 60) : '—'}</strong><div className={styles.barArea}><i className={day.date === todayKey ? styles.todayBar : ''} style={{ height: `${Math.max(duration ? 7 : 0, duration / chartMax * 100)}%` }} /></div><span>{weekday(day.date)}</span></div>; })}</div><dl className={styles.smallStats}><div><dt>日均时长</dt><dd>{formatDuration(liveWeekAverage)}</dd></div><div><dt>学习天数</dt><dd>{weekStats?.studyDays ?? 0} / 7 天</dd></div><div><dt>较上周</dt><dd>{weekChange === null ? '暂无对比' : `${weekChange >= 0 ? '↑' : '↓'} ${Math.abs(weekChange)}%`}</dd></div><div><dt>完成次数</dt><dd>{weekStats?.sessionCount ?? 0} 次</dd></div></dl></section>
+        <section className={styles.sideSection}><Heading title="本周观察" /><p className={styles.insight}>这周已经学习 <em>{weekStats?.studyDays ?? 0} 天</em>{weekChange !== null && <>，相比上周{weekChange >= 0 ? '增加' : '减少'}了 <em>{formatDuration(Math.abs(liveWeekTotal - previousTotal))}</em></>}。{topCategory ? <>最近投入最多的是“<em>{topCategory}</em>”。</> : '完成第一段学习后，这里会生成观察。'}</p></section>
       </aside></div>
       <section className={styles.heatmapSection}><Heading title="学习热力图" subtitle="最近一年 · 颜色按每日学习时长加深" side={heatmapStats ? <span className={styles.heatmapSummary}>{heatmapStats.studyDays} 个学习日 · {formatDuration(heatmapStats.totalDurationSeconds)}</span> : undefined} />
         {heatmapStats ? <StudyHeatmap days={heatmapStats.days} to={todayKey} /> : heatmapError ? <div className={styles.heatmapError}><span>{heatmapError}</span><button type="button" onClick={() => void reload()}>重新加载</button></div> : <div className={styles.heatmapLoading}>正在生成学习热力图…</div>}
