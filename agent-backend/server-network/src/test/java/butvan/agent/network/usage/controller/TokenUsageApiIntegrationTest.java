@@ -1,6 +1,7 @@
 package butvan.agent.network.usage.controller;
 
 import butvan.agent.agents.identity.CurrentUserProvider;
+import butvan.agent.agents.project.ProjectRegistry;
 import butvan.agent.agents.session.SessionCatalogService;
 import butvan.agent.agents.session.TranscriptService;
 import butvan.agent.agents.session.dto.CreateSessionRequest;
@@ -81,7 +82,7 @@ class TokenUsageApiIntegrationTest {
                 ChatUsage.builder().inputTokens(25).outputTokens(7).cachedTokens(5).time(0.4).build(),
                 new ModelInputEstimate(
                         "fixture",
-                        new InputTokenBreakdown(5, 3, 2, 10, 4, 0, 0),
+                        new InputTokenBreakdown(5, 3, 2, 10, 4, 2, 1, 0, 0),
                         List.of(new ToolTokenUsage("search_web", 10, 4))));
         transcriptService.appendAssistantMessage(
                 sessionId, "turn-1", "完成", null,
@@ -101,8 +102,10 @@ class TokenUsageApiIntegrationTest {
                 .andExpect(jsonPath("$.data.totals.status").value("COMPLETE"))
                 .andExpect(jsonPath("$.data.breakdown.systemPromptTokens").value(5))
                 .andExpect(jsonPath("$.data.breakdown.toolSchemaTokens").value(10))
+                .andExpect(jsonPath("$.data.breakdown.profileContextTokens").value(2))
+                .andExpect(jsonPath("$.data.breakdown.memoryRecallTokens").value(1))
                 // 会话范围还包含 4 个标题生成输入 Token；该直接 Model 调用没有本地分类，归入 Other。
-                .andExpect(jsonPath("$.data.breakdown.otherTokens").value(5))
+                .andExpect(jsonPath("$.data.breakdown.otherTokens").value(4))
                 .andExpect(jsonPath("$.data.byTool[0].toolName").value("search_web"))
                 .andExpect(jsonPath("$.data.byTool[0].schemaTokens").value(10))
                 .andExpect(jsonPath("$.data.byTool[0].resultTokens").value(4))
@@ -136,6 +139,7 @@ class TokenUsageApiIntegrationTest {
             TokenUsageController.class,
             ApiExceptionHandler.class,
             CurrentUserProvider.class,
+            ProjectRegistry.class,
             SessionCatalogService.class,
             TranscriptService.class,
             SystemUsageLedger.class

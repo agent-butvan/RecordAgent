@@ -24,6 +24,9 @@ public class AgentStorageProperties {
     /** 保存侧边栏会话摘要的目录册文件。 */
     private final Path sessionCatalogFile;
 
+    /** 保存本机已导入项目引用的目录册文件。 */
+    private final Path projectCatalogFile;
+
     /** 保存用户可见消息记录的目录。 */
     private final Path transcriptDirectory;
 
@@ -52,6 +55,7 @@ public class AgentStorageProperties {
         if (rootDirectory == null) throw new IllegalArgumentException("数据根目录不能为空");
         this.rootDirectory = rootDirectory.toAbsolutePath().normalize();
         sessionCatalogFile = this.rootDirectory.resolve("sessions").resolve("catalog.json");
+        projectCatalogFile = this.rootDirectory.resolve("projects").resolve("catalog.json");
         transcriptDirectory = this.rootDirectory.resolve("transcripts");
         systemUsageFile = this.rootDirectory.resolve("usage").resolve("system-usage.jsonl");
         runCheckpointDirectory = this.rootDirectory.resolve("runs");
@@ -60,6 +64,7 @@ public class AgentStorageProperties {
 
         // 应用启动的时候创建本项目明确拥有的目录
         createDirectories(sessionCatalogFile.getParent());
+        createDirectories(projectCatalogFile.getParent());
         createDirectories(transcriptDirectory);
         createDirectories(systemUsageFile.getParent());
         createDirectories(runCheckpointDirectory);
@@ -86,6 +91,43 @@ public class AgentStorageProperties {
             throw new IllegalArgumentException("轮次ID 格式非法");
         }
         return runCheckpointDirectory.resolve(turnId + ".json");
+    }
+
+    /** 返回隔离后的用户工作区，供个人上下文与记忆模块统一取址。 */
+    public Path userWorkspaceDirectory(String userId) {
+        if (userId == null || !userId.matches("[a-zA-Z0-9-]+")) {
+            throw new IllegalArgumentException("用户ID 格式非法");
+        }
+        Path directory = workspaceDirectory.resolve(userId);
+        if (Files.isSymbolicLink(directory)) {
+            throw new IllegalArgumentException("用户工作区不能是符号链接");
+        }
+        return directory;
+    }
+
+    /** 返回用户显式维护的画像文件。 */
+    public Path personalContextProfileFile(String userId) {
+        return userWorkspaceDirectory(userId).resolve("profile").resolve("PROFILE.md");
+    }
+
+    /** 返回个人上下文开关设置文件。 */
+    public Path personalContextSettingsFile(String userId) {
+        return userWorkspaceDirectory(userId).resolve("profile").resolve("settings.json");
+    }
+
+    /** 返回画像维护状态文件。 */
+    public Path personalContextMaintenanceFile(String userId) {
+        return userWorkspaceDirectory(userId).resolve("profile").resolve("maintenance.json");
+    }
+
+    /** 返回当前唯一待审核画像提案文件。 */
+    public Path personalContextPendingProposalFile(String userId) {
+        return userWorkspaceDirectory(userId).resolve("profile").resolve("proposals").resolve("pending.json");
+    }
+
+    /** 返回已确认画像的历史版本目录。 */
+    public Path personalContextHistoryDirectory(String userId) {
+        return userWorkspaceDirectory(userId).resolve("profile").resolve("history");
     }
 
     private void createDirectories(Path directory) {

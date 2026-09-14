@@ -12,7 +12,7 @@ import { createDateRange, groupVendors, percentage, type UsageRange } from './to
 import styles from './TokenUsageSettingsPage.module.css';
 
 const RANGES: { value: UsageRange; label: string }[] = [{ value: '7d', label: '近 7 天' }, { value: '30d', label: '近 30 天' }, { value: '90d', label: '近 90 天' }, { value: 'all', label: '全部时间' }];
-const PURPOSE_LABELS: Record<string, string> = { CHAT: '聊天对话', SESSION_TITLE: '会话标题', CONTEXT_COMPACTION: '上下文压缩', BACKGROUND_AGENT: '后台 Agent' };
+const PURPOSE_LABELS: Record<string, string> = { CHAT: '聊天对话', SESSION_TITLE: '会话标题', PROFILE_MAINTENANCE: '画像维护', CONTEXT_COMPACTION: '上下文压缩', BACKGROUND_AGENT: '后台 Agent' };
 
 /** 本地用量分析入口；范围切换与刷新均只采纳最后一次请求的结果。 */
 export function TokenUsageSettingsPage() {
@@ -60,6 +60,8 @@ function UsageContent({ overview }: { overview: TokenUsageOverview }) {
     { key: 'user', label: '当前提问', tokens: breakdown.currentUserTokens },
     { key: 'schema', label: '工具定义', tokens: breakdown.toolSchemaTokens },
     { key: 'result', label: '工具返回', tokens: breakdown.toolResultTokens },
+    { key: 'profile', label: '个人画像', tokens: breakdown.profileContextTokens ?? 0 },
+    { key: 'memory', label: '相关记忆', tokens: breakdown.memoryRecallTokens ?? 0 },
     { key: 'rag', label: '检索上下文', tokens: breakdown.ragContextTokens },
     { key: 'other', label: '其他 / 协议', tokens: breakdown.otherTokens },
   ];

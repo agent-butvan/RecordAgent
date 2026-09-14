@@ -7,7 +7,7 @@ export type MessageRole = 'USER' | 'ASSISTANT';
 export type MessageStatus = 'COMPLETED' | 'FAILED' | 'CANCELLED';
 export type SessionPermissionMode = 'ASK' | 'AUTO_EDIT' | 'FULL_ACCESS';
 export type UsageStatus = 'COMPLETE' | 'PARTIAL' | 'UNAVAILABLE';
-export type UsagePurpose = 'CHAT' | 'SESSION_TITLE' | 'CONTEXT_COMPACTION' | 'BACKGROUND_AGENT';
+export type UsagePurpose = 'CHAT' | 'SESSION_TITLE' | 'PROFILE_MAINTENANCE' | 'CONTEXT_COMPACTION' | 'BACKGROUND_AGENT';
 
 export interface InputTokenBreakdown {
   systemPromptTokens: number;
@@ -15,6 +15,8 @@ export interface InputTokenBreakdown {
   currentUserTokens: number;
   toolSchemaTokens: number;
   toolResultTokens: number;
+  profileContextTokens: number;
+  memoryRecallTokens: number;
   ragContextTokens: number;
   otherTokens: number;
 }
@@ -156,6 +158,7 @@ export interface ChatMessage {
   startTime?: number;
   elapsedTime?: number;
   status?: MessageStatus;
+  failureReason?: string;
   usage?: TurnTokenUsage | null;
   tools?: ToolExecution[];
   subagentProgress?: SubagentProgressDto[];
@@ -175,11 +178,21 @@ export interface Project {
   name: string;
   path: string;
   createdAt: number;
+  availability: 'AVAILABLE' | 'MISSING' | 'INACCESSIBLE';
+}
+
+export interface ProjectDto {
+  id: string;
+  name: string;
+  rootPath: string;
+  importedAt: string;
+  availability: Project['availability'];
 }
 
 export interface SessionSummaryDto {
   id: string;
   kind: SessionKind;
+  projectId?: string | null;
   title: string;
   lastMessagePreview: string;
   createdAt: string;

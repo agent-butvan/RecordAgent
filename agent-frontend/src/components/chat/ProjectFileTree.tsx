@@ -1,109 +1,125 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { ChevronRight, File, Folder, FolderOpen, RefreshCw } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { FileCode, FileCog, FileJson, FileText, FolderTree, Image, RefreshCw } from 'lucide-react';
 import type { FileTreeNode } from '../../types/team';
 import { fetchProjectFileTree } from '../../services/fileTreeApi';
 import { LoadingTree } from '../common/LoadingTree';
+import {
+  TreeExpander,
+  TreeIcon,
+  TreeLabel,
+  TreeNode,
+  TreeNodeContent,
+  TreeNodeTrigger,
+  TreeProvider,
+  TreeView,
+} from '../ui/tree';
 import styles from './ProjectFileTree.module.css';
 
 interface ProjectFileTreeProps {
+  projectId: string;
   projectPath: string;
 }
 
 interface TreeListProps {
   nodes: FileTreeNode[];
-  expanded: Set<string>;
-  onToggle: (path: string) => void;
   depth: number;
+  parentPath?: boolean[];
 }
 
-function TreeList({ nodes, expanded, onToggle, depth }: TreeListProps) {
+function fileIcon(name: string): React.ReactNode {
+  const extension = name.split('.').pop()?.toLowerCase();
+  if (['ts', 'tsx', 'js', 'jsx', 'java', 'rs', 'py', 'go', 'kt'].includes(extension ?? '')) {
+    return <FileCode size={15} />;
+  }
+  if (['json', 'jsonl'].includes(extension ?? '')) return <FileJson size={15} />;
+  if (['md', 'mdx', 'txt'].includes(extension ?? '')) return <FileText size={15} />;
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'ico'].includes(extension ?? '')) {
+    return <Image size={15} />;
+  }
+  if (['yml', 'yaml', 'toml', 'xml', 'properties'].includes(extension ?? '')) {
+    return <FileCog size={15} />;
+  }
+  return undefined;
+}
+
+function countNodes(nodes: FileTreeNode[]): number {
+  return nodes.reduce((count, node) => count + 1 + countNodes(node.children ?? []), 0);
+}
+
+function TreeList({ nodes, depth, parentPath = [] }: TreeListProps) {
   return (
-    <ul className={styles.list} role="group">
-      {nodes.map((node) => {
+    <>
+      {nodes.map((node, index) => {
         const isDir = node.type === 'dir';
-        const isOpen = isDir && expanded.has(node.path);
-        const children = isDir && isOpen && node.children ? node.children : [];
+        const children = node.children ?? [];
+        const hasChildren = isDir && children.length > 0;
+        const isLast = index === nodes.length - 1;
 
         return (
-          <li key={node.path} className={styles.item}>
-            {isDir ? (
-              <button
-                type="button"
-                className={styles.row}
-                style={{ paddingLeft: `${12 + depth * 14}px` }}
-                onClick={() => onToggle(node.path)}
-                aria-expanded={isOpen}
-              >
-                <ChevronRight
-                  size={12}
-                  className={`${styles.chevron} ${isOpen ? styles.chevronOpen : ''}`}
-                  aria-hidden="true"
-                />
-                {isOpen ? (
-                  <FolderOpen size={13} className={styles.folderIcon} aria-hidden="true" />
-                ) : (
-                  <Folder size={13} className={styles.folderIcon} aria-hidden="true" />
-                )}
-                <span className={styles.name}>{node.name}</span>
-              </button>
-            ) : (
-              <div className={styles.row} style={{ paddingLeft: `${28 + depth * 14}px` }}>
-                <File size={13} className={styles.fileIcon} aria-hidden="true" />
-                <span className={styles.name}>{node.name}</span>
-              </div>
-            )}
-            {children.length > 0 && (
-              <TreeList nodes={children} expanded={expanded} onToggle={onToggle} depth={depth + 1} />
-            )}
-          </li>
+          <TreeNode
+            key={node.path}
+            nodeId={node.path}
+            level={depth}
+            isLast={isLast}
+            parentPath={parentPath}
+            hasChildren={hasChildren}
+          >
+            <TreeNodeTrigger title={node.path} aria-label={`${isDir ? '目录' : '文件'} ${node.name}`}>
+              <TreeExpander />
+              <TreeIcon kind={isDir ? 'folder' : 'file'} icon={isDir ? undefined : fileIcon(node.name)} />
+              <TreeLabel>{node.name}</TreeLabel>
+            </TreeNodeTrigger>
+            <TreeNodeContent>
+              <TreeList
+                nodes={children}
+                depth={depth + 1}
+                parentPath={[...parentPath, isLast]}
+              />
+            </TreeNodeContent>
+          </TreeNode>
         );
       })}
-    </ul>
+    </>
   );
 }
 
 /** 项目文件树：只读展示项目目录结构，支持目录展开/收起与手动刷新。 */
-export const ProjectFileTree: React.FC<ProjectFileTreeProps> = ({ projectPath }) => {
+export const ProjectFileTree: React.FC<ProjectFileTreeProps> = ({ projectId, projectPath }) => {
   const [tree, setTree] = useState<FileTreeNode[]>([]);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [treeRevision, setTreeRevision] = useState(0);
 
   const load = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const nodes = await fetchProjectFileTree(projectPath);
+      const nodes = await fetchProjectFileTree(projectId);
       setTree(nodes);
-      setExpanded(new Set(nodes.filter((node) => node.type === 'dir').map((node) => node.path)));
+      setTreeRevision((revision) => revision + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : '读取项目文件失败，请稍后重试');
     } finally {
       setIsLoading(false);
     }
-  }, [projectPath]);
+  }, [projectId]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const toggleDir = useCallback((path: string) => {
-    setExpanded((previous) => {
-      const next = new Set(previous);
-      if (next.has(path)) {
-        next.delete(path);
-      } else {
-        next.add(path);
-      }
-      return next;
-    });
-  }, []);
+  const projectName = useMemo(
+    () => projectPath.split(/[\\/]/).filter(Boolean).pop() || '项目',
+    [projectPath],
+  );
+  const nodeCount = useMemo(() => countNodes(tree), [tree]);
 
   return (
     <section className={styles.container} aria-label="项目文件树">
       <div className={styles.header}>
+        <span className={styles.projectIcon} aria-hidden="true"><FolderTree size={15} /></span>
         <div className={styles.headerText}>
-          <div className={styles.title}>项目文件</div>
+          <div className={styles.title}>{projectName}</div>
           <p className={styles.path} title={projectPath}>{projectPath}</p>
         </div>
         <button
@@ -118,6 +134,13 @@ export const ProjectFileTree: React.FC<ProjectFileTreeProps> = ({ projectPath })
         </button>
       </div>
 
+      {tree.length > 0 && !error && (
+        <div className={styles.summary} aria-live="polite">
+          <span>项目文件</span>
+          <span>{nodeCount} 个条目</span>
+        </div>
+      )}
+
       {error ? (
         <div className={styles.error} role="status">
           <p>{error}</p>
@@ -131,7 +154,15 @@ export const ProjectFileTree: React.FC<ProjectFileTreeProps> = ({ projectPath })
         <p className={styles.empty}>项目目录为空或暂无可展示文件。</p>
       ) : (
         <div className={styles.tree}>
-          <TreeList nodes={tree} expanded={expanded} onToggle={toggleDir} depth={0} />
+          <TreeProvider
+            key={`${projectId}-${treeRevision}`}
+            defaultExpandedIds={tree.filter((node) => node.type === 'dir').map((node) => node.path)}
+            indent={18}
+          >
+            <TreeView aria-label={`${projectName} 文件树`}>
+              <TreeList nodes={tree} depth={0} />
+            </TreeView>
+          </TreeProvider>
         </div>
       )}
     </section>

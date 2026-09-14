@@ -4,6 +4,8 @@
   --chart-current-user: color-mix(in srgb, var(--text-secondary) 55%, var(--text-muted));
   --chart-tool-schema: var(--text-muted);
   --chart-tool-result: color-mix(in srgb, var(--text-muted) 55%, var(--border-medium));
+  --chart-profile: #2563eb;
+  --chart-memory: #60a5fa;
   --chart-rag: var(--border-medium);
   --chart-other: var(--border-subtle);
 

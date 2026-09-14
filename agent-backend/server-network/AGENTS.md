@@ -2,6 +2,13 @@
 
 本目录承载 Spring Boot 组合根、HTTP 协议适配和单机业务数据的 SQLite 持久化。除根目录 `AGENTS.md` 外，修改本模块还必须遵守以下规则。
 
+## Agent 业务工具
+
+- 日历、财务、资料和学习等业务 Agent Tool Adapter 归属本模块，通过对应领域 Service 复用业务规则；不得调用 Controller、绕过 Service 直接访问 Repository，或在 Tool 中复制领域校验。
+- `server-agents` 只提供 Tool 注册 seam 与通用执行契约；业务 Tool 通过该 seam 自动注册，禁止为注册业务 Tool 建立 `server-agents` 到 `server-network` 的反向依赖。
+- Tool 不接受调用方传入的 `ownerId`，必须通过 `CurrentUserProvider` 获取当前用户；读取 Tool 才能加入安全白名单，任何业务写入在非完全访问模式下都必须进入统一确认流程。
+- 业务写 Tool 使用 `agent_tool_operation` 保存按用户、Tool 名称和幂等键隔离的执行结果，并与领域写入处于同一事务；该表只用于防止重复执行，不得成为业务事实来源。
+
 ## 本地数据库
 
 - 业务数据库固定存放于 `~/.butvan-agent/data/butvan.db`；测试必须覆盖路径并使用临时目录，禁止触碰用户真实数据。
@@ -50,11 +57,12 @@
 - `token_usage_turn`、`token_usage_invocation` 与 `token_usage_tool` 是统计读模型；聊天 transcript 与系统用量 JSONL 是权威数据源，统计查询必须允许安全重建 SQLite 投影。
 - 聊天轮次与非聊天调用分开建模；全局统计可以合并展示，但不得把会话标题等系统用途计入聊天轮次。
 - 日期筛选使用应用所在时区的闭区间自然日；供应商未上报的实际用量保持不可用，不得通过字符数估算补齐。
-- 输入分类与逐工具 Token 是本地估算投影，必须携带计数器版本并与供应商实际输入分开表达；估算误差不得反向改写实际输入、输出或缓存 Token。
+- 输入分类与逐工具 Token 是本地估算投影，必须携带计数器版本并与供应商实际输入分开表达；个人画像与相关记忆必须独立归因，信封标签等包装开销继续归入 RAG Context；估算误差不得反向改写实际输入、输出或缓存 Token。
 
 ## 聊天上下文适配
 
 - 稳定资料 ID 必须在 `chat/` 内校验所有权与可引用状态后再读取正文；前端不得自行展开资料正文，也不得提交可伪造的 RAG Token 归因。
+- 画像辅助维护接口归属 `context/`，只允许操作 `CurrentUserProvider` 解析出的当前用户；检查接口只生成唯一待审核提案，确认接口必须校验画像 revision，拒绝接口不得修改当前画像。
 - 用户可见命令与模型上下文分开传递，Transcript 只保存用户可见内容；实际送入模型的资料片段必须登记为 `RAG Context`。
 - AI 分析命令只允许前端提交受控命令、范围、时区和逐次确认状态；业务数据必须由后端按当前用户读取、最小化后作为独立 `RAG Context` 注入。凡包含财务数据的命令都必须在每次请求中显式确认，不得持久化或复用同意状态。
 
@@ -73,5 +81,6 @@
 ## 接口与测试
 
 - Controller 只负责请求转换、当前用户解析与响应包装；领域规则必须位于 Service 或类型处理器。
+- Agent 聊天流必须使用稳定 `runId`；`POST /agent/chat/runs/{runId}/cancel` 只做身份、session 与 DTO 适配，实际取消行为必须委托 `server-agents` 的活动运行注册表。该接口应幂等，响应的 `accepted` 只表示服务端已接管，前端只能以 SSE `cancelled` 或详情同步判定终态。
 - 日历月视图只能读取轻量日期摘要；完整手记和类型详情按日加载。
 - SQLite 集成测试必须通过公开 Service 或 HTTP 接口验证行为，不得把私有 SQL 实现作为测试契约。

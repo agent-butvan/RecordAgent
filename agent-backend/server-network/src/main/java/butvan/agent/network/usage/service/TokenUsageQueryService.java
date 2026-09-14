@@ -62,6 +62,7 @@ public class TokenUsageQueryService {
                         breakdown.estimatedInputTokens(), breakdown.systemPromptTokens(),
                         breakdown.historyTokens(), breakdown.currentUserTokens(),
                         breakdown.toolSchemaTokens(), breakdown.toolResultTokens(),
+                        breakdown.profileContextTokens(), breakdown.memoryRecallTokens(),
                         breakdown.ragContextTokens(), breakdown.otherTokens()),
                 repository.summarizeByTool(scope).stream()
                         .map(value -> new ToolResponse(

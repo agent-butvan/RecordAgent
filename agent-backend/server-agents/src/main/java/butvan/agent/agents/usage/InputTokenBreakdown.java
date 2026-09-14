@@ -7,6 +7,8 @@ public record InputTokenBreakdown(
         long currentUserTokens,
         long toolSchemaTokens,
         long toolResultTokens,
+        long profileContextTokens,
+        long memoryRecallTokens,
         long ragContextTokens,
         long otherTokens
 ) {
@@ -17,24 +19,26 @@ public record InputTokenBreakdown(
         currentUserTokens = nonNegative(currentUserTokens);
         toolSchemaTokens = nonNegative(toolSchemaTokens);
         toolResultTokens = nonNegative(toolResultTokens);
+        profileContextTokens = nonNegative(profileContextTokens);
+        memoryRecallTokens = nonNegative(memoryRecallTokens);
         ragContextTokens = nonNegative(ragContextTokens);
         otherTokens = nonNegative(otherTokens);
     }
 
     public static InputTokenBreakdown empty() {
-        return new InputTokenBreakdown(0, 0, 0, 0, 0, 0, 0);
+        return new InputTokenBreakdown(0, 0, 0, 0, 0, 0, 0, 0, 0);
     }
 
     /** 不含 Provider 协议差值的可解释输入估算。 */
     public long estimatedTokens() {
         return systemPromptTokens + historyTokens + currentUserTokens + toolSchemaTokens
-                + toolResultTokens + ragContextTokens;
+                + toolResultTokens + profileContextTokens + memoryRecallTokens + ragContextTokens;
     }
 
     public InputTokenBreakdown withOtherTokens(long value) {
         return new InputTokenBreakdown(
                 systemPromptTokens, historyTokens, currentUserTokens, toolSchemaTokens,
-                toolResultTokens, ragContextTokens, value);
+                toolResultTokens, profileContextTokens, memoryRecallTokens, ragContextTokens, value);
     }
 
     public InputTokenBreakdown plus(InputTokenBreakdown other) {
@@ -45,6 +49,8 @@ public record InputTokenBreakdown(
                 currentUserTokens + other.currentUserTokens,
                 toolSchemaTokens + other.toolSchemaTokens,
                 toolResultTokens + other.toolResultTokens,
+                profileContextTokens + other.profileContextTokens,
+                memoryRecallTokens + other.memoryRecallTokens,
                 ragContextTokens + other.ragContextTokens,
                 otherTokens + other.otherTokens);
     }

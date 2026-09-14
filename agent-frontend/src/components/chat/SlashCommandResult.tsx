@@ -11,13 +11,14 @@ import type { FinanceExpenseChart } from '../../types/finance';
 import type { RecordReferenceOption } from '../../types/record';
 import type { StudyStatistics } from '../../types/study';
 import type { SlashQueryPeriod } from '../../features/slash-command/slashCommandArguments';
+import type { SlashStatusData } from '../../features/slash-command/slashCommandStatus';
 import { RecordReferenceIcon } from './RecordReferenceIcon';
 import { formatTokenCount } from './tokenUsageFormat';
 import styles from './SlashCommandResult.module.css';
 
 export type SlashCommandResultData =
   | { kind: 'help'; commands: readonly SlashCommandDefinition[]; command?: SlashCommandDefinition }
-  | { kind: 'status'; data: SlashStatusData }
+  | { kind: 'status' }
   | { kind: 'today'; data: DailyInsight }
   | { kind: 'agenda'; data: DailyDay }
   | { kind: 'spending'; data: FinanceExpenseChart }
@@ -26,25 +27,13 @@ export type SlashCommandResultData =
   | { kind: 'loading'; message: string }
   | { kind: 'error'; message: string };
 
-export interface SlashStatusData {
-  sessionId: string;
-  sessionTitle: string;
-  providerName: string;
-  modelName: string;
-  permissionMode: string;
-  runtimeState: string;
-  compactionState: string;
-  totalTokens: number;
-  contextTokens?: number;
-  contextWindow?: number;
-}
-
 interface SlashCommandResultProps {
   result: SlashCommandResultData;
+  statusData: SlashStatusData;
   onClose: () => void;
 }
 
-export function SlashCommandResult({ result, onClose }: SlashCommandResultProps) {
+export function SlashCommandResult({ result, statusData, onClose }: SlashCommandResultProps) {
   return (
     <section className={styles.panel} aria-live="polite">
       <header className={styles.header}>
@@ -65,7 +54,7 @@ export function SlashCommandResult({ result, onClose }: SlashCommandResultProps)
       </header>
 
       {result.kind === 'help' ? <HelpContent result={result} />
-        : result.kind === 'status' ? <StatusContent data={result.data} />
+        : result.kind === 'status' ? <StatusContent data={statusData} />
           : result.kind === 'today' ? <TodayContent data={result.data} />
             : result.kind === 'agenda' ? <AgendaContent data={result.data} />
               : result.kind === 'spending' ? <SpendingContent data={result.data} />

@@ -75,7 +75,8 @@ public class AgentAnalysisContextService {
 
                 用户可见命令：%s
                 """.formatted(boundedData, request.content());
-        return new AgentUserCall(request.sessionId(), request.content(), modelContext, List.of(boundedData));
+        return new AgentUserCall(
+                request.sessionId(), request.content(), modelContext, List.of(boundedData), request.runId());
     }
 
     private String dailyContext(String ownerId, LocalDate date, ZoneId timezone) {

@@ -5,6 +5,7 @@ import { convertFileSrc } from '@tauri-apps/api/core';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { CodeBlock } from './CodeBlock';
+import { MermaidBlock } from './MermaidBlock';
 import styles from './MarkdownContent.module.css';
 
 /** 从 ReactNode 中递归提取纯文本（用于复制代码）。 */
@@ -72,6 +73,9 @@ const PreBlock: React.FC<React.ComponentPropsWithoutRef<'pre'>> = ({ children })
   );
   const language = (codeChild?.props.className || '').match(/language-([\w-]+)/)?.[1] || undefined;
   const codeText = codeChild ? extractCodeText(codeChild.props.children) : '';
+  if (language?.toLowerCase() === 'mermaid') {
+    return <MermaidBlock code={codeText} />;
+  }
   return <CodeBlock language={language} code={codeText} />;
 };
 
@@ -133,7 +137,7 @@ export interface MarkdownContentProps {
 }
 
 /**
- * 统一 Markdown 渲染：GFM + 代码语法高亮，样式集中在 MarkdownContent.module.css。
+ * 统一 Markdown 渲染：GFM + 代码语法高亮 + Mermaid 图表。
  */
 export const MarkdownContent: React.FC<MarkdownContentProps> = ({
   content,

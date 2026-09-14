@@ -56,6 +56,7 @@ import {
   type PreparedAnalysisCommand,
 } from '../../features/slash-command/analysisCommands';
 import { parseSlashCommandDisplayArguments } from '../../features/slash-command/slashCommandDisplay';
+import { buildSlashStatusData } from '../../features/slash-command/slashCommandStatus';
 import {
   Copy,
   ThumbsUp,
@@ -78,6 +79,8 @@ interface ChatWorkspaceProps {
   sessionUsageSummary?: TokenUsageSummary;
   isSessionLoading?: boolean;
   isSessionStreaming?: boolean;
+  isSessionStopping?: boolean;
+  onStopSession?: () => void;
   sessionLoadError?: string | null;
   onRetrySessionLoad?: () => void;
   onSendMessage: (
@@ -99,6 +102,7 @@ interface ChatWorkspaceProps {
   onCancelSubagentTask: (taskId: string) => void;
   /** 项目级聊天的项目根目录（非项目聊天为 null）。 */
   projectPath?: string | null;
+  projectId?: string | null;
   permissionMode: SessionPermissionMode;
   onPermissionModeChange: (mode: SessionPermissionMode) => void;
   isPermissionModeDisabled?: boolean;
@@ -149,6 +153,17 @@ const AssistantMessageItem: React.FC<AssistantMessageItemProps> = ({
         msg.content && <MarkdownContent content={msg.content} />
       )}
 
+      {(msg.status === 'CANCELLED' || msg.status === 'FAILED') && (
+        <div
+          className={`${styles.terminalStatus} ${msg.status === 'FAILED' ? styles.failedStatus : ''}`}
+          role={msg.status === 'FAILED' ? 'alert' : 'status'}
+        >
+          {msg.status === 'CANCELLED'
+            ? '已停止生成'
+            : (msg.failureReason || '生成失败，请重试。')}
+        </div>
+      )}
+
       {(msg.content || msg.usage) && (
         <div className={styles.messageFooter}>
           {/* 消息底部操作工具栏：复制、赞、踩、全屏/分享 */}
@@ -188,6 +203,8 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   sessionUsageSummary,
   isSessionLoading = false,
   isSessionStreaming = false,
+  isSessionStopping = false,
+  onStopSession,
   sessionLoadError = null,
   onRetrySessionLoad,
   onSendMessage,
@@ -203,6 +220,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   onRefreshSubagentTasks,
   onCancelSubagentTask,
   projectPath = null,
+  projectId = null,
   permissionMode,
   onPermissionModeChange,
   isPermissionModeDisabled = false,
@@ -268,6 +286,19 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     const selectedIds = new Set(selectedRecordReferences.map((item) => item.id));
     return recordReferences.filter((item) => !selectedIds.has(item.id));
   }, [recordReferences, selectedRecordReferences]);
+  const activeModel = getActiveModel();
+  const activeProvider = getActiveProvider();
+  const statusData = buildSlashStatusData({
+    sessionId,
+    sessionTitle,
+    messages,
+    sessionUsageSummary,
+    activeProvider,
+    activeModel,
+    permissionMode,
+    isSessionStreaming,
+    isWaitingForPermission: Boolean(pendingPermission),
+  });
 
   useEffect(() => {
     setCommandSelectedIndex((index) => Math.min(index, Math.max(0, commandSuggestions.length - 1)));
@@ -607,25 +638,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
       return;
     }
 
-    const activeModel = getActiveModel();
-    const activeProvider = getActiveProvider();
-    const latestUsage = [...messages].reverse().find((message) => message.role === 'assistant' && message.usage)?.usage;
-    const latestCall = latestUsage?.calls.at(-1);
-    setCommandResult({
-      kind: 'status',
-      data: {
-        sessionId,
-        sessionTitle,
-        providerName: activeProvider?.name || activeProvider?.id || '未配置',
-        modelName: activeModel?.name || activeModel?.id || '未配置',
-        permissionMode: permissionMode === 'ASK' ? '逐次询问' : permissionMode === 'AUTO_EDIT' ? '自动编辑' : '完全访问',
-        runtimeState: pendingPermission ? '等待权限确认' : isSessionStreaming ? '运行中' : '空闲',
-        compactionState: '自动压缩已启用；最近一次压缩状态暂不可用',
-        totalTokens: sessionUsageSummary?.totalTokens ?? 0,
-        contextTokens: latestCall?.inputTokens ?? latestCall?.estimatedInputTokens,
-        contextWindow: activeModel?.contextWindow,
-      },
-    });
+    setCommandResult({ kind: 'status' });
   };
 
   const selectCommand = (command: SlashCommandDefinition) => {
@@ -807,7 +820,11 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
           onLoadMore={() => { void loadMoreRecordReferences(); }}
         />
       ) : commandResult ? (
-        <SlashCommandResult result={commandResult} onClose={() => setCommandResult(null)} />
+        <SlashCommandResult
+          result={commandResult}
+          statusData={statusData}
+          onClose={() => setCommandResult(null)}
+        />
       ) : null}
       {selectedRecordReferences.length > 0 && (
         <div className={styles.recordReferenceChips} aria-label="已选择的资料引用">
@@ -832,6 +849,9 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
         value={inputPrompt}
         onValueChange={handleInputValueChange}
         onSend={handleSend}
+        onStop={onStopSession}
+        isStreaming={isSessionStreaming}
+        isStopping={isSessionStopping}
         onOpenSettings={onOpenSettings}
         permissionMode={permissionMode}
         onPermissionModeChange={onPermissionModeChange}
@@ -970,8 +990,8 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
               sessionUsageSummary={sessionUsageSummary}
               selectedMessageId={tokenUsageMessageId}
             />
-          ) : projectPath ? (
-            <ProjectFileTree projectPath={projectPath} />
+          ) : projectPath && projectId ? (
+            <ProjectFileTree projectId={projectId} projectPath={projectPath} />
           ) : null}
         </RightSidePanel>
       </div>

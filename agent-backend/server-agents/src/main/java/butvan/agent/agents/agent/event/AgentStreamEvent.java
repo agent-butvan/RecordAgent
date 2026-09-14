@@ -12,7 +12,7 @@ import java.util.Map;
  * <p>业务层只负责产生此事件，Controller 再将其转换为 SSE，避免 AgentScope 与 Spring Web
  * 相互耦合。</p>
  */
-public sealed interface AgentStreamEvent permits AgentStreamEvent.Completed, AgentStreamEvent.Failed, AgentStreamEvent.PermissionRequired, AgentStreamEvent.SubagentProgress, AgentStreamEvent.TextDelta, AgentStreamEvent.ThinkingDelta, AgentStreamEvent.ToolCall, AgentStreamEvent.ToolResult
+public sealed interface AgentStreamEvent permits AgentStreamEvent.RunStarted, AgentStreamEvent.Completed, AgentStreamEvent.Cancelled, AgentStreamEvent.Failed, AgentStreamEvent.PermissionRequired, AgentStreamEvent.SubagentProgress, AgentStreamEvent.TextDelta, AgentStreamEvent.ThinkingDelta, AgentStreamEvent.ToolCall, AgentStreamEvent.ToolResult
 {
 
     /**
@@ -30,6 +30,19 @@ public sealed interface AgentStreamEvent permits AgentStreamEvent.Completed, Age
 
     default boolean isTerminal() {
         return false;
+    }
+
+    /** 后端已接管并注册这次运行。 */
+    record RunStarted(String runId) implements AgentStreamEvent {
+        @Override
+        public String eventName() {
+            return "run_started";
+        }
+
+        @Override
+        public Object payload() {
+            return Map.of("runId", runId);
+        }
     }
 
     /**
@@ -80,6 +93,24 @@ public sealed interface AgentStreamEvent permits AgentStreamEvent.Completed, Age
         @Override
         public Object payload() {
             return "";
+        }
+
+        @Override
+        public boolean isTerminal() {
+            return true;
+        }
+    }
+
+    /** 用户显式停止或传输断开后，已完成持久化收尾。 */
+    record Cancelled(String runId) implements AgentStreamEvent {
+        @Override
+        public String eventName() {
+            return "cancelled";
+        }
+
+        @Override
+        public Object payload() {
+            return Map.of("runId", runId, "status", "CANCELLED");
         }
 
         @Override

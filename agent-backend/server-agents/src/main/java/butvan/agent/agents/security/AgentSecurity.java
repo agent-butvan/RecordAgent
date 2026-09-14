@@ -35,6 +35,11 @@ public class AgentSecurity {
             "task_output",
             "task_list",
             "wait_async_results",
+            "calendar_query",
+            "finance_query",
+            "library_search",
+            "library_get",
+            "study_query",
             "acceptance_report",
             "plan_exit"
     );

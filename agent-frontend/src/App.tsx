@@ -27,6 +27,7 @@ import {
   generateSessionTitle,
   fetchSessionPermissionMode,
   updateSessionPermissionMode,
+  cancelAgentChatRun,
 } from './services/api';
 import type { PermissionToolPayload } from './services/api';
 import type {
@@ -44,6 +45,7 @@ import {
   fetchSubagentTasks,
   subscribeSubagentTaskEvents,
 } from './services/taskApi';
+import { fetchProjects, importProject } from './services/projectApi';
 
 function mapTranscriptToChatMessage(dto: TranscriptMessageDto): ChatMessage {
   const isUser = dto.role?.toUpperCase() === 'USER';
@@ -78,6 +80,39 @@ function mapTranscriptToChatMessage(dto: TranscriptMessageDto): ChatMessage {
   };
 }
 
+interface ActiveChatRun {
+  runId: string;
+  assistantMessageId: string;
+  controller: AbortController;
+}
+
+function markAssistantTerminal(
+  message: ChatMessage,
+  status: 'FAILED' | 'CANCELLED',
+  failureReason?: string,
+): ChatMessage {
+  const toolStatus = status === 'CANCELLED' ? 'cancelled' as const : 'failed' as const;
+  return {
+    ...message,
+    status,
+    failureReason: status === 'FAILED' ? failureReason : undefined,
+    elapsedTime: Math.max(
+      1,
+      Math.floor((Date.now() - (message.startTime || message.createdAt)) / 1000),
+    ),
+    tools: message.tools?.map((tool) => tool.status === 'running'
+      ? { ...tool, status: toolStatus }
+      : tool),
+  };
+}
+
+function createRunId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `run_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+}
+
 export const MainLayout: React.FC<{
   isSettingsOpen: boolean;
   setIsSettingsOpen: (open: boolean) => void;
@@ -95,6 +130,7 @@ export const MainLayout: React.FC<{
     sessionId: string;
     assistantMessageId: string;
     approvalId: string;
+    runId: string;
     tool: PermissionToolPayload;
   } | null>(null);
   const [isPermissionSubmitting, setIsPermissionSubmitting] = useState(false);
@@ -105,6 +141,8 @@ export const MainLayout: React.FC<{
   const [permissionModes, setPermissionModes] = useState<Record<string, SessionPermissionMode>>({});
   const [savingPermissionSessionId, setSavingPermissionSessionId] = useState<string | null>(null);
   const [streamingSessionIds, setStreamingSessionIds] = useState<Set<string>>(() => new Set());
+  const [stoppingSessionIds, setStoppingSessionIds] = useState<Set<string>>(() => new Set());
+  const activeChatRunsRef = useRef<Map<string, ActiveChatRun>>(new Map());
   const [sessionLoadErrors, setSessionLoadErrors] = useState<Record<string, string>>({});
   const activeSessionIdRef = useRef(activeSessionId);
 
@@ -121,6 +159,34 @@ export const MainLayout: React.FC<{
     });
   }, []);
 
+  const beginChatRun = useCallback((
+    sessionId: string,
+    runId: string,
+    assistantMessageId: string,
+  ) => {
+    const controller = new AbortController();
+    activeChatRunsRef.current.set(sessionId, { runId, assistantMessageId, controller });
+    setSessionStreaming(sessionId, true);
+    return controller;
+  }, [setSessionStreaming]);
+
+  const finishChatRun = useCallback((sessionId: string, runId: string) => {
+    if (activeChatRunsRef.current.get(sessionId)?.runId !== runId) return false;
+    activeChatRunsRef.current.delete(sessionId);
+    setSessionStreaming(sessionId, false);
+    setStoppingSessionIds((previous) => {
+      const next = new Set(previous);
+      next.delete(sessionId);
+      return next;
+    });
+    return true;
+  }, [setSessionStreaming]);
+
+  useEffect(() => () => {
+    activeChatRunsRef.current.forEach((run) => run.controller.abort());
+    activeChatRunsRef.current.clear();
+  }, []);
+
   const syncSessionDetail = useCallback(async (sessionId: string, generateTitle = false) => {
     setSessionLoadErrors((previous) => {
       if (!previous[sessionId]) return previous;
@@ -134,7 +200,7 @@ export const MainLayout: React.FC<{
         ...previous,
         [sessionId]: '聊天记录读取失败，请检查网络连接后重试。',
       }));
-      return;
+      return false;
     }
     const hasUserMessage = detail.messages.some((message) => message.role === 'USER');
     if (detail.summary.title === '新对话' && (generateTitle || hasUserMessage)) {
@@ -145,7 +211,7 @@ export const MainLayout: React.FC<{
           ...previous,
           [sessionId]: '聊天记录读取失败，请检查网络连接后重试。',
         }));
-        return;
+        return false;
       }
     }
     const messages = detail.messages.map(mapTranscriptToChatMessage);
@@ -159,6 +225,7 @@ export const MainLayout: React.FC<{
           isLoaded: true,
         }
       : session));
+    return true;
   }, []);
 
   const refreshSubagentTasks = useCallback(async (sessionId = activeSessionId) => {
@@ -248,11 +315,16 @@ export const MainLayout: React.FC<{
 
   // 1. 初始化从后端 API 获取会话列表数据
   useEffect(() => {
+    fetchProjects()
+      .then(setProjects)
+      .catch((error) => showMessage('error', error instanceof Error ? error.message : '读取项目列表失败'));
+
     fetchSessions().then(async (data: SessionSummaryDto[]) => {
       if (Array.isArray(data) && data.length > 0) {
         const initialSessions: ChatSession[] = data.map((dto) => ({
           id: dto.id,
           kind: dto.kind,
+          projectId: dto.projectId ?? undefined,
           title: dto.title,
           lastMessagePreview: dto.lastMessagePreview,
           createdAt: new Date(dto.createdAt).getTime() || Date.now(),
@@ -269,6 +341,7 @@ export const MainLayout: React.FC<{
           const created: ChatSession = {
             id: res.data.id,
             kind: res.data.kind,
+            projectId: res.data.projectId ?? undefined,
             title: res.data.title,
             lastMessagePreview: res.data.lastMessagePreview,
             createdAt: new Date(res.data.createdAt).getTime() || Date.now(),
@@ -281,7 +354,7 @@ export const MainLayout: React.FC<{
         }
       }
     });
-  }, []);
+  }, [showMessage]);
 
   // 2. 切换当前激活会话时，若消息未加载，从后端 fetchSessionDetail 获取完整聊天记录
   useEffect(() => {
@@ -313,7 +386,7 @@ export const MainLayout: React.FC<{
     ? sessionLoadErrors[activeSession.id] ?? null
     : null;
   const activeProjectPath = activeSession?.projectId
-    ? (projects.find((project) => project.id === activeSession.projectId)?.path ?? null)
+    ? (projects.find((project) => project.id === activeSession.projectId && project.availability === 'AVAILABLE')?.path ?? null)
     : null;
 
   // 3. 新建普通独立会话（UUID 由后端统一生成）
@@ -323,6 +396,7 @@ export const MainLayout: React.FC<{
       const newSession: ChatSession = {
         id: res.data.id,
         kind: res.data.kind,
+        projectId: res.data.projectId ?? undefined,
         title: res.data.title,
         lastMessagePreview: res.data.lastMessagePreview,
         createdAt: new Date(res.data.createdAt).getTime() || Date.now(),
@@ -335,19 +409,23 @@ export const MainLayout: React.FC<{
     }
   };
 
-  // 4. 新建项目绑定会话（项目绑定目前采用 GENERAL 会话挂载）
-  const handleNewProjectChat = async (projectId: string) => {
+  // 4. 新建项目绑定会话
+  const handleNewProjectChat = async (projectId: string, knownProjectName?: string): Promise<boolean> => {
     const targetProject = projects.find((p) => p.id === projectId);
-    const titleName = targetProject ? `${targetProject.name} 会话` : '项目会话';
+    if (targetProject && targetProject.availability !== 'AVAILABLE') {
+      showMessage('error', '项目目录当前不可访问，请恢复目录后重试。');
+      return false;
+    }
+    const titleName = `${knownProjectName || targetProject?.name || '项目'} 会话`;
 
-    const res = await createSessionApi({ kind: 'GENERAL', title: titleName });
+    const res = await createSessionApi({ kind: 'PROJECT', projectId, title: titleName });
     if (res.success && res.data) {
       const newSession: ChatSession = {
         id: res.data.id,
         kind: res.data.kind,
         title: res.data.title,
         lastMessagePreview: res.data.lastMessagePreview,
-        projectId,
+        projectId: res.data.projectId ?? projectId,
         createdAt: new Date(res.data.createdAt).getTime() || Date.now(),
         updatedAt: new Date(res.data.updatedAt).getTime() || Date.now(),
         messages: [],
@@ -355,20 +433,27 @@ export const MainLayout: React.FC<{
       };
       setSessions((prev) => [newSession, ...prev]);
       setActiveSessionId(newSession.id);
+      setActiveFeature('chat');
+      return true;
     }
+    showMessage('error', res.message || '创建项目会话失败');
+    return false;
   };
 
   // 5. 导入本地项目
-  const handleImportProject = (name: string, path: string) => {
-    const newProjectId = String(Date.now());
-    const newProject: Project = {
-      id: newProjectId,
-      name,
-      path,
-      createdAt: Date.now(),
-    };
-    setProjects((prev) => [...prev, newProject]);
-    handleNewProjectChat(newProjectId);
+  const handleImportProject = async (name: string, path: string): Promise<{ success: boolean; message?: string }> => {
+    try {
+      const project = await importProject(name, path);
+      setProjects((previous) => [project, ...previous]);
+      const created = await handleNewProjectChat(project.id, project.name);
+      showMessage(
+        created ? 'success' : 'info',
+        created ? `已导入项目“${project.name}”` : `已导入项目“${project.name}”，请从项目旁的新建按钮重试会话。`,
+      );
+      return { success: true };
+    } catch (error) {
+      return { success: false, message: error instanceof Error ? error.message : '导入项目失败' };
+    }
   };
 
   // 6. 删除会话
@@ -477,6 +562,8 @@ export const MainLayout: React.FC<{
       }
     }
 
+    if (activeChatRunsRef.current.has(currentSessionId)) return;
+
     const userMsg: ChatMessage = {
       id: String(Date.now()),
       role: 'user',
@@ -486,6 +573,7 @@ export const MainLayout: React.FC<{
 
     const startTime = Date.now();
     const assistantMsgId = String(startTime + 1);
+    const runId = createRunId();
     const assistantMsg: ChatMessage = {
       id: assistantMsgId,
       role: 'assistant',
@@ -510,16 +598,19 @@ export const MainLayout: React.FC<{
     );
 
     // 发起 SSE 流式调用，发送 content 字段
-    setSessionStreaming(currentSessionId, true);
-    streamAgentChat(
+    const controller = beginChatRun(currentSessionId, runId, assistantMsgId);
+    void streamAgentChat(
       {
+        runId,
         sessionId: currentSessionId,
         content: prompt,
         context: modelContext,
         recordReferenceIds,
         analysisContext,
+        signal: controller.signal,
       },
       (chunkText) => {
+        if (activeChatRunsRef.current.get(currentSessionId)?.runId !== runId) return;
         setSessions((prev) =>
           prev.map((s) => {
             if (s.id === currentSessionId) {
@@ -537,7 +628,7 @@ export const MainLayout: React.FC<{
         );
       },
       () => {
-        setSessionStreaming(currentSessionId, false);
+        if (!finishChatRun(currentSessionId, runId)) return;
         // 流式对话完成后同步耗时并重新刷新后端的最新详情
         setSessions((prev) =>
           prev.map((s) => {
@@ -564,7 +655,7 @@ export const MainLayout: React.FC<{
         void syncSessionDetail(currentSessionId, targetSession?.title === '新对话');
       },
       (err) => {
-        setSessionStreaming(currentSessionId, false);
+        if (!finishChatRun(currentSessionId, runId)) return;
         console.error('Session 流式对话异常:', err);
         setSessions((prev) =>
           prev.map((s) => {
@@ -572,13 +663,9 @@ export const MainLayout: React.FC<{
               return {
                 ...s,
                 messages: s.messages.map((msg) =>
-                  msg.id === assistantMsgId && !msg.content
-                    ? {
-                        ...msg,
-                        content:
-                          '连接 Agent 对话服务失败或发生错误，请检查后端服务状态与 API Key 配置。',
-                      }
-                    : msg
+                  msg.id === assistantMsgId
+                    ? markAssistantTerminal(msg, 'FAILED', err.message)
+                    : msg,
                 ),
               };
             }
@@ -587,6 +674,7 @@ export const MainLayout: React.FC<{
         );
       },
       (toolCallPayload) => {
+        if (activeChatRunsRef.current.get(currentSessionId)?.runId !== runId) return;
         setSessions((prev) =>
           prev.map((s) => {
             if (s.id === currentSessionId) {
@@ -623,6 +711,7 @@ export const MainLayout: React.FC<{
         );
       },
       (toolResultPayload) => {
+        if (activeChatRunsRef.current.get(currentSessionId)?.runId !== runId) return;
         setSessions((prev) =>
           prev.map((s) => {
             if (s.id === currentSessionId) {
@@ -659,6 +748,7 @@ export const MainLayout: React.FC<{
         );
       },
       (thinkingChunk) => {
+        if (activeChatRunsRef.current.get(currentSessionId)?.runId !== runId) return;
         setSessions((prev) =>
           prev.map((s) => {
             if (s.id === currentSessionId) {
@@ -676,16 +766,24 @@ export const MainLayout: React.FC<{
         );
       },
       (permissionPayload) => {
-        setSessionStreaming(currentSessionId, false);
+        if (!finishChatRun(currentSessionId, runId)) return;
         setPendingPermission({
           sessionId: currentSessionId,
           assistantMessageId: assistantMsgId,
           approvalId: permissionPayload.approvalId,
+          runId,
           tool: permissionPayload.tool,
         });
       },
       (progress) => {
+        if (activeChatRunsRef.current.get(currentSessionId)?.runId !== runId) return;
         appendSubagentProgress(currentSessionId, assistantMsgId, progress);
+      },
+      () => {
+        if (!finishChatRun(currentSessionId, runId)) return;
+        updateAssistantMessage(currentSessionId, assistantMsgId,
+          (message) => markAssistantTerminal(message, 'CANCELLED'));
+        void syncSessionDetail(currentSessionId);
       },
     );
   };
@@ -722,13 +820,25 @@ export const MainLayout: React.FC<{
       }
 
       setPendingPermission(null);
-      setSessionStreaming(current.sessionId, true);
+      const controller = beginChatRun(
+        current.sessionId,
+        current.runId,
+        current.assistantMessageId,
+      );
       await streamAgentChat(
-        { sessionId: current.sessionId, approvalId: current.approvalId },
-        (text) => updateAssistantMessage(current.sessionId, current.assistantMessageId,
-          (message) => ({ ...message, content: message.content + text })),
+        {
+          runId: current.runId,
+          sessionId: current.sessionId,
+          approvalId: current.approvalId,
+          signal: controller.signal,
+        },
+        (text) => {
+          if (activeChatRunsRef.current.get(current.sessionId)?.runId !== current.runId) return;
+          updateAssistantMessage(current.sessionId, current.assistantMessageId,
+            (message) => ({ ...message, content: message.content + text }));
+        },
         () => {
-          setSessionStreaming(current.sessionId, false);
+          if (!finishChatRun(current.sessionId, current.runId)) return;
           updateAssistantMessage(current.sessionId, current.assistantMessageId, (message) => ({
             ...message,
             elapsedTime: Math.max(1, Math.floor((Date.now() - (message.startTime || message.createdAt)) / 1000)),
@@ -736,37 +846,54 @@ export const MainLayout: React.FC<{
           void syncSessionDetail(current.sessionId, true);
         },
         (error) => {
-          setSessionStreaming(current.sessionId, false);
+          if (!finishChatRun(current.sessionId, current.runId)) return;
           updateAssistantMessage(current.sessionId, current.assistantMessageId,
-            (message) => ({ ...message, content: message.content || `恢复任务失败：${error.message}` }));
+            (message) => markAssistantTerminal(message, 'FAILED', `恢复任务失败：${error.message}`));
         },
-        (tool) => updateAssistantMessage(current.sessionId, current.assistantMessageId, (message) => ({
-          ...message,
-          tools: [...(message.tools || []), {
-            toolCallId: tool.toolCallId || `tool_${Date.now()}`,
-            toolName: tool.toolName || 'tool', command: tool.command || '', status: 'running',
-          }],
-        })),
-        (result) => updateAssistantMessage(current.sessionId, current.assistantMessageId, (message) => ({
-          ...message,
-          tools: (message.tools || []).map((tool) => tool.toolCallId === result.toolCallId
-            ? { ...tool, status: 'completed', output: (tool.output || '') + (result.result || '') }
-            : tool),
-        })),
-        (thinking) => updateAssistantMessage(current.sessionId, current.assistantMessageId,
-          (message) => ({ ...message, reasoning: (message.reasoning || '') + thinking })),
+        (tool) => {
+          if (activeChatRunsRef.current.get(current.sessionId)?.runId !== current.runId) return;
+          updateAssistantMessage(current.sessionId, current.assistantMessageId, (message) => ({
+            ...message,
+            tools: [...(message.tools || []), {
+              toolCallId: tool.toolCallId || `tool_${Date.now()}`,
+              toolName: tool.toolName || 'tool', command: tool.command || '', status: 'running',
+            }],
+          }));
+        },
+        (result) => {
+          if (activeChatRunsRef.current.get(current.sessionId)?.runId !== current.runId) return;
+          updateAssistantMessage(current.sessionId, current.assistantMessageId, (message) => ({
+            ...message,
+            tools: (message.tools || []).map((tool) => tool.toolCallId === result.toolCallId
+              ? { ...tool, status: 'completed', output: (tool.output || '') + (result.result || '') }
+              : tool),
+          }));
+        },
+        (thinking) => {
+          if (activeChatRunsRef.current.get(current.sessionId)?.runId !== current.runId) return;
+          updateAssistantMessage(current.sessionId, current.assistantMessageId,
+            (message) => ({ ...message, reasoning: (message.reasoning || '') + thinking }));
+        },
         (permissionPayload) => {
-          setSessionStreaming(current.sessionId, false);
+          if (!finishChatRun(current.sessionId, current.runId)) return;
           setPendingPermission({
             sessionId: current.sessionId,
             assistantMessageId: current.assistantMessageId,
             approvalId: permissionPayload.approvalId,
+            runId: current.runId,
             tool: permissionPayload.tool,
           });
         },
         (progress) => {
+          if (activeChatRunsRef.current.get(current.sessionId)?.runId !== current.runId) return;
           appendSubagentProgress(current.sessionId, current.assistantMessageId, progress);
           void refreshSubagentTasks(current.sessionId);
+        },
+        () => {
+          if (!finishChatRun(current.sessionId, current.runId)) return;
+          updateAssistantMessage(current.sessionId, current.assistantMessageId,
+            (message) => markAssistantTerminal(message, 'CANCELLED'));
+          void syncSessionDetail(current.sessionId);
         },
       );
     } catch {
@@ -776,6 +903,37 @@ export const MainLayout: React.FC<{
       }));
     } finally {
       setIsPermissionSubmitting(false);
+    }
+  };
+
+  const handleStopAgentRun = async () => {
+    if (!activeSessionId || stoppingSessionIds.has(activeSessionId)) return;
+    const activeRun = activeChatRunsRef.current.get(activeSessionId);
+    if (!activeRun) return;
+    const sessionId = activeSessionId;
+    setStoppingSessionIds((previous) => new Set(previous).add(sessionId));
+    try {
+      const result = await cancelAgentChatRun(sessionId, activeRun.runId);
+      if (result.status === 'NOT_FOUND') {
+        activeRun.controller.abort();
+        finishChatRun(sessionId, activeRun.runId);
+        const reconciled = await syncSessionDetail(sessionId);
+        if (!reconciled) {
+          updateAssistantMessage(sessionId, activeRun.assistantMessageId,
+            (message) => markAssistantTerminal(
+              message,
+              'FAILED',
+              '未找到对应的 Agent 运行，且聊天记录同步失败，请重新发送。',
+            ));
+        }
+      }
+    } catch (error) {
+      setStoppingSessionIds((previous) => {
+        const next = new Set(previous);
+        next.delete(sessionId);
+        return next;
+      });
+      showMessage('error', error instanceof Error ? error.message : '停止请求失败，请重试。');
     }
   };
 
@@ -818,6 +976,8 @@ export const MainLayout: React.FC<{
               sessionUsageSummary={activeSession?.usageSummary}
               isSessionLoading={Boolean(activeSession && !activeSession.isLoaded && !activeSessionLoadError)}
               isSessionStreaming={streamingSessionIds.has(activeSessionId)}
+              isSessionStopping={stoppingSessionIds.has(activeSessionId)}
+              onStopSession={handleStopAgentRun}
               sessionLoadError={activeSessionLoadError}
               onRetrySessionLoad={() => {
                 if (activeSessionId) void syncSessionDetail(activeSessionId);
@@ -835,6 +995,7 @@ export const MainLayout: React.FC<{
               onRefreshSubagentTasks={() => void refreshSubagentTasks()}
               onCancelSubagentTask={handleCancelSubagentTask}
               projectPath={activeProjectPath}
+              projectId={activeSession?.projectId ?? null}
               permissionMode={permissionModes[activeSessionId] ?? 'ASK'}
               onPermissionModeChange={handlePermissionModeChange}
               isPermissionModeDisabled={!activeSessionId

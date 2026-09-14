@@ -11,6 +11,7 @@ import { ModelCard, type ModelCardItem } from './ModelCard';
 import { FeatureSettingsPage, type FeatureSettingsTab } from '../settings/FeatureSettingsPage';
 import { SettingsPageLayout } from '../settings/SettingsPageLayout';
 import { TokenUsageSettingsPage } from '../settings/TokenUsageSettingsPage';
+import { PersonalContextSettingsPage } from '../settings/PersonalContextSettingsPage';
 import { ProfileSettingsPage } from '../settings/ProfileSettingsPage';
 import { SlashCommandSettingsPage } from '../settings/SlashCommandSettingsPage';
 import { getFeaturePreferences, setStudyWindowMode } from '../../services/featurePreferences';
@@ -27,6 +28,7 @@ import {
   WalletCards,
   ChartNoAxesColumnIncreasing,
   Command,
+  BrainCircuit,
 } from 'lucide-react';
 import styles from './ModelSettingsPage.module.css';
 
@@ -175,6 +177,12 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
             <ChartNoAxesColumnIncreasing size={14} /> Token 用量
           </button>
           <button
+            className={`${styles.navItem} ${activeTab === 'context' ? styles.navItemActive : ''}`}
+            onClick={() => setActiveTab('context')}
+          >
+            <BrainCircuit size={14} /> 个人上下文
+          </button>
+          <button
             className={`${styles.navItem} ${activeTab === 'commands' ? styles.navItemActive : ''}`}
             onClick={() => setActiveTab('commands')}
           >
@@ -319,6 +327,8 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
         {activeTab === 'account' && <ProfileSettingsPage accountStatus={accountStatus} />}
 
         {activeTab === 'usage' && <TokenUsageSettingsPage />}
+
+        {activeTab === 'context' && <PersonalContextSettingsPage />}
 
         {activeTab === 'commands' && <SlashCommandSettingsPage />}
 

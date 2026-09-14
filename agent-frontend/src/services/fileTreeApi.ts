@@ -13,8 +13,8 @@ function isFileTreeNode(value: unknown): value is FileTreeNode {
 }
 
 /** 读取项目根目录下的文件树（默认深度 3）。 */
-export async function fetchProjectFileTree(projectPath: string, depth = 3): Promise<FileTreeNode[]> {
-  const query = new URLSearchParams({ path: projectPath, depth: String(depth) });
+export async function fetchProjectFileTree(projectId: string, depth = 3): Promise<FileTreeNode[]> {
+  const query = new URLSearchParams({ projectId, depth: String(depth) });
   const response = await fetch(`${getApiBaseUrl()}/api/files/tree?${query.toString()}`);
   if (!response.ok) {
     throw new Error(`读取项目文件失败：HTTP ${response.status}`);
