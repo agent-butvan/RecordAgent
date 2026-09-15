@@ -13,18 +13,22 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Objects;
 
-/** 聚合天气与节假日上下文，并用短期内存缓存保护第三方免费额度。 */
+/**
+ * 聚合天气与节假日上下文。
+ *
+ * <p>天气使用短期内存缓存（20 分钟 TTL）；节假日使用文件持久化缓存（每天只请求一次）
+ * 并附带每日请求限额保护（默认 90 次/天），进程重启后缓存和计数不会丢失。</p>
+ */
 @Service
 @RequiredArgsConstructor
 public class DailyContextService {
     private static final Duration WEATHER_TTL = Duration.ofMinutes(20);
-    private static final Duration HOLIDAY_TTL = Duration.ofHours(12);
 
     private final DailyContextConfigService configService;
     private final QWeatherClient qWeatherClient;
     private final TianApiHolidayClient holidayClient;
+    private final TianApiHolidayStore holidayStore;
     private volatile CacheEntry<WeatherResponse> weatherCache;
-    private volatile CacheEntry<HolidayResponse> holidayCache;
 
     /** 查询当日上下文；两个供应商独立降级，任一失败仍返回另一项。 */
     public SummaryResponse getSummary(LocalDate date, boolean includeWeather, boolean includeHoliday) {
@@ -53,7 +57,7 @@ public class DailyContextService {
     /** 配置变化后清空供应商缓存，保证连接测试和新配置立即生效。 */
     public void clearCaches() {
         weatherCache = null;
-        holidayCache = null;
+        holidayStore.clearHolidayCache();
     }
 
     /** 使用设备坐标反查地点名称，不修改配置，用户确认保存后才持久化。 */
@@ -83,12 +87,22 @@ public class DailyContextService {
         return loaded;
     }
 
+    /**
+     * 获取节假日信息：持久化缓存优先 → 限额检查 → API 请求 → 写回持久化。
+     */
     private HolidayResponse currentHoliday(LocalDate date, DailyContextConfigData config) {
-        String key = date + ":" + Objects.hashCode(config.getTianApi().getApiKey());
-        CacheEntry<HolidayResponse> cached = holidayCache;
-        if (cached != null && cached.usable(key)) return cached.value();
+        // 1. 持久化缓存命中则直接返回
+        HolidayResponse cached = holidayStore.loadCachedHoliday(date);
+        if (cached != null) return cached;
+
+        // 2. 检查并递增每日请求计数
+        holidayStore.incrementAndCheckUsage(date, TianApiHolidayStore.DEFAULT_DAILY_LIMIT);
+
+        // 3. 请求天行 API
         HolidayResponse loaded = holidayClient.fetch(date, config.getTianApi());
-        holidayCache = new CacheEntry<>(key, loaded, Instant.now().plus(HOLIDAY_TTL));
+
+        // 4. 持久化缓存
+        holidayStore.saveCachedHoliday(date, loaded);
         return loaded;
     }
 
