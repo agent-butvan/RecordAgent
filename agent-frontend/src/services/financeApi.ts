@@ -1,12 +1,14 @@
 import type {
   CreateFinanceAccountInput,
   CreateFinanceTransactionInput,
+  CreateFinanceTransferInput,
   FinanceAccount,
   FinanceChartRange,
   FinanceCategoryOptions,
   FinanceExpenseChart,
   FinanceOverview,
   FinanceTransaction,
+  FinanceTransferResponse,
 } from '../types/finance';
 import { getApiBaseUrl, type ApiResponse } from './api';
 
@@ -73,4 +75,9 @@ export function createFinanceAccount(input: CreateFinanceAccountInput): Promise<
 /** 新建一条关联资产账户的收入或支出。 */
 export function createFinanceTransaction(input: CreateFinanceTransactionInput): Promise<FinanceTransaction> {
   return financeRequest<FinanceTransaction>('/agent/finance/transactions', jsonInit(input));
+}
+
+/** 在两个资产账户之间进行划账并同步调整双方余额。 */
+export function createFinanceTransfer(input: CreateFinanceTransferInput): Promise<FinanceTransferResponse> {
+  return financeRequest<FinanceTransferResponse>('/agent/finance/transfers', jsonInit(input));
 }

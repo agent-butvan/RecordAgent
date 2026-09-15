@@ -64,7 +64,13 @@ export const TransactionDrawer: React.FC<TransactionDrawerProps> = ({
       if (date && transaction.date !== date) return false;
       if (selectedCategory && transaction.category !== selectedCategory) return false;
       if (selectedAccountId && transaction.accountId !== selectedAccountId && transaction.accountName !== selectedAccountId) return false;
-      if (selectedType && selectedType !== 'all' && transaction.transactionType !== selectedType) return false;
+      if (selectedType && selectedType !== 'all') {
+        if (selectedType === 'transfer') {
+          if (transaction.transactionType !== 'transfer_out' && transaction.transactionType !== 'transfer_in') return false;
+        } else if (transaction.transactionType !== selectedType) {
+          return false;
+        }
+      }
       if (normalizedKeyword && !transaction.note.toLocaleLowerCase('zh-CN').includes(normalizedKeyword)) return false;
       return true;
     });
@@ -103,6 +109,7 @@ export const TransactionDrawer: React.FC<TransactionDrawerProps> = ({
             <option value="expense">支出</option>
             <option value="income">收入</option>
             <option value="yield">收益</option>
+            <option value="transfer">划账</option>
           </select>
         </label>
       </div>
@@ -119,10 +126,23 @@ export const TransactionDrawer: React.FC<TransactionDrawerProps> = ({
         : error ? <div className={styles.state}><strong>流水加载失败</strong><p>{error}</p><button type="button" onClick={onRetry}>重新加载</button></div>
           : filtered.length ? filtered.map((transaction) => {
             const isExpense = transaction.transactionType === 'expense';
+            const isTransferOut = transaction.transactionType === 'transfer_out';
+            const isTransferIn = transaction.transactionType === 'transfer_in';
+            const isOutflow = isExpense || isTransferOut;
+            const amountClass = isExpense
+              ? styles.expenseAmount
+              : isTransferOut
+              ? styles.transferOutAmount
+              : isTransferIn
+              ? styles.transferInAmount
+              : styles.incomeAmount;
             return <article className={styles.row} key={transaction.id}>
               <TransactionTypeIcon type={transaction.transactionType} category={transaction.category} />
               <div className={styles.content}>
-                <div className={styles.primary}><strong>{transaction.note}</strong><b className={isExpense ? styles.expenseAmount : styles.incomeAmount}>{isExpense ? '-' : '+'}{money(transaction.amount)}</b></div>
+                <div className={styles.primary}>
+                  <strong>{transaction.note}</strong>
+                  <b className={amountClass}>{isOutflow ? '-' : '+'}{money(transaction.amount)}</b>
+                </div>
                 <div className={styles.meta}>
                   <span><CalendarDotsIcon size={12} />{transaction.date} {transaction.time.slice(0, 5)}</span>
                   <span><WalletIcon size={12} />{transaction.accountName}</span>

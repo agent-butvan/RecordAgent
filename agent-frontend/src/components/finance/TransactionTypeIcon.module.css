@@ -4,3 +4,5 @@
 .expense { --icon-ink: #913f38; }
 .income { --icon-ink: #246247; }
 .yield { --icon-ink: #725212; }
+.transfer_out { --icon-ink: #1d4ed8; }
+.transfer_in { --icon-ink: #0284c7; }
