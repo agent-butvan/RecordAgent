@@ -259,8 +259,8 @@ function HolidayStatus({ resource }: { resource: ResourceState<DailyContextSumma
   return (
     <div className={styles.holidayDetail}>
       <strong>{holiday.name || holiday.description}</strong>
-      <span>{holiday.dayOff ? '今日休息' : holiday.dayCode === 3 ? '今日调休上班' : '今日工作'}</span>
-      {holiday.lunarDate && <span>农历 {holiday.lunarDate}</span>}
+      <span className={styles.holidayBadge}>{holiday.dayOff ? '今日休息' : holiday.dayCode === 3 ? '今日调休上班' : '今日工作'}</span>
+      {holiday.lunarDate && <span className={styles.holidayBadge}>农历 {holiday.lunarDate}</span>}
       {holiday.tip && <p>{holiday.tip}</p>}
     </div>
   );
