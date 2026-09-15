@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { detectCurrentCoordinates } from './deviceLocation.ts';
+import { detectCurrentCoordinates, DeviceLocationError } from './deviceLocation.ts';
 
 test('设备定位返回适合配置保存的经纬度和精度', async () => {
   const geolocation = {
@@ -21,8 +21,10 @@ test('用户拒绝定位时返回可恢复的中文提示', async () => {
     },
   };
 
-  await assert.rejects(
-    detectCurrentCoordinates(geolocation),
-    /系统设置中允许 ButvanAgent 使用位置/,
-  );
+  await assert.rejects(detectCurrentCoordinates(geolocation), (error) => {
+    assert.ok(error instanceof DeviceLocationError);
+    assert.equal(error.reason, 'permission-denied');
+    assert.match(error.message, /允许 Butvan Agent 使用位置/);
+    return true;
+  });
 });

@@ -11,6 +11,8 @@
 .locationAction { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; min-width: 0; }
 .locationAction small { color: var(--text-secondary); font-size: 11px; line-height: 1.45; }
 .actions { display: flex; justify-content: flex-end; }
+.message { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.message > span { min-width: 0; overflow-wrap: anywhere; }
 .error, .success { padding: 8px 10px; border: 1px solid; border-radius: var(--radius-md); font-size: 12px; }
 .error { border-color: #e8c7c3; background: #fff9f8; color: #8d332c; }
 .success { border-color: #b9dcc9; background: #f7fcf9; color: #17663f; }
@@ -18,4 +20,5 @@
   .sectionHeading { flex-direction: column; gap: 12px; }
   .formGrid { grid-template-columns: 1fr; }
   .locationAction { align-items: flex-start; flex-direction: column; }
+  .message { align-items: flex-start; flex-direction: column; gap: 10px; }
 }

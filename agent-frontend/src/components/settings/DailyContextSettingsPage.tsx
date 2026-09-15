@@ -6,7 +6,8 @@ import {
   saveDailyContextConfig,
   type DailyContextConfig,
 } from '../../services/dailyContextApi';
-import { detectCurrentCoordinates } from '../../services/deviceLocation';
+import { detectCurrentCoordinates, DeviceLocationError } from '../../services/deviceLocation';
+import { openLocationPrivacySettings } from '../../services/systemSettings';
 import type { ChatTopBarPreferences } from '../../types/preferences';
 import { Button } from '../common/Button';
 import { TextInput } from '../common/TextInput';
@@ -32,6 +33,12 @@ const EMPTY_FORM: FormState = {
   qweatherApiHost: '', qweatherApiKey: '', locationName: '', latitude: '', longitude: '', tianApiKey: '',
 };
 
+interface PageMessage {
+  type: 'success' | 'error';
+  text: string;
+  action?: 'open-location-settings';
+}
+
 /** 天气与节假日供应商设置；后端只返回密钥是否存在，不回传密钥正文。 */
 export function DailyContextSettingsPage({
   chatTopBar,
@@ -42,7 +49,7 @@ export function DailyContextSettingsPage({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [locating, setLocating] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [message, setMessage] = useState<PageMessage | null>(null);
 
   useEffect(() => {
     fetchDailyContextConfig()
@@ -120,9 +127,41 @@ export function DailyContextSettingsPage({
         });
       }
     } catch (cause) {
-      setMessage({ type: 'error', text: cause instanceof Error ? cause.message : '自动定位失败' });
+      if (cause instanceof DeviceLocationError && cause.reason === 'permission-denied') {
+        try {
+          await openLocationPrivacySettings();
+          setMessage({
+            type: 'error',
+            text: '定位权限未开启，已打开系统定位设置。授权后返回此页面，再次点击“识别当前位置”。',
+            action: 'open-location-settings',
+          });
+        } catch (settingsCause) {
+          setMessage({
+            type: 'error',
+            text: settingsCause instanceof Error ? settingsCause.message : '无法打开系统定位设置',
+          });
+        }
+        return;
+      }
+      setMessage({
+        type: 'error',
+        text: cause instanceof Error ? cause.message : '自动定位失败',
+      });
     } finally {
       setLocating(false);
+    }
+  };
+
+  const openLocationSettings = async () => {
+    try {
+      await openLocationPrivacySettings();
+      setMessage({
+        type: 'error',
+        text: '已重新打开系统定位设置。授权后返回此页面，再次点击“识别当前位置”。',
+        action: 'open-location-settings',
+      });
+    } catch (cause) {
+      setMessage({ type: 'error', text: cause instanceof Error ? cause.message : '无法打开系统定位设置' });
     }
   };
 
@@ -130,6 +169,19 @@ export function DailyContextSettingsPage({
     <SettingsPageLayout title="天气与节假日" description="配置聊天顶栏使用的外部数据源，密钥仅保存在本机。">
       {loading ? <p className={styles.state}>正在读取配置…</p> : (
         <div className={styles.content}>
+          {message && (
+            <div
+              className={`${styles.message} ${message.type === 'error' ? styles.error : styles.success}`}
+              role={message.type === 'error' ? 'alert' : 'status'}
+            >
+              <span>{message.text}</span>
+              {message.action === 'open-location-settings' && (
+                <Button size="sm" variant="outline" onClick={() => void openLocationSettings()}>
+                  重新打开系统定位设置
+                </Button>
+              )}
+            </div>
+          )}
           <section className={styles.section} aria-labelledby="weather-settings-title">
             <div className={styles.sectionHeading}>
               <div><h2 id="weather-settings-title">和风天气</h2><p>使用专属 API Host 和 API KEY 获取当前天气。</p></div>
@@ -173,7 +225,6 @@ export function DailyContextSettingsPage({
             </Field>
           </section>
 
-          {message && <p className={message.type === 'error' ? styles.error : styles.success} role={message.type === 'error' ? 'alert' : 'status'}>{message.text}</p>}
           <div className={styles.actions}><Button variant="primary" icon={<Save size={14} />} disabled={saving} onClick={() => void save()}>{saving ? '保存中…' : '保存配置'}</Button></div>
         </div>
       )}
