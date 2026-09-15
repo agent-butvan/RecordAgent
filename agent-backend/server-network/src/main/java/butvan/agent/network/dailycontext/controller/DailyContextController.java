@@ -4,10 +4,12 @@ import butvan.agent.network.annotation.ApiLog;
 import butvan.agent.network.common.Result;
 import butvan.agent.network.dailycontext.dto.DailyContextDtos.ConfigResponse;
 import butvan.agent.network.dailycontext.dto.DailyContextDtos.LocationResponse;
+import butvan.agent.network.dailycontext.dto.DailyContextDtos.QWeatherConsoleResponse;
 import butvan.agent.network.dailycontext.dto.DailyContextDtos.SummaryResponse;
 import butvan.agent.network.dailycontext.dto.DailyContextDtos.UpdateConfigRequest;
 import butvan.agent.network.dailycontext.service.DailyContextConfigService;
 import butvan.agent.network.dailycontext.service.DailyContextService;
+import butvan.agent.network.dailycontext.service.QWeatherConsoleService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,6 +29,7 @@ import java.time.LocalDate;
 public class DailyContextController {
     private final DailyContextConfigService configService;
     private final DailyContextService dailyContextService;
+    private final QWeatherConsoleService qWeatherConsoleService;
 
     @ApiLog("查询天气与节假日脱敏配置")
     @GetMapping("/config")
@@ -39,7 +42,15 @@ public class DailyContextController {
     public Result<ConfigResponse> updateConfig(@RequestBody UpdateConfigRequest request) {
         ConfigResponse response = configService.update(request);
         dailyContextService.clearCaches();
+        qWeatherConsoleService.clearCaches();
         return Result.success(response);
+    }
+
+    @ApiLog("查询和风天气控制台摘要")
+    @GetMapping("/qweather-console")
+    public Result<QWeatherConsoleResponse> qWeatherConsole(
+            @RequestParam(defaultValue = "false") boolean refresh) {
+        return Result.success(qWeatherConsoleService.getSummary(refresh));
     }
 
     @ApiLog("查询天气与节假日摘要")

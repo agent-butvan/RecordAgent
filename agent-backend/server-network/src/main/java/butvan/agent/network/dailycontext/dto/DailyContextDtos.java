@@ -1,6 +1,9 @@
 package butvan.agent.network.dailycontext.dto;
 
+import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 
 /** 天气与节假日模块的稳定 HTTP DTO，隔离第三方响应结构。 */
 public final class DailyContextDtos {
@@ -68,6 +71,41 @@ public final class DailyContextDtos {
             int wageMultiple,
             String lunarDate,
             String tip
+    ) {
+    }
+
+    public record QWeatherConsoleResponse(
+            QWeatherFinanceResponse finance,
+            QWeatherUsageResponse usage,
+            String financeError,
+            String usageError
+    ) {
+    }
+
+    public record QWeatherFinanceResponse(
+            Instant asOf,
+            String currency,
+            BigDecimal balance,
+            BigDecimal previousDayCharges,
+            BigDecimal thisMonthCharges,
+            BigDecimal sinceLastBillCharges,
+            int pendingBillCount,
+            BigDecimal pendingAmountDue
+    ) {
+    }
+
+    public record QWeatherUsageResponse(
+            Instant asOf,
+            long successRequests,
+            long errorRequests,
+            List<QWeatherApiUsageResponse> apis
+    ) {
+    }
+
+    public record QWeatherApiUsageResponse(
+            String api,
+            long successRequests,
+            long errorRequests
     ) {
     }
 }

@@ -58,6 +58,37 @@ export interface ResolvedLocation {
   country: string;
 }
 
+export interface QWeatherFinanceSummary {
+  asOf: string;
+  currency: string;
+  balance: number;
+  previousDayCharges: number;
+  thisMonthCharges: number;
+  sinceLastBillCharges: number;
+  pendingBillCount: number;
+  pendingAmountDue: number;
+}
+
+export interface QWeatherApiUsage {
+  api: string;
+  successRequests: number;
+  errorRequests: number;
+}
+
+export interface QWeatherUsageSummary {
+  asOf: string;
+  successRequests: number;
+  errorRequests: number;
+  apis: QWeatherApiUsage[];
+}
+
+export interface QWeatherConsoleSummary {
+  finance: QWeatherFinanceSummary | null;
+  usage: QWeatherUsageSummary | null;
+  financeError: string | null;
+  usageError: string | null;
+}
+
 async function dailyContextRequest<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
@@ -114,4 +145,9 @@ export function resolveDailyContextLocation(
 ): Promise<ResolvedLocation> {
   const params = new URLSearchParams({ latitude: String(latitude), longitude: String(longitude) });
   return dailyContextRequest(`/agent/daily-context/location?${params}`);
+}
+
+/** 获取和风控制台财务与最近 24 小时请求量摘要。 */
+export function fetchQWeatherConsoleSummary(refresh = false): Promise<QWeatherConsoleSummary> {
+  return dailyContextRequest(`/agent/daily-context/qweather-console?refresh=${refresh}`);
 }

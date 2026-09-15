@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
-import { LocateFixed, Save } from 'lucide-react';
+import { ExternalLink, LocateFixed, RefreshCw, Save } from 'lucide-react';
 import {
   fetchDailyContextConfig,
+  fetchQWeatherConsoleSummary,
   resolveDailyContextLocation,
   saveDailyContextConfig,
   type DailyContextConfig,
+  type QWeatherConsoleSummary,
 } from '../../services/dailyContextApi';
 import { detectCurrentCoordinates, DeviceLocationError } from '../../services/deviceLocation';
 import { openLocationPrivacySettings } from '../../services/systemSettings';
@@ -45,6 +47,21 @@ export function DailyContextSettingsPage({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [consoleSummary, setConsoleSummary] = useState<QWeatherConsoleSummary | null>(null);
+  const [consoleLoading, setConsoleLoading] = useState(false);
+  const [consoleError, setConsoleError] = useState<string | null>(null);
+
+  const loadConsoleSummary = async (refresh: boolean) => {
+    setConsoleLoading(true);
+    setConsoleError(null);
+    try {
+      setConsoleSummary(await fetchQWeatherConsoleSummary(refresh));
+    } catch (cause) {
+      setConsoleError(cause instanceof Error ? cause.message : '和风控制台数据读取失败');
+    } finally {
+      setConsoleLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchDailyContextConfig()
@@ -57,6 +74,9 @@ export function DailyContextSettingsPage({
           latitude: loaded.latitude?.toString() ?? '',
           longitude: loaded.longitude?.toString() ?? '',
         });
+        if (loaded.qweatherApiKeyConfigured && loaded.qweatherApiHost) {
+          void loadConsoleSummary(false);
+        }
       })
       .catch((cause) => showMessage('error', cause instanceof Error ? cause.message : '配置读取失败'))
       .finally(() => setLoading(false));
@@ -86,6 +106,9 @@ export function DailyContextSettingsPage({
       setConfig(saved);
       setForm((current) => ({ ...current, qweatherApiKey: '', tianApiKey: '' }));
       showMessage('success', '天气与节假日配置已保存到本机。');
+      if (saved.qweatherApiKeyConfigured && saved.qweatherApiHost) {
+        void loadConsoleSummary(true);
+      }
     } catch (cause) {
       showMessage('error', cause instanceof Error ? cause.message : '配置保存失败');
     } finally {
@@ -179,6 +202,13 @@ export function DailyContextSettingsPage({
                 <small>仅在点击后请求系统定位权限；识别结果不会自动保存。</small>
               </div>
             </div>
+            <QWeatherConsolePanel
+              configured={Boolean(config?.qweatherApiKeyConfigured && config.qweatherApiHost)}
+              summary={consoleSummary}
+              loading={consoleLoading}
+              error={consoleError}
+              onRefresh={() => void loadConsoleSummary(true)}
+            />
           </section>
 
           <section className={styles.section} aria-labelledby="holiday-settings-title">
@@ -196,6 +226,133 @@ export function DailyContextSettingsPage({
       )}
     </SettingsPageLayout>
   );
+}
+
+function QWeatherConsolePanel({
+  configured,
+  summary,
+  loading,
+  error,
+  onRefresh,
+}: {
+  configured: boolean;
+  summary: QWeatherConsoleSummary | null;
+  loading: boolean;
+  error: string | null;
+  onRefresh: () => void;
+}) {
+  const finance = summary?.finance;
+  const usage = summary?.usage;
+  const hasData = Boolean(finance || usage);
+
+  return (
+    <section
+      className={styles.consolePanel}
+      aria-labelledby="qweather-console-title"
+      aria-busy={loading}
+      aria-live="polite"
+    >
+      <div className={styles.consoleHeading}>
+        <div>
+          <h3 id="qweather-console-title">用量与费用</h3>
+          <p>来自和风控制台 API，数据通常延迟一小时以上。</p>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={<RefreshCw className={loading ? styles.refreshing : ''} size={13} />}
+          disabled={!configured || loading}
+          onClick={onRefresh}
+        >
+          {loading ? '刷新中' : '刷新'}
+        </Button>
+      </div>
+
+      {!configured && <p className={styles.consoleState}>保存 API Host 和 API KEY 后即可查看控制台摘要。</p>}
+      {configured && loading && !hasData && <p className={styles.consoleState}>正在读取用量与费用…</p>}
+      {configured && error && <p className={styles.consoleError} role="alert">{error}</p>}
+
+      {hasData && (
+        <>
+          <dl className={styles.consoleMetrics}>
+            <Metric label="账户余额" value={finance ? formatMoney(finance.balance, finance.currency) : '—'} />
+            <Metric label="本月费用" value={finance ? formatMoney(finance.thisMonthCharges, finance.currency) : '—'} />
+            <Metric label="昨日费用" value={finance ? formatMoney(finance.previousDayCharges, finance.currency) : '—'} />
+            <Metric
+              label={`待支付账单${finance?.pendingBillCount ? ` · ${finance.pendingBillCount} 笔` : ''}`}
+              value={finance ? formatMoney(finance.pendingAmountDue, finance.currency) : '—'}
+              warning={Boolean(finance?.pendingBillCount)}
+            />
+            <Metric label="24 小时成功请求" value={usage ? formatCount(usage.successRequests) : '—'} />
+            <Metric label="24 小时失败请求" value={usage ? formatCount(usage.errorRequests) : '—'} warning={Boolean(usage?.errorRequests)} />
+          </dl>
+
+          {usage && usage.apis.length > 0 && (
+            <div className={styles.usageBreakdown}>
+              <div className={styles.usageHeader}><span>API</span><span>成功</span><span>失败</span></div>
+              {usage.apis.map((item) => (
+                <div className={styles.usageRow} key={item.api}>
+                  <span>{formatApiName(item.api)}</span>
+                  <span>{formatCount(item.successRequests)}</span>
+                  <span className={item.errorRequests ? styles.errorCount : undefined}>{formatCount(item.errorRequests)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <p className={styles.consoleTimestamp}>
+            数据截止：{formatAsOf(usage?.asOf ?? finance?.asOf)}
+          </p>
+        </>
+      )}
+
+      {configured && summary?.financeError && <PermissionNotice message={summary.financeError} />}
+      {configured && summary?.usageError && <PermissionNotice message={summary.usageError} />}
+    </section>
+  );
+}
+
+function Metric({ label, value, warning = false }: { label: string; value: string; warning?: boolean }) {
+  return <div><dt>{label}</dt><dd className={warning ? styles.metricWarning : undefined}>{value}</dd></div>;
+}
+
+function PermissionNotice({ message }: { message: string }) {
+  return (
+    <div className={styles.permissionNotice}>
+      <p>{message}</p>
+      <a href="https://console.qweather.com/project" target="_blank" rel="noreferrer">
+        打开凭据权限设置 <ExternalLink size={12} aria-hidden="true" />
+      </a>
+    </div>
+  );
+}
+
+function formatMoney(value: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat('zh-CN', {
+      style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2,
+    }).format(value);
+  } catch {
+    return `${value.toFixed(2)} ${currency}`;
+  }
+}
+
+function formatCount(value: number): string {
+  return new Intl.NumberFormat('zh-CN').format(value);
+}
+
+function formatAsOf(value?: string): string {
+  if (!value) return '未知';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { hour12: false });
+}
+
+function formatApiName(api: string): string {
+  const names: Record<string, string> = {
+    Weather: '天气', Geo: '地理位置', WeatherAlert: '天气预警',
+    WeatherIndices: '天气指数', AirQuality: '空气质量', Console: '控制台',
+  };
+  return names[api] ?? api;
 }
 
 function Field({ label, hint, children }: { label: string; hint: string; children: React.ReactNode }) {
