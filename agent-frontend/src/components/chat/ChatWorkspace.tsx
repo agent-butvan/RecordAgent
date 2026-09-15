@@ -17,6 +17,7 @@ import { SubagentActivity } from './SubagentActivity';
 import { SubagentTaskPanel } from './SubagentTaskPanel';
 import { ProjectFileTree } from './ProjectFileTree';
 import { RightSidePanel, type RightPanelTab } from './RightSidePanel';
+import { ChatTopBarInformation } from './topbar/ChatTopBarInformation';
 import { SlashCommandMenu } from './SlashCommandMenu';
 import { SlashCommandChip } from './SlashCommandChip';
 import { RecordReferenceTag } from './RecordReferenceTag';
@@ -938,6 +939,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
             </button>
           )}
         </div>
+        <ChatTopBarInformation onOpenFeature={onOpenFeature} />
         <button
           type="button"
           className={`${styles.panelToggle} ${rightPanelOpen ? styles.panelToggleActive : ''}`}

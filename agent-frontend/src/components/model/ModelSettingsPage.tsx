@@ -14,8 +14,13 @@ import { TokenUsageSettingsPage } from '../settings/TokenUsageSettingsPage';
 import { PersonalContextSettingsPage } from '../settings/PersonalContextSettingsPage';
 import { ProfileSettingsPage } from '../settings/ProfileSettingsPage';
 import { SlashCommandSettingsPage } from '../settings/SlashCommandSettingsPage';
-import { getFeaturePreferences, setStudyWindowMode } from '../../services/featurePreferences';
-import type { StudyWindowMode } from '../../types/preferences';
+import {
+  getFeaturePreferences,
+  setChatTopBarPreference,
+  setStudyWindowMode,
+  subscribeFeaturePreferences,
+} from '../../services/featurePreferences';
+import type { ChatTopBarPreferences, FeaturePreferences, StudyWindowMode } from '../../types/preferences';
 import {
   ArrowLeft,
   CalendarDays,
@@ -60,9 +65,7 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
   const [activeTab, setActiveTab] = useState<string>(initialTab);
   const [supportedVendors, setSupportedVendors] = useState<string[]>(['gemini', 'openai', 'dashscope', 'deepseek', 'anthropic', 'ollama']);
   const [accountStatus, setAccountStatus] = useState<AccountStatus | null>(null);
-  const [studyWindowMode, setStudyWindowModeState] = useState<StudyWindowMode>(
-    () => getFeaturePreferences().studyWindowMode,
-  );
+  const [featurePreferences, setFeaturePreferencesState] = useState<FeaturePreferences>(getFeaturePreferences);
   
   const allModels = getAllModels();
 
@@ -92,6 +95,8 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
     };
     loadVendors();
   }, []);
+
+  useEffect(() => subscribeFeaturePreferences(setFeaturePreferencesState), []);
 
   useEffect(() => {
     fetchAccountStatus().then(setAccountStatus);
@@ -141,7 +146,11 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
   };
 
   const handleStudyWindowModeChange = (mode: StudyWindowMode) => {
-    setStudyWindowModeState(setStudyWindowMode(mode).studyWindowMode);
+    setFeaturePreferencesState(setStudyWindowMode(mode));
+  };
+
+  const handleChatTopBarChange = (key: keyof ChatTopBarPreferences, visible: boolean) => {
+    setFeaturePreferencesState(setChatTopBarPreference(key, visible));
   };
 
   const isFeatureTab = (tab: string): tab is FeatureSettingsTab => (
@@ -335,8 +344,10 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
         {isFeatureTab(activeTab) && (
           <FeatureSettingsPage
             tab={activeTab}
-            studyWindowMode={studyWindowMode}
+            studyWindowMode={featurePreferences.studyWindowMode}
             onStudyWindowModeChange={handleStudyWindowModeChange}
+            chatTopBar={featurePreferences.chatTopBar}
+            onChatTopBarChange={handleChatTopBarChange}
           />
         )}
 

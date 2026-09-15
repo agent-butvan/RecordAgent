@@ -1,5 +1,6 @@
-import type { StudyWindowMode } from '../../types/preferences';
+import type { ChatTopBarPreferences, StudyWindowMode } from '../../types/preferences';
 import { Select } from '../common/Select';
+import { Toggle } from '../common/Toggle';
 import { SettingsPageLayout } from './SettingsPageLayout';
 import styles from './FeatureSettingsPage.module.css';
 
@@ -31,6 +32,8 @@ interface FeatureSettingsPageProps {
   tab: FeatureSettingsTab;
   studyWindowMode: StudyWindowMode;
   onStudyWindowModeChange: (mode: StudyWindowMode) => void;
+  chatTopBar: ChatTopBarPreferences;
+  onChatTopBarChange: (key: keyof ChatTopBarPreferences, visible: boolean) => void;
 }
 
 /** 功能设置统一页面，保持四个业务入口的信息结构与空状态一致。 */
@@ -38,6 +41,8 @@ export function FeatureSettingsPage({
   tab,
   studyWindowMode,
   onStudyWindowModeChange,
+  chatTopBar,
+  onChatTopBarChange,
 }: FeatureSettingsPageProps) {
   if (tab === 'record') {
     return (
@@ -67,6 +72,38 @@ export function FeatureSettingsPage({
     );
   }
 
+  if (tab === 'calendar') {
+    return (
+      <SettingsPageLayout title="日历" description={FEATURE_CONTENT.calendar.description}>
+        <SettingToggle
+          label="在聊天顶栏显示日期"
+          description="显示今天的日期和星期，点击后展开完整日期信息。"
+          checked={chatTopBar.showDate}
+          onChange={(checked) => onChatTopBarChange('showDate', checked)}
+        />
+        <SettingToggle
+          label="在聊天顶栏显示待办"
+          description="显示今日待办完成情况，点击后查看接下来要处理的事项。"
+          checked={chatTopBar.showTodos}
+          onChange={(checked) => onChatTopBarChange('showTodos', checked)}
+        />
+      </SettingsPageLayout>
+    );
+  }
+
+  if (tab === 'finance') {
+    return (
+      <SettingsPageLayout title="财务" description={FEATURE_CONTENT.finance.description}>
+        <SettingToggle
+          label="在聊天顶栏显示财务摘要"
+          description="显示今日收入和支出，点击后查看本月汇总与最近流水。"
+          checked={chatTopBar.showFinance}
+          onChange={(checked) => onChatTopBarChange('showFinance', checked)}
+        />
+      </SettingsPageLayout>
+    );
+  }
+
   const content = FEATURE_CONTENT[tab];
   return (
     <SettingsPageLayout title={content.title} description={content.description}>
@@ -75,5 +112,27 @@ export function FeatureSettingsPage({
         <p>{content.detail}</p>
       </div>
     </SettingsPageLayout>
+  );
+}
+
+function SettingToggle({
+  label,
+  description,
+  checked,
+  onChange,
+}: {
+  label: string;
+  description: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <div className={styles.settingGroup}>
+      <div className={styles.settingCopy}>
+        <span className={styles.settingLabel}>{label}</span>
+        <p>{description}</p>
+      </div>
+      <Toggle checked={checked} onChange={onChange} label={label} showLabel={false} />
+    </div>
   );
 }
