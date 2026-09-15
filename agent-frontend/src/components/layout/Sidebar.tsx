@@ -392,6 +392,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside ref={sidebarRef} className={styles.sidebar} style={{ width: sidebarWidth }}>
+      {/* Overlay 标题栏在侧边栏上方没有内容时，保留可拖拽的原生窗口区域。 */}
+      <div className={styles.titlebarDragRegion} data-tauri-drag-region aria-hidden="true" />
       {/* 右缘拖拽手柄：调整侧边栏宽度，双击恢复默认宽度 */}
       <div
         className={`${styles.resizeHandle} ${isResizing ? styles.resizeHandleActive : ''}`}

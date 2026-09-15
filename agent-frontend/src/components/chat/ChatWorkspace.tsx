@@ -914,7 +914,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   return (
     <div className={styles.workspace}>
       {/* 顶部工作区：当前会话信息与右侧面板开关 */}
-      <div className={styles.workspaceHeader}>
+      <div className={styles.workspaceHeader} data-tauri-drag-region>
         <div className={styles.workspaceIdentity}>
           {projectPath ? (
             <FolderTree size={16} aria-hidden="true" />

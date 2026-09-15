@@ -161,6 +161,7 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
 
   return (
     <div className={styles.pageContainer}>
+      <div className={styles.titlebarDragRegion} data-tauri-drag-region aria-hidden="true" />
       <div className={styles.settingsSidebar}>
         <button className={styles.backBtn} onClick={onBack}>
           <ArrowLeft size={14} />

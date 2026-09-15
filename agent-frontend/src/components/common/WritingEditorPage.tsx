@@ -79,7 +79,7 @@ export function WritingEditorPage({ backLabel, identity, detail, initialTitle = 
   };
 
   return <main className={styles.workspace}>
-    <header className={styles.topBar}>
+    <header className={styles.topBar} data-tauri-drag-region>
       <button type="button" className={styles.backButton} onClick={onBack}><CaretLeftIcon size={17} />{backLabel}</button>
       <div className={styles.pageIdentity}><NotePencilIcon size={15} /><span>{identity}</span><small>{detail}</small></div>
       <button type="button" className={styles.saveButton} disabled={!canSave} onClick={() => void save()}><CheckIcon size={15} weight="bold" />{saving ? '保存中…' : '保存'}</button>

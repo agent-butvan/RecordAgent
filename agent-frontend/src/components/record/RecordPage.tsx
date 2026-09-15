@@ -236,7 +236,7 @@ export function RecordPage({ initialEntry, initialType = 'quick' }: { initialEnt
     tabs={tabs} saving={saving} onSave={save} onBack={() => setEditing(null)} />;
 
   return <main className={styles.workspace}>
-    <div className={styles.commandBar}>
+    <div className={styles.commandBar} data-tauri-drag-region>
       <div className={styles.search}><MagnifyingGlassIcon size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索资料" /></div>
       <div className={styles.actions}>
         <button className={styles.iconButton} onClick={() => void exportRecordBackup()} title="导出备份"><DownloadSimpleIcon size={14} /></button>

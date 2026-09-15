@@ -1,14 +1,25 @@
 /* Sidebar.module.css - ChatGPT 风格会话历史侧边栏 */
 
 .sidebar {
+  box-sizing: border-box;
   position: relative;
   width: 260px;
   height: 100vh;
   background-color: #e3edf3;
   display: flex;
   flex-direction: column;
-  padding: 12px 12px 4px;
+  padding: calc(12px + var(--window-titlebar-inset)) 12px 4px;
   user-select: none;
+}
+
+/* macOS Overlay 标题栏的侧边栏拖拽区域；非 macOS 下高度为 0。 */
+.titlebarDragRegion {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--window-titlebar-inset);
+  z-index: 20;
 }
 
 /* 右缘拖拽手柄 */
