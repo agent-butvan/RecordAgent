@@ -42,6 +42,9 @@ public class AgentStorageProperties {
     /** AgentScope Workspace 的根目录。 */
     private final Path workspaceDirectory;
 
+    /** 天气与节假日持久化缓存目录。 */
+    private final Path dailyContextDirectory;
+
     public AgentStorageProperties() {
         this(Paths.get(System.getProperty("user.home"), ".butvan-agent"));
     }
@@ -61,6 +64,7 @@ public class AgentStorageProperties {
         runCheckpointDirectory = this.rootDirectory.resolve("runs");
         agentStateDirectory = this.rootDirectory.resolve("agentscope").resolve("state");
         workspaceDirectory = this.rootDirectory.resolve("agentscope").resolve("workspace");
+        dailyContextDirectory = this.rootDirectory.resolve("daily-context");
 
         // 应用启动的时候创建本项目明确拥有的目录
         createDirectories(sessionCatalogFile.getParent());
@@ -70,6 +74,7 @@ public class AgentStorageProperties {
         createDirectories(runCheckpointDirectory);
         createDirectories(agentStateDirectory);
         createDirectories(workspaceDirectory);
+        createDirectories(dailyContextDirectory);
     }
 
     /**

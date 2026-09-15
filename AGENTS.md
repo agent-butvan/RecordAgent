@@ -74,6 +74,8 @@
 - 主 Agent 保持禁用 AgentScope 默认 Workspace Context；常驻 System Core 必须通过测试限制在 1,200 个 `TokenCounter` 估算 Token 内。个人上下文统一由 `server-agents/context` 的 `ConversationContextAssembler` 组装，默认总预算 850（Profile 300、Memory 500、Top-K 4），并由 `ContextInjectionMiddleware` 仅在 Model Call 前临时注入，禁止写入 AgentState 或 transcript；个人画像和开关分别保存于用户工作区的 `profile/PROFILE.md` 与 `profile/settings.json`，显式空画像必须阻止 `MEMORY.md#User Profile` 回退，暂停只停止自动注入而不得删除数据。画像辅助维护默认关闭，只能在聊天完成后按记忆指纹和 24 小时间隔低频生成提案；提案、维护状态和确认历史分别保存于 `profile/proposals/pending.json`、`profile/maintenance.json` 与 `profile/history/`，必须携带来源与置信度，并通过画像 revision 校验后由用户显式确认才能写入，禁止后台静默改写。新增上下文来源必须接入该唯一 seam、设置硬预算并补充注入与归因测试。
 - Agent 工具 Schema 默认按 `ToolSchemaRoutingPolicy` 中的能力组延迟暴露，只常驻轻量元工具；新增或重命名工具时必须同步确认其分组，未知工具仅作为兼容兜底保持常驻，禁止无评估地恢复全量 Schema 注入。
 - Agent 聊天运行必须使用稳定 `runId` 贯穿请求、SSE、运行注册表和终态收尾关联；显式取消必须通过后端取消接口向 AgentScope、生产线程、模型适配器和工具传播。传输层断开与用户显式取消必须区分；取消后必须保留 partial assistant、工具状态和 usage，且只有一个终态路径可写入。真正可恢复的暂停只能在有明确 checkpoint、待恢复动作和工具幂等语义后开放，不得用 Java 线程 suspend/resume 冒充。
+- 工具审批以“每用户、每会话最多一个待处理批次”为硬约束，审批必须绑定原始 `runId`，恢复前必须原子领取并立即释放旧批次槽位，禁止以新 `runId` 重放同一批工具。同一批次的全部未决工具必须在一张审批卡片内展示，允许逐项决定或批量选择，并通过单次原子请求提交完整决定，禁止前端逐项提交形成半完成状态。桌面端刷新后通过后端权威查询恢复审批卡片；正常 HITL 恢复必须优先消费完整 `ConfirmResult`，不得启用会在确认前补写失败结果的框架自动恢复。进程重启不承诺继续旧审批，只有新用户轮次开始且不存在应用审批句柄时，才允许把遗留 AgentScope 工具调用安全收尾为中断结果，避免会话永久停留在 `ASKING`。
+- 学习状态跨窗口同步统一使用后端 SSE：所有写入在事务成功提交后发布领域事件，连接建立及自动重连时必须先下发当前权威快照；主窗口内只允许一个共享订阅，禁止使用定时 HTTP 轮询或仅依赖前端本地事件推断状态。
 
 ### 代码质量与安全
 
@@ -84,6 +86,7 @@
 - 用户模型配置统一持久化在 `~/.butvan-agent/config.json`，不得把用户密钥或个性化配置写入 `application.yml`、`application-vendor.yml` 或源码。
 - 聊天轮次 Token 用量随 assistant 消息写入 `~/.butvan-agent/transcripts/*.jsonl`；标题等非聊天模型调用写入 `~/.butvan-agent/usage/system-usage.jsonl`；未结束轮次仅暂存在 `~/.butvan-agent/runs/*.json`，终态落盘或重启恢复后必须清理。供应商 Usage 是实际总量，System、History、Current User、Tool Schema、Tool Result、Profile Context、Memory Recall、RAG 与 Other 是携带计数器版本的本地归因估算，两者不得混淆或互相补齐。SQLite 中的 Token 用量表仅作为可从上述文件重建的统计读模型，不得取代原始记录。
 - AgentScope 工作区、工具权限、文件与网络访问必须按最小权限设计；任何可能执行本机操作的能力都应具备明确的审批、范围和错误反馈。
+- 系统设置跳转只能通过参数固定的 Tauri 命令暴露，禁止允许前端传入任意 URL 或本机命令；不支持直达的平台必须提供可执行的手工路径说明。
 
 ## 四、前端工程与 UI 组件规范
 
@@ -103,8 +106,11 @@
 - 所有后端 API 调用必须集中在 `services`，统一处理响应结构、超时、错误映射与类型；组件内不得散落重复 `fetch` 实现。
 - 跨页面且需要持久化或同步的状态使用 Context 或专用状态模块；仅限单组件使用的状态保留在组件内部。
 - API 基础地址、功能开关和环境差异必须通过配置集中管理，禁止在多个组件硬编码。
+- 聊天 Top 栏的日期、待办、财务、天气与节假日等摘要必须作为独立模块接入统一的信息栏与覆盖式详情面板；模块可见性由对应业务设置页管理并通过 `featurePreferences` 即时同步。各模块只请求自身启用的数据，加载或失败状态必须相互隔离，不得阻断聊天主流程；外部数据源必须经后端稳定 DTO 适配并设置缓存，密钥不得返回前端。
 - 未检测到模型配置时，必须展示全屏居中的独立 `ModelInitPage`：纯白背景、椭圆形“取消 / 继续”按钮、极简排版；禁止改为遮罩弹窗。
 - 所有用户可见文案、错误信息和空状态应使用清晰中文；技术名词、模型名和协议名可保留英文。
+- 保存、删除、导入、权限请求等短暂操作结果统一通过窗口顶部居中的全局 `Message` 展示，不得在页面内容流中临时插入横幅；字段校验、加载失败、空状态和需要就地重试的上下文反馈仍应保留在所属组件附近。
+- macOS 主窗口使用 Tauri Overlay 标题栏时，窗口安全内边距必须统一由 `--window-titlebar-inset` 提供；拖拽区域只能标注非交互容器，按钮、输入框和链接必须保持可点击，其他平台不得额外增加标题栏空白。
 
 ## 五、验证、评审与交付
 

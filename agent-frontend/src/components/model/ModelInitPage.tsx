@@ -75,6 +75,7 @@ export const ModelInitPage: React.FC<ModelInitPageProps> = ({ vendors, onSuccess
 
   return (
     <div className={styles.container}>
+      <div className={styles.titlebarDragRegion} data-tauri-drag-region aria-hidden="true" />
       <div className={styles.contentCard}>
         <div className={styles.header}>
           <Bot className={styles.logoIcon} strokeWidth={1.5} />

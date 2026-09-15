@@ -58,6 +58,7 @@ public class AgentService {
     private final ConversationContextAssembler contextAssembler;
     private final ProfileMaintenanceScheduler profileMaintenanceScheduler;
     private final ActiveAgentRunRegistry activeRunRegistry;
+    private final OrphanedToolCallRecovery orphanedToolCallRecovery;
 
     /**
      * 创建一次 HTTP 流对应的队列和生产虚拟线程。
@@ -68,6 +69,8 @@ public class AgentService {
         if (request == null) throw new IllegalArgumentException("聊天请求不能为空");
         String userId = currentUserProvider.currentUserId();
         String runId = normalizeRunId(request.runId());
+        sessionCatalogService.requireActive(request.sessionId());
+        pendingApprovalStore.requireNoPending(userId, request.sessionId());
         AgentStreamSession streamSession = new AgentStreamSession(runId);
         activeRunRegistry.register(userId, request.sessionId(), streamSession);
         streamSession.queue().offer(new AgentStreamEvent.RunStarted(runId));
@@ -115,6 +118,9 @@ public class AgentService {
             run = new AgentRun(request.sessionId(), userId, turnId, context);
             checkpointService.save(run);
 
+            // 仅新用户轮次修复进程重启遗留调用；HITL 恢复必须让 AgentScope 原样消费 ConfirmResult。
+            recoverOrphanedToolCalls(userId, request.sessionId());
+
             // 首 token 前收到停止请求时，也要保留用户消息和 CANCELLED assistant 终态。
             if (streamSession.isCancelled()) {
                 finishCancelled(run, streamSession);
@@ -150,6 +156,16 @@ public class AgentService {
             putEvent(streamSession, new AgentStreamEvent.Failed(userMessage));
         } finally {
             activeRunRegistry.unregister(userId, request.sessionId(), streamSession);
+        }
+    }
+
+    private void recoverOrphanedToolCalls(String userId, String sessionId) {
+        HarnessAgent agent = agentFactory.currentAgent(sessionId);
+        int recovered = orphanedToolCallRecovery.recover(
+                agent.getDelegate().getAgentState(userId, sessionId), agent.getName());
+        if (recovered > 0) {
+            agent.getDelegate().saveAgentState(userId, sessionId);
+            log.warn("已安全收尾进程遗留工具调用：sessionId={}, 数量={}", sessionId, recovered);
         }
     }
 
@@ -283,18 +299,36 @@ public class AgentService {
         }
 
         // 已记住的结果也放入统一 PendingApproval，确保最终一次恢复包含整批工具的结果
-        PendingApproval approval = new PendingApproval(run, askedTools);
+        PendingApproval approval = new PendingApproval(run, askedTools, streamSession.runId());
         rememberResults.forEach(result -> approval.decide(
                 result.getToolCall().getId(), result.isConfirmed()
         ));
         pendingApprovalStore.save(approval);
         checkpointService.save(run);
 
-        PermissionToolDto first = approval.nextTool();
         return putEvent(
                 streamSession,
-                new AgentStreamEvent.PermissionRequired(approval.approvalId(), first)
+                new AgentStreamEvent.PermissionRequired(
+                        approval.approvalId(), approval.runId(), run.turnId(), approval.pendingTools())
         );
+    }
+
+    /** 原子保存当前批次的全部审核决定，完成后由前端恢复原运行。 */
+    public PermissionDecisionResponse decidePermissions(PermissionBatchDecisionRequest request) {
+        String userId = currentUserProvider.currentUserId();
+        sessionCatalogService.requireActive(request.sessionId());
+        PendingApproval approval = pendingApprovalStore.require(
+                request.approvalId(), userId, request.sessionId());
+        approval.decideBatch(request.decisions());
+
+        for (PermissionToolDecision decision : request.decisions()) {
+            if (decision.rememberForSession()) {
+                ToolUseBlock tool = approval.findTool(decision.toolCallId());
+                pendingApprovalStore.remember(
+                        userId, request.sessionId(), tool, decision.approved());
+            }
+        }
+        return PermissionDecisionResponse.ready();
     }
 
     public PermissionDecisionResponse decidePermission(PermissionDecisionRequest request) {
@@ -329,7 +363,7 @@ public class AgentService {
         approval.approveAll();
         log.info("自动批准工具权限：sessionId={}, approvalId={}, 工具数={}",
                 sessionId, approvalId, approval.toolCount());
-        return resumeAgent(sessionId, approvalId);
+        return resumeAgent(sessionId, approvalId, approval.runId());
     }
 
     /**
@@ -357,45 +391,47 @@ public class AgentService {
     /** 使用原 runId 恢复权限确认后的同一轮运行。 */
     public AgentStreamSession resumeAgent(String sessionId, String approvalId, String requestedRunId) {
         String userId = currentUserProvider.currentUserId();
-        PendingApproval approval = pendingApprovalStore.require(approvalId, userId, sessionId);
-        if (!approval.allDecided()) {
-            throw new IllegalArgumentException("请先逐条完成所有工具确认");
-        }
-
-        String runId = normalizeRunId(requestedRunId);
+        String runId = requireRunId(requestedRunId);
+        PendingApproval approval = pendingApprovalStore.claimForResume(
+                approvalId, userId, sessionId, runId);
         AgentStreamSession streamSession = new AgentStreamSession(runId);
-        activeRunRegistry.register(userId, sessionId, streamSession);
         streamSession.queue().offer(new AgentStreamEvent.RunStarted(runId));
-        Thread producer;
-        try {
-            producer = Thread.startVirtualThread(() -> {
-                try {
-                    runAgentStream(approval.run(),
-                            List.of(buildResumeMessage(approval.toConfirmResults())), streamSession);
-                } catch (Exception exception) {
-                    if (streamSession.isCancelled() || Thread.currentThread().isInterrupted()) {
-                        Thread.currentThread().interrupt();
-                        finishCancelled(approval.run(), streamSession);
-                    } else {
-                        log.error("恢复 Agent 流失败: sessionId={}, approvalId={}", sessionId, approvalId, exception);
-                        String message = agentRunCompleter.tryComplete(
-                                approval.run(), TranscriptMessageDto.MessageStatus.FAILED)
-                                ? "恢复 Agent 处理失败，请重新发起任务。"
-                                : terminalPersistenceFailureMessage(false);
-                        putEvent(streamSession, new AgentStreamEvent.Failed(message));
-                    }
-                } finally {
-                    // 无论恢复成功还是失败，该批次都不能再次提交。
-                    pendingApprovalStore.remove(approvalId);
-                    activeRunRegistry.unregister(userId, sessionId, streamSession);
+        Thread producer = Thread.ofVirtual().unstarted(() -> {
+            try {
+                runAgentStream(approval.run(),
+                        List.of(buildResumeMessage(approval.toConfirmResults())), streamSession);
+            } catch (Exception exception) {
+                if (streamSession.isCancelled() || Thread.currentThread().isInterrupted()) {
+                    Thread.currentThread().interrupt();
+                    finishCancelled(approval.run(), streamSession);
+                } else {
+                    log.error("恢复 Agent 流失败: sessionId={}, approvalId={}", sessionId, approvalId, exception);
+                    String message = agentRunCompleter.tryComplete(
+                            approval.run(), TranscriptMessageDto.MessageStatus.FAILED)
+                            ? "恢复 Agent 处理失败，请重新发起任务。"
+                            : terminalPersistenceFailureMessage(false);
+                    putEvent(streamSession, new AgentStreamEvent.Failed(message));
                 }
-            });
+            } finally {
+                activeRunRegistry.unregister(userId, sessionId, streamSession);
+            }
+        });
+        try {
+            activeRunRegistry.register(userId, sessionId, streamSession);
+            streamSession.bindProducer(producer);
+            producer.start();
         } catch (RuntimeException exception) {
             activeRunRegistry.unregister(userId, sessionId, streamSession);
+            pendingApprovalStore.restoreAfterFailedResume(approval);
             throw exception;
         }
-        streamSession.bindProducer(producer);
         return streamSession;
+    }
+
+    /** 查询当前用户在指定会话中等待处理的审批。 */
+    public Optional<PendingApprovalView> currentPendingApproval(String sessionId) {
+        sessionCatalogService.requireActive(sessionId);
+        return pendingApprovalStore.current(currentUserProvider.currentUserId(), sessionId);
     }
 
     /** 由当前用户取消指定会话中的精确 run。 */
@@ -464,6 +500,11 @@ public class AgentService {
             throw new IllegalArgumentException("runId 格式不正确");
         }
         return normalized;
+    }
+
+    private String requireRunId(String runId) {
+        if (runId == null || runId.isBlank()) throw new IllegalArgumentException("runId 不能为空");
+        return normalizeRunId(runId);
     }
 
     /** 先持久化 partial assistant，再将取消终态交给 SSE。 */

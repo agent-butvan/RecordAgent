@@ -216,7 +216,7 @@ export interface ToolResultPayload {
   result?: string;
 }
 
-/** 后端要求用户确认时返回的单条高风险工具。 */
+/** 后端要求用户确认时返回的高风险工具。 */
 export interface PermissionToolPayload {
   toolCallId: string;
   toolName: string;
@@ -228,7 +228,22 @@ export interface PermissionToolPayload {
 
 export interface PermissionRequiredPayload {
   approvalId: string;
-  tool: PermissionToolPayload;
+  runId: string;
+  turnId: string;
+  tools: PermissionToolPayload[];
+}
+
+export interface PendingApprovalPayload extends PermissionRequiredPayload {
+  sessionId: string;
+  partialContent: string;
+  startedAt: string;
+  readyToResume: boolean;
+}
+
+export interface PermissionDecisionInput {
+  toolCallId: string;
+  approved: boolean;
+  rememberForSession: boolean;
 }
 
 export interface PermissionDecisionResponse {
@@ -247,15 +262,13 @@ function isSubagentProgressDto(value: unknown): value is SubagentProgressDto {
   );
 }
 
-/** 提交一条工具授权决定；本批全部完成时响应会标记 readyToResume。 */
-export async function submitPermissionDecision(params: {
+/** 原子提交同一审批批次的全部工具授权决定。 */
+export async function submitPermissionDecisions(params: {
   sessionId: string;
   approvalId: string;
-  toolCallId: string;
-  approved: boolean;
-  rememberForSession: boolean;
+  decisions: PermissionDecisionInput[];
 }): Promise<PermissionDecisionResponse> {
-  const response = await fetch(`${apiBaseUrl}/agent/chat/permission/decision`, {
+  const response = await fetch(`${apiBaseUrl}/agent/chat/permission/decisions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params),
@@ -264,6 +277,16 @@ export async function submitPermissionDecision(params: {
     throw new Error(`提交权限决定失败：HTTP ${response.status}`);
   }
   return response.json() as Promise<PermissionDecisionResponse>;
+}
+
+/** 查询会话当前待处理审批，供页面刷新或重新切换会话后恢复。 */
+export async function fetchPendingPermission(
+  sessionId: string,
+): Promise<PendingApprovalPayload | null> {
+  const response = await fetch(`${apiBaseUrl}/agent/chat/${sessionId}/permission/pending`);
+  if (response.status === 204) return null;
+  if (!response.ok) throw new Error(`读取待审批操作失败：HTTP ${response.status}`);
+  return response.json() as Promise<PendingApprovalPayload>;
 }
 
 /**

@@ -7,6 +7,7 @@ import butvan.agent.network.agenttool.finance.FinanceTool.CreateAccountRequest;
 import butvan.agent.network.agenttool.finance.FinanceTool.QueryRequest;
 import butvan.agent.network.agenttool.finance.FinanceTool.TransactionQueryResult;
 import butvan.agent.network.agenttool.finance.FinanceTool.TransactionRequest;
+import butvan.agent.network.agenttool.finance.FinanceTool.TransferRequest;
 import butvan.agent.network.config.database.LocalDatabaseConfiguration;
 import butvan.agent.network.daily.DailyEventModuleConfiguration;
 import butvan.agent.network.finance.model.FinanceModels.FinanceAccount;
@@ -55,7 +56,7 @@ class FinanceToolIntegrationTest {
     void exposesFinanceToolSchemas() {
         Toolkit toolkit = new Toolkit();
         toolkit.registerTool(financeTool);
-        assertEquals(Set.of("finance_query", "finance_create_account", "finance_record_transaction"),
+        assertEquals(Set.of("finance_query", "finance_create_account", "finance_record_transaction", "finance_transfer"),
                 toolkit.getToolNames());
     }
 
@@ -82,6 +83,31 @@ class FinanceToolIntegrationTest {
                 "2026-09-12", "13:00", "finance-overdraw"));
         assertFalse(overdraw.success());
         assertEquals("INSUFFICIENT_BALANCE", overdraw.error().code());
+    }
+
+    @Test
+    void transferAdjustsBothAccountsAndDeduplicates() {
+        ToolResult<?> sourceResult = financeTool.createAccount(new CreateAccountRequest(
+                "转出银行卡", "bank", "CNY", "500.00", false, null, "finance-transfer-source"));
+        FinanceAccount sourceAccount = assertInstanceOf(FinanceAccount.class, sourceResult.data());
+
+        ToolResult<?> targetResult = financeTool.createAccount(new CreateAccountRequest(
+                "转入零钱通", "wechat_yield", "CNY", "100.00", false, null, "finance-transfer-target"));
+        FinanceAccount targetAccount = assertInstanceOf(FinanceAccount.class, targetResult.data());
+
+        TransferRequest transferRequest = new TransferRequest(
+                sourceAccount.id(), targetAccount.id(), "200.00", "转入零钱通理财",
+                "2026-09-13", "10:30", "finance-transfer-key-1");
+
+        ToolResult<?> transferResult = financeTool.transfer(transferRequest);
+        assertTrue(transferResult.success());
+        assertTrue(financeTool.transfer(transferRequest).success());
+
+        ToolResult<?> overdrawTransfer = financeTool.transfer(new TransferRequest(
+                sourceAccount.id(), targetAccount.id(), "9999.00", "超额划转",
+                "2026-09-13", "10:35", "finance-transfer-overdraw"));
+        assertFalse(overdrawTransfer.success());
+        assertEquals("INSUFFICIENT_BALANCE", overdrawTransfer.error().code());
     }
 
     private static Path createDatabasePath() {

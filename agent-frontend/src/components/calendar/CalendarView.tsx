@@ -25,7 +25,7 @@ import {
 } from '../../services/dailyEvents';
 import type { CreateFinanceTransactionInput, FinanceAccount, FinanceCategoryOptions } from '../../types/finance';
 import { Button } from '../common/Button';
-import { Message } from '../common/Message';
+import { useMessage } from '../common/Message';
 import { Modal } from '../common/Modal';
 import { TopBar } from '../common/TopBar';
 import { CalendarDayPreview } from './CalendarDayPreview';
@@ -91,17 +91,16 @@ const EMPTY_ENTRY: CalendarDayEntry = { todos: [], expenses: [], incomes: [], sc
 
 /** 日记录原型：月历负责浏览，每日详情聚合待办、花销、手记、图片和日程。 */
 export const CalendarView: React.FC = () => {
+  const { showMessage } = useMessage();
   const today = useMemo(() => startOfDay(new Date()), []);
   const [cursor, setCursor] = useState(today);
   const [selected, setSelected] = useState(today);
   const [entries, setEntries] = useState<Record<string, CalendarDayEntry>>({});
   const [summaries, setSummaries] = useState<Record<string, DailyDaySummary>>({});
   const [isDayLoading, setIsDayLoading] = useState(true);
-  const [dataError, setDataError] = useState<string | null>(null);
   const [journalEditorDate, setJournalEditorDate] = useState<Date | null>(null);
   const [journalEditorId, setJournalEditorId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isCashflowModalOpen, setIsCashflowModalOpen] = useState(false);
   const [isFinanceTransactionModalOpen, setIsFinanceTransactionModalOpen] = useState(false);
@@ -162,23 +161,21 @@ export const CalendarView: React.FC = () => {
   useEffect(() => {
     let active = true;
     setIsDayLoading(true);
-    setDataError(null);
     fetchDailyDay(selected)
       .then((day) => {
         if (active) setEntries((current) => ({ ...current, [day.date]: toCalendarDayEntry(day) }));
       })
       .catch((error: unknown) => {
-        if (active) setDataError(error instanceof Error ? error.message : '读取日记录失败');
+        if (active) showMessage('error', error instanceof Error ? error.message : '读取日记录失败');
       })
       .finally(() => {
         if (active) setIsDayLoading(false);
       });
     return () => { active = false; };
-  }, [selected]);
+  }, [selected, showMessage]);
 
   useEffect(() => {
     let active = true;
-    setDataError(null);
     const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
     const last = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
     fetchDailySummaries(first, last)
@@ -186,10 +183,10 @@ export const CalendarView: React.FC = () => {
         if (active) setSummaries(Object.fromEntries(items.map((item) => [item.date, item])));
       })
       .catch((error: unknown) => {
-        if (active) setDataError(error instanceof Error ? error.message : '读取月度摘要失败');
+        if (active) showMessage('error', error instanceof Error ? error.message : '读取月度摘要失败');
       });
     return () => { active = false; };
-  }, [cursor]);
+  }, [cursor, showMessage]);
 
   const refreshSelectedAndMonth = async () => {
     await Promise.all([loadDay(selected), loadMonth()]);
@@ -197,17 +194,16 @@ export const CalendarView: React.FC = () => {
 
   const openFinanceTransactionModal = async () => {
     try {
-      setDataError(null);
       const [overview, categories] = await Promise.all([fetchFinanceOverview(), fetchFinanceCategories()]);
       if (!overview.accounts.length) {
-        setDataError('暂无资产账户，请先添加一个账户后再记账。');
+        showMessage('info', '暂无资产账户，请先添加一个账户后再记账。');
         return;
       }
       setFinanceAccounts(overview.accounts);
       setFinanceCategories(categories);
       setIsFinanceTransactionModalOpen(true);
     } catch (error: unknown) {
-      setDataError(error instanceof Error ? error.message : '读取财务账户失败，请稍后重试');
+      showMessage('error', error instanceof Error ? error.message : '读取财务账户失败，请稍后重试');
     }
   };
 
@@ -217,7 +213,7 @@ export const CalendarView: React.FC = () => {
     try {
       await refreshSelectedAndMonth();
     } catch (error: unknown) {
-      setDataError(error instanceof Error ? `流水已保存，但日历刷新失败：${error.message}` : '流水已保存，但日历刷新失败');
+      showMessage('error', error instanceof Error ? `流水已保存，但日历刷新失败：${error.message}` : '流水已保存，但日历刷新失败');
     }
   };
 
@@ -225,21 +221,19 @@ export const CalendarView: React.FC = () => {
     const todo = selectedEntry.todos.find((item) => item.id === todoId);
     if (!todo) return;
     try {
-      setDataError(null);
       await setDailyTodoCompleted(todo.id, !todo.completed, todo.version ?? 0, selected);
       await refreshSelectedAndMonth();
     } catch (error: unknown) {
-      setDataError(error instanceof Error ? error.message : '修改待办失败');
+      showMessage('error', error instanceof Error ? error.message : '修改待办失败');
     }
   };
 
   const createRecord = async (draft: CalendarRecordDraft) => {
     try {
-      setDataError(null);
       await createDailyRecord(selected, draft);
       await refreshSelectedAndMonth();
     } catch (error: unknown) {
-      setDataError(error instanceof Error ? error.message : '创建日记录失败');
+      showMessage('error', error instanceof Error ? error.message : '创建日记录失败');
     }
   };
 
@@ -249,34 +243,30 @@ export const CalendarView: React.FC = () => {
     title: string,
   ) => {
     if (!record.id || record.version === undefined) {
-      setDataError(`缺少${kind}版本信息，无法安全删除，请刷新后重试`);
+      showMessage('error', `缺少${kind}版本信息，无法安全删除，请刷新后重试`);
       return;
     }
-    setDeleteError(null);
     setDeleteTarget({ id: record.id, version: record.version, kind, title });
   };
 
   const closeDeleteDialog = () => {
     if (isDeleting) return;
     setDeleteTarget(null);
-    setDeleteError(null);
   };
 
   const confirmDelete = async () => {
     if (!deleteTarget || isDeleting) return;
     setIsDeleting(true);
-    setDeleteError(null);
     try {
       await deleteDailyEvent(deleteTarget.id, deleteTarget.version);
       setDeleteTarget(null);
-      setDataError(null);
       try {
         await refreshSelectedAndMonth();
       } catch (error: unknown) {
-        setDataError(error instanceof Error ? `记录已删除，但刷新失败：${error.message}` : '记录已删除，但刷新失败');
+        showMessage('error', error instanceof Error ? `记录已删除，但刷新失败：${error.message}` : '记录已删除，但刷新失败');
       }
     } catch (error: unknown) {
-      setDeleteError(error instanceof Error ? error.message : `删除${deleteTarget.kind}失败`);
+      showMessage('error', error instanceof Error ? error.message : `删除${deleteTarget.kind}失败`);
     } finally {
       setIsDeleting(false);
     }
@@ -285,7 +275,6 @@ export const CalendarView: React.FC = () => {
   const saveJournal = async (journal: CalendarJournal) => {
     if (!journalEditorDate) return;
     try {
-      setDataError(null);
       const editorEntry = entries[formatLocalDate(journalEditorDate)];
       const journals = editorEntry?.journals ?? (editorEntry?.journal ? [editorEntry.journal] : []);
       const existing = journals.find((item) => item.id === journalEditorId);
@@ -302,7 +291,7 @@ export const CalendarView: React.FC = () => {
       setJournalEditorDate(null);
       setJournalEditorId(null);
     } catch (error: unknown) {
-      setDataError(error instanceof Error ? error.message : '保存手记失败');
+      showMessage('error', error instanceof Error ? error.message : '保存手记失败');
     }
   };
 
@@ -316,7 +305,6 @@ export const CalendarView: React.FC = () => {
         initialJournal={journals.find((item) => item.id === journalEditorId)}
         onBack={() => { setJournalEditorDate(null); setJournalEditorId(null); }}
         onSave={saveJournal}
-        error={dataError}
       />
     );
   }
@@ -348,7 +336,6 @@ export const CalendarView: React.FC = () => {
       />
       <div className={styles.page}>
         <div className={styles.content}>
-          {dataError && <div className={styles.dataError} role="alert">{dataError}</div>}
           <div className={styles.calendarLayout}>
             <section className={styles.monthPanel} aria-label="月历">
               <div className={styles.monthTitleRow}>
@@ -598,7 +585,6 @@ export const CalendarView: React.FC = () => {
           <p className={styles.deleteDescription}>
             “{deleteTarget?.title}”将被永久删除，此操作无法撤销。
           </p>
-          {deleteError && <Message tone="error">{deleteError}</Message>}
           <div className={styles.deleteDialogActions}>
             <Button type="button" variant="outline" onClick={closeDeleteDialog} disabled={isDeleting} autoFocus>
               取消

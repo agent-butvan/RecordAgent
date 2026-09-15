@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DotsThree } from '@phosphor-icons/react';
 import { fetchDailyDay, setDailyTodoCompleted } from '../../../services/dailyEvents';
 import { DailyTodoList } from '../../calendar/DailyTodoList';
+import { useMessage } from '../../common/Message';
 import type { CalendarTodo } from '../../../types/calendar';
 import type { TodoDailyEvent } from '../../../types/dailyEvent';
 import { overviewTodos } from './overviewData';
@@ -104,18 +105,22 @@ export function TodoListTile({
   onToggle: controlledToggle,
   onReload: controlledReload,
 }: TodoListTileProps) {
+  const { showMessage } = useMessage();
   const isControlled = controlledTodos !== undefined;
   const load = useCallback(() => fetchDailyDay(new Date(`${date ?? ''}T12:00:00`)), [date]);
   const resource = useOverviewResource(load, isControlled ? 0 : (refreshKey ?? 0));
   const fallbackPending = useRef(new Set<string>());
   const [fallbackPendingIds, setFallbackPendingIds] = useState<ReadonlySet<string>>(new Set());
-  const [fallbackSaveError, setFallbackSaveError] = useState<string | null>(null);
 
   const loading = isControlled ? (controlledLoading ?? false) : resource.loading;
   const error = isControlled ? (controlledError ?? null) : resource.error;
   const reload = isControlled ? (controlledReload ?? (() => {})) : resource.reload;
-  const saveError = isControlled ? (controlledSaveError ?? null) : fallbackSaveError;
+  const saveError = isControlled ? (controlledSaveError ?? null) : null;
   const pendingIds = isControlled ? (controlledPendingIds ?? new Set()) : fallbackPendingIds;
+
+  useEffect(() => {
+    if (saveError) showMessage('error', saveError);
+  }, [saveError, showMessage]);
 
   const internalCalendarTodos: CalendarTodo[] = useMemo(() => {
     if (isControlled) return [];
@@ -141,11 +146,10 @@ export function TodoListTile({
     if (!todo || fallbackPending.current.has(id)) return;
     fallbackPending.current.add(id);
     setFallbackPendingIds(new Set(fallbackPending.current));
-    setFallbackSaveError(null);
     try {
       await setDailyTodoCompleted(id, !todo.completed, todo.version ?? 0, new Date(`${date ?? ''}T12:00:00`));
     } catch (cause) {
-      setFallbackSaveError(cause instanceof Error ? cause.message : '待办更新失败');
+      showMessage('error', cause instanceof Error ? cause.message : '待办更新失败');
     } finally {
       await reload();
       fallbackPending.current.delete(id);
@@ -165,7 +169,6 @@ export function TodoListTile({
         <span className={`${styles.pill} ${styles.pillBlue}`}>按优先级</span>
       </div>
 
-      {saveError && <p className={styles.error} role="alert">{saveError}</p>}
       {loading ? (
         <p className={styles.empty}>正在加载待办列表…</p>
       ) : error ? (
@@ -280,4 +283,3 @@ export function TodoOverviewCard({ date, refreshKey, onOpenCalendar, onCompose }
     </>
   );
 }
-

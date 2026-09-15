@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Map;
+import java.util.List;
 
 /**
  * Agent 对话流在业务层和网络层之间传递的标准事件。
@@ -188,7 +189,12 @@ public sealed interface AgentStreamEvent permits AgentStreamEvent.RunStarted, Ag
     }
 
 
-    record PermissionRequired(String approvalId, PermissionToolDto firstTool) implements AgentStreamEvent{
+    record PermissionRequired(
+            String approvalId,
+            String runId,
+            String turnId,
+            List<PermissionToolDto> tools
+    ) implements AgentStreamEvent{
 
         @Override
         public String eventName() {
@@ -197,7 +203,12 @@ public sealed interface AgentStreamEvent permits AgentStreamEvent.RunStarted, Ag
 
         @Override
         public Object payload() {
-            return Map.of("approvalId", approvalId, "tool", firstTool);
+            return Map.of(
+                    "approvalId", approvalId,
+                    "runId", runId,
+                    "turnId", turnId,
+                    "tools", tools
+            );
         }
 
         /** 结束当前 SSE；恢复会由前端建立新的 SSE 连接。 */

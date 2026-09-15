@@ -3,12 +3,15 @@ package butvan.agent.network.study.service;
 import butvan.agent.network.daily.repository.DailyEventRepository;
 import butvan.agent.network.daily.repository.DailyEventRepository.DailyEventRow;
 import butvan.agent.network.daily.type.DailyEventTypeRegistry;
+import butvan.agent.network.study.event.StudySessionChangedEvent;
+import butvan.agent.network.study.event.StudySessionChangedEvent.ChangeType;
 import butvan.agent.network.study.model.StudyModels.StudyCommand;
 import butvan.agent.network.study.model.StudyModels.StudyDayStat;
 import butvan.agent.network.study.model.StudyModels.StudySession;
 import butvan.agent.network.study.model.StudyModels.StudyStatistics;
 import butvan.agent.network.study.repository.StudyRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +35,7 @@ public class StudyService {
     private final DailyEventRepository dailyEventRepository;
     private final DailyEventTypeRegistry typeRegistry;
     private final StudyRepository studyRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     /** 立即开始一段学习。 */
     @Transactional
@@ -51,7 +55,9 @@ public class StudyService {
         } catch (DataIntegrityViolationException exception) {
             throw new IllegalArgumentException("已有进行中的学习，请刷新后重试", exception);
         }
-        return requireSession(ownerId, id, now);
+        StudySession created = requireSession(ownerId, id, now);
+        publishChanged(ownerId, id, ChangeType.STARTED);
+        return created;
     }
 
     /** 以当前服务时间结束指定的进行中学习。 */
@@ -74,7 +80,9 @@ public class StudyService {
                 cleanContent(existing.content()), "completed", now)) {
             throw new IllegalStateException("学习记录已被其他操作修改，请刷新后重试");
         }
-        return requireSession(ownerId, eventId, now);
+        StudySession finished = requireSession(ownerId, eventId, now);
+        publishChanged(ownerId, eventId, ChangeType.FINISHED);
+        return finished;
     }
 
     /** 补录一段已结束的学习。 */
@@ -93,7 +101,9 @@ public class StudyService {
         dailyEventRepository.insertEvent(id, ownerId, command.eventDate(), "study", cleanContent(content),
                 "manual", null, "completed", now);
         typeRegistry.insert(id, command);
-        return requireSession(ownerId, id, now);
+        StudySession created = requireSession(ownerId, id, now);
+        publishChanged(ownerId, id, ChangeType.CREATED);
+        return created;
     }
 
     /** 修改一段已结束学习的内容和时间。 */
@@ -116,7 +126,9 @@ public class StudyService {
                 cleanContent(content), "completed", now)) {
             throw new IllegalStateException("学习记录已被其他操作修改，请刷新后重试");
         }
-        return requireSession(ownerId, eventId, now);
+        StudySession updated = requireSession(ownerId, eventId, now);
+        publishChanged(ownerId, eventId, ChangeType.UPDATED);
+        return updated;
     }
 
     /** 删除一段学习记录。 */
@@ -129,6 +141,7 @@ public class StudyService {
         if (!dailyEventRepository.delete(ownerId, eventId, expectedVersion)) {
             throw new IllegalStateException("学习记录已被其他操作修改，请刷新后重试");
         }
+        publishChanged(ownerId, eventId, ChangeType.DELETED);
     }
 
     /** 查询进行中的学习。 */
@@ -236,6 +249,10 @@ public class StudyService {
     private void validateCompletedTime(Instant endedAt, Instant now) {
         if (endedAt == null) throw new IllegalArgumentException("学习结束时间不能为空");
         if (endedAt.isAfter(now)) throw new IllegalArgumentException("学习结束时间不能晚于当前时间");
+    }
+
+    private void publishChanged(String ownerId, String sessionId, ChangeType changeType) {
+        eventPublisher.publishEvent(new StudySessionChangedEvent(ownerId, sessionId, changeType));
     }
 
     private String cleanContent(String content) {

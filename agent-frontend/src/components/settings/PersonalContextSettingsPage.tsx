@@ -7,6 +7,7 @@ import {
 } from '../../services/personalContextService';
 import type { PersonalContextSettings, ProfileMaintenanceStatus } from '../../types/personalContext';
 import { Button } from '../common/Button';
+import { useMessage } from '../common/Message';
 import { Modal } from '../common/Modal';
 import { Toggle } from '../common/Toggle';
 import { formatTokenCount } from '../chat/tokenUsageFormat';
@@ -22,6 +23,7 @@ const OPERATION_LABELS = { ADD: '新增', UPDATE: '更新', DELETE: '删除' } a
 
 /** 用户可控的稳定画像、相关记忆注入与辅助维护设置。 */
 export function PersonalContextSettingsPage() {
+  const { showMessage } = useMessage();
   const [settings, setSettings] = useState<PersonalContextSettings | null>(null);
   const [maintenance, setMaintenance] = useState<ProfileMaintenanceStatus | null>(null);
   const [draft, setDraft] = useState('');
@@ -30,7 +32,6 @@ export function PersonalContextSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [confirmingClear, setConfirmingClear] = useState(false);
 
   const applySettings = (next: PersonalContextSettings) => {
@@ -58,57 +59,57 @@ export function PersonalContextSettingsPage() {
   useEffect(() => { void load(); }, []);
 
   const mutateSettings = async (operation: () => Promise<PersonalContextSettings>, success: string) => {
-    setSaving(true); setError(null); setNotice(null);
+    setSaving(true); setError(null);
     try {
       applySettings(await operation());
       applyMaintenance(await fetchProfileMaintenance());
-      setNotice(success);
+      showMessage('success', success);
       return true;
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '保存个人上下文失败');
+      showMessage('error', cause instanceof Error ? cause.message : '保存个人上下文失败');
       return false;
     } finally { setSaving(false); }
   };
   const toggleMaintenance = async (enabled: boolean) => {
-    setSaving(true); setError(null); setNotice(null);
+    setSaving(true); setError(null);
     try {
       applyMaintenance(await updateProfileMaintenanceEnabled(enabled));
-      setNotice(enabled ? '已开启画像辅助维护' : '已暂停画像辅助维护');
+      showMessage('success', enabled ? '已开启画像辅助维护' : '已暂停画像辅助维护');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '更新画像维护开关失败');
+      showMessage('error', cause instanceof Error ? cause.message : '更新画像维护开关失败');
     } finally { setSaving(false); }
   };
   const checkNow = async () => {
-    setChecking(true); setError(null); setNotice(null);
+    setChecking(true); setError(null);
     try {
       const next = await checkProfileMaintenance();
       applyMaintenance(next);
-      setNotice(next.pendingProposal ? '检查完成，请审核新的画像提案' : RESULT_LABELS[next.lastResult]);
+      showMessage('success', next.pendingProposal ? '检查完成，请审核新的画像提案' : RESULT_LABELS[next.lastResult]);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '检查画像变化失败，请确认模型配置后重试');
+      showMessage('error', cause instanceof Error ? cause.message : '检查画像变化失败，请确认模型配置后重试');
     } finally { setChecking(false); }
   };
   const acceptProposal = async () => {
     const proposal = maintenance?.pendingProposal;
     if (!proposal) return;
-    setSaving(true); setError(null); setNotice(null);
+    setSaving(true); setError(null);
     try {
       applySettings(await acceptProfileProposal(proposal.id, proposal.baseRevision, proposalDraft));
       applyMaintenance(await fetchProfileMaintenance());
-      setNotice('画像提案已应用，并保留了上一版本');
+      showMessage('success', '画像提案已应用，并保留了上一版本');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '应用画像提案失败，请重新检查');
+      showMessage('error', cause instanceof Error ? cause.message : '应用画像提案失败，请重新检查');
     } finally { setSaving(false); }
   };
   const rejectProposal = async () => {
     const proposal = maintenance?.pendingProposal;
     if (!proposal) return;
-    setSaving(true); setError(null); setNotice(null);
+    setSaving(true); setError(null);
     try {
       applyMaintenance(await rejectProfileProposal(proposal.id));
-      setNotice('已忽略这份提案，当前画像没有变化');
+      showMessage('success', '已忽略这份提案，当前画像没有变化');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '忽略画像提案失败');
+      showMessage('error', cause instanceof Error ? cause.message : '忽略画像提案失败');
     } finally { setSaving(false); }
   };
 
@@ -139,7 +140,7 @@ export function PersonalContextSettingsPage() {
       <section className={styles.editor} aria-labelledby="profile-editor-title">
         <div className={styles.editorHeading}><div><h2 id="profile-editor-title">个人画像</h2><p>写入长期稳定的信息，例如沟通偏好、常用技术栈与工作习惯；不要填写密钥或密码。</p></div><span>{sourceLabel}</span></div>
         {settings.source === 'legacy' && <p className={styles.legacyNote}>当前内容从旧版画像读取。保存后会创建独立画像文件，后续由你直接维护。</p>}
-        <textarea className={styles.textarea} value={draft} maxLength={settings.maxProfileChars} onChange={(event) => { setDraft(event.target.value); setNotice(null); }} placeholder={'例如：\n- 偏好简短、先给结论的中文回复\n- 常用 React、TypeScript 与 Spring Boot\n- 做重大取舍前希望先看到方案与风险'} aria-describedby="profile-help" />
+        <textarea className={styles.textarea} value={draft} maxLength={settings.maxProfileChars} onChange={(event) => setDraft(event.target.value)} placeholder={'例如：\n- 偏好简短、先给结论的中文回复\n- 常用 React、TypeScript 与 Spring Boot\n- 做重大取舍前希望先看到方案与风险'} aria-describedby="profile-help" />
         <div className={styles.editorFooter} id="profile-help"><span className={atLimit ? styles.limit : ''}>{draft.length.toLocaleString()} / {settings.maxProfileChars.toLocaleString()} 字符 · 已保存画像约 {formatTokenCount(settings.estimatedTokens)} tokens</span><div className={styles.actions}><Button variant="ghost" icon={<Trash2 size={14} />} disabled={saving || (!draft && settings.source === 'explicit')} onClick={() => setConfirmingClear(true)}>清空画像</Button><Button variant="primary" icon={<Save size={14} />} disabled={saving || !dirty} onClick={() => void mutateSettings(() => updatePersonalContextProfile(draft), '个人画像已保存')}>{saving ? '正在保存' : '保存画像'}</Button></div></div>
       </section>
 
@@ -169,7 +170,6 @@ export function PersonalContextSettingsPage() {
         {!proposal && <p className={styles.emptyProposal}>没有待审核提案。自动检查只在开关开启、发现新记忆且距上次检查超过 24 小时时运行。</p>}
       </section>
 
-      {(error || notice) && <p className={error ? styles.error : styles.notice} role={error ? 'alert' : 'status'}>{error || notice}</p>}
       <p className={styles.privacy}>画像、开关、提案与最近 20 个历史版本均保存在本机。敏感片段不会进入自动提案；暂停不会删除任何数据。</p>
     </div>
 

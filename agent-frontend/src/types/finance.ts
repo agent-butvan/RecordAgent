@@ -1,7 +1,7 @@
 export type FinanceAccountType =
   | 'wechat_balance' | 'wechat_yield' | 'alipay_balance' | 'alipay_yuebao' | 'bank' | 'other'
   | 'wechat' | 'alipay' | 'cash';
-export type FinanceTransactionType = 'income' | 'expense' | 'yield';
+export type FinanceTransactionType = 'income' | 'expense' | 'yield' | 'transfer_out' | 'transfer_in';
 export type FinanceChartRange = 'today' | 'week' | 'month' | 'year';
 
 export interface FinanceAccount {
@@ -77,10 +77,24 @@ export interface CreateFinanceAccountInput {
 
 export interface CreateFinanceTransactionInput {
   accountId: string;
-  transactionType: Exclude<FinanceTransactionType, 'yield'>;
+  transactionType: 'income' | 'expense';
   category: string;
   note: string;
   amount: number;
   date: string;
   time: string;
+}
+
+export interface CreateFinanceTransferInput {
+  fromAccountId: string;
+  toAccountId: string;
+  amount: number;
+  note?: string;
+  date: string;
+  time: string;
+}
+
+export interface FinanceTransferResponse {
+  fromTransaction: FinanceTransaction;
+  toTransaction: FinanceTransaction;
 }

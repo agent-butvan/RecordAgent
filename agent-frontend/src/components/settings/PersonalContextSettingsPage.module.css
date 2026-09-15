@@ -52,9 +52,7 @@
 .proposalTextarea { width: calc(100% - 32px); min-height: 180px; margin: 0 16px; border-radius: var(--radius-md); }
 .proposalActions { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 16px 14px; }
 .emptyProposal { margin: 14px 0 0; color: var(--text-muted); font-size: 11px; line-height: 1.6; }
-.limit, .error { color: #b91c1c; }
-.notice { color: #166534; }
-.error, .notice { margin: -6px 0 0; font-size: 12px; }
+.limit { color: #b91c1c; }
 .privacy { margin: 0; padding-top: 16px; border-top: 1px solid var(--border-subtle); color: var(--text-muted); font-size: 11px; line-height: 1.6; }
 .confirm { display: flex; flex-direction: column; gap: 20px; padding: 18px; }
 .confirm p { margin: 0; color: var(--text-secondary); font-size: 13px; line-height: 1.6; }

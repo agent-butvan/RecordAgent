@@ -1,6 +1,6 @@
 .settingGroup { display: flex; align-items: center; justify-content: space-between; gap: 32px; padding: 4px 0 20px; }
 .settingCopy { max-width: 480px; }
-.settingCopy label { color: var(--text-primary); font-size: 14px; font-weight: 600; }
+.settingCopy label, .settingLabel { color: var(--text-primary); font-size: 14px; font-weight: 600; }
 .settingCopy p, .note, .emptyState p { color: var(--text-secondary); font-size: 12px; line-height: 1.65; }
 .settingCopy p { margin-top: 4px; }
 .note { margin-top: 14px; }

@@ -4,6 +4,7 @@ import type { TaskDto } from '../../types/team';
 import { LoadingTree } from '../common/LoadingTree';
 import { PermissionRequestCard } from './PermissionRequestCard';
 import { PlanApprovalCard } from './PlanApprovalCard';
+import { PermissionResumeCard } from './PermissionResumeCard';
 import { AgentResponse } from './AgentResponse';
 import { TokenUsageTrigger } from './TokenUsageTrigger';
 import { TokenUsagePanel, type TokenUsageTurnOption } from './TokenUsagePanel';
@@ -16,6 +17,7 @@ import { SubagentActivity } from './SubagentActivity';
 import { SubagentTaskPanel } from './SubagentTaskPanel';
 import { ProjectFileTree } from './ProjectFileTree';
 import { RightSidePanel, type RightPanelTab } from './RightSidePanel';
+import { ChatTopBarInformation } from './topbar/ChatTopBarInformation';
 import { SlashCommandMenu } from './SlashCommandMenu';
 import { SlashCommandChip } from './SlashCommandChip';
 import { RecordReferenceTag } from './RecordReferenceTag';
@@ -23,7 +25,7 @@ import { SlashCommandResult, type SlashCommandResultData } from './SlashCommandR
 import { RecordReferencePicker } from './RecordReferencePicker';
 import { RecordReferenceChip } from './RecordReferenceChip';
 import { AnalysisPrivacyCard } from './AnalysisPrivacyCard';
-import type { PermissionToolPayload } from '../../services/api';
+import type { PermissionDecisionInput, PermissionToolPayload } from '../../services/api';
 import { fetchRecordReferences } from '../../services/recordApi';
 import { fetchDailyInsight } from '../../services/dailyInsightApi';
 import { fetchDailyDay } from '../../services/dailyEvents';
@@ -92,9 +94,10 @@ interface ChatWorkspaceProps {
   ) => void;
   onOpenSettings: () => void;
   onRenameSession: (title: string) => Promise<{ success: boolean; message?: string }>;
-  pendingPermission?: { assistantMessageId: string; tool: PermissionToolPayload } | null;
+  pendingPermission?: { assistantMessageId: string; tools: PermissionToolPayload[] } | null;
   isPermissionSubmitting?: boolean;
-  onPermissionDecision?: (approved: boolean, rememberForSession: boolean) => void;
+  onPermissionDecision?: (decisions: PermissionDecisionInput[]) => void;
+  onPermissionResume?: () => void;
   subagentTasks: TaskDto[];
   isSubagentTasksLoading: boolean;
   subagentTaskError: string | null;
@@ -214,6 +217,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   pendingPermission = null,
   isPermissionSubmitting = false,
   onPermissionDecision,
+  onPermissionResume,
   subagentTasks,
   isSubagentTasksLoading,
   subagentTaskError,
@@ -801,15 +805,24 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
 
   const inputArea = pendingPermission && onPermissionDecision ? (
     <div className={`${styles.permissionContainer} ${isOverview ? styles.bottomContainerOverview : ''}`}>
-      {pendingPermission.tool.toolName === 'plan_exit' ? (
+      {pendingPermission.tools.length === 0 ? (
+        <PermissionResumeCard
+          isSubmitting={Boolean(isPermissionSubmitting)}
+          onResume={() => onPermissionResume?.()}
+        />
+      ) : pendingPermission.tools.length === 1 && pendingPermission.tools[0].toolName === 'plan_exit' ? (
         <PlanApprovalCard
           sessionId={sessionId}
           isSubmitting={isPermissionSubmitting}
-          onDecision={onPermissionDecision}
+          onDecision={(approved, rememberForSession) => onPermissionDecision([{
+            toolCallId: pendingPermission.tools[0].toolCallId,
+            approved,
+            rememberForSession,
+          }])}
         />
       ) : (
         <PermissionRequestCard
-          tool={pendingPermission.tool}
+          tools={pendingPermission.tools}
           isSubmitting={isPermissionSubmitting}
           onDecision={onPermissionDecision}
         />
@@ -901,7 +914,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   return (
     <div className={styles.workspace}>
       {/* 顶部工作区：当前会话信息与右侧面板开关 */}
-      <div className={styles.workspaceHeader}>
+      <div className={styles.workspaceHeader} data-tauri-drag-region>
         <div className={styles.workspaceIdentity}>
           {projectPath ? (
             <FolderTree size={16} aria-hidden="true" />
@@ -926,6 +939,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
             </button>
           )}
         </div>
+        <ChatTopBarInformation onOpenFeature={onOpenFeature} />
         <button
           type="button"
           className={`${styles.panelToggle} ${rightPanelOpen ? styles.panelToggleActive : ''}`}

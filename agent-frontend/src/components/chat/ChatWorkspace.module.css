@@ -10,7 +10,11 @@
 
 /* 顶部工作区：会话信息与右侧面板开关 */
 .workspaceHeader {
+  box-sizing: border-box;
+  position: relative;
+  z-index: 70;
   flex: 0 0 48px;
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -22,6 +26,7 @@
 }
 
 .workspaceIdentity {
+  flex: 0 1 auto;
   display: flex;
   align-items: center;
   gap: 9px;
@@ -29,7 +34,12 @@
   color: var(--text-secondary);
 }
 
+.workspaceIdentity svg {
+  flex: 0 0 auto;
+}
+
 .workspaceTitle {
+  max-width: min(28vw, 320px);
   overflow: hidden;
   color: var(--text-primary);
   font-size: 13px;
@@ -37,6 +47,11 @@
   line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+@media (max-width: 860px) {
+  .workspaceTitle { max-width: 150px; }
+  .workspaceIdentity { gap: 6px; }
 }
 
 .sessionUsage {

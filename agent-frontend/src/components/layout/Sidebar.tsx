@@ -22,7 +22,7 @@ import type { ChatSession, Project } from '../../types/chat';
 import { FormField } from '../common/FormField';
 import { TextInput } from '../common/TextInput';
 import { Modal } from '../common/Modal';
-import { Message } from '../common/Message';
+import { useMessage } from '../common/Message';
 import { EmailBindingModal } from '../account/EmailBindingModal';
 import { fetchAccountStatus } from '../../services/api';
 import { canPickProjectDirectory, pickProjectDirectory } from '../../services/projectPicker';
@@ -110,6 +110,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenSettings,
   onOpenAccountSettings,
 }) => {
+  const { showMessage } = useMessage();
   const [isEmailBindingOpen, setIsEmailBindingOpen] = useState(false);
   const [maskedEmail, setMaskedEmail] = useState<string | null>(null);
 
@@ -131,12 +132,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const menuRef = useRef<HTMLDivElement>(null);
   const [deleteSession, setDeleteSession] = useState<ChatSession | null>(null);
   const [isDeletingSession, setIsDeletingSession] = useState(false);
-  const [deleteSessionError, setDeleteSessionError] = useState<string | null>(null);
 
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importPath, setImportPath] = useState('');
   const [importName, setImportName] = useState('');
-  const [importError, setImportError] = useState<string | null>(null);
   const [isPickingProject, setIsPickingProject] = useState(false);
   const [isImportingProject, setIsImportingProject] = useState(false);
 
@@ -258,29 +257,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const requestDeleteSession = (session: ChatSession, e?: React.MouseEvent) => {
     e?.stopPropagation();
     setMenuSession(null);
-    setDeleteSessionError(null);
     setDeleteSession(session);
   };
 
   const closeDeleteSession = () => {
     if (isDeletingSession) return;
     setDeleteSession(null);
-    setDeleteSessionError(null);
   };
 
   const confirmDeleteSession = async () => {
     if (!deleteSession || isDeletingSession) return;
     setIsDeletingSession(true);
-    setDeleteSessionError(null);
     try {
       const result = await onDeleteSession(deleteSession.id);
       if (result.success) {
         setDeleteSession(null);
         return;
       }
-      setDeleteSessionError(result.message || '删除会话失败，请稍后重试。');
+      showMessage('error', result.message || '删除会话失败，请稍后重试。');
     } catch (error) {
-      setDeleteSessionError(error instanceof Error ? error.message : '删除会话失败，请稍后重试。');
+      showMessage('error', error instanceof Error ? error.message : '删除会话失败，请稍后重试。');
     } finally {
       setIsDeletingSession(false);
     }
@@ -295,7 +291,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const openImportDialog = async () => {
     if (isPickingProject) return;
-    setImportError(null);
     if (!canPickProjectDirectory()) {
       setIsImportModalOpen(true);
       return;
@@ -308,7 +303,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       setImportName(selected.split(/[\\/]/).filter(Boolean).pop() || '未命名项目');
       setIsImportModalOpen(true);
     } catch (error) {
-      setImportError(error instanceof Error ? error.message : '无法打开目录选择器，请手动填写路径');
+      showMessage('error', error instanceof Error ? error.message : '无法打开目录选择器，请手动填写路径');
       setIsImportModalOpen(true);
     } finally {
       setIsPickingProject(false);
@@ -320,11 +315,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (!importPath.trim() || isImportingProject) return;
     const name = importName.trim() || importPath.split(/[\\/]/).filter(Boolean).pop() || '未命名项目';
     setIsImportingProject(true);
-    setImportError(null);
     try {
       const result = await onImportProject(name, importPath.trim());
       if (!result.success) {
-        setImportError(result.message || '导入项目失败，请检查目录后重试。');
+        showMessage('error', result.message || '导入项目失败，请检查目录后重试。');
         return;
       }
       setImportPath('');
@@ -398,6 +392,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside ref={sidebarRef} className={styles.sidebar} style={{ width: sidebarWidth }}>
+      {/* Overlay 标题栏在侧边栏上方没有内容时，保留可拖拽的原生窗口区域。 */}
+      <div className={styles.titlebarDragRegion} data-tauri-drag-region aria-hidden="true" />
       {/* 右缘拖拽手柄：调整侧边栏宽度，双击恢复默认宽度 */}
       <div
         className={`${styles.resizeHandle} ${isResizing ? styles.resizeHandleActive : ''}`}
@@ -722,8 +718,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             />
           </FormField>
 
-          {importError && <Message tone="error">{importError}</Message>}
-
           <div className={styles.modalActions}>
             <button
               type="button"
@@ -751,7 +745,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <p className={styles.deleteDescription}>
             “{deleteSession?.title || '新对话'}”及其全部聊天记录将被永久删除，此操作无法撤销。
           </p>
-          {deleteSessionError && <Message tone="error">{deleteSessionError}</Message>}
           <div className={styles.modalActions}>
             <button
               type="button"

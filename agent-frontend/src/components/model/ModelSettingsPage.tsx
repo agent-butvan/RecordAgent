@@ -14,8 +14,14 @@ import { TokenUsageSettingsPage } from '../settings/TokenUsageSettingsPage';
 import { PersonalContextSettingsPage } from '../settings/PersonalContextSettingsPage';
 import { ProfileSettingsPage } from '../settings/ProfileSettingsPage';
 import { SlashCommandSettingsPage } from '../settings/SlashCommandSettingsPage';
-import { getFeaturePreferences, setStudyWindowMode } from '../../services/featurePreferences';
-import type { StudyWindowMode } from '../../types/preferences';
+import { DailyContextSettingsPage } from '../settings/DailyContextSettingsPage';
+import {
+  getFeaturePreferences,
+  setChatTopBarPreference,
+  setStudyWindowMode,
+  subscribeFeaturePreferences,
+} from '../../services/featurePreferences';
+import type { ChatTopBarPreferences, FeaturePreferences, StudyWindowMode } from '../../types/preferences';
 import {
   ArrowLeft,
   CalendarDays,
@@ -29,6 +35,7 @@ import {
   ChartNoAxesColumnIncreasing,
   Command,
   BrainCircuit,
+  CloudSun,
 } from 'lucide-react';
 import styles from './ModelSettingsPage.module.css';
 
@@ -60,9 +67,7 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
   const [activeTab, setActiveTab] = useState<string>(initialTab);
   const [supportedVendors, setSupportedVendors] = useState<string[]>(['gemini', 'openai', 'dashscope', 'deepseek', 'anthropic', 'ollama']);
   const [accountStatus, setAccountStatus] = useState<AccountStatus | null>(null);
-  const [studyWindowMode, setStudyWindowModeState] = useState<StudyWindowMode>(
-    () => getFeaturePreferences().studyWindowMode,
-  );
+  const [featurePreferences, setFeaturePreferencesState] = useState<FeaturePreferences>(getFeaturePreferences);
   
   const allModels = getAllModels();
 
@@ -92,6 +97,8 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
     };
     loadVendors();
   }, []);
+
+  useEffect(() => subscribeFeaturePreferences(setFeaturePreferencesState), []);
 
   useEffect(() => {
     fetchAccountStatus().then(setAccountStatus);
@@ -141,7 +148,11 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
   };
 
   const handleStudyWindowModeChange = (mode: StudyWindowMode) => {
-    setStudyWindowModeState(setStudyWindowMode(mode).studyWindowMode);
+    setFeaturePreferencesState(setStudyWindowMode(mode));
+  };
+
+  const handleChatTopBarChange = (key: keyof ChatTopBarPreferences, visible: boolean) => {
+    setFeaturePreferencesState(setChatTopBarPreference(key, visible));
   };
 
   const isFeatureTab = (tab: string): tab is FeatureSettingsTab => (
@@ -150,6 +161,7 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
 
   return (
     <div className={styles.pageContainer}>
+      <div className={styles.titlebarDragRegion} data-tauri-drag-region aria-hidden="true" />
       <div className={styles.settingsSidebar}>
         <button className={styles.backBtn} onClick={onBack}>
           <ArrowLeft size={14} />
@@ -197,6 +209,7 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
             { id: 'finance', label: '财务', icon: WalletCards },
             { id: 'library', label: '资料', icon: Library },
             { id: 'record', label: '记录', icon: NotebookPen },
+            { id: 'daily-context', label: '天气与节假日', icon: CloudSun },
           ].map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -332,11 +345,20 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
 
         {activeTab === 'commands' && <SlashCommandSettingsPage />}
 
+        {activeTab === 'daily-context' && (
+          <DailyContextSettingsPage
+            chatTopBar={featurePreferences.chatTopBar}
+            onChatTopBarChange={handleChatTopBarChange}
+          />
+        )}
+
         {isFeatureTab(activeTab) && (
           <FeatureSettingsPage
             tab={activeTab}
-            studyWindowMode={studyWindowMode}
+            studyWindowMode={featurePreferences.studyWindowMode}
             onStudyWindowModeChange={handleStudyWindowModeChange}
+            chatTopBar={featurePreferences.chatTopBar}
+            onChatTopBarChange={handleChatTopBarChange}
           />
         )}
 

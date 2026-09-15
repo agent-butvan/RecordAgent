@@ -28,6 +28,11 @@ public final class FinanceDtos {
             BigDecimal amount, LocalDate date, LocalTime time) {
     }
 
+    public record CreateTransferRequest(
+            String fromAccountId, String toAccountId, BigDecimal amount, String note,
+            LocalDate date, LocalTime time) {
+    }
+
     public record AccountResponse(
             String id, String name, String accountType, String currency, BigDecimal balance,
             boolean interestEnabled, BigDecimal annualRatePercent, LocalDate lastAccrualDate, int version) {
@@ -37,6 +42,10 @@ public final class FinanceDtos {
             String id, String accountId, String accountName, LocalDate date, LocalTime time,
             String transactionType, String category, String note, BigDecimal amount,
             String currency, String source, Instant createdAt) {
+    }
+
+    public record TransferResponse(
+            TransactionResponse fromTransaction, TransactionResponse toTransaction) {
     }
 
     public record OverviewResponse(
@@ -74,6 +83,10 @@ public final class FinanceDtos {
                 transaction.date(), transaction.time(), transaction.transactionType(), transaction.category(),
                 transaction.note(), transaction.amount(), transaction.currency(), transaction.source(),
                 transaction.createdAt());
+    }
+
+    public static TransferResponse from(FinanceTransaction from, FinanceTransaction to) {
+        return new TransferResponse(from(from), from(to));
     }
 
     public static OverviewResponse from(FinanceOverview overview) {

@@ -6,5 +6,7 @@
   <string>ButvanAgent 需要使用麦克风，将您的语音转换为聊天输入内容。</string>
   <key>NSSpeechRecognitionUsageDescription</key>
   <string>ButvanAgent 需要使用语音识别，将您的语音转换为聊天输入内容。</string>
+  <key>NSLocationWhenInUseUsageDescription</key>
+  <string>ButvanAgent 需要使用您的位置，自动填写天气地点和经纬度。</string>
 </dict>
 </plist>

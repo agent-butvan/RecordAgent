@@ -31,6 +31,7 @@ import java.nio.file.Files;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -78,6 +79,8 @@ class AgentFactoryTest {
         );
 
         try (HarnessAgent agent = factory.currentAgent()) {
+            assertFalse(agent.getDelegate().isPendingToolRecoveryEnabled(),
+                    "框架自动恢复会抢先把 HITL ConfirmResult 改写为失败结果");
             assertTrue(agent.getDelegate().getMiddlewares().stream()
                     .noneMatch(WorkspaceContextMiddleware.class::isInstance));
             List<Class<?>> middlewareOrder = agent.getDelegate().getMiddlewares().stream()

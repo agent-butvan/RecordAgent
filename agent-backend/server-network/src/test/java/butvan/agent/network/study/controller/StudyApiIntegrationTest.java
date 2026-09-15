@@ -6,8 +6,10 @@ import butvan.agent.network.controller.ApiExceptionHandler;
 import butvan.agent.network.daily.repository.DailyEventRepository;
 import butvan.agent.network.daily.type.DailyEventTypeRegistry;
 import butvan.agent.network.daily.type.StudyTypeHandler;
+import butvan.agent.network.study.event.StudySessionChangedEvent;
 import butvan.agent.network.study.repository.StudyRepository;
 import butvan.agent.network.study.service.StudyService;
+import butvan.agent.network.study.service.StudySessionStreamService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -18,6 +20,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.io.IOException;
@@ -31,15 +35,20 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.hamcrest.Matchers.hasItem;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /** 通过 HTTP seam 验证学习打卡、补卡、统计与并发版本。 */
 @SpringBootTest(classes = StudyApiIntegrationTest.TestApplication.class)
 @AutoConfigureMockMvc
+@RecordApplicationEvents
 class StudyApiIntegrationTest {
     private static final Path DATABASE_PATH = createDatabasePath();
 
     @jakarta.annotation.Resource
     private MockMvc mockMvc;
+
+    @jakarta.annotation.Resource
+    private ApplicationEvents applicationEvents;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -75,6 +84,14 @@ class StudyApiIntegrationTest {
         mockMvc.perform(get("/agent/study-sessions/categories"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data", hasItem("系统设计")));
+
+        assertEquals(
+                java.util.List.of(
+                        StudySessionChangedEvent.ChangeType.STARTED,
+                        StudySessionChangedEvent.ChangeType.FINISHED),
+                applicationEvents.stream(StudySessionChangedEvent.class)
+                        .map(StudySessionChangedEvent::changeType)
+                        .toList());
     }
 
     @Test
@@ -189,6 +206,7 @@ class StudyApiIntegrationTest {
             StudyTypeHandler.class,
             StudyRepository.class,
             StudyService.class,
+            StudySessionStreamService.class,
             StudyController.class,
             ApiExceptionHandler.class,
             CurrentUserProvider.class

@@ -46,8 +46,10 @@
 .transactionBody strong { overflow: hidden; color: var(--text-primary); font-size: 11.5px; font-weight: 600; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
 .transactionBody small { overflow: hidden; margin-top: 2px; color: var(--text-muted); font-size: 9.5px; text-overflow: ellipsis; white-space: nowrap; }
 .outAmount, .inAmount { font-size: 10.5px; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.outAmount { color: #a64b43; }
+.outAmount { color: #9f453c; }
 .inAmount { color: #31725a; }
+.transferOutAmount { color: #1d4ed8; }
+.transferInAmount { color: #0284c7; }
 .yieldNote { display: flex; gap: 6px; margin-top: 12px; color: var(--text-muted); font-size: 9.5px; line-height: 1.55; }
 .yieldNote svg { flex: 0 0 auto; margin-top: 1px; }
 
@@ -58,9 +60,6 @@
 .emptyState button { margin-top: 10px; }
 .emptyText { padding: 18px 0; }
 .loading { min-height: 300px; font-size: 11px; }
-
-.dataError { margin: 12px 32px 0; padding: 9px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid #e6c8c4; border-radius: var(--radius-md); background: #fff7f5; color: #9a4038; font-size: 12px; }
-.dataError button { border: 0; background: transparent; color: inherit; font: 600 11px var(--font-sans); }
 
 .modalDescription { margin-top: -6px; color: var(--text-muted); font-size: 11px; line-height: 1.55; }
 .modalError { padding: 8px 10px; border: 1px solid #e6c8c4; border-radius: var(--radius-md); background: #fff7f5; color: #9a4038; font-size: 11px; }

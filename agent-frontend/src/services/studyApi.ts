@@ -21,11 +21,6 @@ const jsonInit = (method: 'POST' | 'PUT', body: object): RequestInit => ({
   body: JSON.stringify(body),
 });
 
-/** 查询进行中的学习时段；没有时返回 null。 */
-export function fetchActiveStudySession(): Promise<StudySession | null> {
-  return studyRequest<StudySession | null>('/agent/study-sessions/active');
-}
-
 /** 查询用户使用过的学习分类。 */
 export function fetchStudyCategories(): Promise<string[]> {
   return studyRequest<string[]>('/agent/study-sessions/categories');

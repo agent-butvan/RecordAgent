@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   ArrowDownLeftIcon,
+  ArrowsLeftRightIcon,
   ArrowUpRightIcon,
   BookOpenIcon,
   BriefcaseIcon,
@@ -38,9 +39,11 @@ const INCOME_ICONS = {
 
 /** 每个内置流水分类使用专属图标；历史或外部分类保留收支方向图标。 */
 export const TransactionTypeIcon: React.FC<TransactionTypeIconProps> = ({ type, category = '', compact = false }) => {
+  const isTransfer = type === 'transfer_out' || type === 'transfer_in';
   const categoryIcons = type === 'expense' ? EXPENSE_ICONS : INCOME_ICONS;
-  const fallback = type === 'expense' ? ArrowUpRightIcon : ArrowDownLeftIcon;
+  const fallback = type === 'expense' ? ArrowUpRightIcon : isTransfer ? ArrowsLeftRightIcon : ArrowDownLeftIcon;
   const CategoryIcon = type === 'yield' ? PlantIcon
+    : isTransfer ? ArrowsLeftRightIcon
     : Object.hasOwn(categoryIcons, category) ? categoryIcons[category as keyof typeof categoryIcons] : fallback;
   return <span className={`${styles.icon} ${styles[type]} ${compact ? styles.compact : ''}`} aria-hidden="true">
     <CategoryIcon size={compact ? 14 : 16} />

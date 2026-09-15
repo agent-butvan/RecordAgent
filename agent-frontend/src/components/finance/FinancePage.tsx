@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowClockwiseIcon, CaretRightIcon, PlusIcon, SparkleIcon, WalletIcon } from '@phosphor-icons/react';
-import { createFinanceAccount, createFinanceTransaction, fetchFinanceCategories, fetchFinanceExpenseChart, fetchFinanceOverview, fetchFinanceTransactions } from '../../services/financeApi';
-import type { CreateFinanceTransactionInput, FinanceAccountType, FinanceCategoryOptions, FinanceChartRange, FinanceExpenseChart, FinanceOverview, FinanceTransaction } from '../../types/finance';
+import { ArrowClockwiseIcon, ArrowsLeftRightIcon, CaretRightIcon, PlusIcon, SparkleIcon, WalletIcon } from '@phosphor-icons/react';
+import { createFinanceAccount, createFinanceTransaction, createFinanceTransfer, fetchFinanceCategories, fetchFinanceExpenseChart, fetchFinanceOverview, fetchFinanceTransactions } from '../../services/financeApi';
+import type { CreateFinanceTransactionInput, CreateFinanceTransferInput, FinanceAccountType, FinanceCategoryOptions, FinanceChartRange, FinanceExpenseChart, FinanceOverview, FinanceTransaction } from '../../types/finance';
 import { Button } from '../common/Button';
+import { useMessage } from '../common/Message';
 import { Modal } from '../common/Modal';
 import { TopBar } from '../common/TopBar';
 import styles from './FinancePage.module.css';
@@ -12,6 +13,7 @@ import { SpendingTrendChart } from './SpendingTrendChart';
 import { TransactionTypeIcon } from './TransactionTypeIcon';
 import { TransactionDrawer } from './TransactionDrawer';
 import { TransactionModal } from './TransactionModal';
+import { TransferModal } from './TransferModal';
 import { AssetDetailModal } from './AssetDetailModal';
 
 const ACCOUNT_TYPES: Array<{ value: FinanceAccountType; label: string; interest: boolean }> = [
@@ -28,6 +30,7 @@ function money(value: number): string {
 
 /** 独立财务工作台：统一完成资产建档、收支记账和自动收益查看。 */
 export const FinancePage: React.FC = () => {
+  const { showMessage } = useMessage();
   const [overview, setOverview] = useState<FinanceOverview | null>(null);
   const [categoryOptions, setCategoryOptions] = useState<FinanceCategoryOptions>({ expense: [], income: [] });
   const [chart, setChart] = useState<FinanceExpenseChart | null>(null);
@@ -35,11 +38,11 @@ export const FinancePage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isChartLoading, setIsChartLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [accountError, setAccountError] = useState<string | null>(null);
   const [chartError, setChartError] = useState<string | null>(null);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [isTransactionDrawerOpen, setIsTransactionDrawerOpen] = useState(false);
   const [isAssetDetailModalOpen, setIsAssetDetailModalOpen] = useState(false);
   const [allTransactions, setAllTransactions] = useState<FinanceTransaction[]>([]);
@@ -51,15 +54,14 @@ export const FinancePage: React.FC = () => {
 
   const load = useCallback(async () => {
     setIsLoading(true);
-    setError(null);
     try {
       const [nextOverview, nextCategories] = await Promise.all([fetchFinanceOverview(), fetchFinanceCategories()]);
       setOverview(nextOverview);
       setCategoryOptions(nextCategories);
     }
-    catch (cause) { setError(cause instanceof Error ? cause.message : '财务数据加载失败，请稍后重试。'); }
+    catch (cause) { showMessage('error', cause instanceof Error ? cause.message : '财务数据加载失败，请稍后重试。'); }
     finally { setIsLoading(false); }
-  }, []);
+  }, [showMessage]);
 
   const loadChart = useCallback(async (range: FinanceChartRange) => {
     const requestId = ++chartRequestId.current;
@@ -141,7 +143,17 @@ export const FinancePage: React.FC = () => {
     try {
       await Promise.all([load(), loadChart(chartRange), ...(isTransactionDrawerOpen ? [loadAllTransactions()] : [])]);
     } catch (cause) {
-      setError(cause instanceof Error ? `流水已保存，但财务数据刷新失败：${cause.message}` : '流水已保存，但财务数据刷新失败');
+      showMessage('error', cause instanceof Error ? `流水已保存，但财务数据刷新失败：${cause.message}` : '流水已保存，但财务数据刷新失败');
+    }
+  };
+
+  const submitTransfer = async (input: CreateFinanceTransferInput) => {
+    await createFinanceTransfer(input);
+    setIsTransferModalOpen(false);
+    try {
+      await Promise.all([load(), loadChart(chartRange), ...(isTransactionDrawerOpen ? [loadAllTransactions()] : [])]);
+    } catch (cause) {
+      showMessage('error', cause instanceof Error ? `划账已保存，但财务数据刷新失败：${cause.message}` : '划账已保存，但财务数据刷新失败');
     }
   };
 
@@ -152,11 +164,21 @@ export const FinancePage: React.FC = () => {
         <ArrowClockwiseIcon size={14} className={isLoading || isChartLoading ? styles.spinning : ''} />
       </button>
       <Button type="button" variant="outline" size="sm" icon={<PlusIcon size={13} weight="bold" />} onClick={openAccountModal}>添加账户</Button>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        icon={<ArrowsLeftRightIcon size={13} weight="bold" />}
+        onClick={() => setIsTransferModalOpen(true)}
+        disabled={(overview?.accounts.length ?? 0) < 2}
+        title={(overview?.accounts.length ?? 0) < 2 ? '至少需要两个资产账户才能划账' : '在账户之间划转资金'}
+      >
+        划账
+      </Button>
       <Button type="button" variant="primary" size="sm" onClick={openTransactionModal} disabled={!overview?.accounts.length}>记一笔</Button>
     </>} />
 
     <div className={styles.page}><div className={styles.content}>
-      {error && <div className={styles.dataError} role="alert"><span>{error}</span><button type="button" onClick={() => setError(null)}>关闭</button></div>}
       {isLoading && !overview ? <div className={styles.loading}>正在读取财务数据…</div> : <>
         <section className={styles.overview} aria-label="本月财务概览">
           <div
@@ -192,10 +214,20 @@ export const FinancePage: React.FC = () => {
             <div className={styles.sectionHeading}><h2>最近流水</h2><div className={styles.sectionMeta}><span>最近 {recentTransactions.length} 笔</span>{overview?.transactions.length ? <button type="button" onClick={openTransactionDrawer}>查看全部<CaretRightIcon size={12} /></button> : null}</div></div>
             {recentTransactions.length ? <div className={styles.transactions}>{recentTransactions.map((transaction) => {
               const isExpense = transaction.transactionType === 'expense';
+              const isTransferOut = transaction.transactionType === 'transfer_out';
+              const isTransferIn = transaction.transactionType === 'transfer_in';
+              const isOutflow = isExpense || isTransferOut;
+              const amountClass = isExpense
+                ? styles.outAmount
+                : isTransferOut
+                ? styles.transferOutAmount
+                : isTransferIn
+                ? styles.transferInAmount
+                : styles.inAmount;
               return <div className={styles.transactionRow} key={transaction.id}>
                 <TransactionTypeIcon type={transaction.transactionType} category={transaction.category} />
                 <span className={styles.transactionBody}><strong>{transaction.note}</strong><small>{transaction.accountName} · {transaction.category} · {transaction.date.slice(5)} {transaction.time.slice(0, 5)}</small></span>
-                <strong className={isExpense ? styles.outAmount : styles.inAmount}>{isExpense ? '-' : '+'}{money(transaction.amount)}</strong>
+                <strong className={amountClass}>{isOutflow ? '-' : '+'}{money(transaction.amount)}</strong>
               </div>;
             })}</div> : <div className={styles.emptyState}><WalletIcon size={20} /><strong>还没有流水记录</strong><p>{overview?.accounts.length ? '点击右上角“记一笔”开始记录。' : '先添加资产账户，再记录收入或支出。'}</p>{!overview?.accounts.length && <Button type="button" variant="outline" size="sm" onClick={openAccountModal}>添加第一个账户</Button>}</div>}
           </section>
@@ -217,6 +249,13 @@ export const FinancePage: React.FC = () => {
       categories={categoryOptions}
       onClose={() => setIsTransactionModalOpen(false)}
       onSubmit={submitTransaction}
+    />
+
+    <TransferModal
+      open={isTransferModalOpen}
+      accounts={overview?.accounts ?? []}
+      onClose={() => setIsTransferModalOpen(false)}
+      onSubmit={submitTransfer}
     />
 
     <Modal open={isAccountModalOpen} title="添加资产账户" onClose={closeAccountModal} width={500} centered>
