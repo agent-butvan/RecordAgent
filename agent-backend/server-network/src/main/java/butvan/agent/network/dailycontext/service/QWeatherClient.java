@@ -4,7 +4,8 @@ import butvan.agent.network.dailycontext.config.DailyContextConfigData.QWeatherC
 import butvan.agent.network.dailycontext.dto.DailyContextDtos.LocationResponse;
 import butvan.agent.network.dailycontext.dto.DailyContextDtos.WeatherResponse;
 import com.fasterxml.jackson.databind.JsonNode;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.client.ClientHttpRequestFactory;
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -18,10 +19,14 @@ public class QWeatherClient {
     private final RestClient restClient;
 
     public QWeatherClient(RestClient.Builder builder) {
-        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        this.restClient = builder.clone().requestFactory(createRequestFactory()).build();
+    }
+
+    static ClientHttpRequestFactory createRequestFactory() {
+        HttpComponentsClientHttpRequestFactory requestFactory = new HttpComponentsClientHttpRequestFactory();
         requestFactory.setConnectTimeout(Duration.ofSeconds(5));
         requestFactory.setReadTimeout(Duration.ofSeconds(8));
-        this.restClient = builder.clone().requestFactory(requestFactory).build();
+        return requestFactory;
     }
 
     /** 按配置地点读取当前天气并转换为内部稳定 DTO。 */
