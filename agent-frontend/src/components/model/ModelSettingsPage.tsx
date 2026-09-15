@@ -14,6 +14,7 @@ import { TokenUsageSettingsPage } from '../settings/TokenUsageSettingsPage';
 import { PersonalContextSettingsPage } from '../settings/PersonalContextSettingsPage';
 import { ProfileSettingsPage } from '../settings/ProfileSettingsPage';
 import { SlashCommandSettingsPage } from '../settings/SlashCommandSettingsPage';
+import { DailyContextSettingsPage } from '../settings/DailyContextSettingsPage';
 import {
   getFeaturePreferences,
   setChatTopBarPreference,
@@ -34,6 +35,7 @@ import {
   ChartNoAxesColumnIncreasing,
   Command,
   BrainCircuit,
+  CloudSun,
 } from 'lucide-react';
 import styles from './ModelSettingsPage.module.css';
 
@@ -206,6 +208,7 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
             { id: 'finance', label: '财务', icon: WalletCards },
             { id: 'library', label: '资料', icon: Library },
             { id: 'record', label: '记录', icon: NotebookPen },
+            { id: 'daily-context', label: '天气与节假日', icon: CloudSun },
           ].map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -340,6 +343,13 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
         {activeTab === 'context' && <PersonalContextSettingsPage />}
 
         {activeTab === 'commands' && <SlashCommandSettingsPage />}
+
+        {activeTab === 'daily-context' && (
+          <DailyContextSettingsPage
+            chatTopBar={featurePreferences.chatTopBar}
+            onChatTopBarChange={handleChatTopBarChange}
+          />
+        )}
 
         {isFeatureTab(activeTab) && (
           <FeatureSettingsPage

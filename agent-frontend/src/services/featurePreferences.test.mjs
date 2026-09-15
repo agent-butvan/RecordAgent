@@ -36,7 +36,7 @@ test('旧版偏好迁移时补齐聊天顶栏的安全默认值', () => {
   withBrowserStorage(JSON.stringify({ studyWindowMode: 'desktop' }), () => {
     assert.deepEqual(getFeaturePreferences(), {
       studyWindowMode: 'desktop',
-      chatTopBar: { showDate: true, showTodos: true, showFinance: true },
+      chatTopBar: { showDate: true, showTodos: true, showFinance: true, showHoliday: false, showWeather: false },
     });
   });
 });
@@ -46,7 +46,7 @@ test('单项顶栏开关不会覆盖其他功能偏好', () => {
     setStudyWindowMode('in-app');
     const updated = setChatTopBarPreference('showFinance', false);
     assert.equal(updated.studyWindowMode, 'in-app');
-    assert.deepEqual(updated.chatTopBar, { showDate: true, showTodos: true, showFinance: false });
+    assert.deepEqual(updated.chatTopBar, { showDate: true, showTodos: true, showFinance: false, showHoliday: false, showWeather: false });
     assert.deepEqual(JSON.parse(values.get('butvan.featurePreferences')), updated);
   });
 });
@@ -55,7 +55,7 @@ test('损坏的本地配置回退到完整默认值', () => {
   withBrowserStorage('{broken', () => {
     assert.deepEqual(getFeaturePreferences(), {
       studyWindowMode: 'page',
-      chatTopBar: { showDate: true, showTodos: true, showFinance: true },
+      chatTopBar: { showDate: true, showTodos: true, showFinance: true, showHoliday: false, showWeather: false },
     });
   });
 });

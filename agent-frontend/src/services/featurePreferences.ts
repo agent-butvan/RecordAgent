@@ -13,6 +13,8 @@ const DEFAULT_PREFERENCES: FeaturePreferences = {
     showDate: true,
     showTodos: true,
     showFinance: true,
+    showHoliday: false,
+    showWeather: false,
   },
 };
 
@@ -39,6 +41,12 @@ export function getFeaturePreferences(): FeaturePreferences {
         showFinance: typeof savedTopBar?.showFinance === 'boolean'
           ? savedTopBar.showFinance
           : DEFAULT_PREFERENCES.chatTopBar.showFinance,
+        showHoliday: typeof savedTopBar?.showHoliday === 'boolean'
+          ? savedTopBar.showHoliday
+          : DEFAULT_PREFERENCES.chatTopBar.showHoliday,
+        showWeather: typeof savedTopBar?.showWeather === 'boolean'
+          ? savedTopBar.showWeather
+          : DEFAULT_PREFERENCES.chatTopBar.showWeather,
       },
     };
   } catch {

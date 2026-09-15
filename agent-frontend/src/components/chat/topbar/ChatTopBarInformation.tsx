@@ -3,11 +3,13 @@ import {
   CalendarDays,
   ChevronDown,
   CircleAlert,
+  CloudSun,
   ListChecks,
   RefreshCw,
   WalletCards,
 } from 'lucide-react';
 import { fetchDailyDay, formatLocalDate } from '../../../services/dailyEvents';
+import { fetchDailyContextSummary, type DailyContextSummary } from '../../../services/dailyContextApi';
 import { fetchFinanceExpenseChart, fetchFinanceOverview } from '../../../services/financeApi';
 import {
   getFeaturePreferences,
@@ -18,7 +20,7 @@ import type { FinanceExpenseChart, FinanceOverview } from '../../../types/financ
 import { overviewTodos } from '../overview/overviewData';
 import styles from './ChatTopBarInformation.module.css';
 
-type TopBarModuleId = 'date' | 'todos' | 'finance';
+type TopBarModuleId = 'date' | 'todos' | 'finance' | 'weather';
 type FeatureDestination = 'calendar' | 'finance' | 'study';
 
 interface ChatTopBarInformationProps {
@@ -51,8 +53,21 @@ export function ChatTopBarInformation({ onOpenFeature }: ChatTopBarInformationPr
     ]);
     return { overview, chart };
   }, []);
+  const loadDailyContext = useCallback(
+    () => fetchDailyContextSummary(
+      dateKey,
+      preferences.chatTopBar.showWeather,
+      preferences.chatTopBar.showHoliday,
+    ),
+    [dateKey, preferences.chatTopBar.showHoliday, preferences.chatTopBar.showWeather],
+  );
   const todoResource = useTopBarResource(preferences.chatTopBar.showTodos, loadToday, dateKey);
   const financeResource = useTopBarResource(preferences.chatTopBar.showFinance, loadFinance, dateKey);
+  const dailyContextResource = useTopBarResource(
+    preferences.chatTopBar.showWeather || preferences.chatTopBar.showHoliday,
+    loadDailyContext,
+    dateKey,
+  );
 
   useEffect(() => subscribeFeaturePreferences(setPreferences), []);
 
@@ -67,9 +82,12 @@ export function ChatTopBarInformation({ onOpenFeature }: ChatTopBarInformationPr
   }, []);
 
   useEffect(() => {
-    if (activeModule === 'date' && !preferences.chatTopBar.showDate) setActiveModule(null);
+    if (activeModule === 'date'
+        && !preferences.chatTopBar.showDate
+        && !preferences.chatTopBar.showHoliday) setActiveModule(null);
     if (activeModule === 'todos' && !preferences.chatTopBar.showTodos) setActiveModule(null);
     if (activeModule === 'finance' && !preferences.chatTopBar.showFinance) setActiveModule(null);
+    if (activeModule === 'weather' && !preferences.chatTopBar.showWeather) setActiveModule(null);
   }, [activeModule, preferences.chatTopBar]);
 
   useEffect(() => {
@@ -89,7 +107,8 @@ export function ChatTopBarInformation({ onOpenFeature }: ChatTopBarInformationPr
   }, [activeModule]);
 
   const visible = preferences.chatTopBar;
-  if (!visible.showDate && !visible.showTodos && !visible.showFinance) return null;
+  if (!visible.showDate && !visible.showTodos && !visible.showFinance
+      && !visible.showHoliday && !visible.showWeather) return null;
 
   const toggle = (module: TopBarModuleId) => {
     setActiveModule((current) => current === module ? null : module);
@@ -98,11 +117,11 @@ export function ChatTopBarInformation({ onOpenFeature }: ChatTopBarInformationPr
   return (
     <div ref={rootRef} className={styles.root} aria-label="今日信息">
       <div className={styles.triggers}>
-        {visible.showDate && (
+        {(visible.showDate || visible.showHoliday) && (
           <InformationTrigger
             moduleId="date"
             icon={<CalendarDays size={14} />}
-            summary={formatCompactDate(today)}
+            summary={dateSummary(today, visible.showHoliday ? dailyContextResource : null)}
             active={activeModule === 'date'}
             onClick={() => toggle('date')}
           />
@@ -125,6 +144,15 @@ export function ChatTopBarInformation({ onOpenFeature }: ChatTopBarInformationPr
             onClick={() => toggle('finance')}
           />
         )}
+        {visible.showWeather && (
+          <InformationTrigger
+            moduleId="weather"
+            icon={<CloudSun size={14} />}
+            summary={weatherSummary(dailyContextResource)}
+            active={activeModule === 'weather'}
+            onClick={() => toggle('weather')}
+          />
+        )}
       </div>
 
       <div
@@ -133,7 +161,13 @@ export function ChatTopBarInformation({ onOpenFeature }: ChatTopBarInformationPr
         aria-hidden={!activeModule}
       >
         <div className={styles.panelInner}>
-          {activeModule === 'date' && <DateDetail date={today} />}
+          {activeModule === 'date' && (
+            <DateDetail
+              date={today}
+              showHoliday={visible.showHoliday}
+              resource={dailyContextResource}
+            />
+          )}
           {activeModule === 'todos' && (
             <TodoDetail
               resource={todoResource}
@@ -147,6 +181,7 @@ export function ChatTopBarInformation({ onOpenFeature }: ChatTopBarInformationPr
               onOpen={() => onOpenFeature('finance')}
             />
           )}
+          {activeModule === 'weather' && <WeatherDetail resource={dailyContextResource} />}
         </div>
       </div>
     </div>
@@ -166,7 +201,8 @@ function InformationTrigger({
   active: boolean;
   onClick: () => void;
 }) {
-  const label = moduleId === 'date' ? '日期' : moduleId === 'todos' ? '待办' : '财务';
+  const label = moduleId === 'date' ? '日期' : moduleId === 'todos' ? '待办'
+    : moduleId === 'finance' ? '财务' : '天气';
   return (
     <button
       type="button"
@@ -183,7 +219,15 @@ function InformationTrigger({
   );
 }
 
-function DateDetail({ date }: { date: Date }) {
+function DateDetail({
+  date,
+  showHoliday,
+  resource,
+}: {
+  date: Date;
+  showHoliday: boolean;
+  resource: ResourceState<DailyContextSummary>;
+}) {
   const fullDate = new Intl.DateTimeFormat('zh-CN', {
     year: 'numeric',
     month: 'long',
@@ -196,8 +240,57 @@ function DateDetail({ date }: { date: Date }) {
     <section className={styles.detailSection} aria-labelledby="topbar-date-title">
       <div className={styles.detailHeading}>
         <CalendarDays size={18} aria-hidden="true" />
-        <div><h2 id="topbar-date-title">{fullDate}</h2><p>今天是今年的第 {dayOfYear} 天，还剩 {remaining} 天。</p></div>
+        <div>
+          <h2 id="topbar-date-title">{fullDate}</h2>
+          <p>今天是今年的第 {dayOfYear} 天，还剩 {remaining} 天。</p>
+          {showHoliday && <HolidayStatus resource={resource} />}
+        </div>
       </div>
+    </section>
+  );
+}
+
+function HolidayStatus({ resource }: { resource: ResourceState<DailyContextSummary> }) {
+  if (resource.loading && !resource.data) return <p className={styles.contextState}>正在读取节假日信息…</p>;
+  if (resource.error && !resource.data) return <p className={styles.contextError}>{resource.error}</p>;
+  if (resource.data?.holidayError) return <p className={styles.contextError}>{resource.data.holidayError}</p>;
+  const holiday = resource.data?.holiday;
+  if (!holiday) return <p className={styles.contextState}>暂无节假日信息。</p>;
+  return (
+    <div className={styles.holidayDetail}>
+      <strong>{holiday.name || holiday.description}</strong>
+      <span>{holiday.dayOff ? '今日休息' : holiday.dayCode === 3 ? '今日调休上班' : '今日工作'}</span>
+      {holiday.lunarDate && <span>农历 {holiday.lunarDate}</span>}
+      {holiday.tip && <p>{holiday.tip}</p>}
+    </div>
+  );
+}
+
+function WeatherDetail({ resource }: { resource: ResourceState<DailyContextSummary> }) {
+  if (resource.loading && !resource.data) {
+    return <section className={styles.detailSection}><p className={styles.state}>正在读取天气…</p></section>;
+  }
+  if (resource.error && !resource.data) {
+    return <section className={styles.detailSection}><p className={styles.contextError}>{resource.error}</p></section>;
+  }
+  if (resource.data?.weatherError) {
+    return <section className={styles.detailSection}><p className={styles.contextError}>{resource.data.weatherError}</p></section>;
+  }
+  const weather = resource.data?.weather;
+  if (!weather) return <section className={styles.detailSection}><p className={styles.state}>暂无天气信息。</p></section>;
+  return (
+    <section className={styles.detailSection} aria-labelledby="topbar-weather-title">
+      <div className={styles.detailHeading}>
+        <CloudSun size={18} aria-hidden="true" />
+        <div><h2 id="topbar-weather-title">{weather.locationName} · {weather.condition}</h2><p>数据来源：和风天气</p></div>
+      </div>
+      <dl className={styles.weatherMetrics}>
+        <div><dt>当前温度</dt><dd>{roundWeather(weather.temperature)}{weather.temperatureUnit}</dd></div>
+        <div><dt>体感温度</dt><dd>{roundWeather(weather.feelsLike)}{weather.temperatureUnit}</dd></div>
+        <div><dt>相对湿度</dt><dd>{weather.humidityPercent}%</dd></div>
+        <div><dt>风速</dt><dd>{roundWeather(weather.windSpeed)} {weather.windSpeedUnit}</dd></div>
+      </dl>
+      <a className={styles.attribution} href={weather.attributionUrl} target="_blank" rel="noreferrer">和风天气数据来源说明</a>
     </section>
   );
 }
@@ -380,6 +473,27 @@ function financeSummary(
 
 function formatCompactDate(date: Date): string {
   return new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric', weekday: 'short' }).format(date);
+}
+
+function dateSummary(date: Date, resource: ResourceState<DailyContextSummary> | null): string {
+  const dateText = formatCompactDate(date);
+  if (!resource) return dateText;
+  if (resource.loading && !resource.data) return `${dateText} · 节假日加载中`;
+  const holiday = resource.data?.holiday;
+  if (!holiday) return dateText;
+  const status = holiday.name || (holiday.dayOff ? '休息日' : holiday.dayCode === 3 ? '调休上班' : '工作日');
+  return `${dateText} · ${status}`;
+}
+
+function weatherSummary(resource: ResourceState<DailyContextSummary>): string {
+  if (resource.loading && !resource.data) return '天气加载中';
+  if (resource.data?.weatherError || resource.error) return '天气暂不可用';
+  const weather = resource.data?.weather;
+  return weather ? `${weather.condition} ${roundWeather(weather.temperature)}${weather.temperatureUnit}` : '天气未配置';
+}
+
+function roundWeather(value: number): string {
+  return new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 1 }).format(value);
 }
 
 function formatCompactMoney(value: number): string {

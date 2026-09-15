@@ -4,6 +4,8 @@ export interface ChatTopBarPreferences {
   showDate: boolean;
   showTodos: boolean;
   showFinance: boolean;
+  showHoliday: boolean;
+  showWeather: boolean;
 }
 
 export interface FeaturePreferences {

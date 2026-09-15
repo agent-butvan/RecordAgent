@@ -1,0 +1,18 @@
+.content { display: grid; gap: 24px; }
+.section { padding: 18px 0 22px; border-bottom: 1px solid var(--border-subtle); }
+.section:first-child { padding-top: 0; }
+.sectionHeading { display: flex; align-items: flex-start; justify-content: space-between; gap: 28px; margin-bottom: 18px; }
+.sectionHeading h2 { color: var(--text-primary); font-size: 15px; font-weight: 650; line-height: 1.4; }
+.sectionHeading p, .field small, .state { margin-top: 4px; color: var(--text-secondary); font-size: 11px; line-height: 1.55; }
+.formGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 20px; }
+.field { display: grid; align-content: start; gap: 6px; min-width: 0; color: var(--text-primary); font-size: 12px; font-weight: 600; }
+.field small { min-height: 17px; font-weight: 400; }
+.coordinateFields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.actions { display: flex; justify-content: flex-end; }
+.error, .success { padding: 8px 10px; border: 1px solid; border-radius: var(--radius-md); font-size: 12px; }
+.error { border-color: #e8c7c3; background: #fff9f8; color: #8d332c; }
+.success { border-color: #b9dcc9; background: #f7fcf9; color: #17663f; }
+@media (max-width: 760px) {
+  .sectionHeading { flex-direction: column; gap: 12px; }
+  .formGrid { grid-template-columns: 1fr; }
+}
