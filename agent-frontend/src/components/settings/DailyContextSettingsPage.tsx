@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Save } from 'lucide-react';
+import { LocateFixed, Save } from 'lucide-react';
 import {
   fetchDailyContextConfig,
+  resolveDailyContextLocation,
   saveDailyContextConfig,
   type DailyContextConfig,
 } from '../../services/dailyContextApi';
+import { detectCurrentCoordinates } from '../../services/deviceLocation';
 import type { ChatTopBarPreferences } from '../../types/preferences';
 import { Button } from '../common/Button';
 import { TextInput } from '../common/TextInput';
@@ -39,6 +41,7 @@ export function DailyContextSettingsPage({
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [locating, setLocating] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
@@ -89,6 +92,40 @@ export function DailyContextSettingsPage({
     }
   };
 
+  const locate = async () => {
+    setLocating(true);
+    setMessage(null);
+    try {
+      const coordinates = await detectCurrentCoordinates();
+      setForm((current) => ({
+        ...current,
+        locationName: '当前位置',
+        latitude: String(coordinates.latitude),
+        longitude: String(coordinates.longitude),
+      }));
+
+      try {
+        const resolved = await resolveDailyContextLocation(coordinates.latitude, coordinates.longitude);
+        setForm((current) => ({ ...current, locationName: resolved.locationName }));
+        setMessage({
+          type: 'success',
+          text: `已识别为${resolved.locationName}，定位精度约 ${coordinates.accuracy} 米；请保存配置。`,
+        });
+      } catch (cause) {
+        setMessage({
+          type: 'error',
+          text: cause instanceof Error
+            ? `${cause.message}；经纬度已填入，可以直接保存。`
+            : '地点名称识别失败；经纬度已填入，可以直接保存。',
+        });
+      }
+    } catch (cause) {
+      setMessage({ type: 'error', text: cause instanceof Error ? cause.message : '自动定位失败' });
+    } finally {
+      setLocating(false);
+    }
+  };
+
   return (
     <SettingsPageLayout title="天气与节假日" description="配置聊天顶栏使用的外部数据源，密钥仅保存在本机。">
       {loading ? <p className={styles.state}>正在读取配置…</p> : (
@@ -111,6 +148,17 @@ export function DailyContextSettingsPage({
               <div className={styles.coordinateFields}>
                 <Field label="纬度" hint="-90 至 90"><TextInput inputMode="decimal" value={form.latitude} onChange={(event) => update('latitude', event.target.value)} placeholder="31.23" /></Field>
                 <Field label="经度" hint="-180 至 180"><TextInput inputMode="decimal" value={form.longitude} onChange={(event) => update('longitude', event.target.value)} placeholder="121.47" /></Field>
+              </div>
+              <div className={styles.locationAction}>
+                <Button
+                  variant="outline"
+                  icon={<LocateFixed size={14} />}
+                  disabled={locating}
+                  onClick={() => void locate()}
+                >
+                  {locating ? '正在识别位置…' : '识别当前位置'}
+                </Button>
+                <small>仅在点击后请求系统定位权限；识别结果不会自动保存。</small>
               </div>
             </div>
           </section>

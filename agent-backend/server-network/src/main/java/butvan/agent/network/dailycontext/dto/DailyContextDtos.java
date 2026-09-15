@@ -38,6 +38,13 @@ public final class DailyContextDtos {
     ) {
     }
 
+    public record LocationResponse(
+            String locationName,
+            String adminArea,
+            String country
+    ) {
+    }
+
     public record WeatherResponse(
             String locationName,
             String condition,

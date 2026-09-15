@@ -2,6 +2,7 @@ package butvan.agent.network.dailycontext.service;
 
 import butvan.agent.network.dailycontext.config.DailyContextConfigData;
 import butvan.agent.network.dailycontext.dto.DailyContextDtos.HolidayResponse;
+import butvan.agent.network.dailycontext.dto.DailyContextDtos.LocationResponse;
 import butvan.agent.network.dailycontext.dto.DailyContextDtos.WeatherResponse;
 import butvan.agent.agents.config.LocalConfigService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -12,6 +13,7 @@ import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /** 每日上下文聚合测试：验证按需请求与供应商故障隔离。 */
 class DailyContextServiceTest {
@@ -50,6 +52,17 @@ class DailyContextServiceTest {
         assertEquals(0, holidayClient.calls);
     }
 
+    @Test
+    void resolveLocation_rejectsCoordinatesOutsideEarthBounds() {
+        DailyContextConfigService configService = new FixedConfigService(new DailyContextConfigData());
+        StubWeatherClient weatherClient = new StubWeatherClient(false);
+        DailyContextService service = new DailyContextService(
+                configService, weatherClient, new StubHolidayClient(null));
+
+        assertThrows(IllegalArgumentException.class, () -> service.resolveLocation(91, 117));
+        assertEquals(0, weatherClient.locationCalls);
+    }
+
     private static final class FixedConfigService extends DailyContextConfigService {
         private final DailyContextConfigData config;
 
@@ -67,6 +80,7 @@ class DailyContextServiceTest {
     private static final class StubWeatherClient extends QWeatherClient {
         private final boolean fail;
         private int calls;
+        private int locationCalls;
 
         private StubWeatherClient(boolean fail) {
             super(RestClient.builder());
@@ -77,6 +91,16 @@ class DailyContextServiceTest {
         public WeatherResponse fetchCurrent(DailyContextConfigData.QWeatherConfig config) {
             calls++;
             if (fail) throw new IllegalStateException("天气失败");
+            return null;
+        }
+
+        @Override
+        public LocationResponse lookupLocation(
+                double latitude,
+                double longitude,
+                DailyContextConfigData.QWeatherConfig config
+        ) {
+            locationCalls++;
             return null;
         }
     }

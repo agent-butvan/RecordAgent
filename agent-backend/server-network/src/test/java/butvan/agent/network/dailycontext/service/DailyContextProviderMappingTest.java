@@ -52,4 +52,23 @@ class DailyContextProviderMappingTest {
         assertEquals(3, result.wageMultiple());
         assertEquals("八月十一", result.lunarDate());
     }
+
+    @Test
+    void qWeatherGeoApiMapsDeviceCoordinatesToLocationName() throws Exception {
+        var payload = mapper.readTree("""
+                {
+                  "code": "200",
+                  "location": [{
+                    "name": "蜀山区", "adm2": "合肥市", "country": "中国",
+                    "lat": "31.85", "lon": "117.26"
+                  }]
+                }
+                """);
+
+        var result = QWeatherClient.parseLocation(payload);
+
+        assertEquals("蜀山区", result.locationName());
+        assertEquals("合肥市", result.adminArea());
+        assertEquals("中国", result.country());
+    }
 }

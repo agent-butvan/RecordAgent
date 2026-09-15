@@ -2,6 +2,7 @@ package butvan.agent.network.dailycontext.service;
 
 import butvan.agent.network.dailycontext.config.DailyContextConfigData;
 import butvan.agent.network.dailycontext.dto.DailyContextDtos.HolidayResponse;
+import butvan.agent.network.dailycontext.dto.DailyContextDtos.LocationResponse;
 import butvan.agent.network.dailycontext.dto.DailyContextDtos.SummaryResponse;
 import butvan.agent.network.dailycontext.dto.DailyContextDtos.WeatherResponse;
 import lombok.RequiredArgsConstructor;
@@ -53,6 +54,22 @@ public class DailyContextService {
     public void clearCaches() {
         weatherCache = null;
         holidayCache = null;
+    }
+
+    /** 使用设备坐标反查地点名称，不修改配置，用户确认保存后才持久化。 */
+    public LocationResponse resolveLocation(double latitude, double longitude) {
+        validateCoordinates(latitude, longitude);
+        DailyContextConfigData config = configService.loadConfig();
+        return qWeatherClient.lookupLocation(latitude, longitude, config.getQweather());
+    }
+
+    private static void validateCoordinates(double latitude, double longitude) {
+        if (!Double.isFinite(latitude) || latitude < -90 || latitude > 90) {
+            throw new IllegalArgumentException("纬度必须位于 -90 至 90 之间");
+        }
+        if (!Double.isFinite(longitude) || longitude < -180 || longitude > 180) {
+            throw new IllegalArgumentException("经度必须位于 -180 至 180 之间");
+        }
     }
 
     private WeatherResponse currentWeather(DailyContextConfigData config) {

@@ -52,6 +52,12 @@ export interface DailyContextSummary {
   holidayError: string | null;
 }
 
+export interface ResolvedLocation {
+  locationName: string;
+  adminArea: string;
+  country: string;
+}
+
 async function dailyContextRequest<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
@@ -99,4 +105,13 @@ export function fetchDailyContextSummary(
 ): Promise<DailyContextSummary> {
   const params = new URLSearchParams({ date, weather: String(weather), holiday: String(holiday) });
   return dailyContextRequest(`/agent/daily-context/summary?${params}`);
+}
+
+/** 通过设备坐标识别和风天气地点名称。 */
+export function resolveDailyContextLocation(
+  latitude: number,
+  longitude: number,
+): Promise<ResolvedLocation> {
+  const params = new URLSearchParams({ latitude: String(latitude), longitude: String(longitude) });
+  return dailyContextRequest(`/agent/daily-context/location?${params}`);
 }
