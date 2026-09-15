@@ -8,27 +8,23 @@ import butvan.agent.network.dailycontext.dto.DailyContextDtos.WeatherResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Objects;
 
 /**
  * 聚合天气与节假日上下文。
  *
- * <p>天气使用短期内存缓存（20 分钟 TTL）；节假日使用文件持久化缓存（每天只请求一次）
- * 并附带每日请求限额保护（默认 90 次/天），进程重启后缓存和计数不会丢失。</p>
+ * <p>天气使用文件持久化缓存（20 分钟 TTL），进程重启后只要未过期就不会重复请求。
+ * 节假日使用文件持久化缓存（每天只请求一次）并附带每日请求限额保护（默认 90 次/天）。</p>
  */
 @Service
 @RequiredArgsConstructor
 public class DailyContextService {
-    private static final Duration WEATHER_TTL = Duration.ofMinutes(20);
 
     private final DailyContextConfigService configService;
     private final QWeatherClient qWeatherClient;
     private final TianApiHolidayClient holidayClient;
-    private final TianApiHolidayStore holidayStore;
-    private volatile CacheEntry<WeatherResponse> weatherCache;
+    private final DailyContextStore store;
 
     /** 查询当日上下文；两个供应商独立降级，任一失败仍返回另一项。 */
     public SummaryResponse getSummary(LocalDate date, boolean includeWeather, boolean includeHoliday) {
@@ -56,8 +52,8 @@ public class DailyContextService {
 
     /** 配置变化后清空供应商缓存，保证连接测试和新配置立即生效。 */
     public void clearCaches() {
-        weatherCache = null;
-        holidayStore.clearHolidayCache();
+        store.clearWeatherCache();
+        store.clearHolidayCache();
     }
 
     /** 使用设备坐标反查地点名称，不修改配置，用户确认保存后才持久化。 */
@@ -76,14 +72,21 @@ public class DailyContextService {
         }
     }
 
+    /**
+     * 获取天气信息：持久化缓存优先（20 分钟 TTL）→ API 请求 → 写回持久化。
+     */
     private WeatherResponse currentWeather(DailyContextConfigData config) {
-        String key = "%s:%s:%s:%s".formatted(config.getQweather().getApiHost(),
-                config.getQweather().getLatitude(), config.getQweather().getLongitude(),
-                Objects.hashCode(config.getQweather().getApiKey()));
-        CacheEntry<WeatherResponse> cached = weatherCache;
-        if (cached != null && cached.usable(key)) return cached.value();
+        String configKey = weatherConfigKey(config);
+
+        // 1. 持久化缓存命中且未过期则直接返回
+        WeatherResponse cached = store.loadCachedWeather(configKey);
+        if (cached != null) return cached;
+
+        // 2. 请求和风天气 API
         WeatherResponse loaded = qWeatherClient.fetchCurrent(config.getQweather());
-        weatherCache = new CacheEntry<>(key, loaded, Instant.now().plus(WEATHER_TTL));
+
+        // 3. 持久化缓存
+        store.saveCachedWeather(configKey, loaded);
         return loaded;
     }
 
@@ -92,23 +95,26 @@ public class DailyContextService {
      */
     private HolidayResponse currentHoliday(LocalDate date, DailyContextConfigData config) {
         // 1. 持久化缓存命中则直接返回
-        HolidayResponse cached = holidayStore.loadCachedHoliday(date);
+        HolidayResponse cached = store.loadCachedHoliday(date);
         if (cached != null) return cached;
 
         // 2. 检查并递增每日请求计数
-        holidayStore.incrementAndCheckUsage(date, TianApiHolidayStore.DEFAULT_DAILY_LIMIT);
+        store.incrementAndCheckUsage(date, DailyContextStore.DEFAULT_DAILY_LIMIT);
 
         // 3. 请求天行 API
         HolidayResponse loaded = holidayClient.fetch(date, config.getTianApi());
 
         // 4. 持久化缓存
-        holidayStore.saveCachedHoliday(date, loaded);
+        store.saveCachedHoliday(date, loaded);
         return loaded;
     }
 
-    private record CacheEntry<T>(String key, T value, Instant expiresAt) {
-        private boolean usable(String expectedKey) {
-            return key.equals(expectedKey) && Instant.now().isBefore(expiresAt);
-        }
+    /** 由配置关键字段组成的指纹，配置变化时自动失效。 */
+    private static String weatherConfigKey(DailyContextConfigData config) {
+        return "%s:%s:%s:%s".formatted(
+                config.getQweather().getApiHost(),
+                config.getQweather().getLatitude(),
+                config.getQweather().getLongitude(),
+                Objects.hashCode(config.getQweather().getApiKey()));
     }
 }

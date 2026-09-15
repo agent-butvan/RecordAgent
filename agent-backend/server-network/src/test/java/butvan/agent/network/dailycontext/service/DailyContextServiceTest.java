@@ -19,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** 每日上下文聚合测试：验证按需请求、供应商故障隔离与持久化缓存。 */
 class DailyContextServiceTest {
@@ -40,8 +41,8 @@ class DailyContextServiceTest {
     ) {
         DailyContextConfigService configService = new FixedConfigService(config);
         AgentStorageProperties storageProperties = new AgentStorageProperties(tempDir);
-        TianApiHolidayStore holidayStore = new TianApiHolidayStore(storageProperties, new ObjectMapper());
-        return new DailyContextService(configService, weatherClient, holidayClient, holidayStore);
+        DailyContextStore store = new DailyContextStore(storageProperties, new ObjectMapper());
+        return new DailyContextService(configService, weatherClient, holidayClient, store);
     }
 
     @Test
@@ -84,7 +85,7 @@ class DailyContextServiceTest {
     }
 
     @Test
-    void getSummary_usesPersistedCacheAndDoesNotCallApiTwice() {
+    void getSummary_usesPersistedHolidayCacheAndDoesNotCallApiTwice() {
         LocalDate date = LocalDate.of(2026, 10, 1);
         HolidayResponse holiday = new HolidayResponse("国庆节", "节假日", 1, true, 3, "八月廿一", "");
         StubHolidayClient holidayClient = new StubHolidayClient(holiday);
@@ -103,7 +104,27 @@ class DailyContextServiceTest {
     }
 
     @Test
-    void getSummary_refetchesForDifferentDate() {
+    void getSummary_usesPersistedWeatherCacheAndDoesNotCallApiTwice() {
+        StubWeatherClient weatherClient = new StubWeatherClient(false);
+        weatherClient.response = new WeatherResponse(
+                "杭州", "晴", "100", 26.5, "°C", 27.0, 65, "东南风", 3.5, "m/s",
+                "https://developer.qweather.com/attribution.html");
+        DailyContextService service = createService(weatherClient, new StubHolidayClient(null));
+
+        // 首次请求应调用 API
+        SummaryResponse first = service.getSummary(LocalDate.of(2026, 9, 15), true, false);
+        assertNotNull(first.weather());
+        assertEquals(1, weatherClient.calls);
+
+        // 第二次请求应命中持久化缓存
+        SummaryResponse second = service.getSummary(LocalDate.of(2026, 9, 15), true, false);
+        assertNotNull(second.weather());
+        assertEquals("杭州", second.weather().locationName());
+        assertEquals(1, weatherClient.calls); // 未再次调用
+    }
+
+    @Test
+    void getSummary_refetchesHolidayForDifferentDate() {
         LocalDate oct1 = LocalDate.of(2026, 10, 1);
         LocalDate oct2 = LocalDate.of(2026, 10, 2);
         HolidayResponse holiday1 = new HolidayResponse("国庆节", "节假日", 1, true, 3, "八月廿一", "");
@@ -123,7 +144,6 @@ class DailyContextServiceTest {
     @Test
     void getSummary_rejectsWhenDailyLimitExceeded() {
         LocalDate date = LocalDate.of(2026, 9, 15);
-        // 用一个总是失败的 holiday client，模拟持续消耗限额但未成功缓存
         StubHolidayClient failingClient = new StubHolidayClient(null) {
             @Override
             public HolidayResponse fetch(LocalDate d, DailyContextConfigData.TianApiConfig config) {
@@ -135,19 +155,19 @@ class DailyContextServiceTest {
         DailyContextConfigData config = new DailyContextConfigData();
         DailyContextConfigService configService = new FixedConfigService(config);
         AgentStorageProperties storageProperties = new AgentStorageProperties(tempDir);
-        TianApiHolidayStore store = new TianApiHolidayStore(storageProperties, new ObjectMapper());
+        DailyContextStore store = new DailyContextStore(storageProperties, new ObjectMapper());
         DailyContextService service = new DailyContextService(configService,
                 new StubWeatherClient(false), failingClient, store);
 
-        // 先用尽限额（使用较小限额方便测试）——直接操作 store
-        for (int i = 0; i < TianApiHolidayStore.DEFAULT_DAILY_LIMIT; i++) {
-            store.incrementAndCheckUsage(date, TianApiHolidayStore.DEFAULT_DAILY_LIMIT);
+        // 先用尽限额
+        for (int i = 0; i < DailyContextStore.DEFAULT_DAILY_LIMIT; i++) {
+            store.incrementAndCheckUsage(date, DailyContextStore.DEFAULT_DAILY_LIMIT);
         }
 
         // 下一次请求应因限额而失败
         SummaryResponse result = service.getSummary(date, false, true);
         assertNotNull(result.holidayError());
-        assertEquals(true, result.holidayError().contains("上限"));
+        assertTrue(result.holidayError().contains("上限"));
     }
 
     private static final class FixedConfigService extends DailyContextConfigService {
@@ -164,10 +184,11 @@ class DailyContextServiceTest {
         }
     }
 
-    private static final class StubWeatherClient extends QWeatherClient {
+    private static class StubWeatherClient extends QWeatherClient {
         private final boolean fail;
-        private int calls;
-        private int locationCalls;
+        WeatherResponse response;
+        int calls;
+        int locationCalls;
 
         private StubWeatherClient(boolean fail) {
             super(RestClient.builder());
@@ -178,7 +199,7 @@ class DailyContextServiceTest {
         public WeatherResponse fetchCurrent(DailyContextConfigData.QWeatherConfig config) {
             calls++;
             if (fail) throw new IllegalStateException("天气失败");
-            return null;
+            return response;
         }
 
         @Override
