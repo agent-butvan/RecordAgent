@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { ExternalLink, LocateFixed, RefreshCw, Save } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { LocateFixed, RefreshCw, Save } from 'lucide-react';
 import {
   fetchDailyContextConfig,
   fetchQWeatherConsoleSummary,
@@ -36,6 +36,8 @@ const EMPTY_FORM: FormState = {
   qweatherApiHost: '', qweatherApiKey: '', locationName: '', latitude: '', longitude: '', tianApiKey: '',
 };
 
+const QWEATHER_CONSOLE_PROJECT_URL = 'https://console.qweather.com/project';
+
 /** 天气与节假日供应商设置；后端只返回密钥是否存在，不回传密钥正文。 */
 export function DailyContextSettingsPage({
   chatTopBar,
@@ -49,19 +51,28 @@ export function DailyContextSettingsPage({
   const [locating, setLocating] = useState(false);
   const [consoleSummary, setConsoleSummary] = useState<QWeatherConsoleSummary | null>(null);
   const [consoleLoading, setConsoleLoading] = useState(false);
-  const [consoleError, setConsoleError] = useState<string | null>(null);
 
-  const loadConsoleSummary = async (refresh: boolean) => {
+  const loadConsoleSummary = useCallback(async (refresh: boolean) => {
     setConsoleLoading(true);
-    setConsoleError(null);
     try {
-      setConsoleSummary(await fetchQWeatherConsoleSummary(refresh));
+      const nextSummary = await fetchQWeatherConsoleSummary(refresh);
+      setConsoleSummary(nextSummary);
+      const permissionErrors = [nextSummary.financeError, nextSummary.usageError]
+        .filter((message, index, errors): message is string => Boolean(message) && errors.indexOf(message) === index);
+      if (permissionErrors.length > 0) {
+        showMessage('error', permissionErrors.join('；'), {
+          action: {
+            label: '打开凭据权限设置',
+            onClick: () => { window.open(QWEATHER_CONSOLE_PROJECT_URL, '_blank', 'noopener,noreferrer'); },
+          },
+        });
+      }
     } catch (cause) {
-      setConsoleError(cause instanceof Error ? cause.message : '和风控制台数据读取失败');
+      showMessage('error', cause instanceof Error ? cause.message : '和风控制台数据读取失败');
     } finally {
       setConsoleLoading(false);
     }
-  };
+  }, [showMessage]);
 
   useEffect(() => {
     fetchDailyContextConfig()
@@ -80,7 +91,7 @@ export function DailyContextSettingsPage({
       })
       .catch((cause) => showMessage('error', cause instanceof Error ? cause.message : '配置读取失败'))
       .finally(() => setLoading(false));
-  }, [showMessage]);
+  }, [loadConsoleSummary, showMessage]);
 
   const update = (key: keyof FormState, value: string) => setForm((current) => ({ ...current, [key]: value }));
 
@@ -206,7 +217,6 @@ export function DailyContextSettingsPage({
               configured={Boolean(config?.qweatherApiKeyConfigured && config.qweatherApiHost)}
               summary={consoleSummary}
               loading={consoleLoading}
-              error={consoleError}
               onRefresh={() => void loadConsoleSummary(true)}
             />
           </section>
@@ -232,13 +242,11 @@ function QWeatherConsolePanel({
   configured,
   summary,
   loading,
-  error,
   onRefresh,
 }: {
   configured: boolean;
   summary: QWeatherConsoleSummary | null;
   loading: boolean;
-  error: string | null;
   onRefresh: () => void;
 }) {
   const finance = summary?.finance;
@@ -270,7 +278,6 @@ function QWeatherConsolePanel({
 
       {!configured && <p className={styles.consoleState}>保存 API Host 和 API KEY 后即可查看控制台摘要。</p>}
       {configured && loading && !hasData && <p className={styles.consoleState}>正在读取用量与费用…</p>}
-      {configured && error && <p className={styles.consoleError} role="alert">{error}</p>}
 
       {hasData && (
         <>
@@ -305,26 +312,12 @@ function QWeatherConsolePanel({
           </p>
         </>
       )}
-
-      {configured && summary?.financeError && <PermissionNotice message={summary.financeError} />}
-      {configured && summary?.usageError && <PermissionNotice message={summary.usageError} />}
     </section>
   );
 }
 
 function Metric({ label, value, warning = false }: { label: string; value: string; warning?: boolean }) {
   return <div><dt>{label}</dt><dd className={warning ? styles.metricWarning : undefined}>{value}</dd></div>;
-}
-
-function PermissionNotice({ message }: { message: string }) {
-  return (
-    <div className={styles.permissionNotice}>
-      <p>{message}</p>
-      <a href="https://console.qweather.com/project" target="_blank" rel="noreferrer">
-        打开凭据权限设置 <ExternalLink size={12} aria-hidden="true" />
-      </a>
-    </div>
-  );
 }
 
 function formatMoney(value: number, currency: string): string {

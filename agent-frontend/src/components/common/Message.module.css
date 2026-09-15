@@ -18,7 +18,7 @@
   max-width: min(560px, calc(100vw - 32px));
   pointer-events: none;
   position: fixed;
-  top: 18px;
+  top: calc(var(--window-titlebar-inset, 0px) + 18px);
   transform: translateX(-50%);
   z-index: 3000;
 }

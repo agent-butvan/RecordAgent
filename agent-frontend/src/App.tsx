@@ -1171,7 +1171,6 @@ const PrimaryApp: React.FC = () => {
   }
 
   return (
-    <MessageProvider>
     <ModelProviderContext>
       <MainLayout
         isSettingsOpen={isSettingsOpen}
@@ -1180,16 +1179,17 @@ const PrimaryApp: React.FC = () => {
         setSettingsTab={setSettingsTab}
       />
     </ModelProviderContext>
-    </MessageProvider>
   );
 };
 
 export const App: React.FC = () => (
-  <StudyRealtimeProvider>
-    {new URLSearchParams(window.location.search).get('view') === 'study-widget'
-      ? <SystemStudyWindow />
-      : <PrimaryApp />}
-  </StudyRealtimeProvider>
+  <MessageProvider>
+    <StudyRealtimeProvider>
+      {new URLSearchParams(window.location.search).get('view') === 'study-widget'
+        ? <SystemStudyWindow />
+        : <PrimaryApp />}
+    </StudyRealtimeProvider>
+  </MessageProvider>
 );
 
 export default App;
