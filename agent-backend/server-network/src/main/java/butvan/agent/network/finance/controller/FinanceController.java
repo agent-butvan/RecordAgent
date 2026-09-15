@@ -7,8 +7,11 @@ import butvan.agent.network.finance.dto.FinanceDtos;
 import butvan.agent.network.finance.dto.FinanceDtos.AccountResponse;
 import butvan.agent.network.finance.dto.FinanceDtos.CreateAccountRequest;
 import butvan.agent.network.finance.dto.FinanceDtos.CreateTransactionRequest;
+import butvan.agent.network.finance.dto.FinanceDtos.CreateTransferRequest;
 import butvan.agent.network.finance.dto.FinanceDtos.OverviewResponse;
 import butvan.agent.network.finance.dto.FinanceDtos.TransactionResponse;
+import butvan.agent.network.finance.dto.FinanceDtos.TransferResponse;
+import butvan.agent.network.finance.model.FinanceModels.FinanceTransaction;
 import butvan.agent.network.finance.service.FinanceService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -73,5 +76,14 @@ public class FinanceController {
         return Result.success(FinanceDtos.from(financeService.createTransaction(
                 currentUserProvider.currentUserId(), request.accountId(), request.transactionType(),
                 request.category(), request.note(), request.amount(), request.date(), request.time())));
+    }
+
+    @ApiLog("账户间资产划账")
+    @PostMapping("/transfers")
+    public Result<TransferResponse> transfer(@RequestBody CreateTransferRequest request) {
+        List<FinanceTransaction> transactions = financeService.transfer(
+                currentUserProvider.currentUserId(), request.fromAccountId(), request.toAccountId(),
+                request.amount(), request.note(), request.date(), request.time());
+        return Result.success(FinanceDtos.from(transactions.get(0), transactions.get(1)));
     }
 }

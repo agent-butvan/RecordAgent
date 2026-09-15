@@ -104,6 +104,46 @@ class FinanceApiIntegrationTest {
                 .andExpect(jsonPath("$.data.range").value("today"))
                 .andExpect(jsonPath("$.data.from").value(LocalDate.now().toString()))
                 .andExpect(jsonPath("$.data.to").value(LocalDate.now().toString()));
+
+        // 创建第二个账户并验证划账接口
+        String secondAccountJson = mockMvc.perform(post("/agent/finance/accounts")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "name": "微信零钱",
+                                  "accountType": "wechat_balance",
+                                  "currency": "CNY",
+                                  "initialBalance": 200.00,
+                                  "interestEnabled": false,
+                                  "annualRatePercent": 0
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String secondAccountId = new com.fasterxml.jackson.databind.ObjectMapper()
+                .readTree(secondAccountJson).path("data").path("id").asText();
+
+        mockMvc.perform(post("/agent/finance/transfers")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "fromAccountId": "%s",
+                                  "toAccountId": "%s",
+                                  "amount": 350.00,
+                                  "note": "日常充值零钱",
+                                  "date": "2026-09-04",
+                                  "time": "11:20"
+                                }
+                                """.formatted(accountId, secondAccountId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.fromTransaction.transactionType").value("transfer_out"))
+                .andExpect(jsonPath("$.data.fromTransaction.amount").value(350.00))
+                .andExpect(jsonPath("$.data.toTransaction.transactionType").value("transfer_in"))
+                .andExpect(jsonPath("$.data.toTransaction.amount").value(350.00));
+
+        mockMvc.perform(get("/agent/finance/overview"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalAssets").value(1700.00));
     }
 
     private static Path createDatabasePath() {

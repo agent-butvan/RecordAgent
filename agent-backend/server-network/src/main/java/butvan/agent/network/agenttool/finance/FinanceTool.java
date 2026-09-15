@@ -31,6 +31,7 @@ public class FinanceTool implements AgentToolModule {
     private static final String QUERY = "finance_query";
     private static final String CREATE_ACCOUNT = "finance_create_account";
     private static final String RECORD_TRANSACTION = "finance_record_transaction";
+    private static final String TRANSFER = "finance_transfer";
     private static final int MAX_RESULTS = 100;
 
     private final FinanceService financeService;
@@ -100,6 +101,28 @@ public class FinanceTool implements AgentToolModule {
                 String action = "expense".equals(transaction.transactionType()) ? "支出" : "收入";
                 return ToolResult.success("已记录" + action + " " + transaction.currency() + " " + transaction.amount(),
                         transaction);
+            });
+        } catch (RuntimeException exception) {
+            return BusinessToolErrors.from(exception);
+        }
+    }
+
+    @Tool(name = TRANSFER, description = "在两个资产账户之间划账并调整双方余额。金额始终传正数。")
+    public ToolResult<?> transfer(
+            @ToolParam(name = "request", description = "划账信息；写入前会请求用户确认") TransferRequest request) {
+        try {
+            if (request == null) throw new IllegalArgumentException("划账参数不能为空");
+            String ownerId = currentUserProvider.currentUserId();
+            return businessToolExecutor.write(ownerId, TRANSFER, request.idempotencyKey(), () -> {
+                List<FinanceTransaction> transactions = financeService.transfer(
+                        ownerId, required(request.fromAccountId(), "fromAccountId"),
+                        required(request.toAccountId(), "toAccountId"),
+                        parseMoney(request.amount(), "amount", false),
+                        clean(request.note()),
+                        parseDate(request.date()), parseTime(request.time()));
+                FinanceTransaction fromTx = transactions.get(0);
+                return ToolResult.success("已完成划账 " + fromTx.currency() + " " + fromTx.amount() + " 从“"
+                        + fromTx.accountName() + "”至“" + transactions.get(1).accountName() + "”", transactions);
             });
         } catch (RuntimeException exception) {
             return BusinessToolErrors.from(exception);
@@ -195,6 +218,11 @@ public class FinanceTool implements AgentToolModule {
     public record TransactionRequest(
             String accountId, String transactionType, String amount, String category,
             String note, String date, String time, String idempotencyKey) {
+    }
+
+    public record TransferRequest(
+            String fromAccountId, String toAccountId, String amount, String note,
+            String date, String time, String idempotencyKey) {
     }
 
     public record TransactionQueryResult(List<FinanceTransaction> items, boolean truncated) {

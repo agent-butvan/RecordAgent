@@ -68,6 +68,46 @@ class FinanceServiceIntegrationTest {
     }
 
     @Test
+    void transferBetweenAccountsUpdatesBalancesAndKeepsTotalAssetsAndMonthlyTotalsUnchanged() {
+        String ownerId = "finance-transfer-user";
+        FinanceAccount from = financeService.createAccount(
+                ownerId, "招商银行", "bank", "CNY", new BigDecimal("1000.00"), false, BigDecimal.ZERO);
+        FinanceAccount to = financeService.createAccount(
+                ownerId, "微信零钱通", "wechat_yield", "CNY", new BigDecimal("500.00"), false, BigDecimal.ZERO);
+
+        var transactions = financeService.transfer(
+                ownerId, from.id(), to.id(), new BigDecimal("300.00"), "转入零钱通",
+                LocalDate.now(), LocalTime.of(14, 0));
+
+        assertEquals(2, transactions.size());
+        assertEquals("transfer_out", transactions.get(0).transactionType());
+        assertEquals("transfer_in", transactions.get(1).transactionType());
+
+        FinanceOverview overview = financeService.getOverview(ownerId);
+        assertEquals(new BigDecimal("1500.00"), overview.totalAssets());
+        assertEquals(0, overview.monthIncome().compareTo(BigDecimal.ZERO));
+        assertEquals(0, overview.monthExpense().compareTo(BigDecimal.ZERO));
+
+        var accounts = overview.accounts();
+        var updatedFrom = accounts.stream().filter(a -> a.id().equals(from.id())).findFirst().orElseThrow();
+        var updatedTo = accounts.stream().filter(a -> a.id().equals(to.id())).findFirst().orElseThrow();
+        assertEquals(new BigDecimal("700.00"), updatedFrom.balance());
+        assertEquals(new BigDecimal("800.00"), updatedTo.balance());
+
+        // 余额不足校验
+        var error = assertThrows(IllegalArgumentException.class, () ->
+                financeService.transfer(ownerId, from.id(), to.id(), new BigDecimal("9999.00"),
+                        "超额划账", LocalDate.now(), LocalTime.of(15, 0)));
+        assertEquals("转出账户余额不足，无法划账", error.getMessage());
+
+        // 相同账户划转校验
+        var sameError = assertThrows(IllegalArgumentException.class, () ->
+                financeService.transfer(ownerId, from.id(), from.id(), new BigDecimal("100.00"),
+                        "同账户划转", LocalDate.now(), LocalTime.of(15, 0)));
+        assertEquals("转出账户与转入账户不能相同", sameError.getMessage());
+    }
+
+    @Test
     void monthlyExpenseIncludesLegacyExpensesRecordedFromCalendar() {
         String ownerId = "finance-calendar-consistency-user";
         LocalDate today = LocalDate.now();

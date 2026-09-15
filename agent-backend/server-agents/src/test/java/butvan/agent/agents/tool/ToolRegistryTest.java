@@ -20,7 +20,7 @@ class ToolRegistryTest {
             "acceptance_report", "agent_list", "agent_send", "agent_spawn", "calendar_create",
             "calendar_delete", "calendar_query", "calendar_set_todo_completed", "calendar_update",
             "edit_file", "execute", "finance_create_account", "finance_query",
-            "finance_record_transaction", "glob_files", "grep_files", "library_create",
+            "finance_record_transaction", "finance_transfer", "glob_files", "grep_files", "library_create",
             "library_get", "library_recycle", "library_search", "library_update", "list_files",
             "load_skill_through_path", "memory_get", "memory_save", "memory_search", "plan_enter",
             "plan_exit", "plan_write", "read_file", "session_history", "session_list",
