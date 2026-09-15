@@ -10,6 +10,7 @@ import { detectCurrentCoordinates, DeviceLocationError } from '../../services/de
 import { openLocationPrivacySettings } from '../../services/systemSettings';
 import type { ChatTopBarPreferences } from '../../types/preferences';
 import { Button } from '../common/Button';
+import { useMessage } from '../common/Message';
 import { TextInput } from '../common/TextInput';
 import { Toggle } from '../common/Toggle';
 import { SettingsPageLayout } from './SettingsPageLayout';
@@ -33,23 +34,17 @@ const EMPTY_FORM: FormState = {
   qweatherApiHost: '', qweatherApiKey: '', locationName: '', latitude: '', longitude: '', tianApiKey: '',
 };
 
-interface PageMessage {
-  type: 'success' | 'error';
-  text: string;
-  action?: 'open-location-settings';
-}
-
 /** 天气与节假日供应商设置；后端只返回密钥是否存在，不回传密钥正文。 */
 export function DailyContextSettingsPage({
   chatTopBar,
   onChatTopBarChange,
 }: DailyContextSettingsPageProps) {
+  const { showMessage } = useMessage();
   const [config, setConfig] = useState<DailyContextConfig | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [locating, setLocating] = useState(false);
-  const [message, setMessage] = useState<PageMessage | null>(null);
 
   useEffect(() => {
     fetchDailyContextConfig()
@@ -63,9 +58,9 @@ export function DailyContextSettingsPage({
           longitude: loaded.longitude?.toString() ?? '',
         });
       })
-      .catch((cause) => setMessage({ type: 'error', text: cause instanceof Error ? cause.message : '配置读取失败' }))
+      .catch((cause) => showMessage('error', cause instanceof Error ? cause.message : '配置读取失败'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [showMessage]);
 
   const update = (key: keyof FormState, value: string) => setForm((current) => ({ ...current, [key]: value }));
 
@@ -73,11 +68,10 @@ export function DailyContextSettingsPage({
     const latitude = optionalNumber(form.latitude);
     const longitude = optionalNumber(form.longitude);
     if (latitude === undefined || longitude === undefined) {
-      setMessage({ type: 'error', text: '经纬度必须填写有效数字。' });
+      showMessage('error', '经纬度必须填写有效数字。');
       return;
     }
     setSaving(true);
-    setMessage(null);
     try {
       const saved = await saveDailyContextConfig({
         qweatherApiHost: form.qweatherApiHost,
@@ -91,9 +85,9 @@ export function DailyContextSettingsPage({
       });
       setConfig(saved);
       setForm((current) => ({ ...current, qweatherApiKey: '', tianApiKey: '' }));
-      setMessage({ type: 'success', text: '天气与节假日配置已保存到本机。' });
+      showMessage('success', '天气与节假日配置已保存到本机。');
     } catch (cause) {
-      setMessage({ type: 'error', text: cause instanceof Error ? cause.message : '配置保存失败' });
+      showMessage('error', cause instanceof Error ? cause.message : '配置保存失败');
     } finally {
       setSaving(false);
     }
@@ -101,7 +95,6 @@ export function DailyContextSettingsPage({
 
   const locate = async () => {
     setLocating(true);
-    setMessage(null);
     try {
       const coordinates = await detectCurrentCoordinates();
       setForm((current) => ({
@@ -114,39 +107,26 @@ export function DailyContextSettingsPage({
       try {
         const resolved = await resolveDailyContextLocation(coordinates.latitude, coordinates.longitude);
         setForm((current) => ({ ...current, locationName: resolved.locationName }));
-        setMessage({
-          type: 'success',
-          text: `已识别为${resolved.locationName}，定位精度约 ${coordinates.accuracy} 米；请保存配置。`,
-        });
+        showMessage('success', `已识别为${resolved.locationName}，定位精度约 ${coordinates.accuracy} 米；请保存配置。`);
       } catch (cause) {
-        setMessage({
-          type: 'error',
-          text: cause instanceof Error
-            ? `${cause.message}；经纬度已填入，可以直接保存。`
-            : '地点名称识别失败；经纬度已填入，可以直接保存。',
-        });
+        showMessage('error', cause instanceof Error
+          ? `${cause.message}；经纬度已填入，可以直接保存。`
+          : '地点名称识别失败；经纬度已填入，可以直接保存。');
       }
     } catch (cause) {
       if (cause instanceof DeviceLocationError && cause.reason === 'permission-denied') {
         try {
           await openLocationPrivacySettings();
-          setMessage({
-            type: 'error',
-            text: '定位权限未开启，已打开系统定位设置。授权后返回此页面，再次点击“识别当前位置”。',
-            action: 'open-location-settings',
+          showMessage('error', '定位权限未开启，已打开系统定位设置。授权后返回此页面，再次点击“识别当前位置”。', {
+            action: { label: '重新打开系统定位设置', onClick: () => void openLocationSettings() },
+            duration: 0,
           });
         } catch (settingsCause) {
-          setMessage({
-            type: 'error',
-            text: settingsCause instanceof Error ? settingsCause.message : '无法打开系统定位设置',
-          });
+          showMessage('error', settingsCause instanceof Error ? settingsCause.message : '无法打开系统定位设置');
         }
         return;
       }
-      setMessage({
-        type: 'error',
-        text: cause instanceof Error ? cause.message : '自动定位失败',
-      });
+      showMessage('error', cause instanceof Error ? cause.message : '自动定位失败');
     } finally {
       setLocating(false);
     }
@@ -155,13 +135,12 @@ export function DailyContextSettingsPage({
   const openLocationSettings = async () => {
     try {
       await openLocationPrivacySettings();
-      setMessage({
-        type: 'error',
-        text: '已重新打开系统定位设置。授权后返回此页面，再次点击“识别当前位置”。',
-        action: 'open-location-settings',
+      showMessage('info', '已重新打开系统定位设置。授权后返回此页面，再次点击“识别当前位置”。', {
+        action: { label: '重新打开系统定位设置', onClick: () => void openLocationSettings() },
+        duration: 0,
       });
     } catch (cause) {
-      setMessage({ type: 'error', text: cause instanceof Error ? cause.message : '无法打开系统定位设置' });
+      showMessage('error', cause instanceof Error ? cause.message : '无法打开系统定位设置');
     }
   };
 
@@ -169,19 +148,6 @@ export function DailyContextSettingsPage({
     <SettingsPageLayout title="天气与节假日" description="配置聊天顶栏使用的外部数据源，密钥仅保存在本机。">
       {loading ? <p className={styles.state}>正在读取配置…</p> : (
         <div className={styles.content}>
-          {message && (
-            <div
-              className={`${styles.message} ${message.type === 'error' ? styles.error : styles.success}`}
-              role={message.type === 'error' ? 'alert' : 'status'}
-            >
-              <span>{message.text}</span>
-              {message.action === 'open-location-settings' && (
-                <Button size="sm" variant="outline" onClick={() => void openLocationSettings()}>
-                  重新打开系统定位设置
-                </Button>
-              )}
-            </div>
-          )}
           <section className={styles.section} aria-labelledby="weather-settings-title">
             <div className={styles.sectionHeading}>
               <div><h2 id="weather-settings-title">和风天气</h2><p>使用专属 API Host 和 API KEY 获取当前天气。</p></div>

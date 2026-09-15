@@ -5,8 +5,6 @@
 .textAction, .linkButton { border: 0; background: transparent; color: var(--text-secondary); font: 500 11px var(--font-sans); }
 .linkButton { display: inline-flex; align-items: center; gap: 4px; }
 .textAction:hover, .linkButton:hover { color: var(--accent-blue); }
-.dataError { margin-bottom: 24px; padding: 9px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid #e6c8c4; border-radius: var(--radius-md); background: #fff7f5; color: #9a4038; font-size: 12px; }
-.dataError button { border: 0; background: transparent; color: inherit; font: 600 11px var(--font-sans); }
 
 .overview { display: grid; grid-template-columns: 1.35fr repeat(3, 1fr); align-items: end; gap: 44px; margin-bottom: 50px; }
 .todayBlock { display: flex; flex-direction: column; }

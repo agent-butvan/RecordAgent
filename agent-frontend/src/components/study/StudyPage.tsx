@@ -62,12 +62,12 @@ export function StudyPage() {
   const todayKey = formatLocalDate(new Date());
   const [timelineDate, setTimelineDate] = useState(todayKey); const [timelineSessions, setTimelineSessions] = useState<StudySession[]>([]);
   const [timelineLoading, setTimelineLoading] = useState(true); const [timelineError, setTimelineError] = useState<string | null>(null); const [timelineRefresh, setTimelineRefresh] = useState(0);
-  const [historyOpen, setHistoryOpen] = useState(false); const [error, setError] = useState<string | null>(null); const [recordError, setRecordError] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false); const [recordError, setRecordError] = useState<string | null>(null);
   const [startModalOpen, setStartModalOpen] = useState(false); const [startError, setStartError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false); const [editing, setEditing] = useState<StudySession | null>(null); const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
-    setError(null); setHeatmapError(null); const today = formatLocalDate(new Date());
+    setHeatmapError(null); const today = formatLocalDate(new Date());
     try {
       const [recent, nextWeek, previousWeek, nextMonth, nextHeatmap, categories] = await Promise.all([
         fetchStudySessions(formatLocalDate(shiftedDate(-30)), today, TIMEZONE),
@@ -80,9 +80,14 @@ export function StudyPage() {
         fetchStudyCategories(),
       ]);
       setSessions(recent); setWeekStats(nextWeek); setPreviousWeekStats(previousWeek); setMonthStats(nextMonth); setHeatmapStats(nextHeatmap.value); setHeatmapError(nextHeatmap.error); setRememberedCategories(categories);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : '学习记录加载失败，请稍后重试。'); }
+    } catch (cause) {
+      showMessage('error', cause instanceof Error ? cause.message : '学习记录加载失败，请稍后重试。', {
+        action: { label: '重新加载', onClick: () => void reload() },
+        duration: 0,
+      });
+    }
     finally { setLoading(false); }
-  }, []);
+  }, [showMessage]);
   useEffect(() => { void reload(); }, [reload, syncGeneration]);
   useEffect(() => { if (!active) return; setNow(Date.now()); const timer = window.setInterval(() => setNow(Date.now()), 1_000); return () => window.clearInterval(timer); }, [active]);
   useEffect(() => {
@@ -153,7 +158,6 @@ export function StudyPage() {
         onClick={() => { setStartError(null); setStartModalOpen(true); }} disabled={Boolean(active)}>{active ? '学习中' : '开始学习'}</Button>
     </div>} />
     <div className={styles.page}><div className={styles.content}>
-      {error && <div className={styles.dataError} role="alert"><span>{error}</span><button onClick={() => void reload()}>重新加载</button></div>}
       <section className={styles.overview} aria-label="学习概览">
         <div className={styles.todayBlock}><span>今天已学习</span><strong>{formatDuration(todaySeconds)}</strong><small>{todayStat?.sessionCount ?? 0} 段已完成记录</small></div>
         <dl className={styles.periodStats}><div><dt>近 7 天</dt><dd>{formatDuration(liveWeekTotal)}</dd></div><div><dt>本月累计</dt><dd>{formatDuration(liveMonthTotal)}</dd></div><div><dt>学习天数</dt><dd>{monthStats?.studyDays ?? 0} 天</dd></div></dl>

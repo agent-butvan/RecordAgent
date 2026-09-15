@@ -3,6 +3,7 @@ import { ArrowClockwiseIcon, CaretRightIcon, PlusIcon, SparkleIcon, WalletIcon }
 import { createFinanceAccount, createFinanceTransaction, fetchFinanceCategories, fetchFinanceExpenseChart, fetchFinanceOverview, fetchFinanceTransactions } from '../../services/financeApi';
 import type { CreateFinanceTransactionInput, FinanceAccountType, FinanceCategoryOptions, FinanceChartRange, FinanceExpenseChart, FinanceOverview, FinanceTransaction } from '../../types/finance';
 import { Button } from '../common/Button';
+import { useMessage } from '../common/Message';
 import { Modal } from '../common/Modal';
 import { TopBar } from '../common/TopBar';
 import styles from './FinancePage.module.css';
@@ -28,6 +29,7 @@ function money(value: number): string {
 
 /** 独立财务工作台：统一完成资产建档、收支记账和自动收益查看。 */
 export const FinancePage: React.FC = () => {
+  const { showMessage } = useMessage();
   const [overview, setOverview] = useState<FinanceOverview | null>(null);
   const [categoryOptions, setCategoryOptions] = useState<FinanceCategoryOptions>({ expense: [], income: [] });
   const [chart, setChart] = useState<FinanceExpenseChart | null>(null);
@@ -35,7 +37,6 @@ export const FinancePage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isChartLoading, setIsChartLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [accountError, setAccountError] = useState<string | null>(null);
   const [chartError, setChartError] = useState<string | null>(null);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
@@ -51,15 +52,14 @@ export const FinancePage: React.FC = () => {
 
   const load = useCallback(async () => {
     setIsLoading(true);
-    setError(null);
     try {
       const [nextOverview, nextCategories] = await Promise.all([fetchFinanceOverview(), fetchFinanceCategories()]);
       setOverview(nextOverview);
       setCategoryOptions(nextCategories);
     }
-    catch (cause) { setError(cause instanceof Error ? cause.message : '财务数据加载失败，请稍后重试。'); }
+    catch (cause) { showMessage('error', cause instanceof Error ? cause.message : '财务数据加载失败，请稍后重试。'); }
     finally { setIsLoading(false); }
-  }, []);
+  }, [showMessage]);
 
   const loadChart = useCallback(async (range: FinanceChartRange) => {
     const requestId = ++chartRequestId.current;
@@ -141,7 +141,7 @@ export const FinancePage: React.FC = () => {
     try {
       await Promise.all([load(), loadChart(chartRange), ...(isTransactionDrawerOpen ? [loadAllTransactions()] : [])]);
     } catch (cause) {
-      setError(cause instanceof Error ? `流水已保存，但财务数据刷新失败：${cause.message}` : '流水已保存，但财务数据刷新失败');
+      showMessage('error', cause instanceof Error ? `流水已保存，但财务数据刷新失败：${cause.message}` : '流水已保存，但财务数据刷新失败');
     }
   };
 
@@ -156,7 +156,6 @@ export const FinancePage: React.FC = () => {
     </>} />
 
     <div className={styles.page}><div className={styles.content}>
-      {error && <div className={styles.dataError} role="alert"><span>{error}</span><button type="button" onClick={() => setError(null)}>关闭</button></div>}
       {isLoading && !overview ? <div className={styles.loading}>正在读取财务数据…</div> : <>
         <section className={styles.overview} aria-label="本月财务概览">
           <div

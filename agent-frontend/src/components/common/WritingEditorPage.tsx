@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { CaretLeftIcon, CheckIcon, NotePencilIcon } from '@phosphor-icons/react';
+import { useMessage } from './Message';
 import styles from './WritingEditorPage.module.css';
 
 interface WritingEditorPageProps {
@@ -12,7 +13,6 @@ interface WritingEditorPageProps {
   meta?: ReactNode;
   footer?: ReactNode;
   saving?: boolean;
-  error?: string | null;
   onBack: () => void;
   onSave: (value: { title?: string; body: string }) => void | Promise<void>;
 }
@@ -37,10 +37,10 @@ function extractHeadings(body: string): EditorHeading[] {
 
 /** 项目唯一的沉浸式长文编辑器，日历手记与资料记录均复用此界面。 */
 export function WritingEditorPage({ backLabel, identity, detail, initialTitle = '', initialBody = '',
-  bodyPlaceholder = '开始写下今天……', meta, footer, saving = false, error, onBack, onSave }: WritingEditorPageProps) {
+  bodyPlaceholder = '开始写下今天……', meta, footer, saving = false, onBack, onSave }: WritingEditorPageProps) {
+  const { showMessage } = useMessage();
   const [title, setTitle] = useState(initialTitle);
   const [body, setBody] = useState(initialBody);
-  const [localError, setLocalError] = useState<string | null>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const canSave = Boolean(title.trim() || body.trim()) && !saving;
@@ -55,10 +55,9 @@ export function WritingEditorPage({ backLabel, identity, detail, initialTitle = 
 
   const save = useCallback(async () => {
     if (!canSave) return;
-    setLocalError(null);
     try { await onSave({ title: title.trim() || undefined, body: body.trim() }); }
-    catch (reason) { setLocalError(reason instanceof Error ? reason.message : '保存失败，请重试'); }
-  }, [body, canSave, onSave, title]);
+    catch (reason) { showMessage('error', reason instanceof Error ? reason.message : '保存失败，请重试'); }
+  }, [body, canSave, onSave, showMessage, title]);
 
   useEffect(() => {
     const handleSaveShortcut = (event: KeyboardEvent) => {
@@ -86,7 +85,6 @@ export function WritingEditorPage({ backLabel, identity, detail, initialTitle = 
       <button type="button" className={styles.saveButton} disabled={!canSave} onClick={() => void save()}><CheckIcon size={15} weight="bold" />{saving ? '保存中…' : '保存'}</button>
     </header>
     <div ref={scrollAreaRef} className={styles.scrollArea}><div className={styles.editorLayout}><article className={styles.editor}>
-        {(error || localError) && <div className={styles.saveError} role="alert">{error || localError}</div>}
         <p className={styles.date}>{detail}</p>
         <input className={styles.titleInput} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="标题" aria-label="标题" autoFocus />
         <div className={styles.metaRow}>{meta}<span>{body.length} 字</span></div>
