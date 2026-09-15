@@ -3,6 +3,8 @@ package butvan.agent.network.dailycontext.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -76,7 +78,7 @@ class DailyContextProviderMappingTest {
     void qWeatherConsoleFinanceMapsToSafeSummary() throws Exception {
         var payload = mapper.readTree("""
                 {
-                  "asOf": "2026-09-15T07:59:00Z",
+                  "asOf": "2026-09-15T07:59Z",
                   "currency": "CNY",
                   "balance": 12.50,
                   "accruedCharges": {
@@ -94,6 +96,7 @@ class DailyContextProviderMappingTest {
         var result = QWeatherConsoleClient.parseFinance(payload);
 
         assertEquals("CNY", result.currency());
+        assertEquals(Instant.parse("2026-09-15T07:59:00Z"), result.asOf());
         assertEquals("12.5", result.balance().stripTrailingZeros().toPlainString());
         assertEquals("1.25", result.thisMonthCharges().toPlainString());
         assertEquals(2, result.pendingBillCount());
@@ -104,7 +107,7 @@ class DailyContextProviderMappingTest {
     void qWeatherConsoleStatsCombinesSuccessAndErrorsByApi() throws Exception {
         var payload = mapper.readTree("""
                 {
-                  "asOf": "2026-09-15T07:59:00Z",
+                  "asOf": "2026-09-15T09:11Z",
                   "success": [
                     {"api": "Weather", "hours": [2, 3]},
                     {"api": "Geo", "hours": [1, 0]}
@@ -118,6 +121,7 @@ class DailyContextProviderMappingTest {
 
         var result = QWeatherConsoleClient.parseUsage(payload);
 
+        assertEquals(Instant.parse("2026-09-15T09:11:00Z"), result.asOf());
         assertEquals(6, result.successRequests());
         assertEquals(3, result.errorRequests());
         assertEquals(3, result.apis().size());

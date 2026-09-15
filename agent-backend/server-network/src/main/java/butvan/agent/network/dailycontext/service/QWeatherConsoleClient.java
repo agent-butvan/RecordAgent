@@ -12,6 +12,9 @@ import org.springframework.web.client.RestClientResponseException;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -72,7 +75,7 @@ public class QWeatherConsoleClient {
             }
         }
         return new QWeatherFinanceResponse(
-                Instant.parse(payload.path("asOf").asText()),
+                parseAsOf(payload.path("asOf").asText(), "和风天气财务汇总时间格式无法识别"),
                 payload.path("currency").asText(),
                 decimal(payload.path("balance")),
                 decimal(charges.path("previousDay")),
@@ -94,7 +97,7 @@ public class QWeatherConsoleClient {
                         entry.getKey(), entry.getValue()[0], entry.getValue()[1]))
                 .toList();
         return new QWeatherUsageResponse(
-                Instant.parse(payload.path("asOf").asText()),
+                parseAsOf(payload.path("asOf").asText(), "和风天气请求量统计时间格式无法识别"),
                 apis.stream().mapToLong(QWeatherApiUsageResponse::successRequests).sum(),
                 apis.stream().mapToLong(QWeatherApiUsageResponse::errorRequests).sum(),
                 apis);
@@ -120,6 +123,17 @@ public class QWeatherConsoleClient {
 
     private static BigDecimal decimal(JsonNode node) {
         return node == null || !node.isNumber() ? BigDecimal.ZERO : node.decimalValue();
+    }
+
+    /**
+     * 控制台接口可能返回带秒或分钟精度的 ISO-8601 时间，统一转换为 UTC Instant。
+     */
+    private static Instant parseAsOf(String value, String errorMessage) {
+        try {
+            return OffsetDateTime.parse(value, DateTimeFormatter.ISO_OFFSET_DATE_TIME).toInstant();
+        } catch (DateTimeParseException exception) {
+            throw new IllegalStateException(errorMessage, exception);
+        }
     }
 
     private static boolean hasText(String value) {
