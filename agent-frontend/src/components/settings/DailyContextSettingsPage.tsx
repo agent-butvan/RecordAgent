@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { LocateFixed, RefreshCw, Save } from 'lucide-react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { CalendarDays, CloudSun, Pencil, RefreshCw } from 'lucide-react';
 import {
   fetchDailyContextConfig,
   fetchQWeatherConsoleSummary,
@@ -13,8 +13,12 @@ import { openLocationPrivacySettings } from '../../services/systemSettings';
 import type { ChatTopBarPreferences } from '../../types/preferences';
 import { Button } from '../common/Button';
 import { useMessage } from '../common/Message';
-import { TextInput } from '../common/TextInput';
 import { Toggle } from '../common/Toggle';
+import {
+  DailyContextConfigModal,
+  type DailyContextFormState,
+  type DailyContextProvider,
+} from './DailyContextConfigModal';
 import { SettingsPageLayout } from './SettingsPageLayout';
 import styles from './DailyContextSettingsPage.module.css';
 
@@ -23,16 +27,7 @@ interface DailyContextSettingsPageProps {
   onChatTopBarChange: (key: keyof ChatTopBarPreferences, visible: boolean) => void;
 }
 
-interface FormState {
-  qweatherApiHost: string;
-  qweatherApiKey: string;
-  locationName: string;
-  latitude: string;
-  longitude: string;
-  tianApiKey: string;
-}
-
-const EMPTY_FORM: FormState = {
+const EMPTY_FORM: DailyContextFormState = {
   qweatherApiHost: '', qweatherApiKey: '', locationName: '', latitude: '', longitude: '', tianApiKey: '',
 };
 
@@ -45,10 +40,11 @@ export function DailyContextSettingsPage({
 }: DailyContextSettingsPageProps) {
   const { showMessage } = useMessage();
   const [config, setConfig] = useState<DailyContextConfig | null>(null);
-  const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [form, setForm] = useState<DailyContextFormState>(EMPTY_FORM);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [editingProvider, setEditingProvider] = useState<DailyContextProvider | null>(null);
   const [consoleSummary, setConsoleSummary] = useState<QWeatherConsoleSummary | null>(null);
   const [consoleLoading, setConsoleLoading] = useState(false);
 
@@ -93,12 +89,13 @@ export function DailyContextSettingsPage({
       .finally(() => setLoading(false));
   }, [loadConsoleSummary, showMessage]);
 
-  const update = (key: keyof FormState, value: string) => setForm((current) => ({ ...current, [key]: value }));
+  const update = (key: keyof DailyContextFormState, value: string) => setForm((current) => ({ ...current, [key]: value }));
 
   const save = async () => {
+    if (!editingProvider) return;
     const latitude = optionalNumber(form.latitude);
     const longitude = optionalNumber(form.longitude);
-    if (latitude === undefined || longitude === undefined) {
+    if (editingProvider === 'weather' && (latitude === undefined || longitude === undefined)) {
       showMessage('error', '经纬度必须填写有效数字。');
       return;
     }
@@ -109,13 +106,14 @@ export function DailyContextSettingsPage({
         qweatherApiKey: form.qweatherApiKey,
         clearQweatherApiKey: false,
         locationName: form.locationName,
-        latitude,
-        longitude,
+        latitude: latitude ?? config?.latitude ?? null,
+        longitude: longitude ?? config?.longitude ?? null,
         tianApiKey: form.tianApiKey,
         clearTianApiKey: false,
       });
       setConfig(saved);
       setForm((current) => ({ ...current, qweatherApiKey: '', tianApiKey: '' }));
+      setEditingProvider(null);
       showMessage('success', '天气与节假日配置已保存到本机。');
       if (saved.qweatherApiKeyConfigured && saved.qweatherApiHost) {
         void loadConsoleSummary(true);
@@ -178,73 +176,141 @@ export function DailyContextSettingsPage({
     }
   };
 
+  const weatherConfigured = Boolean(config?.qweatherApiKeyConfigured && config.qweatherApiHost.trim());
+  const holidayConfigured = Boolean(config?.tianApiKeyConfigured);
+
+  const openConfigModal = (provider: DailyContextProvider) => {
+    setForm({
+      ...EMPTY_FORM,
+      qweatherApiHost: config?.qweatherApiHost ?? '',
+      locationName: config?.locationName ?? '',
+      latitude: config?.latitude?.toString() ?? '',
+      longitude: config?.longitude?.toString() ?? '',
+    });
+    setEditingProvider(provider);
+  };
+
   return (
     <SettingsPageLayout title="天气与节假日" description="配置聊天顶栏使用的外部数据源，密钥仅保存在本机。">
       {loading ? <p className={styles.state}>正在读取配置…</p> : (
         <div className={styles.content}>
           <section className={styles.section} aria-labelledby="weather-settings-title">
-            <div className={styles.sectionHeading}>
-              <div><h2 id="weather-settings-title">和风天气</h2><p>使用专属 API Host 和 API KEY 获取当前天气。</p></div>
-              <Toggle checked={chatTopBar.showWeather} onChange={(checked) => onChatTopBarChange('showWeather', checked)} label="在聊天顶栏显示天气" />
-            </div>
-            <div className={styles.formGrid}>
-              <Field label="API Host" hint="控制台 → 设置中的专属 qweatherapi.com 域名">
-                <TextInput value={form.qweatherApiHost} onChange={(event) => update('qweatherApiHost', event.target.value)} placeholder="abcxyz.qweatherapi.com" />
-              </Field>
-              <Field label="API KEY" hint={config?.qweatherApiKeyConfigured ? '已配置；留空保持原密钥' : '尚未配置'}>
-                <TextInput type="password" autoComplete="off" value={form.qweatherApiKey} onChange={(event) => update('qweatherApiKey', event.target.value)} placeholder={config?.qweatherApiKeyConfigured ? '••••••••••••' : '输入 API KEY'} />
-              </Field>
-              <Field label="地点名称" hint="仅用于界面展示">
-                <TextInput value={form.locationName} onChange={(event) => update('locationName', event.target.value)} placeholder="例如：上海" />
-              </Field>
-              <div className={styles.coordinateFields}>
-                <Field label="纬度" hint="-90 至 90"><TextInput inputMode="decimal" value={form.latitude} onChange={(event) => update('latitude', event.target.value)} placeholder="31.23" /></Field>
-                <Field label="经度" hint="-180 至 180"><TextInput inputMode="decimal" value={form.longitude} onChange={(event) => update('longitude', event.target.value)} placeholder="121.47" /></Field>
-              </div>
-              <div className={styles.locationAction}>
-                <Button
-                  variant="outline"
-                  icon={<LocateFixed size={14} />}
-                  disabled={locating}
-                  onClick={() => void locate()}
-                >
-                  {locating ? '正在识别位置…' : '识别当前位置'}
-                </Button>
-                <small>仅在点击后请求系统定位权限；识别结果不会自动保存。</small>
-              </div>
-            </div>
-            <QWeatherConsolePanel
-              configured={Boolean(config?.qweatherApiKeyConfigured && config.qweatherApiHost)}
-              summary={consoleSummary}
-              loading={consoleLoading}
-              onRefresh={() => void loadConsoleSummary(true)}
+            <ProviderRow
+              icon={<CloudSun size={17} />}
+              headingId="weather-settings-title"
+              title="和风天气"
+              description="使用专属 API Host 和 API KEY 获取当前天气。"
+              configured={weatherConfigured}
+              enabled={chatTopBar.showWeather}
+              enabledLabel="在聊天顶栏显示天气"
+              onConfigure={() => openConfigModal('weather')}
+              onEnabledChange={(checked) => onChatTopBarChange('showWeather', checked)}
             />
+            {weatherConfigured && (
+              <QWeatherConsolePanel
+                summary={consoleSummary}
+                loading={consoleLoading}
+                onRefresh={() => void loadConsoleSummary(true)}
+              />
+            )}
           </section>
 
           <section className={styles.section} aria-labelledby="holiday-settings-title">
-            <div className={styles.sectionHeading}>
-              <div><h2 id="holiday-settings-title">天聚数行节假日</h2><p>识别法定节假日、双休日和调休上班。</p></div>
-              <Toggle checked={chatTopBar.showHoliday} onChange={(checked) => onChatTopBarChange('showHoliday', checked)} label="在聊天顶栏显示节假日" />
-            </div>
-            <Field label="API KEY" hint={config?.tianApiKeyConfigured ? '已配置；留空保持原密钥' : '尚未配置'}>
-              <TextInput type="password" autoComplete="off" value={form.tianApiKey} onChange={(event) => update('tianApiKey', event.target.value)} placeholder={config?.tianApiKeyConfigured ? '••••••••••••' : '输入 API KEY'} />
-            </Field>
+            <ProviderRow
+              icon={<CalendarDays size={17} />}
+              headingId="holiday-settings-title"
+              title="天聚数行节假日"
+              description="识别法定节假日、双休日和调休上班。"
+              configured={holidayConfigured}
+              enabled={chatTopBar.showHoliday}
+              enabledLabel="在聊天顶栏显示节假日"
+              onConfigure={() => openConfigModal('holiday')}
+              onEnabledChange={(checked) => onChatTopBarChange('showHoliday', checked)}
+            />
           </section>
-
-          <div className={styles.actions}><Button variant="primary" icon={<Save size={14} />} disabled={saving} onClick={() => void save()}>{saving ? '保存中…' : '保存配置'}</Button></div>
         </div>
       )}
+      <DailyContextConfigModal
+        open={editingProvider !== null}
+        provider={editingProvider}
+        form={form}
+        weatherConfigured={weatherConfigured}
+        holidayConfigured={holidayConfigured}
+        saving={saving}
+        locating={locating}
+        onClose={() => { if (!saving) setEditingProvider(null); }}
+        onChange={update}
+        onLocate={() => void locate()}
+        onSubmit={() => void save()}
+      />
     </SettingsPageLayout>
   );
 }
 
-function QWeatherConsolePanel({
+function ProviderRow({
+  icon,
+  headingId,
+  title,
+  description,
   configured,
+  enabled,
+  enabledLabel,
+  onConfigure,
+  onEnabledChange,
+}: {
+  icon: ReactNode;
+  headingId: string;
+  title: string;
+  description: string;
+  configured: boolean;
+  enabled: boolean;
+  enabledLabel: string;
+  onConfigure: () => void;
+  onEnabledChange: (enabled: boolean) => void;
+}) {
+  return (
+    <article className={styles.providerRow}>
+      <div className={styles.providerMain}>
+        <span className={styles.providerIcon} aria-hidden="true">{icon}</span>
+        <div className={styles.providerCopy}>
+          <h2 id={headingId}>{title}</h2>
+          <p>{description}</p>
+          <div className={styles.statusList} aria-label={`${title}状态`}>
+            <StatusPill active={configured}>{configured ? '已配置' : '未配置'}</StatusPill>
+            <StatusPill active={enabled} tone="blue">{enabled ? '已开启' : '未开启'}</StatusPill>
+          </div>
+        </div>
+      </div>
+      <div className={styles.providerActions}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          icon={<Pencil size={13} />}
+          onClick={onConfigure}
+        >
+          {configured ? '编辑配置' : '去配置'}
+        </Button>
+        <Toggle
+          checked={enabled}
+          onChange={onEnabledChange}
+          label={enabledLabel}
+          showLabel={false}
+        />
+      </div>
+    </article>
+  );
+}
+
+function StatusPill({ children, active, tone = 'green' }: { children: string; active: boolean; tone?: 'green' | 'blue' }) {
+  return <span className={`${styles.statusPill} ${active ? styles.statusActive : styles.statusInactive} ${tone === 'blue' ? styles.statusBlue : ''}`}>{children}</span>;
+}
+
+function QWeatherConsolePanel({
   summary,
   loading,
   onRefresh,
 }: {
-  configured: boolean;
   summary: QWeatherConsoleSummary | null;
   loading: boolean;
   onRefresh: () => void;
@@ -269,15 +335,14 @@ function QWeatherConsolePanel({
           variant="ghost"
           size="sm"
           icon={<RefreshCw className={loading ? styles.refreshing : ''} size={13} />}
-          disabled={!configured || loading}
+          disabled={loading}
           onClick={onRefresh}
         >
           {loading ? '刷新中' : '刷新'}
         </Button>
       </div>
 
-      {!configured && <p className={styles.consoleState}>保存 API Host 和 API KEY 后即可查看控制台摘要。</p>}
-      {configured && loading && !hasData && <p className={styles.consoleState}>正在读取用量与费用…</p>}
+      {loading && !hasData && <p className={styles.consoleState}>正在读取用量与费用…</p>}
 
       {hasData && (
         <>
@@ -346,10 +411,6 @@ function formatApiName(api: string): string {
     WeatherIndices: '天气指数', AirQuality: '空气质量', Console: '控制台',
   };
   return names[api] ?? api;
-}
-
-function Field({ label, hint, children }: { label: string; hint: string; children: React.ReactNode }) {
-  return <label className={styles.field}><span>{label}</span>{children}<small>{hint}</small></label>;
 }
 
 function optionalNumber(value: string): number | null | undefined {
