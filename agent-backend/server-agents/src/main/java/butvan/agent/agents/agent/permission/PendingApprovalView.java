@@ -15,15 +15,17 @@ public record PendingApprovalView(
         List<PermissionToolDto> tools
 ) {
     public static PendingApprovalView from(PendingApproval approval) {
-        return new PendingApprovalView(
-                approval.run().sessionId(),
-                approval.approvalId(),
-                approval.runId(),
-                approval.run().turnId(),
-                approval.run().contentAsString(),
-                approval.run().startedAt(),
-                approval.allDecided(),
-                approval.pendingTools()
-        );
+        synchronized (approval) {
+            return new PendingApprovalView(
+                    approval.run().sessionId(),
+                    approval.approvalId(),
+                    approval.runId(),
+                    approval.run().turnId(),
+                    approval.run().contentAsString(),
+                    approval.run().startedAt(),
+                    approval.allDecided(),
+                    approval.pendingTools()
+            );
+        }
     }
 }

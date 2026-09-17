@@ -23,7 +23,7 @@ public final class PendingApproval {
 
     /** 兼容测试调用；生产代码必须显式传入客户端 runId。 */
     public PendingApproval(AgentRun run, List<ToolUseBlock> tools) {
-        this(run, tools, run.turnId());
+        this(run, tools, run != null ? run.turnId() : null);
     }
 
     public PendingApproval(AgentRun run, List<ToolUseBlock> tools, String runId) {

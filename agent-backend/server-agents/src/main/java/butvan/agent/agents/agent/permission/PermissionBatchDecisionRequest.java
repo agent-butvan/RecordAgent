@@ -7,4 +7,8 @@ public record PermissionBatchDecisionRequest(
         String sessionId,
         String approvalId,
         List<PermissionToolDecision> decisions
-) {}
+) {
+    public PermissionBatchDecisionRequest {
+        decisions = decisions == null ? List.of() : List.copyOf(decisions);
+    }
+}

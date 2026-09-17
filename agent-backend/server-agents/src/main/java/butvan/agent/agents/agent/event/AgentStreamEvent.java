@@ -1,8 +1,6 @@
 package butvan.agent.agents.agent.event;
 
 import butvan.agent.agents.agent.permission.PermissionToolDto;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 import java.util.List;
@@ -42,7 +40,7 @@ public sealed interface AgentStreamEvent permits AgentStreamEvent.RunStarted, Ag
 
         @Override
         public Object payload() {
-            return Map.of("runId", runId);
+            return Map.of("runId", runId != null ? runId : "");
         }
     }
 
@@ -60,7 +58,7 @@ public sealed interface AgentStreamEvent permits AgentStreamEvent.RunStarted, Ag
 
         @Override
         public Object payload() {
-            return content;
+            return content == null ? "" : content;
         }
     }
 
@@ -111,7 +109,7 @@ public sealed interface AgentStreamEvent permits AgentStreamEvent.RunStarted, Ag
 
         @Override
         public Object payload() {
-            return Map.of("runId", runId, "status", "CANCELLED");
+            return Map.of("runId", runId != null ? runId : "", "status", "CANCELLED");
         }
 
         @Override
@@ -204,10 +202,10 @@ public sealed interface AgentStreamEvent permits AgentStreamEvent.RunStarted, Ag
         @Override
         public Object payload() {
             return Map.of(
-                    "approvalId", approvalId,
-                    "runId", runId,
-                    "turnId", turnId,
-                    "tools", tools
+                    "approvalId", approvalId != null ? approvalId : "",
+                    "runId", runId != null ? runId : "",
+                    "turnId", turnId != null ? turnId : "",
+                    "tools", tools != null ? tools : List.of()
             );
         }
 
