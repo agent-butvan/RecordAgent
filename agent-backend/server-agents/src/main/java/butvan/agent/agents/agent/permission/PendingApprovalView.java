@@ -1,5 +1,7 @@
 package butvan.agent.agents.agent.permission;
 
+import butvan.agent.agents.agent.run.AgentRun;
+
 import java.time.Instant;
 import java.util.List;
 
@@ -16,13 +18,14 @@ public record PendingApprovalView(
 ) {
     public static PendingApprovalView from(PendingApproval approval) {
         synchronized (approval) {
+            AgentRun run = approval.run();
             return new PendingApprovalView(
-                    approval.run().sessionId(),
+                    run.sessionId(),
                     approval.approvalId(),
                     approval.runId(),
-                    approval.run().turnId(),
-                    approval.run().contentAsString(),
-                    approval.run().startedAt(),
+                    run.turnId(),
+                    run.contentAsString(),
+                    run.startedAt(),
                     approval.allDecided(),
                     approval.pendingTools()
             );
