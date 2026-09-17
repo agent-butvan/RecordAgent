@@ -300,16 +300,20 @@ export function ChatTopBarInformation({ onOpenFeature }: ChatTopBarInformationPr
             onClick={() => toggle('todos')}
           />
         )}
-        {visible.showFinance && (
-          <InformationTrigger
-            moduleId="finance"
-            icon={<WalletCards size={13} />}
-            summary={financeSummary(financeResource, dateKey)}
-            active={activeModule === 'finance'}
-            controlsId={popoverId}
-            onClick={() => toggle('finance')}
-          />
-        )}
+        {visible.showFinance && (() => {
+          const fin = financeSummary(financeResource, dateKey);
+          return (
+            <InformationTrigger
+              moduleId="finance"
+              icon={<WalletCards size={13} />}
+              summary={fin.node}
+              ariaSummary={fin.text}
+              active={activeModule === 'finance'}
+              controlsId={popoverId}
+              onClick={() => toggle('finance')}
+            />
+          );
+        })()}
         {visible.showWeather && (
           <InformationTrigger
             moduleId="weather"
@@ -407,13 +411,15 @@ function InformationTrigger({
   moduleId,
   icon,
   summary,
+  ariaSummary,
   active,
   controlsId,
   onClick,
 }: {
   moduleId: TopBarModuleId;
   icon: React.ReactNode;
-  summary: string;
+  summary: React.ReactNode;
+  ariaSummary?: string;
   active: boolean;
   controlsId: string;
   onClick: () => void;
@@ -424,7 +430,7 @@ function InformationTrigger({
     <button
       type="button"
       className={`${styles.trigger} ${active ? styles.triggerActive : ''}`}
-      aria-label={`${label}：${summary}`}
+      aria-label={`${label}：${ariaSummary ?? (typeof summary === 'string' ? summary : '')}`}
       aria-expanded={active}
       aria-controls={controlsId}
       onClick={onClick}
@@ -982,8 +988,8 @@ function FinanceDetail({
 
         {/* 本月汇总与结余条（无灰色背景） */}
         <div className={styles.monthSummaryBar}>
-          <span>月支出 <strong>{formatMoney(monthExpense)}</strong></span>
-          <span>月收入 <strong>{formatMoney(monthIncome)}</strong></span>
+          <span>月支出 <strong style={{ color: '#dc2626' }}>{formatMoney(monthExpense)}</strong></span>
+          <span>月收入 <strong style={{ color: '#16a34a' }}>{formatMoney(monthIncome)}</strong></span>
           <span>
             净结余{' '}
             <strong style={{ color: monthBalance >= 0 ? '#16a34a' : '#dc2626' }}>
@@ -1119,11 +1125,25 @@ function todoSummary(resource: ResourceState<DailyDay>): string {
 function financeSummary(
   resource: ResourceState<{ overview: FinanceOverview; chart: FinanceExpenseChart }>,
   date: string,
-): string {
-  if (resource.loading && !resource.data) return '收支加载中';
-  if (resource.error && !resource.data) return '收支不可用';
+): { node: React.ReactNode; text: string } {
+  if (resource.loading && !resource.data) return { node: '收支加载中', text: '收支加载中' };
+  if (resource.error && !resource.data) return { node: '收支不可用', text: '收支不可用' };
   const today = resource.data?.chart.days.find((day) => day.date === date);
-  return `支 ${formatCompactMoney(today?.total ?? 0)} · 收 ${formatCompactMoney(today?.income ?? 0)}`;
+  const expense = today?.total ?? 0;
+  const income = today?.income ?? 0;
+  const expenseText = formatCompactMoney(expense);
+  const incomeText = formatCompactMoney(income);
+
+  return {
+    node: (
+      <span className={styles.triggerFinanceCapsule}>
+        <span className={styles.triggerExpense}>支 {expenseText}</span>
+        <span className={styles.triggerFinanceSep}>·</span>
+        <span className={styles.triggerIncome}>收 {incomeText}</span>
+      </span>
+    ),
+    text: `支 ${expenseText} · 收 ${incomeText}`,
+  };
 }
 
 function formatCompactDate(date: Date): string {

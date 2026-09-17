@@ -59,6 +59,36 @@
 }
 
 /* 统一克制的触发图标，去除鲜艳高饱和独立色彩 */
+.triggerSummary {
+  display: inline-flex;
+  align-items: center;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.triggerFinanceCapsule {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  font-variant-numeric: tabular-nums;
+}
+
+.triggerExpense {
+  color: #dc2626;
+  font-weight: 500;
+}
+
+.triggerIncome {
+  color: #16a34a;
+  font-weight: 500;
+}
+
+.triggerFinanceSep {
+  color: var(--text-muted);
+  opacity: 0.6;
+  margin: 0 1px;
+}
+
 .triggerIcon {
   display: inline-flex;
   align-items: center;
