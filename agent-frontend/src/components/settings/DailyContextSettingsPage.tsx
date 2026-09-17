@@ -13,7 +13,7 @@ import { openLocationPrivacySettings } from '../../services/systemSettings';
 import type { ChatTopBarPreferences } from '../../types/preferences';
 import { Button } from '../common/Button';
 import { useMessage } from '../common/Message';
-import { Toggle } from '../common/Toggle';
+import { LeverSwitch } from '../common/LeverSwitch';
 import {
   DailyContextConfigModal,
   type DailyContextFormState,
@@ -291,7 +291,7 @@ function ProviderRow({
         >
           {configured ? '编辑配置' : '去配置'}
         </Button>
-        <Toggle
+        <LeverSwitch
           checked={enabled}
           onChange={onEnabledChange}
           label={enabledLabel}

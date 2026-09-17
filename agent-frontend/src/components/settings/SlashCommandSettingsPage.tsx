@@ -15,7 +15,7 @@ import { Button } from '../common/Button';
 import { FormField } from '../common/FormField';
 import { Modal } from '../common/Modal';
 import { TextInput } from '../common/TextInput';
-import { Toggle } from '../common/Toggle';
+import { LeverSwitch } from '../common/LeverSwitch';
 import { SettingsPageLayout } from './SettingsPageLayout';
 import styles from './SlashCommandSettingsPage.module.css';
 
@@ -119,7 +119,7 @@ export function SlashCommandSettingsPage() {
               >
                 编辑
               </Button>
-              <Toggle
+              <LeverSwitch
                 checked={enabled}
                 onChange={(next) => handleEnabledChange(command, next)}
                 label={enabled ? '已启用' : '已禁用'}

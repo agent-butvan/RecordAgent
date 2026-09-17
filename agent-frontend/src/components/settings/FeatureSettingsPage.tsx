@@ -1,6 +1,6 @@
 import type { ChatTopBarPreferences, StudyWindowMode } from '../../types/preferences';
 import { Select } from '../common/Select';
-import { Toggle } from '../common/Toggle';
+import { LeverSwitch } from '../common/LeverSwitch';
 import { SettingsPageLayout } from './SettingsPageLayout';
 import styles from './FeatureSettingsPage.module.css';
 
@@ -132,7 +132,7 @@ function SettingToggle({
         <span className={styles.settingLabel}>{label}</span>
         <p>{description}</p>
       </div>
-      <Toggle checked={checked} onChange={onChange} label={label} showLabel={false} />
+      <LeverSwitch checked={checked} onChange={onChange} label={label} showLabel={false} />
     </div>
   );
 }

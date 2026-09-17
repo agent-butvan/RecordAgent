@@ -9,7 +9,7 @@ import type { PersonalContextSettings, ProfileMaintenanceStatus } from '../../ty
 import { Button } from '../common/Button';
 import { useMessage } from '../common/Message';
 import { Modal } from '../common/Modal';
-import { Toggle } from '../common/Toggle';
+import { LeverSwitch } from '../common/LeverSwitch';
 import { formatTokenCount } from '../chat/tokenUsageFormat';
 import { SettingsPageLayout } from './SettingsPageLayout';
 import styles from './PersonalContextSettingsPage.module.css';
@@ -128,7 +128,7 @@ export function PersonalContextSettingsPage() {
     <div className={styles.content}>
       <section className={styles.switchRow} aria-labelledby="context-switch-title">
         <div className={styles.switchCopy}><span className={styles.icon}><BrainCircuit size={18} aria-hidden="true" /></span><div><h2 id="context-switch-title">自动使用个人上下文</h2><p>{settings.enabled ? '对话时注入画像，并按当前问题召回少量相关记忆。' : '已暂停自动注入，画像与记忆仍保留在本机。'}</p></div></div>
-        <Toggle checked={settings.enabled} disabled={saving} label={settings.enabled ? '已开启' : '已暂停'} onChange={(enabled) => void mutateSettings(() => updatePersonalContextEnabled(enabled), enabled ? '已开启个人上下文' : '已暂停个人上下文')} />
+        <LeverSwitch checked={settings.enabled} disabled={saving} label={settings.enabled ? '已开启' : '已暂停'} onChange={(enabled) => void mutateSettings(() => updatePersonalContextEnabled(enabled), enabled ? '已开启个人上下文' : '已暂停个人上下文')} />
       </section>
 
       <dl className={styles.budgets} aria-label="单次调用 Token 硬预算">
@@ -147,7 +147,7 @@ export function PersonalContextSettingsPage() {
       <section className={styles.maintenance} aria-labelledby="maintenance-title">
         <div className={styles.maintenanceHeader}>
           <div className={styles.switchCopy}><span className={styles.icon}><Sparkles size={18} aria-hidden="true" /></span><div><h2 id="maintenance-title">画像辅助维护</h2><p>对话结束后低频检查新记忆，只生成提案；你确认后才会修改画像。</p></div></div>
-          <Toggle checked={maintenance.enabled} disabled={saving || checking} label={maintenance.enabled ? '已开启' : '已关闭'} onChange={(enabled) => void toggleMaintenance(enabled)} />
+          <LeverSwitch checked={maintenance.enabled} disabled={saving || checking} label={maintenance.enabled ? '已开启' : '已关闭'} onChange={(enabled) => void toggleMaintenance(enabled)} />
         </div>
         <div className={styles.maintenanceMeta}>
           <span>{RESULT_LABELS[maintenance.lastResult]}{lastChecked ? ` · ${lastChecked}` : ''}</span>
