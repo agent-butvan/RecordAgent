@@ -870,17 +870,14 @@ export const MainLayout: React.FC<{
       : session));
   };
 
-  /** 建立恢复 SSE；READY_TO_RESUME 状态保留在界面中，连接失败时可再次继续。 */
+  /** 建立恢复 SSE；提交决定后立即清除待处理弹窗，使界面无缝切入恢复推流。 */
   const resumePendingPermission = async (current: PendingPermissionState) => {
-    setPendingPermissions((previous) => ({
-      ...previous,
-      [current.sessionId]: { ...current, tool: null },
-    }));
     const clearPending = () => setPendingPermissions((previous) => {
       const next = { ...previous };
       delete next[current.sessionId];
       return next;
     });
+    clearPending();
 
     const controller = beginChatRun(
       current.sessionId,
