@@ -18,6 +18,7 @@ import io.agentscope.harness.agent.memory.compaction.CompactionConfig;
 import io.agentscope.harness.agent.subagent.task.TaskRepository;
 import io.agentscope.harness.agent.workspace.LocalFsMode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
@@ -30,6 +31,7 @@ import java.util.Map;
  * <p>模型切换时重建 Agent；会话状态保存在独立的 agentStateStore 中，
  * 因此不会因 Agent 实例替换而丢失。</p>
  */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class AgentFactory {
@@ -126,8 +128,9 @@ public class AgentFactory {
     private void closeQuietly(HarnessAgent agent) {
         try {
             agent.close();
-        } catch (Exception ignored) {
+        } catch (Exception e) {
             // 模型切换时旧 Agent 已不可再用，关闭失败不阻断新 Agent 创建。
+            log.debug("模型切换时关闭旧 Agent 失败", e);
         }
     }
 }

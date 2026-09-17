@@ -10,14 +10,6 @@ public record AgentUserCall(
         List<String> ragContexts,
         String runId) {
 
-    public AgentUserCall(String sessionId, String content, String context, List<String> ragContexts) {
-        this(sessionId, content, context, ragContexts, null);
-    }
-
-    public AgentUserCall(String sessionId, String content, String context) {
-        this(sessionId, content, context, List.of(), null);
-    }
-
     public AgentUserCall(String sessionId, String context) {
         this(sessionId, context, context, List.of(), null);
     }

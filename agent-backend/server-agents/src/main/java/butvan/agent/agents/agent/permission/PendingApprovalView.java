@@ -1,5 +1,7 @@
 package butvan.agent.agents.agent.permission;
 
+import butvan.agent.agents.agent.run.AgentRun;
+
 import java.time.Instant;
 import java.util.List;
 
@@ -15,15 +17,18 @@ public record PendingApprovalView(
         List<PermissionToolDto> tools
 ) {
     public static PendingApprovalView from(PendingApproval approval) {
-        return new PendingApprovalView(
-                approval.run().sessionId(),
-                approval.approvalId(),
-                approval.runId(),
-                approval.run().turnId(),
-                approval.run().contentAsString(),
-                approval.run().startedAt(),
-                approval.allDecided(),
-                approval.pendingTools()
-        );
+        synchronized (approval) {
+            AgentRun run = approval.run();
+            return new PendingApprovalView(
+                    run.sessionId(),
+                    approval.approvalId(),
+                    approval.runId(),
+                    run.turnId(),
+                    run.contentAsString(),
+                    run.startedAt(),
+                    approval.allDecided(),
+                    approval.pendingTools()
+            );
+        }
     }
 }

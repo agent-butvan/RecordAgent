@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { CalendarDays, CloudSun, Pencil, RefreshCw } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Pencil, RefreshCw } from 'lucide-react';
 import {
   fetchDailyContextConfig,
   fetchQWeatherConsoleSummary,
@@ -194,9 +194,16 @@ export function DailyContextSettingsPage({
     <SettingsPageLayout title="天气与节假日" description="配置聊天顶栏使用的外部数据源，密钥仅保存在本机。">
       {loading ? <p className={styles.state}>正在读取配置…</p> : (
         <div className={styles.content}>
-          <section className={styles.section} aria-labelledby="weather-settings-title">
+          {weatherConfigured && (
+            <QWeatherConsolePanel
+              summary={consoleSummary}
+              loading={consoleLoading}
+              onRefresh={() => void loadConsoleSummary(true)}
+            />
+          )}
+
+          <div className={styles.providerList}>
             <ProviderRow
-              icon={<CloudSun size={17} />}
               headingId="weather-settings-title"
               title="和风天气"
               description="使用专属 API Host 和 API KEY 获取当前天气。"
@@ -206,18 +213,8 @@ export function DailyContextSettingsPage({
               onConfigure={() => openConfigModal('weather')}
               onEnabledChange={(checked) => onChatTopBarChange('showWeather', checked)}
             />
-            {weatherConfigured && (
-              <QWeatherConsolePanel
-                summary={consoleSummary}
-                loading={consoleLoading}
-                onRefresh={() => void loadConsoleSummary(true)}
-              />
-            )}
-          </section>
 
-          <section className={styles.section} aria-labelledby="holiday-settings-title">
             <ProviderRow
-              icon={<CalendarDays size={17} />}
               headingId="holiday-settings-title"
               title="天聚数行节假日"
               description="识别法定节假日、双休日和调休上班。"
@@ -227,7 +224,7 @@ export function DailyContextSettingsPage({
               onConfigure={() => openConfigModal('holiday')}
               onEnabledChange={(checked) => onChatTopBarChange('showHoliday', checked)}
             />
-          </section>
+          </div>
         </div>
       )}
       <DailyContextConfigModal
@@ -248,7 +245,6 @@ export function DailyContextSettingsPage({
 }
 
 function ProviderRow({
-  icon,
   headingId,
   title,
   description,
@@ -258,7 +254,6 @@ function ProviderRow({
   onConfigure,
   onEnabledChange,
 }: {
-  icon: ReactNode;
   headingId: string;
   title: string;
   description: string;
@@ -270,15 +265,12 @@ function ProviderRow({
 }) {
   return (
     <article className={styles.providerRow}>
-      <div className={styles.providerMain}>
-        <span className={styles.providerIcon} aria-hidden="true">{icon}</span>
-        <div className={styles.providerCopy}>
-          <h2 id={headingId}>{title}</h2>
-          <p>{description}</p>
-          <div className={styles.statusList} aria-label={`${title}状态`}>
-            <StatusPill active={configured}>{configured ? '已配置' : '未配置'}</StatusPill>
-            <StatusPill active={enabled} tone="blue">{enabled ? '已开启' : '未开启'}</StatusPill>
-          </div>
+      <div className={styles.providerCopy}>
+        <h2 id={headingId}>{title}</h2>
+        <p>{description}</p>
+        <div className={styles.statusList} aria-label={`${title}状态`}>
+          <StatusPill active={configured}>{configured ? '已配置' : '未配置'}</StatusPill>
+          <StatusPill active={enabled} tone="blue">{enabled ? '已开启' : '未开启'}</StatusPill>
         </div>
       </div>
       <div className={styles.providerActions}>

@@ -1,6 +1,7 @@
 package butvan.agent.agents.agent;
 
 import butvan.agent.agents.agent.event.AgentStreamEvent;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agentscope.core.event.*;
@@ -92,14 +93,14 @@ public class AgentEventManager {
             // 参数是合法 JSON：优先取 command 字段
             JsonNode node = objectMapper.readTree(rawArguments);
             return node.has("command") ? node.get("command").asText() : rawArguments;
-        } catch (Exception exception) {
+        } catch (JsonProcessingException exception) {
             // 参数不是合法 JSON：原样返回供 UI 展示
             return rawArguments;
         }
     }
 
     /**
-     * 从 source 路径去最后一段 agentId
+     * 从 source 路径取最后一段 agentId
      * @param source
      * @return
      */
