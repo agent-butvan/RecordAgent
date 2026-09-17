@@ -198,7 +198,7 @@ export const MainLayout: React.FC<{
       delete next[sessionId];
       return next;
     });
-    let detail = await fetchSessionDetail(sessionId);
+    const detail = await fetchSessionDetail(sessionId);
     if (!detail) {
       setSessionLoadErrors((previous) => ({
         ...previous,
@@ -206,18 +206,8 @@ export const MainLayout: React.FC<{
       }));
       return false;
     }
-    const hasUserMessage = detail.messages.some((message) => message.role === 'USER');
-    if (detail.summary.title === '新对话' && (generateTitle || hasUserMessage)) {
-      await generateSessionTitle(sessionId);
-      detail = await fetchSessionDetail(sessionId);
-      if (!detail) {
-        setSessionLoadErrors((previous) => ({
-          ...previous,
-          [sessionId]: '聊天记录读取失败，请检查网络连接后重试。',
-        }));
-        return false;
-      }
-    }
+
+    // 立即刷新消息与 Token 用量（毫秒级响应，避免被标题生成阻塞）
     const messages = detail.messages.map(mapTranscriptToChatMessage);
     setSessions((previous) => previous.map((session) => session.id === sessionId
       ? {
@@ -229,6 +219,28 @@ export const MainLayout: React.FC<{
           isLoaded: true,
         }
       : session));
+
+    // 若当前会话为“新对话”，在后台异步生成标题并局部更新，不阻塞界面的 Token 和消息终态呈现
+    const hasUserMessage = detail.messages.some((message) => message.role === 'USER');
+    if (detail.summary.title === '新对话' && (generateTitle || hasUserMessage)) {
+      void (async () => {
+        try {
+          await generateSessionTitle(sessionId);
+          const updatedDetail = await fetchSessionDetail(sessionId);
+          if (updatedDetail) {
+            setSessions((previous) => previous.map((session) => session.id === sessionId
+              ? {
+                  ...session,
+                  title: updatedDetail.summary.title,
+                  lastMessagePreview: updatedDetail.summary.lastMessagePreview,
+                }
+              : session));
+          }
+        } catch (error) {
+          console.error('异步生成会话标题失败:', error);
+        }
+      })();
+    }
     return true;
   }, []);
 
