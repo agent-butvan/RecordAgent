@@ -155,7 +155,9 @@ public class AgentService {
             }
             putEvent(streamSession, new AgentStreamEvent.Failed(userMessage));
         } finally {
-            activeRunRegistry.unregister(userId, request.sessionId(), streamSession);
+            if (request != null) {
+                activeRunRegistry.unregister(userId, request.sessionId(), streamSession);
+            }
         }
     }
 
@@ -384,10 +386,6 @@ public class AgentService {
                 .build();
     }
 
-    public AgentStreamSession resumeAgent(String sessionId, String approvalId) {
-        return resumeAgent(sessionId, approvalId, null);
-    }
-
     /** 使用原 runId 恢复权限确认后的同一轮运行。 */
     public AgentStreamSession resumeAgent(String sessionId, String approvalId, String requestedRunId) {
         String userId = currentUserProvider.currentUserId();
@@ -398,6 +396,11 @@ public class AgentService {
         streamSession.queue().offer(new AgentStreamEvent.RunStarted(runId));
         Thread producer = Thread.ofVirtual().unstarted(() -> {
             try {
+                if (!modelHolder.isInitialized()) {
+                    agentRunCompleter.tryComplete(approval.run(), TranscriptMessageDto.MessageStatus.FAILED);
+                    putEvent(streamSession, new AgentStreamEvent.Failed("请先完成模型配置"));
+                    return;
+                }
                 runAgentStream(approval.run(),
                         List.of(buildResumeMessage(approval.toConfirmResults())), streamSession);
             } catch (Exception exception) {

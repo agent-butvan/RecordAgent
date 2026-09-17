@@ -24,9 +24,11 @@ public class OrphanedToolCallRecovery {
      */
     public int recover(AgentState state, String agentName) {
         List<Msg> context = state.contextMutable();
+        int lastAssistantIndex = -1;
         Msg lastAssistant = null;
         for (int index = context.size() - 1; index >= 0; index--) {
             if (context.get(index).getRole() == MsgRole.ASSISTANT) {
+                lastAssistantIndex = index;
                 lastAssistant = context.get(index);
                 break;
             }
@@ -34,10 +36,11 @@ public class OrphanedToolCallRecovery {
         if (lastAssistant == null) return 0;
 
         Set<String> completedIds = new HashSet<>();
-        context.stream()
-                .flatMap(message -> message.getContentBlocks(ToolResultBlock.class).stream())
-                .map(ToolResultBlock::getId)
-                .forEach(completedIds::add);
+        for (int i = lastAssistantIndex + 1; i < context.size(); i++) {
+            context.get(i).getContentBlocks(ToolResultBlock.class).stream()
+                    .map(ToolResultBlock::getId)
+                    .forEach(completedIds::add);
+        }
         List<ToolUseBlock> orphaned = lastAssistant.getContentBlocks(ToolUseBlock.class).stream()
                 .filter(tool -> !completedIds.contains(tool.getId()))
                 .toList();
