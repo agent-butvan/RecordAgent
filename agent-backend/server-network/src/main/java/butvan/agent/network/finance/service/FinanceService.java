@@ -66,10 +66,11 @@ public class FinanceService {
         String normalizedRange = range == null || range.isBlank() ? "month" : range.trim().toLowerCase();
         LocalDate today = LocalDate.now();
         LocalDate from = switch (normalizedRange) {
+            case "today" -> today;
             case "week" -> today.minusDays(today.getDayOfWeek().getValue() - 1L);
             case "month" -> today.withDayOfMonth(1);
             case "year" -> today.withDayOfYear(1);
-            default -> throw new IllegalArgumentException("图表时间范围仅支持 week、month 或 year");
+            default -> throw new IllegalArgumentException("图表时间范围仅支持 today、week、month 或 year");
         };
         settleYieldThrough(ownerId, today);
         var analysis = expenseAnalyticsService.analyze(ownerId, from, today);
@@ -113,6 +114,15 @@ public class FinanceService {
         return transactions.stream().sorted(newestFirst).toList();
     }
 
+    /** 查询用户使用过的收入与支出分类。 */
+    @Transactional(readOnly = true)
+    public Map<String, List<String>> getTransactionCategories(String ownerId) {
+        requireOwner(ownerId);
+        return Map.of(
+                "expense", repository.findTransactionCategories(ownerId, "expense"),
+                "income", repository.findTransactionCategories(ownerId, "income"));
+    }
+
     /** 创建资产账户；年化率使用百分数表达，例如 1.85 表示 1.85%。 */
     @Transactional
     public FinanceAccount createAccount(
@@ -144,6 +154,8 @@ public class FinanceService {
         requireOwner(ownerId);
         if (!TRANSACTION_TYPES.contains(transactionType)) throw new IllegalArgumentException("流水类型不合法");
         if (category == null || category.isBlank()) throw new IllegalArgumentException("分类不能为空");
+        String normalizedCategory = category.trim();
+        if (normalizedCategory.length() > 40) throw new IllegalArgumentException("分类不能超过 40 个字符");
         if (note == null || note.isBlank()) throw new IllegalArgumentException("说明不能为空");
         if (date == null || time == null) throw new IllegalArgumentException("流水日期和时间不能为空");
         BigDecimal normalizedAmount = requireMoney(amount, false, "流水金额");
@@ -157,12 +169,72 @@ public class FinanceService {
             throw new IllegalArgumentException("账户余额不足，无法记录这笔支出");
         }
         String id = UUID.randomUUID().toString();
+        repository.rememberTransactionCategory(ownerId, transactionType, normalizedCategory, now);
         repository.insertTransaction(id, ownerId, accountId, date, time, transactionType,
-                category.trim(), note.trim(), amountMinor, account.currency(), "manual", now);
+                normalizedCategory, note.trim(), amountMinor, account.currency(), "manual", now);
         return repository.findTransactions(ownerId, 100).stream()
                 .filter(transaction -> transaction.id().equals(id))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("流水创建后无法读取"));
+    }
+
+    /** 在两个资产账户之间进行划账，并成对写入划出与划入流水。 */
+    @Transactional
+    public List<FinanceTransaction> transfer(
+            String ownerId, String fromAccountId, String toAccountId, BigDecimal amount,
+            String note, LocalDate date, LocalTime time) {
+        requireOwner(ownerId);
+        if (fromAccountId == null || fromAccountId.isBlank()) throw new IllegalArgumentException("转出账户不能为空");
+        if (toAccountId == null || toAccountId.isBlank()) throw new IllegalArgumentException("转入账户不能为空");
+        if (fromAccountId.trim().equals(toAccountId.trim())) {
+            throw new IllegalArgumentException("转出账户与转入账户不能相同");
+        }
+        if (date == null || time == null) throw new IllegalArgumentException("流水日期和时间不能为空");
+        BigDecimal normalizedAmount = requireMoney(amount, false, "划账金额");
+
+        FinanceAccount fromAccount = repository.findAccount(ownerId, fromAccountId.trim())
+                .orElseThrow(() -> new IllegalArgumentException("转出账户不存在"));
+        FinanceAccount toAccount = repository.findAccount(ownerId, toAccountId.trim())
+                .orElseThrow(() -> new IllegalArgumentException("转入账户不存在"));
+
+        if (!fromAccount.currency().equalsIgnoreCase(toAccount.currency())) {
+            throw new IllegalArgumentException("不同币种账户之间暂不支持划账");
+        }
+
+        LocalDate today = LocalDate.now();
+        accrueYield(ownerId, fromAccount, today);
+        accrueYield(ownerId, toAccount, today);
+
+        long amountMinor = toMinor(normalizedAmount);
+        Instant now = Instant.now();
+
+        if (!repository.adjustBalance(ownerId, fromAccount.id(), -amountMinor, now)) {
+            throw new IllegalArgumentException("转出账户余额不足，无法划账");
+        }
+        repository.adjustBalance(ownerId, toAccount.id(), amountMinor, now);
+
+        String trimmedNote = note != null ? note.trim() : "";
+        if (trimmedNote.length() > 100) throw new IllegalArgumentException("说明不能超过 100 个字符");
+        String outNote = !trimmedNote.isEmpty() ? trimmedNote : "划账至 " + toAccount.name();
+        String inNote = !trimmedNote.isEmpty() ? trimmedNote : "从 " + fromAccount.name() + " 划入";
+
+        String fromTransactionId = UUID.randomUUID().toString();
+        String toTransactionId = UUID.randomUUID().toString();
+
+        repository.insertTransaction(fromTransactionId, ownerId, fromAccount.id(), date, time,
+                "transfer_out", "划账", outNote, amountMinor, fromAccount.currency(), "manual", now);
+        repository.insertTransaction(toTransactionId, ownerId, toAccount.id(), date, time,
+                "transfer_in", "划账", inNote, amountMinor, toAccount.currency(), "manual", now);
+
+        FinanceTransaction fromTx = new FinanceTransaction(fromTransactionId, fromAccount.id(), fromAccount.name(),
+                date, time, "transfer_out", "划账", outNote, normalizedAmount, fromAccount.currency(),
+                "manual", now);
+
+        FinanceTransaction toTx = new FinanceTransaction(toTransactionId, toAccount.id(), toAccount.name(),
+                date, time, "transfer_in", "划账", inNote, normalizedAmount, toAccount.currency(),
+                "manual", now);
+
+        return List.of(fromTx, toTx);
     }
 
     /** 补齐指定日期前尚未计提的账户收益，供总览读取和未来定时任务复用。 */

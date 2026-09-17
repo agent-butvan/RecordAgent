@@ -8,6 +8,8 @@ export interface CalendarTodo {
   priority: TodoPriority;
   completed: boolean;
   recurrence?: TodoRecurrence;
+  recurrenceWeekday?: number;
+  recurrenceMonthDay?: number;
   version?: number;
 }
 
@@ -50,6 +52,7 @@ export interface CalendarPhoto {
 export interface CalendarJournal {
   id?: string;
   version?: number;
+  source?: string;
   title?: string;
   excerpt: string;
   mood: string;
@@ -68,12 +71,21 @@ export interface CalendarDayEntry {
   incomes: CalendarIncome[];
   schedules: CalendarSchedule[];
   journal?: CalendarJournal;
+  journals?: CalendarJournal[];
   photos: CalendarPhoto[];
   otherRecords?: CalendarOtherRecord[];
 }
 
 export type CalendarRecordDraft =
-  | { kind: 'todo'; title: string; time?: string; priority: TodoPriority; recurrence: TodoRecurrence }
+  | {
+      kind: 'todo';
+      title: string;
+      time?: string;
+      priority: TodoPriority;
+      recurrence: TodoRecurrence;
+      recurrenceWeekday?: number;
+      recurrenceMonthDay?: number;
+    }
   | { kind: 'schedule'; title: string; startTime?: string; endTime?: string; location?: string }
   | { kind: 'expense'; category: string; note: string; amount: number; time: string }
   | { kind: 'journal'; title?: string; excerpt: string; mood: string };

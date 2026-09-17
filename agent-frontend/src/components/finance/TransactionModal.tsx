@@ -1,0 +1,110 @@
+import React, { useEffect, useState } from 'react';
+import type { CreateFinanceTransactionInput, FinanceAccount, FinanceCategoryOptions } from '../../types/finance';
+import { formatLocalDate } from '../../services/dailyEvents';
+import { Button } from '../common/Button';
+import { CategoryPicker } from '../common/CategoryPicker';
+import { mergeCategoryOptions } from '../common/categoryOptions';
+import { Modal } from '../common/Modal';
+import { Select } from '../common/Select';
+import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from './financeCategories';
+import styles from './TransactionModal.module.css';
+
+function nowTime(): string {
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+}
+
+function money(value: number): string {
+  return new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY' }).format(value);
+}
+
+interface TransactionModalProps {
+  open: boolean;
+  accounts: FinanceAccount[];
+  categories: FinanceCategoryOptions;
+  defaultDate?: string;
+  onClose: () => void;
+  onSubmit: (input: CreateFinanceTransactionInput) => Promise<void>;
+}
+
+/** 统一的收入 / 支出记账弹框，供财务页和日历页共用。 */
+export const TransactionModal: React.FC<TransactionModalProps> = ({
+  open, accounts, categories, defaultDate, onClose, onSubmit,
+}) => {
+  const [entryType, setEntryType] = useState<'expense' | 'income'>('expense');
+  const [category, setCategory] = useState<string>(EXPENSE_CATEGORIES[0]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const availableCategories = mergeCategoryOptions(
+    entryType === 'expense' ? EXPENSE_CATEGORIES : INCOME_CATEGORIES,
+    categories[entryType],
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    setEntryType('expense');
+    setCategory(EXPENSE_CATEGORIES[0]);
+    setError(null);
+  }, [open]);
+
+  const closeModal = () => {
+    if (isSaving) return;
+    setError(null);
+    onClose();
+  };
+
+  const submitTransaction = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    setIsSaving(true);
+    setError(null);
+    try {
+      await onSubmit({
+        accountId: String(data.get('accountId')),
+        transactionType: entryType,
+        category: category.trim(),
+        note: String(data.get('note') ?? '').trim(),
+        amount: Number(data.get('amount')),
+        date: String(data.get('date')),
+        time: String(data.get('time')),
+      });
+      form.reset();
+      onClose();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '流水保存失败，请检查填写内容。');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <Modal open={open} title="记一笔" onClose={closeModal} width={600} centered>
+      <form key={`${open}-${defaultDate ?? 'today'}`} className={styles.transactionForm} onSubmit={(event) => { void submitTransaction(event); }}>
+        <div className={styles.typeSwitch} aria-label="流水类型">
+          <button type="button" className={entryType === 'expense' ? styles.typeActive : ''} onClick={() => { setEntryType('expense'); setCategory(EXPENSE_CATEGORIES[0]); }}>支出</button>
+          <button type="button" className={entryType === 'income' ? styles.typeActive : ''} onClick={() => { setEntryType('income'); setCategory(INCOME_CATEGORIES[0]); }}>收入</button>
+        </div>
+        {error && <div className={styles.modalError} role="alert">{error}</div>}
+        <label className={styles.amountField}><span>金额</span><div><b>¥</b><input name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required autoFocus /></div></label>
+        <div className={styles.formGrid}>
+          <Select
+            name="accountId"
+            label="资产账户"
+            options={accounts.map((account) => ({ value: account.id, label: `${account.name} · ${money(account.balance)}` }))}
+            fieldSize="md"
+            fullWidth
+            required
+          />
+          <CategoryPicker options={availableCategories} value={category} onChange={setCategory} disabled={isSaving} />
+          <label className={styles.wideField}><span>说明</span><input name="note" required placeholder={entryType === 'expense' ? '例如：午餐' : '例如：九月工资'} /></label>
+          <label><span>日期</span><input name="date" type="date" defaultValue={defaultDate ?? formatLocalDate(new Date())} required /></label>
+          <label><span>时间</span><input name="time" type="time" defaultValue={nowTime()} required /></label>
+        </div>
+        <div className={styles.modalActions}><Button type="button" variant="outline" onClick={closeModal} disabled={isSaving}>取消</Button><Button type="submit" variant="primary" disabled={isSaving || !category.trim()}>{isSaving ? '保存中…' : `保存${entryType === 'expense' ? '支出' : '收入'}`}</Button></div>
+      </form>
+    </Modal>
+  );
+};
+
+export default TransactionModal;

@@ -1,0 +1,131 @@
+package butvan.agent.network.dailycontext.service;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Test;
+
+import java.time.Instant;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/** 第三方响应映射测试，确保供应商字段不会泄漏到前端接口。 */
+class DailyContextProviderMappingTest {
+    private final ObjectMapper mapper = new ObjectMapper();
+
+    @Test
+    void qWeatherResponseMapsToStableWeatherSummary() throws Exception {
+        var payload = mapper.readTree("""
+                {
+                  "condition": {"text": "多云", "code": "101"},
+                  "temperature": {"value": 26.4, "unit": "°C"},
+                  "feelsLike": {"value": 27.1, "unit": "°C"},
+                  "humidity": 0.68,
+                  "wind": {"direction": {"compass": "se"}, "speed": {"value": 3.2, "unit": "m/s"}}
+                }
+                """);
+
+        var result = QWeatherClient.parse(payload, "上海");
+
+        assertEquals("多云", result.condition());
+        assertEquals(26.4, result.temperature());
+        assertEquals(68, result.humidityPercent());
+        assertEquals("上海", result.locationName());
+    }
+
+    @Test
+    void tianApiResponseMapsHolidayAndWorkdaySemantics() throws Exception {
+        var payload = mapper.readTree("""
+                {
+                  "code": 200,
+                  "msg": "success",
+                  "result": {
+                    "list": [{
+                      "name": "国庆节", "info": "节假日", "daycode": 1,
+                      "isnotwork": 1, "wage": 3, "lunarmonth": "八月", "lunarday": "十一", "tip": "放假安排"
+                    }]
+                  }
+                }
+                """);
+
+        var result = TianApiHolidayClient.parse(payload);
+
+        assertEquals("国庆节", result.name());
+        assertTrue(result.dayOff());
+        assertEquals(3, result.wageMultiple());
+        assertEquals("八月十一", result.lunarDate());
+    }
+
+    @Test
+    void qWeatherGeoApiMapsDeviceCoordinatesToLocationName() throws Exception {
+        var payload = mapper.readTree("""
+                {
+                  "code": "200",
+                  "location": [{
+                    "name": "蜀山区", "adm2": "合肥市", "country": "中国",
+                    "lat": "31.85", "lon": "117.26"
+                  }]
+                }
+                """);
+
+        var result = QWeatherClient.parseLocation(payload);
+
+        assertEquals("蜀山区", result.locationName());
+        assertEquals("合肥市", result.adminArea());
+        assertEquals("中国", result.country());
+    }
+
+    @Test
+    void qWeatherConsoleFinanceMapsToSafeSummary() throws Exception {
+        var payload = mapper.readTree("""
+                {
+                  "asOf": "2026-09-15T07:59Z",
+                  "currency": "CNY",
+                  "balance": 12.50,
+                  "accruedCharges": {
+                    "previousDay": 0.10,
+                    "thisMonth": 1.25,
+                    "sinceLastBill": 1.25
+                  },
+                  "pendingBills": [
+                    {"number": "hidden", "amountDue": 2.30},
+                    {"number": "hidden-too", "amountDue": 1.20}
+                  ]
+                }
+                """);
+
+        var result = QWeatherConsoleClient.parseFinance(payload);
+
+        assertEquals("CNY", result.currency());
+        assertEquals(Instant.parse("2026-09-15T07:59:00Z"), result.asOf());
+        assertEquals("12.5", result.balance().stripTrailingZeros().toPlainString());
+        assertEquals("1.25", result.thisMonthCharges().toPlainString());
+        assertEquals(2, result.pendingBillCount());
+        assertEquals("3.5", result.pendingAmountDue().stripTrailingZeros().toPlainString());
+    }
+
+    @Test
+    void qWeatherConsoleStatsCombinesSuccessAndErrorsByApi() throws Exception {
+        var payload = mapper.readTree("""
+                {
+                  "asOf": "2026-09-15T09:11Z",
+                  "success": [
+                    {"api": "Weather", "hours": [2, 3]},
+                    {"api": "Geo", "hours": [1, 0]}
+                  ],
+                  "errors": [
+                    {"api": "Weather", "hours": [0, 1]},
+                    {"api": "WeatherAlert", "hours": [2, 0]}
+                  ]
+                }
+                """);
+
+        var result = QWeatherConsoleClient.parseUsage(payload);
+
+        assertEquals(Instant.parse("2026-09-15T09:11:00Z"), result.asOf());
+        assertEquals(6, result.successRequests());
+        assertEquals(3, result.errorRequests());
+        assertEquals(3, result.apis().size());
+        assertEquals(5, result.apis().getFirst().successRequests());
+        assertEquals(1, result.apis().getFirst().errorRequests());
+    }
+}

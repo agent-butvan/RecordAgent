@@ -1,5 +1,6 @@
 package butvan.agent.agents.tool.impl;
 
+import butvan.agent.agents.tool.AgentToolModule;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.agentscope.core.tool.Tool;
@@ -12,7 +13,7 @@ import java.util.List;
  * 验收报告工具
  */
 @Component
-public class AcceptanceReportTool {
+public class AcceptanceReportTool implements AgentToolModule {
 
 
     /**

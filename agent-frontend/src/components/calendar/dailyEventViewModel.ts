@@ -5,7 +5,7 @@ const TODO_RECURRENCE_ORDER = { none: 0, daily: 1, weekly: 2, monthly: 3 } as co
 
 /** 将可扩展日记录联合类型适配为当前日历页面的展示模型。 */
 export function toCalendarDayEntry(day: DailyDay): CalendarDayEntry {
-  const entry: CalendarDayEntry = { todos: [], schedules: [], expenses: [], incomes: [], photos: [], otherRecords: [] };
+  const entry: CalendarDayEntry = { todos: [], schedules: [], expenses: [], incomes: [], journals: [], photos: [], otherRecords: [] };
   for (const event of day.events) {
     if (event.eventType === 'todo') {
       entry.todos.push({
@@ -15,6 +15,8 @@ export function toCalendarDayEntry(day: DailyDay): CalendarDayEntry {
         priority: event.details.priority,
         completed: event.details.completed,
         recurrence: event.details.recurrence,
+        recurrenceWeekday: event.details.recurrenceWeekday ?? undefined,
+        recurrenceMonthDay: event.details.recurrenceMonthDay ?? undefined,
         version: event.version,
       });
     } else if (event.eventType === 'schedule') {
@@ -48,14 +50,19 @@ export function toCalendarDayEntry(day: DailyDay): CalendarDayEntry {
         time: event.details.time,
       });
     } else if (event.eventType === 'journal') {
-      entry.journal = {
+      const journal = {
         id: event.id,
         version: event.version,
+        source: event.source,
         title: event.title === '无标题记录' || event.title === '无标题手记' ? undefined : event.title,
         excerpt: event.details.body,
         mood: event.details.mood,
         updatedAt: event.updatedAt,
       };
+      entry.journals?.push(journal);
+      entry.journal ??= journal;
+    } else if (event.eventType === 'study') {
+      entry.otherRecords?.push({ id: event.id, type: '学习', title: event.title });
     } else {
       entry.otherRecords?.push({ id: event.id, type: event.originalEventType, title: event.title });
     }

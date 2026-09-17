@@ -134,6 +134,13 @@ ButvanAgent 采用一线科技大厂（如 Vercel, Linear, Google Technical Styl
 - **Style:** 填充 `#FFFFFF`，`border: 1px solid #cbd5e1`，`8px` 紧凑圆角，无阴影。
 - **Focus:** 描边高亮 `border-color: #2563EB`，无 boxShadow 扩散。
 
+### Select
+- **Semantics:** 统一封装原生 `select`，保留键盘操作、表单提交和浏览器辅助功能；页面不得重复实现下拉箭头与交互状态。
+- **Sizes:** `sm`、`md`、`lg` 分别用于紧凑工具栏、常规表单和初始化表单，控件高度保持为 `32px`、`36px`、`46px`。
+- **States:** 默认使用中性描边；悬停增强描边，键盘聚焦使用品牌蓝，错误态使用克制的红色描边与说明文字。
+- **Appearance:** 常规表单使用 `outline`；文章编辑器等沉浸式界面使用 `ghost`，静态状态不显示背景与边框，但保留键盘焦点提示。
+- **Content:** 支持标签、说明、错误、占位项、禁用选项和前置图标；表单布局通过全宽属性适配，视觉细节由公共组件统一维护。包含自定义输入项的分类选择器必须通过二级 Modal 收集内容，不得在 Select 下方展开输入框。
+
 ### Quick Action Cards
 - **Style:** 填充 `#FFFFFF`，`border: 1px solid #e2e8f0`，`8px` 紧凑圆角。
 - **Hover:** 描边转换为 `border-color: #2563EB`，微平移但不添加阴影。

@@ -1,6 +1,7 @@
 package butvan.agent.network.aspect;
 
 import butvan.agent.agents.agent.AgentUserCall;
+import butvan.agent.network.chat.dto.AgentChatRequest;
 import butvan.agent.agents.config.LocalConfigService;
 import butvan.agent.network.annotation.ApiLog;
 import butvan.agent.network.common.Result;
@@ -97,6 +98,12 @@ public class ApiLogAspect {
             int contextLength = agentUserCall.context() == null ? 0 : agentUserCall.context().length();
             return "AgentUserCall{sessionId='%s', contextLength=%d}"
                     .formatted(agentUserCall.sessionId(), contextLength);
+        }
+        if (value instanceof AgentChatRequest chatRequest) {
+            int contentLength = chatRequest.content() == null ? 0 : chatRequest.content().length();
+            int referenceCount = chatRequest.recordReferenceIds() == null ? 0 : chatRequest.recordReferenceIds().size();
+            return "AgentChatRequest{sessionId='%s', contentLength=%d, referenceCount=%d}"
+                    .formatted(chatRequest.sessionId(), contentLength, referenceCount);
         }
         if (value instanceof SetModel setModel) {
             return "SetModel{vendor='%s', modelName='%s', apiKey='***'}"

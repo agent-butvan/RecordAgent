@@ -1,0 +1,79 @@
+.card {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 18px 20px;
+  background-color: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.7);
+  border-radius: 16px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02), 0 4px 14px rgba(0, 0, 0, 0.025);
+}
+
+.card:hover {
+  /* 移除鼠标悬浮时的额外阴影与效果 */
+}
+
+.header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.eyebrow {
+  display: block;
+  margin-bottom: 4px;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.header h2 {
+  font-size: 16px;
+  font-weight: 650;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+
+.header p {
+  margin-top: 3px;
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.body {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.state {
+  min-height: 140px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.footer {
+  flex: 0 0 auto;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(241, 245, 249, 0.9);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}

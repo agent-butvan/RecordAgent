@@ -21,6 +21,7 @@
 | `agent-frontend/src/components/` | 可复用视图组件；按业务域建立目录，例如 `chat/`、`model/`、`layout/`、`common/`。 |
 | `agent-frontend/src/services/` | HTTP、SSE、存储与第三方调用等基础设施适配；不得承载页面状态或 JSX。 |
 | `agent-frontend/src/context/` | 跨页面共享状态与领域上下文；不得把一次性局部状态提升到此处。 |
+| `agent-frontend/src/features/` | 前端领域能力模块；封装不属于视图或基础设施的解析、规则与应用交互逻辑，例如 Slash Command。 |
 | `agent-frontend/src/types/` | 前端领域类型、接口和 DTO 定义；禁止放置运行逻辑。 |
 | `agent-frontend/src-tauri/` | Tauri/Rust 桌面端能力；系统权限与原生能力必须最小化授权。 |
 | `agent-frontend/src-tauri/binaries/` | Tauri sidecar 产物目录：启动器脚本入库，fat jar 与最小 JRE 运行时不入库。 |
@@ -28,8 +29,8 @@
 | `scripts/` | 项目级一键打包脚本（前端 + 后端 sidecar 组装）；不得混入业务代码。 |
 | `scripts/backend-launcher/` | Windows 后端 sidecar 原生启动器源码（Rust）；由打包脚本在 Windows 上编译生成 exe。 |
 | `.github/workflows/` | GitHub Actions 自动化；包含 PR / develop 三平台构建验证，以及 tag 驱动的桌面端 Release 打包发布。 |
-| `agent-backend/server-network/` | Spring Boot 启动、Controller、DTO、API 通用能力、AOP、网络适配层，以及单机业务数据的 SQLite 持久化；业务表必须按领域归属，禁止形成通用数据大杂烩。 |
-| `agent-backend/server-agents/` | AgentScope、模型工厂、智能体编排、工作区与配置领域逻辑。 |
+| `agent-backend/server-network/` | Spring Boot 启动、Controller、DTO、API 通用能力、AOP、网络适配层、业务 Agent Tool Adapter，以及单机业务数据的 SQLite 持久化；业务表必须按领域归属，禁止形成通用数据大杂烩。 |
+| `agent-backend/server-agents/` | AgentScope、模型工厂、智能体编排、Tool 注册 seam、工作区与配置领域逻辑；不得反向依赖 `server-network` 的业务实现。 |
 | `agent-backend/server-feishu/` | 飞书等即时通讯渠道集成：长连接事件接收、消息收发与渠道适配；仅依赖 `server-agents`，不承载 Agent 编排逻辑。 |
 | `agent-backend/*/src/main/resources/` | 仅保存不含密钥的默认配置和资源；真实用户配置不得硬编码于 yml。 |
 | `.agentscope/` | AgentScope 运行态工作区；不得手工提交会话、日志、缓存或临时任务数据。 |
@@ -45,6 +46,21 @@
 - 桌面端打包采用 Tauri sidecar 方案：统一入口为 `scripts/build-app.sh`（内部执行 `pnpm tauri build`，由 beforeBuildCommand 调用 `agent-backend/scripts/package-sidecar.sh` 生成后端 sidecar）；`pnpm tauri dev` 不打包、不拉起 sidecar，开发时后端在 IDEA 等本机环境启动（默认 8081）。打包模式下 Tauri（`src-tauri/src/backend.rs`）负责启动、健康检查与退出清理，端口动态分配；前端 API 地址由 `services/api.ts` 统一获取，禁止在组件中硬编码后端地址或端口。
 - 发布采用完整 SemVer git tag（`v<major>.<minor>.<patch>`）驱动：根目录 `VERSION` 是桌面端版本唯一来源，必须先同步到前端包与 Tauri 配置；GitHub Actions 先校验版本、构建并验证 sidecar，再上传 macOS / Linux / Windows 安装包至草稿 Release。PR 与 `develop` 推送只执行构建验证，不创建 Release；Windows 的 sidecar 由 Rust 原生启动器（`scripts/backend-launcher/`）支持。
 
+### 分支管理策略
+
+本项目采用三层分支模型，分支流向为：`feature/*` → `main` → `develop`。
+
+| 分支 | 定位与约束 |
+| --- | --- |
+| `feature/*`（或 `codex/*` 等命名前缀） | 功能开发分支；每个新功能从 `main` 创建独立分支，功能完成后合并回 `main`。 |
+| `main` | 本地集成分支；用于汇聚已完成的功能分支，在本地执行完整测试与验证。验证通过后合并到 `develop`。不直接向远程推送，仅作为本地集成测试的中间层。 |
+| `develop` | 生产推送分支；`main` 验证通过后合并到此分支并推送到远程仓库。CI/CD 构建验证和 Release 发布均基于此分支。 |
+
+- 新功能开发必须从 `main` 创建独立的功能分支，禁止直接在 `main` 或 `develop` 上提交业务代码。
+- 功能分支完成后，先合并到 `main` 进行本地集成测试；测试通过后再从 `main` 合并到 `develop` 推送。
+- 合并到 `main` 和 `develop` 时，优先使用 `--no-ff`（非快进合并）以保留合并记录。
+- 功能分支合并完毕且确认无需保留后，应及时删除已合并的功能分支，保持分支列表清洁。
+
 ## 三、后端工程规范
 
 ### 分层与接口
@@ -54,6 +70,12 @@
 - 请求/响应对象使用独立 DTO；禁止把持久化对象、AgentScope 第三方对象或内部领域对象直接暴露给 API。
 - 所有 REST Controller 方法必须标注 `@ApiLog("接口作用描述")`，由 `ApiLogAspect` 输出包含 Description、参数、客户端 IP、状态和毫秒级 Cost 的 `[API-LOG] START/END/ERROR` 日志。
 - 新增 API 必须同步明确 HTTP 方法、URL、请求字段、响应结构、异常语义和权限要求；对前端有影响时同步更新前端类型与服务层。
+- Agent 运行时默认不得将项目 `AGENTS.md`、完整 `MEMORY.md` 或整个 Knowledge 内容注入每次模型调用；项目规则和领域资料通过对应工具按任务需要检索，个人历史只允许由下述有界上下文模块自动召回或由记忆工具显式读取。若重新启用自动 Workspace Context，必须设置真实 Token 预算并补充用量回归测试。
+- 主 Agent 保持禁用 AgentScope 默认 Workspace Context；常驻 System Core 必须通过测试限制在 1,200 个 `TokenCounter` 估算 Token 内。个人上下文统一由 `server-agents/context` 的 `ConversationContextAssembler` 组装，默认总预算 850（Profile 300、Memory 500、Top-K 4），并由 `ContextInjectionMiddleware` 仅在 Model Call 前临时注入，禁止写入 AgentState 或 transcript；个人画像和开关分别保存于用户工作区的 `profile/PROFILE.md` 与 `profile/settings.json`，显式空画像必须阻止 `MEMORY.md#User Profile` 回退，暂停只停止自动注入而不得删除数据。画像辅助维护默认关闭，只能在聊天完成后按记忆指纹和 24 小时间隔低频生成提案；提案、维护状态和确认历史分别保存于 `profile/proposals/pending.json`、`profile/maintenance.json` 与 `profile/history/`，必须携带来源与置信度，并通过画像 revision 校验后由用户显式确认才能写入，禁止后台静默改写。新增上下文来源必须接入该唯一 seam、设置硬预算并补充注入与归因测试。
+- Agent 工具 Schema 默认按 `ToolSchemaRoutingPolicy` 中的能力组延迟暴露，只常驻轻量元工具；新增或重命名工具时必须同步确认其分组，未知工具仅作为兼容兜底保持常驻，禁止无评估地恢复全量 Schema 注入。
+- Agent 聊天运行必须使用稳定 `runId` 贯穿请求、SSE、运行注册表和终态收尾关联；显式取消必须通过后端取消接口向 AgentScope、生产线程、模型适配器和工具传播。传输层断开与用户显式取消必须区分；取消后必须保留 partial assistant、工具状态和 usage，且只有一个终态路径可写入。真正可恢复的暂停只能在有明确 checkpoint、待恢复动作和工具幂等语义后开放，不得用 Java 线程 suspend/resume 冒充。
+- 工具审批以“每用户、每会话最多一个待处理批次”为硬约束，审批必须绑定原始 `runId`，恢复前必须原子领取并立即释放旧批次槽位，禁止以新 `runId` 重放同一批工具。同一批次的全部未决工具必须在一张审批卡片内展示，允许逐项决定或批量选择，并通过单次原子请求提交完整决定，禁止前端逐项提交形成半完成状态。桌面端刷新后通过后端权威查询恢复审批卡片；正常 HITL 恢复必须优先消费完整 `ConfirmResult`，不得启用会在确认前补写失败结果的框架自动恢复。进程重启不承诺继续旧审批，只有新用户轮次开始且不存在应用审批句柄时，才允许把遗留 AgentScope 工具调用安全收尾为中断结果，避免会话永久停留在 `ASKING`。
+- 学习状态跨窗口同步统一使用后端 SSE：所有写入在事务成功提交后发布领域事件，连接建立及自动重连时必须先下发当前权威快照；主窗口内只允许一个共享订阅，禁止使用定时 HTTP 轮询或仅依赖前端本地事件推断状态。
 
 ### 代码质量与安全
 
@@ -62,7 +84,9 @@
 - 禁止捕获异常后静默忽略；必须记录有上下文的日志，或转换为可识别的业务异常。
 - 禁止在日志、异常响应、配置文件和代码中输出 API Key、Token、密码或完整敏感请求体。
 - 用户模型配置统一持久化在 `~/.butvan-agent/config.json`，不得把用户密钥或个性化配置写入 `application.yml`、`application-vendor.yml` 或源码。
+- 聊天轮次 Token 用量随 assistant 消息写入 `~/.butvan-agent/transcripts/*.jsonl`；标题等非聊天模型调用写入 `~/.butvan-agent/usage/system-usage.jsonl`；未结束轮次仅暂存在 `~/.butvan-agent/runs/*.json`，终态落盘或重启恢复后必须清理。供应商 Usage 是实际总量，System、History、Current User、Tool Schema、Tool Result、Profile Context、Memory Recall、RAG 与 Other 是携带计数器版本的本地归因估算，两者不得混淆或互相补齐。SQLite 中的 Token 用量表仅作为可从上述文件重建的统计读模型，不得取代原始记录。
 - AgentScope 工作区、工具权限、文件与网络访问必须按最小权限设计；任何可能执行本机操作的能力都应具备明确的审批、范围和错误反馈。
+- 系统设置跳转只能通过参数固定的 Tauri 命令暴露，禁止允许前端传入任意 URL 或本机命令；不支持直达的平台必须提供可执行的手工路径说明。
 
 ## 四、前端工程与 UI 组件规范
 
@@ -82,8 +106,11 @@
 - 所有后端 API 调用必须集中在 `services`，统一处理响应结构、超时、错误映射与类型；组件内不得散落重复 `fetch` 实现。
 - 跨页面且需要持久化或同步的状态使用 Context 或专用状态模块；仅限单组件使用的状态保留在组件内部。
 - API 基础地址、功能开关和环境差异必须通过配置集中管理，禁止在多个组件硬编码。
+- 聊天 Top 栏的日期、待办、财务、天气与节假日等摘要必须作为独立模块接入统一的信息栏与覆盖式详情面板；模块可见性由对应业务设置页管理并通过 `featurePreferences` 即时同步。各模块只请求自身启用的数据，加载或失败状态必须相互隔离，不得阻断聊天主流程；外部数据源必须经后端稳定 DTO 适配并设置缓存，密钥不得返回前端。
 - 未检测到模型配置时，必须展示全屏居中的独立 `ModelInitPage`：纯白背景、椭圆形“取消 / 继续”按钮、极简排版；禁止改为遮罩弹窗。
 - 所有用户可见文案、错误信息和空状态应使用清晰中文；技术名词、模型名和协议名可保留英文。
+- 保存、删除、导入、权限请求等短暂操作结果统一通过窗口顶部居中的全局 `Message` 展示，不得在页面内容流中临时插入横幅；字段校验、加载失败、空状态和需要就地重试的上下文反馈仍应保留在所属组件附近。
+- macOS 主窗口使用 Tauri Overlay 标题栏时，窗口安全内边距必须统一由 `--window-titlebar-inset` 提供；拖拽区域只能标注非交互容器，按钮、输入框和链接必须保持可点击，其他平台不得额外增加标题栏空白。
 
 ## 五、验证、评审与交付
 
@@ -105,5 +132,5 @@
 - 做任务之前先说一句你要做什么，别一声不吭就开始。
 - 做完之后一两句话总结。改了什么，接下来该做什么。
 - 探索性问题（"这个怎么办？""你觉得呢？"）回 2-3 句建议，不要直接动手。
-- 不确定的时候先问，不要猜。
+- 可查明的事实先查证；在已明确的任务范围内，常规、可逆的实现选择沿用项目惯例和用户已有决策。需求存在实质歧义、授权不明或涉及重大取舍时先询问用户，不把未经验证的假设当作事实；本文件的分支、推送、发布和外部写入权限约束继续适用。
 - 除非用户明确要求，不进行截图、浏览器逐页查看或其他手动界面效果检查；前端改动优先通过构建、类型检查、Lint 和自动化测试验证，避免不必要的 Token 消耗。

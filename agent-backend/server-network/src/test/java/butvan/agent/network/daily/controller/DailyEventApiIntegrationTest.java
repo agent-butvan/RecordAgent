@@ -48,13 +48,16 @@ class DailyEventApiIntegrationTest {
                                   "title": "验证日记录接口",
                                   "time": "08:00",
                                   "priority": "low",
-                                  "recurrence": "weekly"
+                                  "recurrence": "weekly",
+                                  "recurrenceWeekday": 7
                                 }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.eventType").value("todo"))
-                .andExpect(jsonPath("$.data.details.recurrence").value("weekly"));
+                .andExpect(jsonPath("$.data.details.recurrence").value("weekly"))
+                .andExpect(jsonPath("$.data.details.recurrenceWeekday").value(7))
+                .andExpect(jsonPath("$.data.details.recurrenceMonthDay").doesNotExist());
 
         mockMvc.perform(get("/agent/daily-events/days/2026-09-06"))
                 .andExpect(status().isOk())

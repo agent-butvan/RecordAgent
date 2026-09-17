@@ -4,19 +4,38 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  padding: 8px;
-  background-color: #ffffff;
-  border: 1px solid var(--border-medium);
-  border-radius: 28px;
+  padding: 8px 12px 6px;
+  background-color: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid #d8e0e8;
+  border-radius: 24px;
+  box-shadow: 0 12px 30px rgba(16, 24, 40, 0.06);
   cursor: text;
-  transition: border-color var(--transition-fast), background-color var(--transition-fast);
+  transition: border-color var(--transition-fast), background-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .container:focus-within {
-  border-color: var(--border-focus);
+  border-color: #b0c4de;
+  box-shadow: 0 14px 34px rgba(16, 24, 40, 0.09);
+}
+
+.editor {
+  display: flex;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.leadingContent {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  padding: 12px 0 0 14px;
 }
 
 .textarea {
+  flex: 1;
+  min-width: 0;
   width: 100%;
   min-height: 48px;
   max-height: 200px;
@@ -29,6 +48,10 @@
   font-family: var(--font-sans);
   font-size: 14px;
   line-height: 1.5;
+}
+
+.leadingContent + .textarea {
+  padding-left: 7px;
 }
 
 .textarea::placeholder {
@@ -125,4 +148,33 @@
 
 .sendBtnActive:hover {
   background-color: #27272a;
+}
+
+.stopBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: var(--radius-full);
+  background-color: var(--accent-dark);
+  color: #ffffff;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), opacity var(--transition-fast);
+}
+
+.stopBtn:hover:not(:disabled) {
+  background-color: #27272a;
+}
+
+.stopBtn:focus-visible,
+.sendBtn:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.stopBtn:disabled {
+  cursor: wait;
+  opacity: 0.58;
 }

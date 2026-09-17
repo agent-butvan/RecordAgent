@@ -1,5 +1,6 @@
 package butvan.agent.agents.tool.impl;
 
+import butvan.agent.agents.tool.AgentToolModule;
 import butvan.agent.agents.config.TavilyConfigData;
 import butvan.agent.agents.config.TavilyProperties;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -17,7 +18,7 @@ import java.util.LinkedHashMap;
 
 @Slf4j
 @Component
-public class WebSearchTool {
+public class WebSearchTool implements AgentToolModule {
 
     /**
      * 接口地址

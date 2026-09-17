@@ -1,0 +1,8 @@
+.glyph { display: block; flex: 0 0 auto; }
+
+/* 与钱包卡片共用克制的账户色相，图标不跟随标签文字一起变淡。 */
+.tile.tile { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; margin: 0; border: 1px solid var(--icon-border); border-radius: var(--radius-md); background: var(--icon-surface); color: var(--icon-ink); }
+.wechat { --icon-ink: #315f4c; --icon-surface: #edf5f0; --icon-border: #cddfd4; }
+.alipay { --icon-ink: #315782; --icon-surface: #edf3fa; --icon-border: #cedcee; }
+.bank { --icon-ink: #3d506c; --icon-surface: #eef1f6; --icon-border: #d2d9e4; }
+.other { --icon-ink: #665a49; --icon-surface: #f5f2ec; --icon-border: #e1d9cc; }

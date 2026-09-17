@@ -6,6 +6,74 @@ export type SessionStatus = 'ACTIVE' | 'DELETING';
 export type MessageRole = 'USER' | 'ASSISTANT';
 export type MessageStatus = 'COMPLETED' | 'FAILED' | 'CANCELLED';
 export type SessionPermissionMode = 'ASK' | 'AUTO_EDIT' | 'FULL_ACCESS';
+export type UsageStatus = 'COMPLETE' | 'PARTIAL' | 'UNAVAILABLE';
+export type UsagePurpose = 'CHAT' | 'SESSION_TITLE' | 'PROFILE_MAINTENANCE' | 'CONTEXT_COMPACTION' | 'BACKGROUND_AGENT';
+
+export interface InputTokenBreakdown {
+  systemPromptTokens: number;
+  historyTokens: number;
+  currentUserTokens: number;
+  toolSchemaTokens: number;
+  toolResultTokens: number;
+  profileContextTokens: number;
+  memoryRecallTokens: number;
+  ragContextTokens: number;
+  otherTokens: number;
+}
+
+export interface ToolTokenUsage {
+  toolName: string;
+  schemaTokens: number;
+  resultTokens: number;
+}
+
+export interface ModelInvocationUsage {
+  invocationId: string;
+  modelCallIndex: number;
+  source: string;
+  purpose: UsagePurpose;
+  vendor: string;
+  model: string;
+  inputTokens?: number | null;
+  outputTokens?: number | null;
+  cachedInputTokens?: number | null;
+  totalTokens?: number | null;
+  durationMillis?: number | null;
+  status: UsageStatus;
+  tokenCounterId: string;
+  estimatedInputTokens: number;
+  estimationDeltaTokens?: number | null;
+  breakdown: InputTokenBreakdown;
+  toolUsages: ToolTokenUsage[];
+}
+
+export interface TurnTokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cachedInputTokens: number;
+  totalTokens: number;
+  modelCallCount: number;
+  reportedCallCount: number;
+  status: UsageStatus;
+  calls: ModelInvocationUsage[];
+  estimatedInputTokens: number;
+  estimationDeltaTokens?: number | null;
+  breakdown: InputTokenBreakdown;
+  toolUsages: ToolTokenUsage[];
+  durationMillis: number;
+}
+
+export interface TokenUsageSummary {
+  inputTokens: number;
+  outputTokens: number;
+  cachedInputTokens: number;
+  totalTokens: number;
+  turnCount: number;
+  trackedTurnCount: number;
+  modelCallCount: number;
+  reportedCallCount: number;
+  status: UsageStatus;
+}
 
 /** Agent 响应时间线节点类型 */
 export type TraceNodeType =
@@ -90,8 +158,19 @@ export interface ChatMessage {
   startTime?: number;
   elapsedTime?: number;
   status?: MessageStatus;
+  failureReason?: string;
+  usage?: TurnTokenUsage | null;
   tools?: ToolExecution[];
   subagentProgress?: SubagentProgressDto[];
+}
+
+/** 服务端按当前用户读取业务数据，前端只提交受控分析意图。 */
+export interface AgentAnalysisContextRequest {
+  command: 'daily-review' | 'weekly-review' | 'todo-review'
+    | 'finance-review' | 'study-review' | 'study-plan';
+  argument: string;
+  timezone: string;
+  privacyConfirmed: boolean;
 }
 
 export interface Project {
@@ -99,11 +178,21 @@ export interface Project {
   name: string;
   path: string;
   createdAt: number;
+  availability: 'AVAILABLE' | 'MISSING' | 'INACCESSIBLE';
+}
+
+export interface ProjectDto {
+  id: string;
+  name: string;
+  rootPath: string;
+  importedAt: string;
+  availability: Project['availability'];
 }
 
 export interface SessionSummaryDto {
   id: string;
   kind: SessionKind;
+  projectId?: string | null;
   title: string;
   lastMessagePreview: string;
   createdAt: string;
@@ -129,11 +218,13 @@ export interface TranscriptMessageDto {
   durationMillis?: number | null;
   tools?: TranscriptToolExecutionDto[];
   thinking?: string | null;
+  usage?: TurnTokenUsage | null;
 }
 
 export interface SessionDetailDto {
   summary: SessionSummaryDto;
   messages: TranscriptMessageDto[];
+  usageSummary: TokenUsageSummary;
 }
 
 export interface ChatSession {
@@ -145,5 +236,6 @@ export interface ChatSession {
   createdAt: number;
   updatedAt: number;
   messages: ChatMessage[];
+  usageSummary?: TokenUsageSummary;
   isLoaded?: boolean; // 消息记录是否已从后端详情接口中全量加载
 }

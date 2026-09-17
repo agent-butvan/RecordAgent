@@ -1,7 +1,9 @@
 .topBar {
   position: relative;
   z-index: 60;
+  box-sizing: border-box;
   flex: 0 0 48px;
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: space-between;

@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import {
-  ArrowLeft,
-  CalendarClock,
-  CheckSquare2,
-  NotebookPen,
-  Plus,
-  WalletCards,
-} from 'lucide-react';
+  ArrowLeftIcon,
+  CalendarDotsIcon,
+  CheckSquareIcon,
+  NotePencilIcon,
+  PlusIcon,
+  WalletIcon,
+} from '@phosphor-icons/react';
 import type { CalendarRecordDraft, TodoPriority, TodoRecurrence } from '../../types/calendar';
 import { Modal } from '../common/Modal';
+import { Select } from '../common/Select';
 import { TimeWheelPicker } from './TimeWheelPicker';
 import styles from './CalendarQuickCreate.module.css';
 
@@ -17,39 +18,72 @@ type ModalRecordKind = Exclude<RecordKind, 'journal' | 'expense'>;
 
 interface CalendarQuickCreateProps {
   selectedDate: Date;
-  onCreate: (draft: CalendarRecordDraft) => void;
+  onCreate: (draft: CalendarRecordDraft) => void | Promise<void>;
   onWriteJournal: () => void;
-  onOpenFinance: () => void;
+  onCreateFinance: () => void;
 }
 
 const RECORD_OPTIONS = [
-  { kind: 'todo', label: '新建待办', description: '记录要完成的事项', icon: CheckSquare2 },
-  { kind: 'schedule', label: '添加日程', description: '安排时间与地点', icon: CalendarClock },
-  { kind: 'finance', label: '记一笔', description: '前往财务页记录收支', icon: WalletCards },
-  { kind: 'journal', label: '写手记', description: '留下当天的想法', icon: NotebookPen },
-] satisfies Array<{ kind: RecordKind | 'finance'; label: string; description: string; icon: typeof CheckSquare2 }>;
+  { kind: 'todo', label: '新建待办', description: '记录要完成的事项', icon: CheckSquareIcon },
+  { kind: 'schedule', label: '添加日程', description: '安排时间与地点', icon: CalendarDotsIcon },
+  { kind: 'finance', label: '记一笔', description: '在当前页面记录收支', icon: WalletIcon },
+  { kind: 'journal', label: '写手记', description: '留下当天的想法', icon: NotePencilIcon },
+] satisfies Array<{ kind: RecordKind | 'finance'; label: string; description: string; icon: typeof CheckSquareIcon }>;
 
 const FORM_TITLES: Record<ModalRecordKind, string> = {
   todo: '新建待办',
   schedule: '添加日程',
 };
 
+const PRIORITY_OPTIONS = [
+  { value: 'high', label: '重要' },
+  { value: 'medium', label: '计划' },
+  { value: 'low', label: '生活' },
+] as const;
+
+const RECURRENCE_OPTIONS = [
+  { value: 'none', label: '不重复' },
+  { value: 'daily', label: '每天' },
+  { value: 'weekly', label: '每周' },
+  { value: 'monthly', label: '每月' },
+] as const;
+
+const WEEKDAY_OPTIONS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'].map((label, index) => ({
+  value: String(index + 1),
+  label,
+}));
+
+const MONTH_DAY_OPTIONS = Array.from({ length: 31 }, (_, index) => ({
+  value: String(index + 1),
+  label: `${index + 1} 号`,
+}));
+
 const valueOf = (formData: FormData, key: string): string => String(formData.get(key) ?? '').trim();
+const optionalNumberOf = (formData: FormData, key: string): number | undefined => {
+  const value = valueOf(formData, key);
+  return value ? Number(value) : undefined;
+};
 
 /** 日历顶栏快捷记录入口：在当前选中日期内创建四类日记录。 */
-export const CalendarQuickCreate: React.FC<CalendarQuickCreateProps> = ({ selectedDate, onCreate, onWriteJournal, onOpenFinance }) => {
+export const CalendarQuickCreate: React.FC<CalendarQuickCreateProps> = ({ selectedDate, onCreate, onWriteJournal, onCreateFinance }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [activeKind, setActiveKind] = useState<ModalRecordKind | null>(null);
+  const [todoRecurrence, setTodoRecurrence] = useState<TodoRecurrence>('none');
   const selectedDateLabel = `${selectedDate.getMonth() + 1}月${selectedDate.getDate()}日`;
 
   const closeModal = () => {
+    if (saving) return;
     setIsOpen(false);
     setActiveKind(null);
+    setTodoRecurrence('none');
+    setError(null);
   };
 
-  const submitRecord = (event: React.FormEvent<HTMLFormElement>) => {
+  const submitRecord = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!activeKind) return;
+    if (!activeKind || saving) return;
 
     const formData = new FormData(event.currentTarget);
     let draft: CalendarRecordDraft;
@@ -60,6 +94,8 @@ export const CalendarQuickCreate: React.FC<CalendarQuickCreateProps> = ({ select
         time: valueOf(formData, 'time') || undefined,
         priority: (valueOf(formData, 'priority') || 'medium') as TodoPriority,
         recurrence: (valueOf(formData, 'recurrence') || 'none') as TodoRecurrence,
+        recurrenceWeekday: optionalNumberOf(formData, 'recurrenceWeekday'),
+        recurrenceMonthDay: optionalNumberOf(formData, 'recurrenceMonthDay'),
       };
     } else if (activeKind === 'schedule') {
       draft = {
@@ -71,8 +107,13 @@ export const CalendarQuickCreate: React.FC<CalendarQuickCreateProps> = ({ select
       };
     } else return;
 
-    onCreate(draft);
-    closeModal();
+    setSaving(true); setError(null);
+    try {
+      await onCreate(draft);
+      setIsOpen(false); setActiveKind(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '保存失败，请重试。');
+    } finally { setSaving(false); }
   };
 
   return (
@@ -84,7 +125,7 @@ export const CalendarQuickCreate: React.FC<CalendarQuickCreateProps> = ({ select
         aria-haspopup="dialog"
         onClick={() => setIsOpen(true)}
       >
-        <Plus size={14} strokeWidth={2} />
+        <PlusIcon size={14} weight="bold" />
         新建记录
       </button>
 
@@ -97,10 +138,12 @@ export const CalendarQuickCreate: React.FC<CalendarQuickCreateProps> = ({ select
         className={styles.modal}
       >
         {activeKind ? (
-          <form className={styles.form} onSubmit={submitRecord}>
+          <form className={styles.form} onSubmit={(event) => void submitRecord(event)}>
+            <fieldset disabled={saving} className={styles.formFields}>
+            {error && <p role="alert">{error}</p>}
             <div className={styles.formHeading}>
               <button type="button" className={styles.backButton} aria-label="返回记录类型" onClick={() => setActiveKind(null)}>
-                <ArrowLeft size={15} />
+                <ArrowLeftIcon size={15} />
               </button>
               <span>记录到 {selectedDateLabel}</span>
             </div>
@@ -109,9 +152,41 @@ export const CalendarQuickCreate: React.FC<CalendarQuickCreateProps> = ({ select
               <label className={styles.field}>待办内容<input name="title" required autoFocus placeholder="例如：整理项目笔记" /></label>
               <div className={styles.fieldRowThree}>
                 <div className={styles.field}><span>时间（选填）</span><TimeWheelPicker name="time" ariaLabel="待办时间" /></div>
-                <label className={styles.field}>优先级<select name="priority" defaultValue="medium"><option value="high">重要</option><option value="medium">计划</option><option value="low">生活</option></select></label>
-                <label className={styles.field}>重复<select name="recurrence" defaultValue="none"><option value="none">不重复</option><option value="daily">每天</option><option value="weekly">每周</option><option value="monthly">每月</option></select></label>
+                <Select name="priority" label="优先级" options={PRIORITY_OPTIONS} defaultValue="medium" fieldSize="md" fullWidth />
+                <Select
+                  name="recurrence"
+                  label="重复"
+                  options={RECURRENCE_OPTIONS}
+                  value={todoRecurrence}
+                  onChange={(event) => setTodoRecurrence(event.target.value as TodoRecurrence)}
+                  fieldSize="md"
+                  fullWidth
+                />
               </div>
+              {todoRecurrence === 'weekly' && (
+                <Select
+                  name="recurrenceWeekday"
+                  label="每周星期"
+                  options={WEEKDAY_OPTIONS}
+                  defaultValue={String(selectedDate.getDay() || 7)}
+                  description={`从 ${selectedDateLabel} 起，仅在所选星期显示`}
+                  fieldSize="md"
+                  fullWidth
+                  containerClassName={styles.recurrenceRule}
+                />
+              )}
+              {todoRecurrence === 'monthly' && (
+                <Select
+                  name="recurrenceMonthDay"
+                  label="每月日期"
+                  options={MONTH_DAY_OPTIONS}
+                  defaultValue={String(selectedDate.getDate())}
+                  description="当月没有所选日期时，该月不会生成此待办"
+                  fieldSize="md"
+                  fullWidth
+                  containerClassName={styles.recurrenceRule}
+                />
+              )}
             </>}
 
             {activeKind === 'schedule' && <>
@@ -125,8 +200,9 @@ export const CalendarQuickCreate: React.FC<CalendarQuickCreateProps> = ({ select
 
             <div className={styles.formActions}>
               <button type="button" className={styles.cancelButton} onClick={closeModal}>取消</button>
-              <button type="submit" className={styles.submitButton}>保存到 {selectedDateLabel}</button>
+              <button type="submit" className={styles.submitButton}>{saving ? '保存中…' : `保存到 ${selectedDateLabel}`}</button>
             </div>
+            </fieldset>
           </form>
         ) : (
           <div className={styles.menu} aria-label="选择记录类型">
@@ -144,13 +220,14 @@ export const CalendarQuickCreate: React.FC<CalendarQuickCreateProps> = ({ select
                     }
                     if (kind === 'finance') {
                       closeModal();
-                      onOpenFinance();
+                      onCreateFinance();
                       return;
                     }
+                    setTodoRecurrence('none');
                     setActiveKind(kind);
                   }}
                 >
-                  <span className={styles.optionIcon}><Icon size={17} strokeWidth={1.8} /></span>
+                  <span className={styles.optionIcon}><Icon size={17} /></span>
                   <span><strong>{label}</strong><small>{description}</small></span>
                 </button>
               ))}

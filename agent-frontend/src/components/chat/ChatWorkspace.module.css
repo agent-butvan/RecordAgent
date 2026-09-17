@@ -10,7 +10,11 @@
 
 /* 顶部工作区：会话信息与右侧面板开关 */
 .workspaceHeader {
+  box-sizing: border-box;
+  position: relative;
+  z-index: 70;
   flex: 0 0 48px;
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -22,6 +26,7 @@
 }
 
 .workspaceIdentity {
+  flex: 0 1 auto;
   display: flex;
   align-items: center;
   gap: 9px;
@@ -29,7 +34,12 @@
   color: var(--text-secondary);
 }
 
+.workspaceIdentity svg {
+  flex: 0 0 auto;
+}
+
 .workspaceTitle {
+  max-width: min(28vw, 320px);
   overflow: hidden;
   color: var(--text-primary);
   font-size: 13px;
@@ -37,6 +47,35 @@
   line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+@media (max-width: 860px) {
+  .workspaceTitle { max-width: 150px; }
+  .workspaceIdentity { gap: 6px; }
+}
+
+.sessionUsage {
+  flex: 0 0 auto;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.sessionUsage:hover {
+  color: var(--text-primary);
+}
+
+.sessionUsage:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
 }
 
 .panelToggle {
@@ -108,31 +147,6 @@
   border-color: var(--border-focus);
 }
 
-.centerHero {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 28px;
-  padding: 0 40px;
-  min-width: 0;
-}
-
-.cloudIcon {
-  width: 48px;
-  height: 48px;
-  color: #64748b;
-  stroke-width: 1.5;
-}
-
-.heroTitle {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--text-primary);
-  letter-spacing: -0.02em;
-  text-align: center;
-}
 
 /* 聊天主体：左侧任务步骤时间轨 + 右侧消息/输入列 */
 .chatBody {
@@ -163,52 +177,14 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  position: relative;
 }
 
-.cardGrid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  width: 100%;
-  max-width: 840px;
-}
-
-.quickCard {
-  background-color: #FFFFFF;
-  border: 1px solid #e2e8f0;
-  border-radius: var(--radius-lg);
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 14px;
-  min-height: 110px;
-  cursor: pointer;
-  transition: all var(--transition-normal);
-  box-shadow: none;
-}
-
-.quickCard:hover {
-  border-color: #2563eb;
-  background-color: #f8fafc;
-}
-
-.cardIcon {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-sm);
-  background-color: #f8fafc;
-  border: 1px solid #e2e8f0;
-}
-
-.cardText {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
-  line-height: 1.4;
+.chatColumnOverview {
+  position: relative;
+  background:
+    radial-gradient(circle at 18% 14%, rgba(47, 109, 246, 0.025), transparent 24%),
+    linear-gradient(#fbfcfd, #fbfcfd);
 }
 
 .messagesArea {
@@ -217,6 +193,13 @@
   padding: 24px 20px;
   user-select: text;
   min-width: 0;
+}
+
+/* 空会话首页：透明背景（由外层统一样式），并留出 160px 底部安全留白防止绝对定位输入框遮挡 */
+.overviewArea {
+  background: transparent;
+  overflow-y: auto;
+  padding: 34px 40px 160px;
 }
 
 .messagesInner {
@@ -252,6 +235,18 @@
   user-select: text;
 }
 
+.slashUserMessage {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 3px 7px;
+}
+
+.slashUserMessage > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .assistantMessage {
   align-self: flex-start;
   width: 100%;
@@ -281,6 +276,37 @@
   min-width: 0;
 }
 
+/* 空会话概览下的悬浮输入框：绝对定位到底部，不独占文档流高度，背景透明统一 */
+.bottomContainerOverview {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  width: min(840px, calc(100% - 80px));
+  padding: 0;
+  margin: 0;
+  z-index: 20;
+  background: transparent;
+  pointer-events: none;
+}
+
+.bottomContainerOverview > * {
+  pointer-events: auto;
+}
+
+.recordReferenceChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 768px) {
+  .bottomContainerOverview {
+    width: calc(100% - 32px);
+    bottom: 16px;
+  }
+}
+
 .permissionContainer {
   width: 100%;
   max-width: 840px;
@@ -289,13 +315,35 @@
   min-width: 0;
 }
 
+.messageFooter {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 10px;
+  padding-top: 4px;
+  min-width: 0;
+}
+
+.terminalStatus {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 10px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.failedStatus {
+  color: #b42318;
+}
+
 /* 消息底部动作工具栏 */
 .messageActions {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 12px;
-  margin-top: 10px;
-  padding-top: 4px;
 }
 
 .actionBtn {

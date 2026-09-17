@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Plus, ArrowUp, Mic } from 'lucide-react';
+import { Plus, ArrowUp, Mic, Square } from 'lucide-react';
 import { ModelSelector } from '../model/ModelSelector';
 import { PermissionModeSelector } from './PermissionModeSelector';
 import type { SessionPermissionMode } from '../../types/chat';
@@ -16,6 +16,9 @@ interface PromptInputProps {
   value: string;
   onValueChange: (value: string) => void;
   onSend: () => void;
+  onStop?: () => void;
+  isStreaming?: boolean;
+  isStopping?: boolean;
   onOpenSettings: () => void;
   className?: string;
   placeholder?: string;
@@ -23,16 +26,23 @@ interface PromptInputProps {
   onPermissionModeChange: (mode: SessionPermissionMode) => void;
   isPermissionModeDisabled?: boolean;
   isPermissionModeSaving?: boolean;
+  onInputKeyDown?: (event: React.KeyboardEvent<HTMLTextAreaElement>) => boolean;
+  suggestionListId?: string;
+  leadingContent?: React.ReactNode;
+  canSend?: boolean;
 }
 
 /**
- * AI 对话输入框：大圆角容器 + 自动增高文本域 + 工具条。
+ * AI 对话输入框：可组合前置标签、自动增高文本域与底部工具条。
  * 工具条左侧保留附件占位与 AI 模型选择，右侧为语音听写与发送按钮。
  */
 export const PromptInput: React.FC<PromptInputProps> = ({
   value,
   onValueChange,
   onSend,
+  onStop,
+  isStreaming = false,
+  isStopping = false,
   onOpenSettings,
   className,
   placeholder = '随心输入',
@@ -40,6 +50,10 @@ export const PromptInput: React.FC<PromptInputProps> = ({
   onPermissionModeChange,
   isPermissionModeDisabled = false,
   isPermissionModeSaving = false,
+  onInputKeyDown,
+  suggestionListId,
+  leadingContent,
+  canSend,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const speechRecognitionRef = useRef<SpeechRecognitionController | null>(null);
@@ -60,8 +74,10 @@ export const PromptInput: React.FC<PromptInputProps> = ({
   }, [value]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (onInputKeyDown?.(e)) return;
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
+      if (isStreaming) return;
       onSend();
     }
   };
@@ -121,18 +137,24 @@ export const PromptInput: React.FC<PromptInputProps> = ({
   };
 
   const hasValue = value.trim().length > 0;
+  const isSendEnabled = canSend ?? hasValue;
 
   return (
     <div className={`${styles.container} ${className || ''}`}>
-      <textarea
-        ref={textareaRef}
-        rows={1}
-        className={styles.textarea}
-        placeholder={placeholder}
-        value={value}
-        onChange={(e) => onValueChange(e.target.value)}
-        onKeyDown={handleKeyDown}
-      />
+      <div className={styles.editor}>
+        {leadingContent && <div className={styles.leadingContent}>{leadingContent}</div>}
+        <textarea
+          ref={textareaRef}
+          rows={1}
+          className={styles.textarea}
+          placeholder={placeholder}
+          value={value}
+          onChange={(e) => onValueChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+          aria-expanded={Boolean(suggestionListId)}
+          aria-controls={suggestionListId}
+        />
+      </div>
 
       <div className={styles.toolbar}>
         <div className={styles.toolbarLeft}>
@@ -171,16 +193,29 @@ export const PromptInput: React.FC<PromptInputProps> = ({
             <Mic size={18} />
           </button>
 
-          <button
-            type="button"
-            className={`${styles.sendBtn} ${hasValue ? styles.sendBtnActive : ''}`}
-            onClick={onSend}
-            title="发送消息 (Enter)"
-            aria-label="发送消息"
-            disabled={!hasValue}
-          >
-            <ArrowUp size={16} />
-          </button>
+          {isStreaming ? (
+            <button
+              type="button"
+              className={styles.stopBtn}
+              onClick={onStop}
+              title={isStopping ? '正在停止…' : '停止当前回复'}
+              aria-label={isStopping ? '正在停止当前回复' : '停止当前回复'}
+              disabled={isStopping || !onStop}
+            >
+              <Square size={12} fill="currentColor" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className={`${styles.sendBtn} ${isSendEnabled ? styles.sendBtnActive : ''}`}
+              onClick={onSend}
+              title="发送消息 (Enter)"
+              aria-label="发送消息"
+              disabled={!isSendEnabled}
+            >
+              <ArrowUp size={16} />
+            </button>
+          )}
         </div>
       </div>
     </div>

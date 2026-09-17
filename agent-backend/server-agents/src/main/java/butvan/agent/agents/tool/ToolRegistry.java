@@ -1,23 +1,18 @@
 package butvan.agent.agents.tool;
 
-import butvan.agent.agents.tool.impl.AcceptanceReportTool;
-import butvan.agent.agents.tool.impl.WebSearchTool;
 import io.agentscope.core.tool.Toolkit;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
 
 @Component
 public class ToolRegistry {
 
     private final Toolkit toolkit;
 
-    public ToolRegistry(
-            WebSearchTool webSearchTool,
-            AcceptanceReportTool acceptanceReportTool
-    ) {
+    public ToolRegistry(List<AgentToolModule> toolModules) {
         this.toolkit = new Toolkit();
-
-        this.toolkit.registerTool(webSearchTool);
-        this.toolkit.registerTool(acceptanceReportTool);
+        toolModules.forEach(this.toolkit::registerTool);
     }
 
     /**
@@ -27,5 +22,13 @@ public class ToolRegistry {
         return this.toolkit;
     }
 
+    /**
+     * 为最终 Agent Toolkit 启用按需 Schema 路由。
+     *
+     * <p>必须在 HarnessAgent 完成内置工具注册后调用，确保框架工具和业务工具使用同一套路由策略。</p>
+     */
+    public void enableOnDemandSchemas(Toolkit agentToolkit) {
+        ToolSchemaRoutingPolicy.apply(agentToolkit);
+    }
 
 }

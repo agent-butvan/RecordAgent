@@ -8,6 +8,7 @@ import butvan.agent.network.daily.model.DailyEventModels.JournalDetails;
 import butvan.agent.network.daily.model.DailyEventModels.IncomeDetails;
 import butvan.agent.network.daily.model.DailyEventModels.ScheduleDetails;
 import butvan.agent.network.daily.model.DailyEventModels.TodoDetails;
+import butvan.agent.network.study.model.StudyModels.StudyDetails;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -50,7 +51,13 @@ public final class DailyEventResponses {
     }
 
     /** 待办详情响应。 */
-    public record TodoDetailResponse(String time, String priority, boolean completed, String recurrence) {
+    public record TodoDetailResponse(
+            String time,
+            String priority,
+            boolean completed,
+            String recurrence,
+            Integer recurrenceWeekday,
+            Integer recurrenceMonthDay) {
     }
 
     /** 日程详情响应。 */
@@ -69,6 +76,10 @@ public final class DailyEventResponses {
 
     /** 手记详情响应。 */
     public record JournalDetailResponse(String body, String mood) {
+    }
+
+    /** 学习时段详情响应。 */
+    public record StudyDetailResponse(String startedAt, String endedAt, String category, String timezone) {
     }
 
     /** 将领域日记录转换为协议 DTO。 */
@@ -92,7 +103,9 @@ public final class DailyEventResponses {
 
     private static Object mapDetails(Object details) {
         if (details instanceof TodoDetails todo) {
-            return new TodoDetailResponse(todo.time(), todo.priority(), todo.completed(), todo.recurrence());
+            return new TodoDetailResponse(
+                    todo.time(), todo.priority(), todo.completed(), todo.recurrence(),
+                    todo.recurrenceWeekday(), todo.recurrenceMonthDay());
         }
         if (details instanceof ScheduleDetails schedule) {
             return new ScheduleDetailResponse(
@@ -108,6 +121,9 @@ public final class DailyEventResponses {
         }
         if (details instanceof JournalDetails journal) {
             return new JournalDetailResponse(journal.body(), journal.mood());
+        }
+        if (details instanceof StudyDetails study) {
+            return new StudyDetailResponse(study.startedAt(), study.endedAt(), study.category(), study.timezone());
         }
         return null;
     }

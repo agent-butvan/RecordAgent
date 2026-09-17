@@ -6,6 +6,7 @@ import java.time.Instant;
 public record SessionSummaryDto(
         String id,
         SessionKind kind,
+        String projectId,
         String title,
         String lastMessagePreview,
         Instant createdAt,

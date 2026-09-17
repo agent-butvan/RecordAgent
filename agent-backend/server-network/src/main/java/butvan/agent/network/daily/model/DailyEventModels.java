@@ -22,10 +22,22 @@ public final class DailyEventModels {
     }
 
     /** 创建待办的领域命令。 */
-    public record TodoCommand(LocalDate eventDate, String title, String time, String priority, String recurrence)
+    public record TodoCommand(
+            LocalDate eventDate,
+            String title,
+            String time,
+            String priority,
+            String recurrence,
+            Integer recurrenceWeekday,
+            Integer recurrenceMonthDay)
             implements DailyEventCommand {
         public TodoCommand(LocalDate eventDate, String title, String time, String priority) {
-            this(eventDate, title, time, priority, "none");
+            this(eventDate, title, time, priority, "none", null, null);
+        }
+
+        /** 兼容未指定重复日期的领域调用，由处理器沿用原有周一或每月 1 号规则。 */
+        public TodoCommand(LocalDate eventDate, String title, String time, String priority, String recurrence) {
+            this(eventDate, title, time, priority, recurrence, null, null);
         }
 
         @Override
@@ -35,7 +47,13 @@ public final class DailyEventModels {
     }
 
     /** 待办类型的结构化详情。 */
-    public record TodoDetails(String time, String priority, boolean completed, String recurrence) {
+    public record TodoDetails(
+            String time,
+            String priority,
+            boolean completed,
+            String recurrence,
+            Integer recurrenceWeekday,
+            Integer recurrenceMonthDay) {
     }
 
     /** 创建日程的领域命令。 */

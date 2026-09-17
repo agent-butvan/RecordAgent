@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { CaretLeftIcon, CaretRightIcon } from '@phosphor-icons/react';
 import type { FinanceAccount, FinanceAccountType } from '../../types/finance';
 import { AccountTypeIcon } from './AccountTypeIcon';
 import styles from './AssetAccountDeck.module.css';
@@ -44,7 +44,7 @@ export const AssetAccountDeck: React.FC<AssetAccountDeckProps> = ({ accounts }) 
       <span className={`${styles.backCard} ${styles.backCardNear}`} aria-hidden="true" />
       <article key={account.id} className={`${styles.accountCard} ${tone(account.accountType)}`} aria-live="polite">
         <header>
-          <span className={styles.cardIcon}><AccountTypeIcon type={account.accountType} size={22} /></span>
+          <AccountTypeIcon type={account.accountType} size={22} variant="tile" />
           <span className={styles.cardIdentity}><strong>{account.name}</strong><small>{ACCOUNT_LABELS[account.accountType]}</small></span>
           <span className={styles.cardCount}>{activeIndex + 1} / {accounts.length}</span>
         </header>
@@ -57,7 +57,7 @@ export const AssetAccountDeck: React.FC<AssetAccountDeckProps> = ({ accounts }) 
     </div>
 
     <div className={styles.deckNavigation}>
-      <button type="button" className={styles.arrowButton} onClick={selectPrevious} disabled={accounts.length < 2} aria-label="上一个资产账户"><ChevronLeft size={14} /></button>
+      <button type="button" className={styles.arrowButton} onClick={selectPrevious} disabled={accounts.length < 2} aria-label="上一个资产账户"><CaretLeftIcon size={14} /></button>
       <div className={styles.accountSelectors} aria-label="选择资产账户">
         {accounts.map((item, index) => <button type="button" aria-pressed={index === activeIndex}
           className={index === activeIndex ? styles.selectorActive : ''} key={item.id}
@@ -65,7 +65,7 @@ export const AssetAccountDeck: React.FC<AssetAccountDeckProps> = ({ accounts }) 
           <AccountTypeIcon type={item.accountType} size={16} /><span>{item.name}</span>
         </button>)}
       </div>
-      <button type="button" className={styles.arrowButton} onClick={selectNext} disabled={accounts.length < 2} aria-label="下一个资产账户"><ChevronRight size={14} /></button>
+      <button type="button" className={styles.arrowButton} onClick={selectNext} disabled={accounts.length < 2} aria-label="下一个资产账户"><CaretRightIcon size={14} /></button>
     </div>
   </div>;
 };

@@ -28,6 +28,25 @@ public class FinanceRepository {
 
     private final JdbcTemplate jdbcTemplate;
 
+    /** 查询用户在指定收支类型中使用过的分类。 */
+    public List<String> findTransactionCategories(String ownerId, String transactionType) {
+        return jdbcTemplate.queryForList("""
+                SELECT name FROM finance_transaction_category
+                WHERE owner_id = ? AND transaction_type = ?
+                ORDER BY created_at, name
+                """, String.class, ownerId, transactionType);
+    }
+
+    /** 记住用户首次使用的收支分类，重复使用时保持原顺序。 */
+    public void rememberTransactionCategory(
+            String ownerId, String transactionType, String category, Instant now) {
+        jdbcTemplate.update("""
+                INSERT OR IGNORE INTO finance_transaction_category (
+                    owner_id, transaction_type, name, created_at
+                ) VALUES (?, ?, ?, ?)
+                """, ownerId, transactionType, category, now.toString());
+    }
+
     /** 查询用户全部账户。 */
     public List<FinanceAccount> findAccounts(String ownerId) {
         return jdbcTemplate.query("""

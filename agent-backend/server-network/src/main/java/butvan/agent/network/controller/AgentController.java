@@ -4,10 +4,18 @@ import butvan.agent.agents.agent.*;
 import butvan.agent.agents.agent.event.AgentStreamEvent;
 import butvan.agent.agents.agent.permission.PermissionDecisionRequest;
 import butvan.agent.agents.agent.permission.PermissionDecisionResponse;
+import butvan.agent.agents.agent.permission.PermissionBatchDecisionRequest;
 import butvan.agent.agents.agent.permission.PermissionResumeRequest;
+import butvan.agent.agents.agent.permission.PendingApprovalView;
 import butvan.agent.agents.session.AgentStreamSession;
 import butvan.agent.network.annotation.ApiLog;
 import butvan.agent.network.dto.PlanResponse;
+import butvan.agent.network.chat.dto.AgentChatRequest;
+import butvan.agent.network.chat.dto.AgentRunCancelRequest;
+import butvan.agent.network.chat.dto.AgentRunCancelResponse;
+import butvan.agent.network.chat.service.AgentChatContextService;
+import butvan.agent.network.chat.service.AgentAnalysisContextService;
+import butvan.agent.agents.identity.CurrentUserProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -28,6 +36,9 @@ import java.io.IOException;
 public class AgentController {
 
     private final AgentService agentService;
+    private final AgentChatContextService agentChatContextService;
+    private final AgentAnalysisContextService agentAnalysisContextService;
+    private final CurrentUserProvider currentUserProvider;
 
     @ApiLog("提交单条工具权限确认")
     @PostMapping("/permission/decision")
@@ -37,19 +48,51 @@ public class AgentController {
         return agentService.decidePermission(request);
     }
 
+    @ApiLog("提交整批工具权限确认")
+    @PostMapping("/permission/decisions")
+    public PermissionDecisionResponse decidePermissions(
+            @RequestBody PermissionBatchDecisionRequest request
+    ) {
+        return agentService.decidePermissions(request);
+    }
+
+    @ApiLog("查询会话待处理的工具权限确认")
+    @GetMapping("/{sessionId}/permission/pending")
+    public ResponseEntity<PendingApprovalView> currentPendingPermission(
+            @PathVariable String sessionId
+    ) {
+        return agentService.currentPendingApproval(sessionId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
     @ApiLog("恢复已确认的Agent对话SSE流")
     @PostMapping(value = "/permission/resume", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter resumeChat(@RequestBody PermissionResumeRequest request) {
         AgentStreamSession session = agentService.resumeAgent(
-                request.sessionId(), request.approvalId());
+                request.sessionId(), request.approvalId(), request.runId());
         return createEmitter(session); // 将原 streamChat 中的 emitter/发送线程逻辑提取到此方法。
     }
 
     @ApiLog("Agent对话SSE流式推流")
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter streamChat(@RequestBody AgentUserCall request) {
+    public SseEmitter streamChat(@RequestBody AgentChatRequest request) {
         // 初始对话流和确认后的恢复流共用同一套 SSE 发送/断开逻辑。
-        return createEmitter(agentService.streamAgent(request));
+        String ownerId = currentUserProvider.currentUserId();
+        AgentUserCall call = request.analysisContext() == null
+                ? agentChatContextService.prepare(ownerId, request)
+                : agentAnalysisContextService.prepare(ownerId, request);
+        return createEmitter(agentService.streamAgent(call));
+    }
+
+    @ApiLog("停止指定Agent对话运行")
+    @PostMapping("/runs/{runId}/cancel")
+    public AgentRunCancelResponse cancelRun(
+            @PathVariable String runId,
+            @RequestBody AgentRunCancelRequest request
+    ) {
+        var result = agentService.cancelRun(request.sessionId(), runId);
+        return new AgentRunCancelResponse(result.runId(), result.accepted(), result.status());
     }
 
     @ApiLog("读取当前会话的任务计划书")
@@ -73,6 +116,7 @@ public class AgentController {
         // 0L 表示由应用控制何时关闭，避免 Spring 默认超时中断等待确认的流。
         SseEmitter emitter = new SseEmitter(0L);
 
+        var terminalDelivered = new java.util.concurrent.atomic.AtomicBoolean(false);
         Thread sender = Thread.startVirtualThread(() -> {
             try {
                 while (!Thread.currentThread().isInterrupted()) {
@@ -84,6 +128,7 @@ public class AgentController {
 
                     // done、error、permission_required 都是当前 SSE 的终态事件。
                     if (event.isTerminal()) {
+                        terminalDelivered.set(true);
                         return;
                     }
                 }
@@ -94,16 +139,18 @@ public class AgentController {
                 // onCompletion 会中断 sender；恢复中断标记以便 finally 正常释放资源。
                 Thread.currentThread().interrupt();
             } finally {
-                // 发送端结束后终止仍在等待模型或队列的生产者线程。
-                session.cancel();
+                // 只有非终态断开才取消生产者；正常终态不反向中断 AgentScope。
+                if (!terminalDelivered.get()) session.closeTransport();
                 emitter.complete();
             }
         });
 
         emitter.onCompletion(() -> {
             // 浏览器主动断开时，同时停止 SSE 消费线程与 Agent 生产线程。
-            sender.interrupt();
-            session.cancel();
+            if (!terminalDelivered.get()) {
+                sender.interrupt();
+                session.closeTransport();
+            }
         });
 
         return emitter;

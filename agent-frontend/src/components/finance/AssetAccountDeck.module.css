@@ -12,7 +12,6 @@
 .neutralTone { background: #f7f5f1; color: #665a49; }
 .accountCard header, .accountCard footer { display: flex; align-items: center; }
 .accountCard header { gap: 9px; }
-.cardIcon { width: 34px; height: 34px; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; border: 1px solid currentColor; border-radius: var(--radius-md); opacity: .78; }
 .cardIdentity { min-width: 0; display: flex; flex-direction: column; }
 .cardIdentity strong { overflow: hidden; color: currentColor; font-size: 12px; font-weight: 650; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
 .cardIdentity small { margin-top: 2px; color: currentColor; font-size: 9px; opacity: .66; }
@@ -28,7 +27,7 @@
 .arrowButton:disabled { color: var(--border-medium); cursor: default; }
 .accountSelectors { min-width: 0; display: flex; gap: 5px; overflow-x: auto; padding: 2px; scrollbar-width: none; }
 .accountSelectors::-webkit-scrollbar { display: none; }
-.accountSelectors button { min-width: 34px; max-width: 112px; height: 30px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 0 8px; border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--text-muted); }
+.accountSelectors button { min-width: 34px; max-width: 112px; height: 30px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 0 8px; border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--text-secondary); }
 .accountSelectors button:hover { background: var(--bg-surface); color: var(--text-primary); }
 .accountSelectors button > svg { flex: 0 0 auto; }
 .accountSelectors button > span { overflow: hidden; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }

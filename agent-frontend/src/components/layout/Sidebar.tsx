@@ -15,16 +15,17 @@ import {
   Pencil,
   User,
   Settings,
-  CalendarDays,
-  WalletCards,
+  AlertTriangle,
 } from 'lucide-react';
+import { BooksIcon, CalendarDotsIcon, StudentIcon, WalletIcon } from '@phosphor-icons/react';
 import type { ChatSession, Project } from '../../types/chat';
 import { FormField } from '../common/FormField';
 import { TextInput } from '../common/TextInput';
 import { Modal } from '../common/Modal';
-import { Message } from '../common/Message';
+import { useMessage } from '../common/Message';
 import { EmailBindingModal } from '../account/EmailBindingModal';
 import { fetchAccountStatus } from '../../services/api';
+import { canPickProjectDirectory, pickProjectDirectory } from '../../services/projectPicker';
 import styles from './Sidebar.module.css';
 
 function getAvatarText(email: string | null): string {
@@ -76,8 +77,8 @@ function sortByUpdatedDesc(a: ChatSession, b: ChatSession): number {
 }
 
 interface SidebarProps {
-  activeFeature: 'chat' | 'calendar' | 'finance';
-  onSelectFeature: (feature: 'chat' | 'calendar' | 'finance') => void;
+  activeFeature: 'chat' | 'calendar' | 'finance' | 'record' | 'study';
+  onSelectFeature: (feature: 'chat' | 'calendar' | 'finance' | 'record' | 'study') => void;
   /** 用户头像 URL；未配置时使用邮箱前两位作为默认头像 */
   avatarUrl?: string;
   projects: Project[];
@@ -86,7 +87,7 @@ interface SidebarProps {
   onSelectSession: (id: string) => void;
   onNewGeneralChat: () => void;
   onNewProjectChat: (projectId: string) => void;
-  onImportProject: (name: string, path: string) => void;
+  onImportProject: (name: string, path: string) => Promise<{ success: boolean; message?: string }>;
   onDeleteSession: (id: string) => Promise<{ success: boolean; message?: string }>;
   onUpdateSessionTitle?: (id: string, newTitle: string) => void;
   onOpenSettings: () => void;
@@ -109,6 +110,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenSettings,
   onOpenAccountSettings,
 }) => {
+  const { showMessage } = useMessage();
   const [isEmailBindingOpen, setIsEmailBindingOpen] = useState(false);
   const [maskedEmail, setMaskedEmail] = useState<string | null>(null);
 
@@ -130,11 +132,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const menuRef = useRef<HTMLDivElement>(null);
   const [deleteSession, setDeleteSession] = useState<ChatSession | null>(null);
   const [isDeletingSession, setIsDeletingSession] = useState(false);
-  const [deleteSessionError, setDeleteSessionError] = useState<string | null>(null);
 
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importPath, setImportPath] = useState('');
   const [importName, setImportName] = useState('');
+  const [isPickingProject, setIsPickingProject] = useState(false);
+  const [isImportingProject, setIsImportingProject] = useState(false);
 
   // 侧边栏拖拽调整宽度
   const sidebarRef = useRef<HTMLElement>(null);
@@ -254,29 +257,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const requestDeleteSession = (session: ChatSession, e?: React.MouseEvent) => {
     e?.stopPropagation();
     setMenuSession(null);
-    setDeleteSessionError(null);
     setDeleteSession(session);
   };
 
   const closeDeleteSession = () => {
     if (isDeletingSession) return;
     setDeleteSession(null);
-    setDeleteSessionError(null);
   };
 
   const confirmDeleteSession = async () => {
     if (!deleteSession || isDeletingSession) return;
     setIsDeletingSession(true);
-    setDeleteSessionError(null);
     try {
       const result = await onDeleteSession(deleteSession.id);
       if (result.success) {
         setDeleteSession(null);
         return;
       }
-      setDeleteSessionError(result.message || '删除会话失败，请稍后重试。');
+      showMessage('error', result.message || '删除会话失败，请稍后重试。');
     } catch (error) {
-      setDeleteSessionError(error instanceof Error ? error.message : '删除会话失败，请稍后重试。');
+      showMessage('error', error instanceof Error ? error.message : '删除会话失败，请稍后重试。');
     } finally {
       setIsDeletingSession(false);
     }
@@ -289,14 +289,44 @@ export const Sidebar: React.FC<SidebarProps> = ({
     setEditingSessionId(null);
   };
 
-  const handleConfirmImport = (e: React.FormEvent) => {
+  const openImportDialog = async () => {
+    if (isPickingProject) return;
+    if (!canPickProjectDirectory()) {
+      setIsImportModalOpen(true);
+      return;
+    }
+    setIsPickingProject(true);
+    try {
+      const selected = await pickProjectDirectory();
+      if (!selected) return;
+      setImportPath(selected);
+      setImportName(selected.split(/[\\/]/).filter(Boolean).pop() || '未命名项目');
+      setIsImportModalOpen(true);
+    } catch (error) {
+      showMessage('error', error instanceof Error ? error.message : '无法打开目录选择器，请手动填写路径');
+      setIsImportModalOpen(true);
+    } finally {
+      setIsPickingProject(false);
+    }
+  };
+
+  const handleConfirmImport = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!importPath.trim()) return;
-    const name = importName.trim() || importPath.split('/').filter(Boolean).pop() || '未命名项目';
-    onImportProject(name, importPath.trim());
-    setImportPath('');
-    setImportName('');
-    setIsImportModalOpen(false);
+    if (!importPath.trim() || isImportingProject) return;
+    const name = importName.trim() || importPath.split(/[\\/]/).filter(Boolean).pop() || '未命名项目';
+    setIsImportingProject(true);
+    try {
+      const result = await onImportProject(name, importPath.trim());
+      if (!result.success) {
+        showMessage('error', result.message || '导入项目失败，请检查目录后重试。');
+        return;
+      }
+      setImportPath('');
+      setImportName('');
+      setIsImportModalOpen(false);
+    } finally {
+      setIsImportingProject(false);
+    }
   };
 
   const renderSessionRow = (session: ChatSession, withMenu = true) => {
@@ -362,6 +392,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside ref={sidebarRef} className={styles.sidebar} style={{ width: sidebarWidth }}>
+      {/* Overlay 标题栏在侧边栏上方没有内容时，保留可拖拽的原生窗口区域。 */}
+      <div className={styles.titlebarDragRegion} data-tauri-drag-region aria-hidden="true" />
       {/* 右缘拖拽手柄：调整侧边栏宽度，双击恢复默认宽度 */}
       <div
         className={`${styles.resizeHandle} ${isResizing ? styles.resizeHandleActive : ''}`}
@@ -420,7 +452,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             onClick={() => onSelectFeature('calendar')}
             aria-current={activeFeature === 'calendar' ? 'page' : undefined}
           >
-            <CalendarDays size={14} />
+            <CalendarDotsIcon size={14} />
             <span>日历</span>
           </button>
           <button
@@ -429,8 +461,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
             onClick={() => onSelectFeature('finance')}
             aria-current={activeFeature === 'finance' ? 'page' : undefined}
           >
-            <WalletCards size={14} />
+            <WalletIcon size={14} />
             <span>财务</span>
+          </button>
+          <button
+            type="button"
+            className={`${styles.featureTab} ${activeFeature === 'record' ? styles.featureTabActive : ''}`}
+            onClick={() => onSelectFeature('record')}
+            aria-current={activeFeature === 'record' ? 'page' : undefined}
+          >
+            <BooksIcon size={14} />
+            <span>资料</span>
+          </button>
+          <button
+            type="button"
+            className={`${styles.featureTab} ${activeFeature === 'study' ? styles.featureTabActive : ''}`}
+            onClick={() => onSelectFeature('study')}
+            aria-current={activeFeature === 'study' ? 'page' : undefined}
+          >
+            <StudentIcon size={14} />
+            <span>记录</span>
           </button>
         </nav>
 
@@ -472,7 +522,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     className={styles.iconBtnSmall}
                     title="导入本地项目"
                     aria-label="导入本地项目"
-                    onClick={() => setIsImportModalOpen(true)}
+                    onClick={() => void openImportDialog()}
+                    disabled={isPickingProject}
                   >
                     <FolderPlus size={14} />
                   </button>
@@ -484,7 +535,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <button
                         type="button"
                         className={styles.emptyLinkRow}
-                        onClick={() => setIsImportModalOpen(true)}
+                        onClick={() => void openImportDialog()}
+                        disabled={isPickingProject}
                       >
                         <Plus size={13} />
                         <span>导入项目</span>
@@ -512,15 +564,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                     <ChevronRight size={13} className={styles.arrowIcon} />
                                   )}
                                   <Folder size={14} className={styles.folderIcon} />
-                                  <span className={styles.projectName} title={project.path}>
+                                  <span className={`${styles.projectName} ${project.availability !== 'AVAILABLE' ? styles.projectUnavailable : ''}`} title={project.path}>
                                     {project.name}
                                   </span>
+                                  {project.availability !== 'AVAILABLE' && (
+                                    <AlertTriangle size={12} className={styles.projectWarning} aria-label="项目目录不可访问" />
+                                  )}
                                 </button>
                                 <button
                                   className={styles.iconBtnSmall}
                                   title="在此项目下新建会话"
                                   aria-label="在此项目下新建会话"
                                   onClick={() => onNewProjectChat(project.id)}
+                                  disabled={project.availability !== 'AVAILABLE'}
                                 >
                                   <Plus size={14} />
                                 </button>
@@ -632,18 +688,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <Modal
         open={isImportModalOpen}
         title="导入本地项目"
-        onClose={() => setIsImportModalOpen(false)}
+        onClose={() => { if (!isImportingProject) setIsImportModalOpen(false); }}
       >
         <form onSubmit={handleConfirmImport} className={styles.modalBody}>
-          <FormField label="项目路径 (支持绝对路径)" htmlFor="import-path" required>
-            <TextInput
-              id="import-path"
-              placeholder="/Users/username/Projects/my_project"
-              value={importPath}
-              onChange={(e) => setImportPath(e.target.value)}
-              autoFocus
-              required
-            />
+          <FormField label="项目目录" htmlFor="import-path" required hint="只登记目录位置，不会复制、初始化或删除其中的文件。">
+            <div className={styles.pathPickerRow}>
+              <TextInput
+                id="import-path"
+                placeholder="选择目录，或粘贴绝对路径"
+                value={importPath}
+                onChange={(e) => setImportPath(e.target.value)}
+                autoFocus
+                required
+              />
+              {canPickProjectDirectory() && (
+                <button type="button" className={styles.browseBtn} onClick={() => void openImportDialog()} disabled={isPickingProject || isImportingProject}>
+                  重新选择
+                </button>
+              )}
+            </div>
           </FormField>
 
           <FormField label="项目别名 (可选)" htmlFor="import-name">
@@ -660,11 +723,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
               type="button"
               className={styles.cancelBtn}
               onClick={() => setIsImportModalOpen(false)}
+              disabled={isImportingProject}
             >
               取消
             </button>
-            <button type="submit" className={styles.submitBtn}>
-              确认导入
+            <button type="submit" className={styles.submitBtn} disabled={!importPath.trim() || isImportingProject}>
+              {isImportingProject ? '正在导入…' : '导入并新建会话'}
             </button>
           </div>
         </form>
@@ -681,7 +745,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <p className={styles.deleteDescription}>
             “{deleteSession?.title || '新对话'}”及其全部聊天记录将被永久删除，此操作无法撤销。
           </p>
-          {deleteSessionError && <Message tone="error">{deleteSessionError}</Message>}
           <div className={styles.modalActions}>
             <button
               type="button"
@@ -716,24 +779,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
           className={styles.userProfileCard}
           type="button"
           onClick={() => (maskedEmail ? onOpenAccountSettings() : setIsEmailBindingOpen(true))}
-          title={maskedEmail ? `已绑定账号：${maskedEmail}（点击进入账户设置）` : '点击绑定邮箱'}
+          title={maskedEmail ? `已绑定账号：${maskedEmail}（点击进入个人资料）` : '点击绑定邮箱'}
         >
           <div className={styles.avatarWrapper}>
             {avatarUrl ? (
               <img src={avatarUrl} alt="用户头像" className={styles.avatarImage} />
             ) : (
-              <div className={`${styles.avatar} ${maskedEmail ? styles.avatarBound : styles.avatarUnbound}`}>
-                {maskedEmail ? getAvatarText(maskedEmail) : <User size={15} />}
+              <div className={styles.avatar}>
+                {maskedEmail ? getAvatarText(maskedEmail) : <User size={13} />}
               </div>
             )}
-            {maskedEmail && <span className={styles.verifiedDot} title="已验证" />}
           </div>
           <div className={styles.profileInfo}>
             <span className={styles.profileName}>
               {maskedEmail || '未绑定邮箱'}
-            </span>
-            <span className={styles.profileStatus}>
-              {maskedEmail ? '个人账户' : '点击绑定'}
             </span>
           </div>
         </button>
@@ -745,7 +804,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           aria-label="系统设置"
           onClick={onOpenSettings}
         >
-          <Settings size={15} />
+          <Settings size={15} strokeWidth={1.75} />
         </button>
       </div>
     </aside>

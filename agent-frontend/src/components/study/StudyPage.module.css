@@ -1,0 +1,81 @@
+.workspace { flex: 1; height: 100vh; min-width: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--bg-app); }
+.page { flex: 1; min-height: 0; overflow-y: auto; }
+.content { width: 100%; max-width: 1240px; min-height: 100%; margin: 0 auto; padding: 38px 42px 56px; }
+.topActions { display: flex; align-items: center; gap: 14px; }
+.textAction, .linkButton { border: 0; background: transparent; color: var(--text-secondary); font: 500 11px var(--font-sans); }
+.linkButton { display: inline-flex; align-items: center; gap: 4px; }
+.textAction:hover, .linkButton:hover { color: var(--accent-blue); }
+
+.overview { display: grid; grid-template-columns: 1.35fr repeat(3, 1fr); align-items: end; gap: 44px; margin-bottom: 50px; }
+.todayBlock { display: flex; flex-direction: column; }
+.todayBlock > span, .periodStats dt { color: var(--text-secondary); font-size: 10px; font-weight: 500; }
+.todayBlock strong { margin-top: 8px; color: var(--text-primary); font-size: 34px; font-weight: 700; line-height: 1; letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
+.todayBlock small { margin-top: 8px; color: var(--text-muted); font-size: 10px; }
+.periodStats { grid-column: 2 / -1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 44px; }
+.periodStats dd { margin-top: 8px; color: #416f9f; font-size: 17px; font-weight: 650; font-variant-numeric: tabular-nums; }
+
+.mainLayout { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(300px, .55fr); align-items: start; gap: 70px; }
+.primaryColumn, .insightColumn { min-width: 0; }
+.section { margin-bottom: 48px; }
+.sideSection { margin-bottom: 42px; }
+.sectionHeading { min-height: 37px; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+.sectionHeading h2 { margin: 0; color: var(--text-primary); font-size: 14px; font-weight: 650; letter-spacing: -.01em; }
+.sectionHeading span, .sectionSide { display: block; margin-top: 5px; color: var(--text-muted); font-size: 10px; }
+.sectionSide { margin-top: 1px; }
+
+.textAction:focus-visible, .linkButton:focus-visible { outline: 1px solid var(--accent-blue); outline-offset: 3px; }
+
+.dateNavigation { display: flex; align-items: center; gap: 2px; margin-top: -4px; }
+.dateArrow, .todayAction, .datePicker { height: 28px; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--text-secondary); transition: background-color var(--transition-fast), color var(--transition-fast); }
+.dateArrow { width: 28px; display: grid; place-items: center; padding: 0; }
+.todayAction { padding: 0 8px; font: 550 10px var(--font-sans); }
+.datePicker { position: relative; min-width: 54px; display: grid; place-items: center; overflow: hidden; font-size: 9px; font-variant-numeric: tabular-nums; }
+.datePicker input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.dateArrow:hover:not(:disabled), .todayAction:hover, .datePicker:hover, .datePicker:focus-within { background: var(--bg-surface-hover); color: var(--text-primary); }
+.dateArrow:focus-visible, .todayAction:focus-visible, .datePicker:focus-within { outline: 1px solid var(--accent-blue); outline-offset: 1px; }
+.dateArrow:disabled { color: var(--border-medium); opacity: 1; cursor: default; }
+
+.compactEmpty { min-height: 78px; display: flex; align-items: center; color: var(--text-muted); font-size: 10px; }
+.timelineError { min-height: 78px; display: flex; align-items: center; justify-content: space-between; gap: 16px; color: #9a4038; font-size: 10px; }
+.timelineError button { border: 0; background: transparent; color: inherit; font: 600 10px var(--font-sans); }
+
+.recentPreview { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); min-height: 144px; border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); }
+.latestSession { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-content: center; gap: 6px 16px; padding: 20px 24px 20px 0; border: 0; border-right: 1px solid var(--border-subtle); background: transparent; color: var(--text-primary); text-align: left; }
+.latestSession:focus-visible, .previousSessions button:focus-visible { outline: 1px solid var(--accent-blue); outline-offset: -1px; background: var(--bg-surface-hover); }
+.latestDate { grid-column: 1 / -1; color: var(--text-muted); font-size: 9px; font-variant-numeric: tabular-nums; }
+.latestSession > strong { min-width: 0; overflow: hidden; font-size: 13px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.latestSession > b { grid-column: 2; grid-row: 2 / span 2; align-self: center; color: #416f9f; font-size: 15px; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.latestMeta { overflow: hidden; color: var(--text-muted); font-size: 9.5px; text-overflow: ellipsis; white-space: nowrap; }
+.previousSessions { min-width: 0; display: grid; grid-template-rows: repeat(2, 1fr); }
+.previousSessions button { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-content: center; gap: 5px 12px; padding: 12px 0 12px 20px; border: 0; background: transparent; color: var(--text-primary); text-align: left; }
+.previousSessions button + button { border-top: 1px solid var(--border-subtle); }
+.previousSessions button > span { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: 8.5px; }
+.previousSessions em { color: #587da8; font-style: normal; }
+.previousSessions strong { overflow: hidden; font-size: 10.5px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.previousSessions b { color: var(--text-secondary); font-size: 9.5px; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.empty, .loading { min-height: 170px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; color: var(--text-muted); font-size: 10px; text-align: center; }
+.empty strong { color: var(--text-secondary); font-size: 12px; }
+
+.heatmapSection { margin-top: 4px; padding-top: 32px; }
+.heatmapSummary { color: var(--text-secondary); font-size: 10px; font-variant-numeric: tabular-nums; }
+.heatmapLoading { min-height: 152px; display: flex; align-items: center; color: var(--text-muted); font-size: 9px; }
+.heatmapError { min-height: 152px; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #9a4038; font-size: 9px; }
+.heatmapError button { border: 0; background: transparent; color: inherit; font: 600 9px var(--font-sans); }
+
+.chart { height: 174px; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); align-items: end; gap: 9px; margin-top: 7px; }
+.chartDay { min-width: 0; height: 100%; display: grid; grid-template-rows: 16px minmax(0, 1fr) 18px; justify-items: center; align-items: end; }
+.chartDay strong { color: var(--text-muted); font-size: 8px; font-weight: 500; }
+.barArea { width: 100%; height: 100%; display: flex; align-items: flex-end; justify-content: center; }
+.barArea i { width: 14px; min-height: 3px; border-radius: 4px 4px 2px 2px; background: #dfe5ea; }
+.barArea .todayBar { background: #7ca4d5; }
+.chartDay span { color: var(--text-muted); font-size: 9px; }
+.smallStats { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 24px; margin-top: 22px; }
+.smallStats dt { color: var(--text-muted); font-size: 9px; }
+.smallStats dd { margin-top: 5px; color: var(--text-primary); font-size: 10.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.insight { margin: 0; color: var(--text-secondary); font-size: 11px; line-height: 1.8; }
+.insight em { color: #4776a7; font-style: normal; font-weight: 650; }
+
+@media (max-width: 1050px) { .mainLayout { grid-template-columns: 1fr; gap: 8px; }.insightColumn { display: grid; grid-template-columns: 1fr 1fr; gap: 38px; }.insightColumn .sideSection:first-child { grid-row: span 2; } }
+@media (max-width: 720px) { .content { padding: 28px 20px 42px; }.overview { grid-template-columns: 1fr 1fr; gap: 28px; }.todayBlock { grid-column: 1 / -1; }.periodStats { grid-column: 1 / -1; gap: 18px; }.mainLayout { gap: 0; }.insightColumn { grid-template-columns: 1fr; gap: 0; }.recentPreview { grid-template-columns: 1fr; }.latestSession { border-right: 0; border-bottom: 1px solid var(--border-subtle); padding-right: 0; }.previousSessions button { padding-left: 0; } }
+@media (max-width: 480px) { .topActions { gap: 8px; }.overview, .periodStats { grid-template-columns: 1fr; }.todayBlock, .periodStats { grid-column: auto; }.smallStats { gap: 14px; } }

@@ -1,0 +1,11 @@
+.form { display: flex; flex-direction: column; gap: 16px; }
+.description { margin: -4px 0 0; color: var(--text-secondary); font-size: 12px; line-height: 1.6; }
+.fieldGrid, .coordinateGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.coordinateGrid { gap: 12px; }
+.locationAction { display: flex; align-items: center; gap: 10px; color: var(--text-secondary); font-size: 11px; line-height: 1.5; }
+.actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 2px; }
+
+@media (max-width: 600px) {
+  .fieldGrid, .coordinateGrid { grid-template-columns: 1fr; }
+  .locationAction { align-items: flex-start; flex-direction: column; gap: 7px; }
+}

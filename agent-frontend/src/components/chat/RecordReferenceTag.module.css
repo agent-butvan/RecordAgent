@@ -1,0 +1,22 @@
+.tag {
+  max-width: min(360px, 100%);
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  border: 1px solid var(--reference-border);
+  border-radius: var(--radius-md);
+  background: var(--reference-background);
+  color: var(--reference-color);
+  font-size: 12px;
+  font-weight: 550;
+  line-height: 1.4;
+  vertical-align: middle;
+}
+
+.tag > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

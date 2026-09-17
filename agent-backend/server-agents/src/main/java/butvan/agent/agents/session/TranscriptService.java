@@ -2,6 +2,7 @@ package butvan.agent.agents.session;
 
 import butvan.agent.agents.session.dto.TranscriptMessageDto;
 import butvan.agent.agents.storage.AgentStorageProperties;
+import butvan.agent.agents.usage.TurnTokenUsage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -77,7 +78,8 @@ public class TranscriptService {
                 TranscriptMessageDto.MessageStatus.COMPLETED,
                 null,
                 List.of(),
-                null // 用户消息没有思考过程
+                null, // 用户消息没有思考过程
+                null // 用户消息不承载模型用量
         ));
 
         return turnId;
@@ -93,8 +95,10 @@ public class TranscriptService {
             String thinking,
             TranscriptMessageDto.MessageStatus status,
             Long durationMillis,
-            List<TranscriptMessageDto.ToolExecutionDto> tools
+            List<TranscriptMessageDto.ToolExecutionDto> tools,
+            TurnTokenUsage usage
     ) {
+        if (hasAssistantMessage(sessionId, turnId)) return;
         append(sessionId, new TranscriptMessageDto(
                 UUID.randomUUID().toString(),
                 turnId,
@@ -104,8 +108,17 @@ public class TranscriptService {
                 status,
                 durationMillis,
                 tools,
-                thinking
+                thinking,
+                usage
         ));
+    }
+
+    /** 判断某轮 assistant 终态是否已经写入，用于崩溃恢复去重。 */
+    public synchronized boolean hasAssistantMessage(String sessionId, String turnId) {
+        return list(sessionId).stream().anyMatch(message ->
+                message.role() == TranscriptMessageDto.MessageRole.ASSISTANT
+                        && java.util.Objects.equals(message.turnId(), turnId)
+        );
     }
 
     /**

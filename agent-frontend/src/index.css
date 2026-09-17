@@ -1,11 +1,24 @@
 @import './styles/theme.css';
 
+:root { --window-titlebar-inset: 0px; }
+:root[data-window-chrome='macos-overlay'] { --window-titlebar-inset: 38px; }
+
 #root {
   width: 100vw;
   height: 100vh;
   display: flex;
   overflow: hidden;
 }
+
+/* Tauri Overlay 标题栏的拖拽区域；具体顶栏组件负责声明可拖动容器。 */
+[data-tauri-drag-region] { -webkit-app-region: drag; }
+[data-tauri-drag-region] button,
+[data-tauri-drag-region] input,
+[data-tauri-drag-region] textarea,
+[data-tauri-drag-region] a,
+[data-tauri-drag-region] select,
+[data-tauri-drag-region] label,
+[data-tauri-drag-region] [role='button'] { -webkit-app-region: no-drag; }
 
 /* 全局键盘焦点：所有可交互元素获得统一的高对比焦点环 */
 :focus-visible {

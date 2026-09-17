@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Bot } from 'lucide-react';
 import { saveModelConfig } from '../../services/api';
+import { Select } from '../common/Select';
 import styles from './ModelInitPage.module.css';
 
 interface ModelInitPageProps {
@@ -74,6 +75,7 @@ export const ModelInitPage: React.FC<ModelInitPageProps> = ({ vendors, onSuccess
 
   return (
     <div className={styles.container}>
+      <div className={styles.titlebarDragRegion} data-tauri-drag-region aria-hidden="true" />
       <div className={styles.contentCard}>
         <div className={styles.header}>
           <Bot className={styles.logoIcon} strokeWidth={1.5} />
@@ -83,18 +85,14 @@ export const ModelInitPage: React.FC<ModelInitPageProps> = ({ vendors, onSuccess
         <form className={styles.form} onSubmit={handleSubmit}>
           {/* 模型厂商选择 */}
           <div className={styles.fieldGroup}>
-            <label className={styles.label}>模型厂商 Vendor</label>
-            <select
-              className={styles.select}
+            <Select
+              label={<span className={styles.label}>模型厂商 Vendor</span>}
+              options={vendors.map((vendor) => ({ value: vendor, label: `${vendor.toUpperCase()} (${vendor})` }))}
               value={selectedVendor}
               onChange={handleVendorChange}
-            >
-              {vendors.map((v) => (
-                <option key={v} value={v}>
-                  {v.toUpperCase()} ({v})
-                </option>
-              ))}
-            </select>
+              fieldSize="lg"
+              fullWidth
+            />
           </div>
 
           {/* 模型名称 */}

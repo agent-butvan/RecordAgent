@@ -1,24 +1,29 @@
 package butvan.agent.agents.agent;
 
+import butvan.agent.agents.context.ContextInjectionMiddleware;
 import butvan.agent.agents.model.ModelHolder;
 import butvan.agent.agents.prompts.PromptBuilder;
-import butvan.agent.agents.security.AgentSecurity;
-import butvan.agent.agents.security.PermissionChecker;
+import butvan.agent.agents.project.ProjectRegistry;
+import butvan.agent.agents.session.SessionCatalogService;
 import butvan.agent.agents.storage.AgentStorageProperties;
 import butvan.agent.agents.subagent.SubagentCatalog;
 import butvan.agent.agents.tool.ToolRegistry;
+import butvan.agent.agents.usage.TokenUsageMiddleware;
 import io.agentscope.core.model.Model;
-import io.agentscope.core.permission.PermissionMode;
 import io.agentscope.core.state.AgentStateStore;
 import io.agentscope.harness.agent.HarnessAgent;
 import io.agentscope.harness.agent.bus.MessageBus;
+import io.agentscope.harness.agent.filesystem.spec.LocalFilesystemSpec;
 import io.agentscope.harness.agent.memory.compaction.CompactionConfig;
 import io.agentscope.harness.agent.subagent.task.TaskRepository;
+import io.agentscope.harness.agent.workspace.LocalFsMode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.nio.file.Paths;
-import java.util.concurrent.atomic.AtomicReference;
+import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * HarnessAgent 构建与缓存。
@@ -26,77 +31,106 @@ import java.util.concurrent.atomic.AtomicReference;
  * <p>模型切换时重建 Agent；会话状态保存在独立的 agentStateStore 中，
  * 因此不会因 Agent 实例替换而丢失。</p>
  */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class AgentFactory {
 
     private final ModelHolder modelHolder;
     private final ToolRegistry toolRegistry;
-    private final AgentSecurity agentSecurity;
     private final AgentStorageProperties storageProperties;
     private final AgentStateStore agentStateStore;
     private final TaskRepository subagentTaskRepository;
     private final MessageBus subagentMessageBus;
     private final SubagentCatalog subagentCatalog;
+    private final TokenUsageMiddleware tokenUsageMiddleware;
+    private final ContextInjectionMiddleware contextInjectionMiddleware;
+    private final SessionCatalogService sessionCatalogService;
+    private final ProjectRegistry projectRegistry;
 
-    private final PermissionChecker permissionChecker = new PermissionChecker(
-            PermissionMode.DEFAULT,
-            Paths.get(".").toAbsolutePath().normalize()
-    );
-
-    /**
-     *  当前模型对呀的Agent缓存；同一模型连续请求不会重复构建 Agent
-     */
-    private final AtomicReference<HarnessAgent> cachedAgent = new AtomicReference<>();
+    /** 同一模型下按项目根隔离 Agent，避免不同会话共享文件系统能力根。 */
+    private final Map<String, HarnessAgent> cachedAgents = new HashMap<>();
 
     /**
      * 用对象引用识别 ModelHolder 是否已经切换了模型实例。
      */
     private volatile Model cachedModel;
 
+    /** 返回不绑定项目的通用 Agent，主要用于兼容与测试。 */
     public synchronized HarnessAgent currentAgent() {
-        // 获取当前激活的模型
-        Model currentModel = modelHolder.getModel();
-        HarnessAgent existingAgent = cachedAgent.get();
+        return currentAgent(null);
+    }
 
-        // 模型未变：直接服用缓存，避免重复构建 Agent
-        if (existingAgent != null && cachedModel == currentModel) {
-            return existingAgent;
+    /** 按会话解析项目根并返回隔离后的 Agent。 */
+    public synchronized HarnessAgent currentAgent(String sessionId) {
+        Model currentModel = modelHolder.getModel();
+        if (cachedModel != currentModel) {
+            cachedAgents.values().forEach(this::closeQuietly);
+            cachedAgents.clear();
+            cachedModel = currentModel;
         }
-        // 模型已切换：重建 Agent 并替换缓存
-        HarnessAgent newAgent = createHarnessAgent(currentModel);
-        cachedModel = currentModel;
-        cachedAgent.set(newAgent);
-        return newAgent;
+
+        Path projectRoot = resolveProjectRoot(sessionId);
+        String cacheKey = projectRoot == null ? "__general__" : projectRoot.toString();
+        return cachedAgents.computeIfAbsent(cacheKey, ignored -> createHarnessAgent(currentModel, projectRoot));
     }
 
     /** 构建 Agent 时只指定根目录和状态存储，不拼接任何 sessionDir。 */
-    private HarnessAgent createHarnessAgent(Model model) {
+    private HarnessAgent createHarnessAgent(Model model, Path projectRoot) {
         // 模型名缺失时给兜底名，保证系统提示词可读
         String modelName = model.getModelName() == null ? "unknown-model" : model.getModelName();
         // 根据模型名与工作目录构建系统提示词
         String systemPrompt = PromptBuilder.buildDefaultSystemPrompt(
                 modelName,
-                System.getProperty("user.dir")
+                projectRoot == null ? System.getProperty("user.dir") : projectRoot.toString()
         );
         // 组装 HarnessAgent：计划模式、工具集、权限、工作区、状态存储、上下文压缩
-        return HarnessAgent.builder()
+        HarnessAgent.Builder builder = HarnessAgent.builder()
                 .name("butvan_agent")
                 .sysPrompt(systemPrompt)
                 .model(model)
+                .middleware(contextInjectionMiddleware)
+                .middleware(tokenUsageMiddleware)
                 .enablePlanMode() // 开启计划模式
                 .planFileDirectory("plans")
                 .toolkit(toolRegistry.getToolkit())
-                .permissionContext(agentSecurity.createPermissionContext(permissionChecker))
                 .workspace(storageProperties.getWorkspaceDirectory())
+                .disableWorkspaceContext()
+                // 框架自动恢复发生在 ConfirmResult 消费之前，会误伤正常 HITL；遗留调用由应用层恢复。
+                .enablePendingToolRecovery(false)
                 .stateStore(agentStateStore)
                 .taskRepository(subagentTaskRepository)
                 .messageBus(subagentMessageBus)
                 .subagents(subagentCatalog.declarations())
                 .compaction(CompactionConfig.builder()
-                        .triggerMessages(30) // 30 条消息触发上下文压缩
-                        .keepMessages(10)    // 压缩后保留最近 10 条
-                        .build())
-                .build();
+                        .triggerMessages(30)    // 30 条消息触发上下文压缩
+                        .keepMessages(10)       // 压缩后保留最近 10 条
+                        //.triggerTokens(131072)   // 固定 token 阈值，禁用动态 contextWindowSize 探测（避免框架向 DashScope 发送非法 URL 的探测请求）
+                        .build());
+        if (projectRoot != null) {
+            builder.filesystem(new LocalFilesystemSpec()
+                    .project(projectRoot)
+                    .projectWritable(true)
+                    .mode(LocalFsMode.ROOTED));
+        }
+        HarnessAgent agent = builder.build();
+        toolRegistry.enableOnDemandSchemas(agent.getToolkit());
+        return agent;
+    }
+
+    private Path resolveProjectRoot(String sessionId) {
+        if (sessionId == null || sessionId.isBlank()) return null;
+        String projectId = sessionCatalogService.requireActive(sessionId).projectId();
+        if (projectId == null || projectId.isBlank()) return null;
+        return Path.of(projectRegistry.resolve(projectId).rootPath());
+    }
+
+    private void closeQuietly(HarnessAgent agent) {
+        try {
+            agent.close();
+        } catch (Exception e) {
+            // 模型切换时旧 Agent 已不可再用，关闭失败不阻断新 Agent 创建。
+            log.debug("模型切换时关闭旧 Agent 失败", e);
+        }
     }
 }

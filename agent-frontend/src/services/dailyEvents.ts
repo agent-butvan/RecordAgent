@@ -8,6 +8,7 @@ import type {
   IncomeDailyEvent,
   JournalDailyEvent,
   ScheduleDailyEvent,
+  StudyDailyEvent,
   TodoDailyEvent,
 } from '../types/dailyEvent';
 import { getApiBaseUrl, type ApiResponse } from './api';
@@ -59,6 +60,8 @@ function parseEvent(raw: RawEvent): DailyEvent {
       recurrence: details.recurrence === 'daily' || details.recurrence === 'weekly' || details.recurrence === 'monthly'
         ? details.recurrence
         : 'none',
+      recurrenceWeekday: typeof details.recurrenceWeekday === 'number' ? details.recurrenceWeekday : null,
+      recurrenceMonthDay: typeof details.recurrenceMonthDay === 'number' ? details.recurrenceMonthDay : null,
     } } satisfies TodoDailyEvent;
   }
   if (raw.eventType === 'schedule') {
@@ -93,6 +96,14 @@ function parseEvent(raw: RawEvent): DailyEvent {
       mood: String(details.mood ?? ''),
     } } satisfies JournalDailyEvent;
   }
+  if (raw.eventType === 'study') {
+    return { ...common, eventType: 'study', details: {
+      startedAt: String(details.startedAt ?? ''),
+      endedAt: typeof details.endedAt === 'string' ? details.endedAt : null,
+      category: String(details.category ?? '其他'),
+      timezone: String(details.timezone ?? ''),
+    } } satisfies StudyDailyEvent;
+  }
   return { ...common, eventType: 'unknown', originalEventType: raw.eventType, details };
 }
 
@@ -123,6 +134,8 @@ export async function createDailyRecord(date: Date, draft: CalendarRecordDraft):
       time: draft.time,
       priority: draft.priority,
       recurrence: draft.recurrence,
+      recurrenceWeekday: draft.recurrenceWeekday,
+      recurrenceMonthDay: draft.recurrenceMonthDay,
     };
   } else if (draft.kind === 'schedule') {
     path = '/agent/daily-events/schedules';

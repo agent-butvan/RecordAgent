@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { animate, motion, useMotionValue, useTransform } from 'framer-motion';
 import type { MotionValue, PanInfo } from 'framer-motion';
-import { Check, ChevronDown, Clock3, X } from 'lucide-react';
+import { CaretDownIcon, CheckIcon, ClockIcon, XIcon } from '@phosphor-icons/react';
 import styles from './TimeWheelPicker.module.css';
 
 const ITEM_HEIGHT = 28;
@@ -215,7 +215,7 @@ export const TimeWheelPicker: React.FC<TimeWheelPickerProps> = ({ name, ariaLabe
       <div
         className={`${styles.trigger} ${isOpen ? styles.triggerOpen : ''}`}
       >
-        <Clock3 size={14} aria-hidden="true" />
+        <ClockIcon size={14} aria-hidden="true" />
         <input
           type="text"
           name={name}
@@ -237,7 +237,7 @@ export const TimeWheelPicker: React.FC<TimeWheelPickerProps> = ({ name, ariaLabe
           aria-expanded={isOpen}
           onClick={() => setIsOpen((current) => !current)}
         >
-          <ChevronDown size={14} className={isOpen ? styles.chevronOpen : ''} />
+          <CaretDownIcon size={14} className={isOpen ? styles.chevronOpen : ''} />
         </button>
       </div>
 
@@ -251,11 +251,11 @@ export const TimeWheelPicker: React.FC<TimeWheelPickerProps> = ({ name, ariaLabe
           <div className={styles.actions}>
             {!required && (
               <button type="button" onClick={() => { setInputValue(''); setIsOpen(false); }}>
-                <X size={12} />清除
+                <XIcon size={12} />清除
               </button>
             )}
             <button type="button" className={styles.doneButton} onClick={confirmWheelValue}>
-              <Check size={12} />完成
+              <CheckIcon size={12} weight="bold" />完成
             </button>
           </div>
         </div>

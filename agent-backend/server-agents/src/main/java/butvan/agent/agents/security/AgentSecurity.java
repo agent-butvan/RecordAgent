@@ -35,8 +35,12 @@ public class AgentSecurity {
             "task_output",
             "task_list",
             "wait_async_results",
-            "acceptance_report",
-            "plan_exit"
+            "calendar_query",
+            "finance_query",
+            "library_search",
+            "library_get",
+            "study_query",
+            "acceptance_report"
     );
 
     /** 自动批准编辑模式额外允许的工作区编辑与常规智能体协作工具。 */

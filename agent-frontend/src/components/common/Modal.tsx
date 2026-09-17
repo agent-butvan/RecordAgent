@@ -17,6 +17,8 @@ export interface ModalProps {
 
 const FOCUSABLE =
   'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+let nextModalId = 0;
+const modalStack: number[] = [];
 
 /**
  * 通用模态弹框：遮罩点击 / Esc 关闭、焦点陷阱、aria 语义。
@@ -31,16 +33,24 @@ export const Modal: React.FC<ModalProps> = ({
   className = '',
 }) => {
   const panelRef = useRef<HTMLDivElement>(null);
+  const modalIdRef = useRef(0);
+  if (modalIdRef.current === 0) modalIdRef.current = ++nextModalId;
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!open) return;
 
+    const modalId = modalIdRef.current;
+    const previousFocus = document.activeElement;
+    modalStack.push(modalId);
     const panel = panelRef.current;
-    if (panel) panel.focus();
+    const autoFocusTarget = panel?.querySelector<HTMLElement>('[autofocus]');
+    if (autoFocusTarget) autoFocusTarget.focus();
+    else if (panel) panel.focus();
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (modalStack.at(-1) !== modalId) return;
       if (e.key === 'Escape') {
         onCloseRef.current();
         return;
@@ -64,7 +74,12 @@ export const Modal: React.FC<ModalProps> = ({
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      const stackIndex = modalStack.lastIndexOf(modalId);
+      if (stackIndex >= 0) modalStack.splice(stackIndex, 1);
+      if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus();
+    };
   }, [open]);
 
   if (!open) return null;

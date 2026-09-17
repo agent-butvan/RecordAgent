@@ -1,6 +1,7 @@
 package butvan.agent.agents.session;
 
 import butvan.agent.agents.identity.CurrentUserProvider;
+import butvan.agent.agents.project.ProjectRegistry;
 import butvan.agent.agents.session.dto.CreateSessionRequest;
 import butvan.agent.agents.session.dto.SessionKind;
 import butvan.agent.agents.session.dto.SessionPermissionMode;
@@ -9,8 +10,8 @@ import butvan.agent.agents.session.dto.SessionSummaryDto;
 import butvan.agent.agents.storage.AgentStorageProperties;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -30,7 +31,6 @@ import java.util.UUID;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class SessionCatalogService {
 
     private final AgentStorageProperties agentStorageProperties;
@@ -39,6 +39,32 @@ public class SessionCatalogService {
 
     private final ObjectMapper objectMapper;
 
+    private final ProjectRegistry projectRegistry;
+
+    /** 生产构造器：项目会话创建必须经项目目录册校验。 */
+    @Autowired
+    public SessionCatalogService(
+            AgentStorageProperties agentStorageProperties,
+            CurrentUserProvider currentUserProvider,
+            ObjectMapper objectMapper,
+            ProjectRegistry projectRegistry
+    ) {
+        this.agentStorageProperties = agentStorageProperties;
+        this.currentUserProvider = currentUserProvider;
+        this.objectMapper = objectMapper;
+        this.projectRegistry = projectRegistry;
+    }
+
+    /** 为隔离测试保留的便利构造器，项目目录册使用相同临时数据根。 */
+    public SessionCatalogService(
+            AgentStorageProperties agentStorageProperties,
+            CurrentUserProvider currentUserProvider,
+            ObjectMapper objectMapper
+    ) {
+        this(agentStorageProperties, currentUserProvider, objectMapper,
+                new ProjectRegistry(agentStorageProperties, currentUserProvider, objectMapper));
+    }
+
     /**
      * 创建会话
      * @param request
@@ -46,14 +72,21 @@ public class SessionCatalogService {
      */
     public synchronized SessionSummaryDto create(CreateSessionRequest request) {
         SessionKind kind = request != null && request.kind() != null ? request.kind() : SessionKind.GENERAL;
+        String projectId = request == null ? null : request.projectId();
         if (kind == SessionKind.PROJECT) {
-            throw new IllegalArgumentException("项目会话需要先完成项目目录册功能，当前仅支持 GENERAL");
+            if (projectId == null || projectId.isBlank()) {
+                throw new IllegalArgumentException("项目会话必须绑定项目 ID");
+            }
+            projectRegistry.resolve(projectId);
+        } else if (projectId != null && !projectId.isBlank()) {
+            throw new IllegalArgumentException("普通会话不能绑定项目");
         }
 
         Instant now = Instant.now();
         SessionSummaryDto created = new SessionSummaryDto(
                 UUID.randomUUID().toString(),
                 kind,
+                projectId,
                 normalizeTitle(request == null ? null : request.title(), "新对话"),
                 "",
                 now,
@@ -199,6 +232,21 @@ public class SessionCatalogService {
         writeRecords(remaining);
     }
 
+    /** 项目解除登记时保留历史会话，并将其转为普通会话。 */
+    public synchronized void detachProject(String projectId) {
+        String ownerId = currentUserProvider.currentUserId();
+        List<CatalogRecord> records = readRecords();
+        boolean changed = false;
+        for (int index = 0; index < records.size(); index++) {
+            CatalogRecord record = records.get(index);
+            if (ownerId.equals(record.ownerId()) && java.util.Objects.equals(projectId, record.projectId())) {
+                records.set(index, record.detachProject());
+                changed = true;
+            }
+        }
+        if (changed) writeRecords(records);
+    }
+
     private void writeRecords(List<CatalogRecord> records) {
         Path catalogFile = agentStorageProperties.getSessionCatalogFile();
         Path temporaryFile = catalogFile.resolveSibling(catalogFile.getFileName() + ".tmp");
@@ -269,6 +317,7 @@ public class SessionCatalogService {
             String id,
             String ownerId,
             SessionKind kind,
+            String projectId,
             String title,
             String lastMessagePreview,
             Instant createAt,
@@ -279,23 +328,27 @@ public class SessionCatalogService {
     ) {
 
         static CatalogRecord from(String ownerId, SessionSummaryDto dto) {
-            return new CatalogRecord(dto.id(), ownerId, dto.kind(), dto.title(), dto.lastMessagePreview(), dto.createdAt(), dto.updatedAt(), dto.status(), TitleSource.DEFAULT, SessionPermissionMode.ASK);
+            return new CatalogRecord(dto.id(), ownerId, dto.kind(), dto.projectId(), dto.title(), dto.lastMessagePreview(), dto.createdAt(), dto.updatedAt(), dto.status(), TitleSource.DEFAULT, SessionPermissionMode.ASK);
         }
 
         CatalogRecord withTitle(String newTitle, TitleSource newSource) {
-            return new CatalogRecord(id, ownerId, kind, newTitle, lastMessagePreview, createAt, updateAt, status, newSource, permissionMode);
+            return new CatalogRecord(id, ownerId, kind, projectId, newTitle, lastMessagePreview, createAt, updateAt, status, newSource, permissionMode);
         }
 
         CatalogRecord withPreview(String preview) {
-            return new CatalogRecord(id, ownerId, kind, title, preview, createAt, updateAt, status, titleSource, permissionMode);
+            return new CatalogRecord(id, ownerId, kind, projectId, title, preview, createAt, updateAt, status, titleSource, permissionMode);
         }
 
         CatalogRecord withStatus(SessionStatus newStatus) {
-            return new CatalogRecord(id, ownerId, kind, title, lastMessagePreview, createAt, updateAt, newStatus, titleSource, permissionMode);
+            return new CatalogRecord(id, ownerId, kind, projectId, title, lastMessagePreview, createAt, updateAt, newStatus, titleSource, permissionMode);
         }
 
         CatalogRecord withPermissionMode(SessionPermissionMode newMode) {
-            return new CatalogRecord(id, ownerId, kind, title, lastMessagePreview, createAt, updateAt, status, titleSource, newMode);
+            return new CatalogRecord(id, ownerId, kind, projectId, title, lastMessagePreview, createAt, updateAt, status, titleSource, newMode);
+        }
+
+        CatalogRecord detachProject() {
+            return new CatalogRecord(id, ownerId, SessionKind.GENERAL, null, title, lastMessagePreview, createAt, updateAt, status, titleSource, permissionMode);
         }
 
         TitleSource effectiveTitleSource() {
@@ -308,7 +361,7 @@ public class SessionCatalogService {
         }
 
         SessionSummaryDto toDto() {
-            return new SessionSummaryDto(id, kind, title, lastMessagePreview, createAt, updateAt, status);
+            return new SessionSummaryDto(id, kind, projectId, title, lastMessagePreview, createAt, updateAt, status);
         }
     }
 

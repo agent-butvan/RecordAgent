@@ -1,10 +1,13 @@
 #[cfg(desktop)]
 mod backend;
+#[cfg(desktop)]
+mod system_settings;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   let builder = tauri::Builder::default()
     .plugin(tauri_plugin_shell::init())
+    .plugin(tauri_plugin_dialog::init())
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(
@@ -23,7 +26,8 @@ pub fn run() {
   #[cfg(desktop)]
   let builder = builder.invoke_handler(tauri::generate_handler![
     backend::get_backend_mode,
-    backend::get_backend_port
+    backend::get_backend_port,
+    system_settings::open_location_settings
   ]);
 
   let app = builder

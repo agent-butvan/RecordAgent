@@ -1,0 +1,41 @@
+package butvan.agent.agents.context;
+
+/**
+ * 单轮上下文组装请求。
+ *
+ * @param userId       工作区用户命名空间
+ * @param query        当前用户意图，用于 Memory 相关性排序
+ * @param totalBudget  自动上下文总 Token 预算
+ * @param profileBudget Profile 上限
+ * @param memoryBudget Memory 召回上限
+ * @param memoryTopK   最多返回的 Memory 片段数
+ */
+public record ContextRequest(
+        String userId,
+        String query,
+        int totalBudget,
+        int profileBudget,
+        int memoryBudget,
+        int memoryTopK
+) {
+
+    public static final int DEFAULT_TOTAL_BUDGET = 850;
+    public static final int DEFAULT_PROFILE_BUDGET = 300;
+    public static final int DEFAULT_MEMORY_BUDGET = 500;
+    public static final int DEFAULT_MEMORY_TOP_K = 4;
+
+    public ContextRequest {
+        if (userId == null || !userId.matches("[a-zA-Z0-9-]+")) {
+            throw new IllegalArgumentException("上下文用户 ID 格式非法");
+        }
+        query = query == null ? "" : query.strip();
+        if (totalBudget < 0 || profileBudget < 0 || memoryBudget < 0 || memoryTopK < 0) {
+            throw new IllegalArgumentException("上下文预算不能为负数");
+        }
+    }
+
+    public ContextRequest(String userId, String query) {
+        this(userId, query, DEFAULT_TOTAL_BUDGET, DEFAULT_PROFILE_BUDGET,
+                DEFAULT_MEMORY_BUDGET, DEFAULT_MEMORY_TOP_K);
+    }
+}

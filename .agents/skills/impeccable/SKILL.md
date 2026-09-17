@@ -1,6 +1,6 @@
 ---
 name: impeccable
-description: Use when the user wants to design, redesign, shape, critique, audit, polish, clarify, distill, harden, optimize, adapt, animate, colorize, extract, or otherwise improve a frontend interface. Covers websites, landing pages, dashboards, product UI, app shells, components, forms, settings, onboarding, and empty states. Handles UX review, visual hierarchy, information architecture, cognitive load, accessibility, performance, responsive behavior, theming, anti-patterns, typography, fonts, spacing, layout, alignment, color, motion, micro-interactions, UX copy, error states, edge cases, i18n, and reusable design systems or tokens. Also use for bland designs that need to become bolder or more delightful, loud designs that should become quieter, live browser iteration on UI elements, or ambitious visual effects that should feel technically extraordinary. Not for backend-only or non-UI tasks.
+description: Design, build, review, and refine frontend interfaces, including UX, accessibility, responsive layout, visual systems, and browser iteration. Use for new UI or improvements to existing UI; not for backend-only tasks.
 version: 4.1.1
 ---
 
@@ -65,7 +65,7 @@ Choose the mode from the requested surface, not the product, and persist it only
 Routing:
 
 - **No argument:** read [routing.md](reference/routing.md) and present its context-aware menu; never auto-run a command.
-- **Explicit or clearly implied command:** load its reference (native variant on native platforms) and follow it. Ask once if two commands fit.
+- **Explicit or clearly implied command:** load its reference (native variant on native platforms) and follow it. When commands overlap, select the primary playbook from the requested outcome and consult another only where needed. Ask only if the alternatives materially change the scope or visual direction and the brief does not settle the choice.
 - **Otherwise:** treat the request as general design work. Missing PRODUCT.md routes a new surface or replacement world through init, then new-work; a narrow refinement of existing code proceeds on the incumbent implementation as context.mjs directs, offering init afterward rather than blocking on it.
 - `teach` aliases `init`. `craft` is a deprecated alias for ordinary new-work and adds nothing. `shape` owns task discovery, then enters new-work only for visual-world and surface-concept decisions.
 

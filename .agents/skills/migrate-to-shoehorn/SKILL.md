@@ -104,10 +104,7 @@ getUser(fromAny({ body: { id: 123 } }));
 
 ## Workflow
 
-1. **Gather requirements** - ask user:
-   - What test files have `as` assertions causing problems?
-   - Are they dealing with large objects where only some properties matter?
-   - Do they need to pass intentionally wrong data for error testing?
+1. **Inspect the requested scope** - locate test assertions and read their call sites to distinguish partial fixtures from intentionally invalid inputs. Reuse the user's specified files or migration scope; search results do not expand that scope. Ask only about unresolved scope or expected behavior that the tests and surrounding code cannot establish.
 
 2. **Install and migrate**:
    - [ ] Install: `npm i @total-typescript/shoehorn`

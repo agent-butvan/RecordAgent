@@ -1,0 +1,13 @@
+.settingGroup { display: flex; align-items: center; justify-content: space-between; gap: 32px; padding: 4px 0 20px; }
+.settingCopy { max-width: 480px; }
+.settingCopy label, .settingLabel { color: var(--text-primary); font-size: 14px; font-weight: 600; }
+.settingCopy p, .note, .emptyState p { color: var(--text-secondary); font-size: 12px; line-height: 1.65; }
+.settingCopy p { margin-top: 4px; }
+.note { margin-top: 14px; }
+.emptyState { padding: 4px 0; }
+.emptyState strong { color: var(--text-primary); font-size: 13px; }
+.emptyState p { max-width: 62ch; margin-top: 5px; }
+
+@media (max-width: 720px) {
+  .settingGroup { align-items: stretch; flex-direction: column; gap: 14px; }
+}

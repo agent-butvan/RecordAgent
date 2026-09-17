@@ -1,4 +1,5 @@
 import type {
+  AgentAnalysisContextRequest,
   SessionSummaryDto,
   SessionDetailDto,
   SessionKind,
@@ -215,7 +216,7 @@ export interface ToolResultPayload {
   result?: string;
 }
 
-/** 后端要求用户确认时返回的单条高风险工具。 */
+/** 后端要求用户确认时返回的高风险工具。 */
 export interface PermissionToolPayload {
   toolCallId: string;
   toolName: string;
@@ -227,7 +228,22 @@ export interface PermissionToolPayload {
 
 export interface PermissionRequiredPayload {
   approvalId: string;
-  tool: PermissionToolPayload;
+  runId: string;
+  turnId: string;
+  tools: PermissionToolPayload[];
+}
+
+export interface PendingApprovalPayload extends PermissionRequiredPayload {
+  sessionId: string;
+  partialContent: string;
+  startedAt: string;
+  readyToResume: boolean;
+}
+
+export interface PermissionDecisionInput {
+  toolCallId: string;
+  approved: boolean;
+  rememberForSession: boolean;
 }
 
 export interface PermissionDecisionResponse {
@@ -246,15 +262,13 @@ function isSubagentProgressDto(value: unknown): value is SubagentProgressDto {
   );
 }
 
-/** 提交一条工具授权决定；本批全部完成时响应会标记 readyToResume。 */
-export async function submitPermissionDecision(params: {
+/** 原子提交同一审批批次的全部工具授权决定。 */
+export async function submitPermissionDecisions(params: {
   sessionId: string;
   approvalId: string;
-  toolCallId: string;
-  approved: boolean;
-  rememberForSession: boolean;
+  decisions: PermissionDecisionInput[];
 }): Promise<PermissionDecisionResponse> {
-  const response = await fetch(`${apiBaseUrl}/agent/chat/permission/decision`, {
+  const response = await fetch(`${apiBaseUrl}/agent/chat/permission/decisions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params),
@@ -265,12 +279,31 @@ export async function submitPermissionDecision(params: {
   return response.json() as Promise<PermissionDecisionResponse>;
 }
 
+/** 查询会话当前待处理审批，供页面刷新或重新切换会话后恢复。 */
+export async function fetchPendingPermission(
+  sessionId: string,
+): Promise<PendingApprovalPayload | null> {
+  const response = await fetch(`${apiBaseUrl}/agent/chat/${sessionId}/permission/pending`);
+  if (response.status === 204) return null;
+  if (!response.ok) throw new Error(`读取待审批操作失败：HTTP ${response.status}`);
+  return response.json() as Promise<PendingApprovalPayload>;
+}
+
 /**
  * Agent 对话流式 SSE 交互函数
  * 利用 fetch + ReadableStream 实时解析后端推流
  */
 export async function streamAgentChat(
-  params: { sessionId: string; content?: string; context?: string; approvalId?: string },
+  params: {
+    runId: string;
+    sessionId: string;
+    content?: string;
+    context?: string;
+    recordReferenceIds?: string[];
+    analysisContext?: AgentAnalysisContextRequest;
+    approvalId?: string;
+    signal?: AbortSignal;
+  },
   onChunk: (text: string) => void,
   onComplete?: () => void,
   onError?: (error: Error) => void,
@@ -278,10 +311,12 @@ export async function streamAgentChat(
   onToolResult?: (payload: ToolResultPayload) => void,
   onThinking?: (thinkingText: string) => void,
   onPermissionRequired?: (payload: PermissionRequiredPayload) => void,
-  onSubagentProgress?: (payload: SubagentProgressDto) => void
+  onSubagentProgress?: (payload: SubagentProgressDto) => void,
+  onCancelled?: () => void
 ): Promise<void> {
   try {
     const payloadContent = params.content || params.context || '';
+    const modelContext = params.context || params.content || '';
     const isResume = Boolean(params.approvalId);
     const response = await fetch(
       `${apiBaseUrl}/agent/chat${isResume ? '/permission/resume' : '/stream'}`,
@@ -290,9 +325,17 @@ export async function streamAgentChat(
       headers: {
         'Content-Type': 'application/json',
       },
+        signal: params.signal,
         body: JSON.stringify(isResume
-          ? { sessionId: params.sessionId, approvalId: params.approvalId }
-          : { sessionId: params.sessionId, context: payloadContent, content: payloadContent }),
+          ? { sessionId: params.sessionId, approvalId: params.approvalId, runId: params.runId }
+          : {
+              runId: params.runId,
+              sessionId: params.sessionId,
+              context: modelContext,
+              content: payloadContent,
+              recordReferenceIds: params.recordReferenceIds ?? [],
+              analysisContext: params.analysisContext,
+            }),
       }
     );
 
@@ -359,6 +402,9 @@ export async function streamAgentChat(
       } else if (eventName === 'error') {
         streamFinished = true;
         onError?.(new Error(dataStr || 'Agent 流式处理失败'));
+      } else if (eventName === 'cancelled') {
+        streamFinished = true;
+        onCancelled?.();
       } else if (eventName === 'done') {
         streamFinished = true;
         onComplete?.();
@@ -368,8 +414,11 @@ export async function streamAgentChat(
     while (true) {
       const { done, value } = await reader.read();
       if (done) {
+        buffer += decoder.decode();
         if (buffer.trim()) dispatchSseEvent(buffer);
-        if (!streamFinished) onComplete?.();
+        if (!streamFinished) {
+          onError?.(new Error('Agent 流连接意外结束，未收到终态，请重试。'));
+        }
         break;
       }
 
@@ -382,9 +431,30 @@ export async function streamAgentChat(
       }
     }
   } catch (error: unknown) {
+    if (error instanceof DOMException && error.name === 'AbortError') return;
     console.error('SSE 流数据解析失败:', error);
     onError?.(error instanceof Error ? error : new Error('SSE 流数据解析失败'));
   }
+}
+
+export interface AgentRunCancelResponse {
+  runId: string;
+  accepted: boolean;
+  status: 'CANCELLING' | 'NOT_FOUND';
+}
+
+/** 请求后端停止精确的 Agent run；最终结果以 SSE 终态为准。 */
+export async function cancelAgentChatRun(
+  sessionId: string,
+  runId: string,
+): Promise<AgentRunCancelResponse> {
+  const response = await fetch(`${apiBaseUrl}/agent/chat/runs/${encodeURIComponent(runId)}/cancel`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId }),
+  });
+  if (!response.ok) throw new Error(`停止请求失败（${response.status}）`);
+  return response.json() as Promise<AgentRunCancelResponse>;
 }
 
 /**
@@ -423,6 +493,7 @@ export async function fetchSessionDetail(sessionId: string): Promise<SessionDeta
 export async function createSessionApi(params?: {
   kind?: SessionKind;
   title?: string;
+  projectId?: string;
 }): Promise<{ success: boolean; data?: SessionSummaryDto; message?: string }> {
   try {
     const res = await fetch(`${apiBaseUrl}/agent/sessions`, {
@@ -431,6 +502,7 @@ export async function createSessionApi(params?: {
       body: JSON.stringify({
         kind: params?.kind || 'GENERAL',
         title: params?.title || '新对话',
+        projectId: params?.projectId,
       }),
     });
     const json: ApiResponse<SessionSummaryDto> = await res.json();

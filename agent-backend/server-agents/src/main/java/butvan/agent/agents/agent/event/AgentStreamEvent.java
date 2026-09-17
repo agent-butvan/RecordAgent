@@ -1,10 +1,9 @@
 package butvan.agent.agents.agent.event;
 
 import butvan.agent.agents.agent.permission.PermissionToolDto;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.Map;
+import java.util.List;
 
 /**
  * Agent 对话流在业务层和网络层之间传递的标准事件。
@@ -12,7 +11,7 @@ import java.util.Map;
  * <p>业务层只负责产生此事件，Controller 再将其转换为 SSE，避免 AgentScope 与 Spring Web
  * 相互耦合。</p>
  */
-public sealed interface AgentStreamEvent permits AgentStreamEvent.Completed, AgentStreamEvent.Failed, AgentStreamEvent.PermissionRequired, AgentStreamEvent.SubagentProgress, AgentStreamEvent.TextDelta, AgentStreamEvent.ThinkingDelta, AgentStreamEvent.ToolCall, AgentStreamEvent.ToolResult
+public sealed interface AgentStreamEvent permits AgentStreamEvent.RunStarted, AgentStreamEvent.Completed, AgentStreamEvent.Cancelled, AgentStreamEvent.Failed, AgentStreamEvent.PermissionRequired, AgentStreamEvent.SubagentProgress, AgentStreamEvent.TextDelta, AgentStreamEvent.ThinkingDelta, AgentStreamEvent.ToolCall, AgentStreamEvent.ToolResult
 {
 
     /**
@@ -32,6 +31,19 @@ public sealed interface AgentStreamEvent permits AgentStreamEvent.Completed, Age
         return false;
     }
 
+    /** 后端已接管并注册这次运行。 */
+    record RunStarted(String runId) implements AgentStreamEvent {
+        @Override
+        public String eventName() {
+            return "run_started";
+        }
+
+        @Override
+        public Object payload() {
+            return Map.of("runId", runId != null ? runId : "");
+        }
+    }
+
     /**
      * 模型正文文本增量。
      *
@@ -46,7 +58,7 @@ public sealed interface AgentStreamEvent permits AgentStreamEvent.Completed, Age
 
         @Override
         public Object payload() {
-            return content;
+            return content == null ? "" : content;
         }
     }
 
@@ -80,6 +92,24 @@ public sealed interface AgentStreamEvent permits AgentStreamEvent.Completed, Age
         @Override
         public Object payload() {
             return "";
+        }
+
+        @Override
+        public boolean isTerminal() {
+            return true;
+        }
+    }
+
+    /** 用户显式停止或传输断开后，已完成持久化收尾。 */
+    record Cancelled(String runId) implements AgentStreamEvent {
+        @Override
+        public String eventName() {
+            return "cancelled";
+        }
+
+        @Override
+        public Object payload() {
+            return Map.of("runId", runId != null ? runId : "", "status", "CANCELLED");
         }
 
         @Override
@@ -157,7 +187,12 @@ public sealed interface AgentStreamEvent permits AgentStreamEvent.Completed, Age
     }
 
 
-    record PermissionRequired(String approvalId, PermissionToolDto firstTool) implements AgentStreamEvent{
+    record PermissionRequired(
+            String approvalId,
+            String runId,
+            String turnId,
+            List<PermissionToolDto> tools
+    ) implements AgentStreamEvent{
 
         @Override
         public String eventName() {
@@ -166,7 +201,12 @@ public sealed interface AgentStreamEvent permits AgentStreamEvent.Completed, Age
 
         @Override
         public Object payload() {
-            return Map.of("approvalId", approvalId, "tool", firstTool);
+            return Map.of(
+                    "approvalId", approvalId != null ? approvalId : "",
+                    "runId", runId != null ? runId : "",
+                    "turnId", turnId != null ? turnId : "",
+                    "tools", tools != null ? tools : List.of()
+            );
         }
 
         /** 结束当前 SSE；恢复会由前端建立新的 SSE 连接。 */
