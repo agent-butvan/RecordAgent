@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { AgentAnalysisContextRequest, ChatMessage, SessionPermissionMode, TokenUsageSummary } from '../../types/chat';
 import type { TaskDto } from '../../types/team';
 import { LoadingTree } from '../common/LoadingTree';
-import { PermissionRequestCard } from './PermissionRequestCard';
+import { ToolApprovalCard } from './ToolApprovalCard';
 import { PlanApprovalCard } from './PlanApprovalCard';
 import { PermissionResumeCard } from './PermissionResumeCard';
 import { AgentResponse } from './AgentResponse';
@@ -821,7 +821,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
           }])}
         />
       ) : (
-        <PermissionRequestCard
+        <ToolApprovalCard
           tools={pendingPermission.tools}
           isSubmitting={isPermissionSubmitting}
           onDecision={onPermissionDecision}
