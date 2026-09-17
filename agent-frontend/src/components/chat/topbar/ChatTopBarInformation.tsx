@@ -157,7 +157,7 @@ export function ChatTopBarInformation({ onOpenFeature }: ChatTopBarInformationPr
         {(visible.showDate || visible.showHoliday) && (
           <InformationTrigger
             moduleId="date"
-            icon={<CalendarDays size={13.5} className={styles.iconDate} />}
+            icon={<CalendarDays size={13} />}
             summary={dateSummary(today, visible.showHoliday ? dailyContextResource : null)}
             active={activeModule === 'date'}
             controlsId={popoverId}
@@ -167,7 +167,7 @@ export function ChatTopBarInformation({ onOpenFeature }: ChatTopBarInformationPr
         {visible.showTodos && (
           <InformationTrigger
             moduleId="todos"
-            icon={<ListChecks size={13.5} className={styles.iconTodos} />}
+            icon={<ListChecks size={13} />}
             summary={todoSummary(todoResource)}
             active={activeModule === 'todos'}
             controlsId={popoverId}
@@ -177,7 +177,7 @@ export function ChatTopBarInformation({ onOpenFeature }: ChatTopBarInformationPr
         {visible.showFinance && (
           <InformationTrigger
             moduleId="finance"
-            icon={<WalletCards size={13.5} className={styles.iconFinance} />}
+            icon={<WalletCards size={13} />}
             summary={financeSummary(financeResource, dateKey)}
             active={activeModule === 'finance'}
             controlsId={popoverId}
@@ -187,7 +187,7 @@ export function ChatTopBarInformation({ onOpenFeature }: ChatTopBarInformationPr
         {visible.showWeather && (
           <InformationTrigger
             moduleId="weather"
-            icon={<CloudSun size={13.5} className={styles.iconWeather} />}
+            icon={<CloudSun size={13} />}
             summary={weatherSummary(dailyContextResource)}
             active={activeModule === 'weather'}
             controlsId={popoverId}
@@ -230,7 +230,7 @@ export function ChatTopBarInformation({ onOpenFeature }: ChatTopBarInformationPr
               aria-label="关闭详情面板"
               title="关闭（Esc）"
             >
-              <X size={14} />
+              <X size={13} />
             </button>
           </div>
 
@@ -347,9 +347,7 @@ function DateDetail({
       {/* 头部标题与标识 */}
       <div className={styles.cardHeader}>
         <div className={styles.cardTitleBlock}>
-          <div className={`${styles.cardIconBadge} ${styles.date}`}>
-            <CalendarDays size={17} />
-          </div>
+          <CalendarDays size={15} className={styles.triggerIcon} />
           <div>
             <h2 id="topbar-date-title" className={styles.cardTitle}>{weekdayText}</h2>
             <p className={styles.cardSubtitle}>{year} 年 · 第 {Math.ceil(dayOfYear / 7)} 周</p>
@@ -357,7 +355,7 @@ function DateDetail({
         </div>
       </div>
 
-      {/* Hero 日期卡片 */}
+      {/* Hero 日期区 */}
       <div className={styles.dateHeroCard}>
         <div className={styles.dateHeroTop}>
           <div>
@@ -381,9 +379,9 @@ function DateDetail({
                 }`}
               >
                 {holiday.dayOff
-                  ? '今日放假休息'
+                  ? '今日休假'
                   : holiday.dayCode === 3
-                  ? '调休工作日'
+                  ? '调休上班'
                   : '工作日'}
               </span>
             )}
@@ -391,9 +389,9 @@ function DateDetail({
         </div>
 
         {holiday?.name && (
-          <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Sparkles size={13} color="#d97706" />
-            <span style={{ fontSize: 11.5, fontWeight: 600, color: '#92400e' }}>
+          <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
+            <Sparkles size={12} style={{ color: 'var(--text-muted)' }} />
+            <span style={{ fontSize: 11.5, fontWeight: 500, color: 'var(--text-secondary)' }}>
               {holiday.name}
             </span>
           </div>
@@ -430,8 +428,7 @@ function DateDetail({
 
 /** 渲染当周 7 天迷你日历带 */
 function WeekStrip({ currentDate }: { currentDate: Date }) {
-  const currentDayOfWeek = currentDate.getDay(); // 0 is Sunday, 1 is Monday...
-  // 按照周一到周日排列 (Monday = 0, Sunday = 6)
+  const currentDayOfWeek = currentDate.getDay();
   const mondayOffset = currentDayOfWeek === 0 ? -6 : 1 - currentDayOfWeek;
   const monday = new Date(currentDate);
   monday.setDate(currentDate.getDate() + mondayOffset);
@@ -481,10 +478,10 @@ function WeatherDetail({ resource }: { resource: ResourceState<DailyContextSumma
   if (resource.error && !resource.data) {
     return (
       <div className={styles.stateContainer}>
-        <CircleAlert size={20} color="#ef4444" style={{ margin: '0 auto 8px' }} />
+        <CircleAlert size={18} style={{ margin: '0 auto 6px', color: 'var(--text-muted)' }} />
         <div>{resource.error}</div>
         <button type="button" className={styles.retryBtn} onClick={resource.reload}>
-          <RefreshCw size={12} /> 重新获取
+          <RefreshCw size={11} /> 重试
         </button>
       </div>
     );
@@ -492,10 +489,10 @@ function WeatherDetail({ resource }: { resource: ResourceState<DailyContextSumma
   if (resource.data?.weatherError) {
     return (
       <div className={styles.stateContainer}>
-        <CircleAlert size={20} color="#f59e0b" style={{ margin: '0 auto 8px' }} />
+        <CircleAlert size={18} style={{ margin: '0 auto 6px', color: 'var(--text-muted)' }} />
         <div>{resource.data.weatherError}</div>
         <button type="button" className={styles.retryBtn} onClick={resource.reload}>
-          <RefreshCw size={12} /> 重新获取
+          <RefreshCw size={11} /> 重试
         </button>
       </div>
     );
@@ -505,8 +502,8 @@ function WeatherDetail({ resource }: { resource: ResourceState<DailyContextSumma
   if (!weather) {
     return (
       <div className={styles.stateContainer}>
-        <CloudSun size={24} color="#94a3b8" style={{ margin: '0 auto 8px' }} />
-        <div>未配置和风天气密钥或暂无实时数据</div>
+        <CloudSun size={22} style={{ margin: '0 auto 6px', color: 'var(--text-muted)' }} />
+        <div>未配置天气密钥或暂无实时数据</div>
       </div>
     );
   }
@@ -515,21 +512,19 @@ function WeatherDetail({ resource }: { resource: ResourceState<DailyContextSumma
     <div aria-labelledby="topbar-weather-title">
       <div className={styles.cardHeader}>
         <div className={styles.cardTitleBlock}>
-          <div className={`${styles.cardIconBadge} ${styles.weather}`}>
-            <CloudSun size={17} />
-          </div>
+          <CloudSun size={15} className={styles.triggerIcon} />
           <div>
             <h2 id="topbar-weather-title" className={styles.cardTitle}>实时天气</h2>
-            <p className={styles.cardSubtitle}>和风天气权威气象服务</p>
+            <p className={styles.cardSubtitle}>和风天气气象数据</p>
           </div>
         </div>
       </div>
 
-      {/* Hero 天气主卡 */}
+      {/* Hero 天气区 */}
       <div className={styles.weatherHeroCard}>
         <div className={styles.weatherHeroTop}>
           <div className={styles.locationBadge}>
-            <MapPin size={13} />
+            <MapPin size={12} />
             <span>{weather.locationName}</span>
           </div>
           <span className={styles.weatherConditionTag}>{weather.condition}</span>
@@ -540,17 +535,17 @@ function WeatherDetail({ resource }: { resource: ResourceState<DailyContextSumma
             {roundWeather(weather.temperature)}°
           </div>
           <div className={styles.weatherDegreeSub}>
-            体感温度 {roundWeather(weather.feelsLike)}{weather.temperatureUnit}
+            体感 {roundWeather(weather.feelsLike)}{weather.temperatureUnit}
           </div>
         </div>
       </div>
 
-      {/* 2x2 Bento 指标卡片 */}
+      {/* 2x2 指标极简网格 */}
       <div className={styles.weatherBentoGrid}>
         <div className={styles.weatherBentoItem}>
           <div className={styles.weatherBentoHeader}>
-            <Thermometer size={13} color="#f97316" />
-            <span>体感温差</span>
+            <Thermometer size={12} />
+            <span>体感温度</span>
           </div>
           <div className={styles.weatherBentoVal}>
             {roundWeather(weather.feelsLike)}{weather.temperatureUnit}
@@ -559,7 +554,7 @@ function WeatherDetail({ resource }: { resource: ResourceState<DailyContextSumma
 
         <div className={styles.weatherBentoItem}>
           <div className={styles.weatherBentoHeader}>
-            <Droplets size={13} color="#0284c7" />
+            <Droplets size={12} />
             <span>相对湿度</span>
           </div>
           <div className={styles.weatherBentoVal}>
@@ -569,21 +564,21 @@ function WeatherDetail({ resource }: { resource: ResourceState<DailyContextSumma
 
         <div className={styles.weatherBentoItem}>
           <div className={styles.weatherBentoHeader}>
-            <Wind size={13} color="#059669" />
+            <Wind size={12} />
             <span>风向与风速</span>
           </div>
-          <div className={styles.weatherBentoVal} style={{ fontSize: 13 }}>
+          <div className={styles.weatherBentoVal} style={{ fontSize: 12 }}>
             {weather.windDirection || '微风'} · {roundWeather(weather.windSpeed)} {weather.windSpeedUnit}
           </div>
         </div>
 
         <div className={styles.weatherBentoItem}>
           <div className={styles.weatherBentoHeader}>
-            <Compass size={13} color="#8b5cf6" />
-            <span>数据提供方</span>
+            <Compass size={12} />
+            <span>数据来源</span>
           </div>
-          <div className={styles.weatherBentoVal} style={{ fontSize: 13 }}>
-            和风天气官方
+          <div className={styles.weatherBentoVal} style={{ fontSize: 12 }}>
+            和风天气
           </div>
         </div>
       </div>
@@ -595,7 +590,7 @@ function WeatherDetail({ resource }: { resource: ResourceState<DailyContextSumma
           target="_blank"
           rel="noreferrer"
         >
-          查看和风天气数据来源说明 ↗
+          和风天气数据来源说明 ↗
         </a>
       )}
     </div>
@@ -621,19 +616,17 @@ function TodoDetail({
     <div aria-labelledby="topbar-todo-title">
       <div className={styles.cardHeader}>
         <div className={styles.cardTitleBlock}>
-          <div className={`${styles.cardIconBadge} ${styles.todos}`}>
-            <ListChecks size={17} />
-          </div>
+          <ListChecks size={15} className={styles.triggerIcon} />
           <div>
             <h2 id="topbar-todo-title" className={styles.cardTitle}>今日待办</h2>
             <p className={styles.cardSubtitle}>
-              {todos.length ? `共 ${todos.length} 项任务，已完成 ${completed} 项` : '今日暂无安排'}
+              {todos.length ? `共 ${todos.length} 项，已完成 ${completed} 项` : '今日暂无安排'}
             </p>
           </div>
         </div>
         <button type="button" className={styles.actionBtn} onClick={onOpen}>
-          <span>日历看板</span>
-          <ArrowUpRight size={13} />
+          <span>日历</span>
+          <ArrowUpRight size={11} />
         </button>
       </div>
 
@@ -641,16 +634,13 @@ function TodoDetail({
         {todos.length > 0 && (
           <div className={styles.todoProgressBanner}>
             <div className={styles.todoProgressText}>
-              <strong>任务推进</strong>
+              <strong>任务进度</strong>
               <span>{completed}/{todos.length} ({percent}%)</span>
             </div>
             <div className={styles.progressBarTrack}>
               <div
                 className={styles.progressBarFill}
-                style={{
-                  width: `${percent}%`,
-                  background: 'linear-gradient(90deg, #10b981 0%, #059669 100%)',
-                }}
+                style={{ width: `${percent}%` }}
               />
             </div>
           </div>
@@ -658,14 +648,14 @@ function TodoDetail({
 
         {remaining.length === 0 && todos.length > 0 ? (
           <div className={styles.emptyCelebration}>
-            <CheckCircle2 size={28} color="#10b981" style={{ margin: '0 auto 6px' }} />
-            <strong style={{ fontSize: 13, color: '#0f172a' }}>任务已全部搞定！</strong>
-            <p>今天的既定待办均已完成，适度放松一下吧。</p>
+            <CheckCircle2 size={22} style={{ margin: '0 auto 4px', color: 'var(--text-muted)' }} />
+            <strong style={{ fontSize: 12.5, color: 'var(--text-primary)' }}>待办已全部完成</strong>
+            <p>今天的任务已搞定，尽情专注于对话。</p>
           </div>
         ) : remaining.length === 0 && todos.length === 0 ? (
           <div className={styles.emptyCelebration}>
-            <ListChecks size={28} color="#94a3b8" style={{ margin: '0 auto 6px' }} />
-            <p>今天没有未完成的待办事项，尽情专注对话吧。</p>
+            <ListChecks size={22} style={{ margin: '0 auto 4px', color: 'var(--text-muted)' }} />
+            <p>今天没有未完成的待办事项。</p>
           </div>
         ) : (
           <div className={styles.todoList}>
@@ -673,14 +663,14 @@ function TodoDetail({
               <div key={todo.id} className={styles.todoRow}>
                 <div className={styles.todoLeft}>
                   <span className={styles.todoCheck}>
-                    <Circle size={14} />
+                    <Circle size={12} />
                   </span>
                   <span className={styles.todoTitle}>{todo.title}</span>
                 </div>
                 <div className={styles.todoMeta}>
                   {todo.details.time && (
                     <span className={styles.todoTime}>
-                      <Clock size={11} />
+                      <Clock size={10} />
                       {todo.details.time}
                     </span>
                   )}
@@ -702,8 +692,8 @@ function TodoDetail({
         )}
 
         <button type="button" className={styles.fullActionBtn} onClick={onOpen}>
-          <span>在日历看板中管理全部日程</span>
-          <ArrowUpRight size={13} />
+          <span>在日历中管理全部日程</span>
+          <ArrowUpRight size={11} />
         </button>
       </ResourceBody>
     </div>
@@ -736,26 +726,24 @@ function FinanceDetail({
     <div aria-labelledby="topbar-finance-title">
       <div className={styles.cardHeader}>
         <div className={styles.cardTitleBlock}>
-          <div className={`${styles.cardIconBadge} ${styles.finance}`}>
-            <WalletCards size={17} />
-          </div>
+          <WalletCards size={15} className={styles.triggerIcon} />
           <div>
             <h2 id="topbar-finance-title" className={styles.cardTitle}>今日收支</h2>
-            <p className={styles.cardSubtitle}>今日流水与本月资产结余</p>
+            <p className={styles.cardSubtitle}>今日流水与本月累计</p>
           </div>
         </div>
         <button type="button" className={styles.actionBtn} onClick={onOpen}>
-          <span>财务中心</span>
-          <ArrowUpRight size={13} />
+          <span>财务</span>
+          <ArrowUpRight size={11} />
         </button>
       </div>
 
       <ResourceBody resource={resource} empty="暂无财务记录。">
-        {/* 今日双核收支 Hero 卡 */}
+        {/* 今日双核收支卡 */}
         <div className={styles.financeDualHero}>
           <div className={styles.financeCard}>
             <div className={styles.financeCardHeader}>
-              <TrendingDown size={14} color="#e11d48" />
+              <TrendingDown size={12} />
               <span>今日支出</span>
             </div>
             <div className={`${styles.financeCardVal} ${styles.expenseVal}`}>
@@ -765,7 +753,7 @@ function FinanceDetail({
 
           <div className={styles.financeCard}>
             <div className={styles.financeCardHeader}>
-              <TrendingUp size={14} color="#059669" />
+              <TrendingUp size={12} />
               <span>今日收入</span>
             </div>
             <div className={`${styles.financeCardVal} ${styles.incomeVal}`}>
@@ -776,18 +764,18 @@ function FinanceDetail({
 
         {/* 本月汇总与结余条 */}
         <div className={styles.monthSummaryBar}>
-          <span>本月支出 <strong>{formatMoney(monthExpense)}</strong></span>
-          <span>本月收入 <strong>{formatMoney(monthIncome)}</strong></span>
+          <span>月支出 <strong>{formatMoney(monthExpense)}</strong></span>
+          <span>月收入 <strong>{formatMoney(monthIncome)}</strong></span>
           <span>
-            月净结余{' '}
-            <strong style={{ color: monthBalance >= 0 ? '#059669' : '#e11d48' }}>
+            净结余{' '}
+            <strong style={{ color: monthBalance >= 0 ? '#166534' : '#991b1b' }}>
               {formatMoney(monthBalance)}
             </strong>
           </span>
         </div>
 
         {/* 今日流水清单 */}
-        <div className={styles.transactionHeader}>今日流水记录</div>
+        <div className={styles.transactionHeader}>今日明细</div>
         {transactions.length > 0 ? (
           <div className={styles.transactionList}>
             {transactions.map((item) => (
@@ -802,7 +790,7 @@ function FinanceDetail({
                 <span
                   className={styles.transactionAmount}
                   style={{
-                    color: item.transactionType === 'expense' ? '#e11d48' : '#059669',
+                    color: item.transactionType === 'expense' ? '#991b1b' : '#166534',
                   }}
                 >
                   {item.transactionType === 'expense' ? '-' : '+'}
@@ -812,14 +800,14 @@ function FinanceDetail({
             ))}
           </div>
         ) : (
-          <div style={{ padding: '12px 0 14px', textAlign: 'center', fontSize: 11.5, color: '#94a3b8' }}>
-            今日暂无明细流水记账
+          <div style={{ padding: '10px 0 12px', textAlign: 'center', fontSize: 11, color: 'var(--text-muted)' }}>
+            今日暂无流水记账
           </div>
         )}
 
         <button type="button" className={styles.fullActionBtn} onClick={onOpen}>
-          <span>进入财务中心记一笔或查看资产</span>
-          <ArrowUpRight size={13} />
+          <span>前往财务中心</span>
+          <ArrowUpRight size={11} />
         </button>
       </ResourceBody>
     </div>
@@ -841,10 +829,10 @@ function ResourceBody<T>({
   if (resource.error && !resource.data) {
     return (
       <div className={styles.stateContainer}>
-        <CircleAlert size={20} color="#ef4444" style={{ margin: '0 auto 8px' }} />
+        <CircleAlert size={18} style={{ margin: '0 auto 6px', color: 'var(--text-muted)' }} />
         <div>{resource.error}</div>
         <button type="button" className={styles.retryBtn} onClick={resource.reload}>
-          <RefreshCw size={12} /> 点击重试
+          <RefreshCw size={11} /> 重试
         </button>
       </div>
     );
