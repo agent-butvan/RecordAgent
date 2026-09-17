@@ -1,12 +1,25 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import {
+  ArrowUpRight,
   CalendarDays,
+  CheckCircle2,
   ChevronDown,
+  Circle,
   CircleAlert,
+  Clock,
   CloudSun,
+  Compass,
+  Droplets,
   ListChecks,
+  MapPin,
   RefreshCw,
+  Sparkles,
+  Thermometer,
+  TrendingDown,
+  TrendingUp,
   WalletCards,
+  Wind,
+  X,
 } from 'lucide-react';
 import { fetchDailyDay, formatLocalDate } from '../../../services/dailyEvents';
 import { fetchDailyContextSummary, type DailyContextSummary } from '../../../services/dailyContextApi';
@@ -34,12 +47,13 @@ interface ResourceState<T> {
   reload: () => void;
 }
 
-/** 聊天顶栏的个人信息入口；各领域数据独立加载，单项故障不会影响其他入口。 */
+/** 聊天顶栏的个人信息入口；大厂风格浮动卡片面板，支持分段无缝切换与高品质 Bento 仪表呈现 */
 export function ChatTopBarInformation({ onOpenFeature }: ChatTopBarInformationProps) {
   const [preferences, setPreferences] = useState(getFeaturePreferences);
   const [activeModule, setActiveModule] = useState<TopBarModuleId | null>(null);
   const [today, setToday] = useState(() => new Date());
   const rootRef = useRef<HTMLDivElement>(null);
+  const popoverId = useId();
 
   const dateKey = formatLocalDate(today);
   const loadToday = useCallback(
@@ -61,6 +75,7 @@ export function ChatTopBarInformation({ onOpenFeature }: ChatTopBarInformationPr
     ),
     [dateKey, preferences.chatTopBar.showHoliday, preferences.chatTopBar.showWeather],
   );
+
   const todoResource = useTopBarResource(preferences.chatTopBar.showTodos, loadToday, dateKey);
   const financeResource = useTopBarResource(preferences.chatTopBar.showFinance, loadFinance, dateKey);
   const dailyContextResource = useTopBarResource(
@@ -114,76 +129,145 @@ export function ChatTopBarInformation({ onOpenFeature }: ChatTopBarInformationPr
     setActiveModule((current) => current === module ? null : module);
   };
 
+  const enabledModules: { id: TopBarModuleId; label: string; icon: React.ReactNode; badge?: string }[] = [];
+  if (visible.showDate || visible.showHoliday) {
+    enabledModules.push({ id: 'date', label: '日期', icon: <CalendarDays size={13} /> });
+  }
+  if (visible.showTodos) {
+    const todos = todoResource.data ? overviewTodos(todoResource.data) : [];
+    const remaining = todos.filter((t) => !t.details.completed).length;
+    enabledModules.push({
+      id: 'todos',
+      label: '待办',
+      icon: <ListChecks size={13} />,
+      badge: remaining > 0 ? String(remaining) : undefined,
+    });
+  }
+  if (visible.showFinance) {
+    enabledModules.push({ id: 'finance', label: '财务', icon: <WalletCards size={13} /> });
+  }
+  if (visible.showWeather) {
+    enabledModules.push({ id: 'weather', label: '天气', icon: <CloudSun size={13} /> });
+  }
+
   return (
-    <div ref={rootRef} className={styles.root} aria-label="今日信息">
-      <div className={styles.triggers}>
+    <div ref={rootRef} className={styles.root} aria-label="今日概况">
+      {/* 顶部胶囊触发按钮群 */}
+      <div className={styles.triggers} role="toolbar" aria-label="顶栏状态概览">
         {(visible.showDate || visible.showHoliday) && (
           <InformationTrigger
             moduleId="date"
-            icon={<CalendarDays size={14} />}
+            icon={<CalendarDays size={13.5} className={styles.iconDate} />}
             summary={dateSummary(today, visible.showHoliday ? dailyContextResource : null)}
             active={activeModule === 'date'}
+            controlsId={popoverId}
             onClick={() => toggle('date')}
           />
         )}
         {visible.showTodos && (
           <InformationTrigger
             moduleId="todos"
-            icon={<ListChecks size={14} />}
+            icon={<ListChecks size={13.5} className={styles.iconTodos} />}
             summary={todoSummary(todoResource)}
             active={activeModule === 'todos'}
+            controlsId={popoverId}
             onClick={() => toggle('todos')}
           />
         )}
         {visible.showFinance && (
           <InformationTrigger
             moduleId="finance"
-            icon={<WalletCards size={14} />}
+            icon={<WalletCards size={13.5} className={styles.iconFinance} />}
             summary={financeSummary(financeResource, dateKey)}
             active={activeModule === 'finance'}
+            controlsId={popoverId}
             onClick={() => toggle('finance')}
           />
         )}
         {visible.showWeather && (
           <InformationTrigger
             moduleId="weather"
-            icon={<CloudSun size={14} />}
+            icon={<CloudSun size={13.5} className={styles.iconWeather} />}
             summary={weatherSummary(dailyContextResource)}
             active={activeModule === 'weather'}
+            controlsId={popoverId}
             onClick={() => toggle('weather')}
           />
         )}
       </div>
 
-      <div
-        id="chat-topbar-detail"
-        className={`${styles.panel} ${activeModule ? styles.panelOpen : ''}`}
-        aria-hidden={!activeModule}
-      >
-        <div className={styles.panelInner}>
-          {activeModule === 'date' && (
-            <DateDetail
-              date={today}
-              showHoliday={visible.showHoliday}
-              resource={dailyContextResource}
-            />
-          )}
-          {activeModule === 'todos' && (
-            <TodoDetail
-              resource={todoResource}
-              onOpen={() => onOpenFeature('calendar')}
-            />
-          )}
-          {activeModule === 'finance' && (
-            <FinanceDetail
-              date={dateKey}
-              resource={financeResource}
-              onOpen={() => onOpenFeature('finance')}
-            />
-          )}
-          {activeModule === 'weather' && <WeatherDetail resource={dailyContextResource} />}
+      {/* 悬浮 Popover 卡片面板 */}
+      {activeModule && (
+        <div
+          id={popoverId}
+          className={styles.popover}
+          role="dialog"
+          aria-modal="false"
+          aria-label="顶栏详细面板"
+        >
+          {/* 弹窗顶部分段控制器与快捷关闭 */}
+          <div className={styles.popoverNav}>
+            <div className={styles.segmentedGroup} role="tablist">
+              {enabledModules.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeModule === item.id}
+                  className={`${styles.tabItem} ${activeModule === item.id ? styles.tabItemActive : ''}`}
+                  onClick={() => setActiveModule(item.id)}
+                >
+                  {item.icon}
+                  <span>{item.label}</span>
+                  {item.badge && <span className={styles.tabBadge}>{item.badge}</span>}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className={styles.closeBtn}
+              onClick={() => setActiveModule(null)}
+              aria-label="关闭详情面板"
+              title="关闭（Esc）"
+            >
+              <X size={14} />
+            </button>
+          </div>
+
+          {/* 模块主体内容渲染 */}
+          <div className={styles.popoverBody}>
+            {activeModule === 'date' && (
+              <DateDetail
+                date={today}
+                showHoliday={visible.showHoliday}
+                resource={dailyContextResource}
+              />
+            )}
+            {activeModule === 'todos' && (
+              <TodoDetail
+                resource={todoResource}
+                onOpen={() => {
+                  setActiveModule(null);
+                  onOpenFeature('calendar');
+                }}
+              />
+            )}
+            {activeModule === 'finance' && (
+              <FinanceDetail
+                date={dateKey}
+                resource={financeResource}
+                onOpen={() => {
+                  setActiveModule(null);
+                  onOpenFeature('finance');
+                }}
+              />
+            )}
+            {activeModule === 'weather' && (
+              <WeatherDetail resource={dailyContextResource} />
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -193,12 +277,14 @@ function InformationTrigger({
   icon,
   summary,
   active,
+  controlsId,
   onClick,
 }: {
   moduleId: TopBarModuleId;
   icon: React.ReactNode;
   summary: string;
   active: boolean;
+  controlsId: string;
   onClick: () => void;
 }) {
   const label = moduleId === 'date' ? '日期' : moduleId === 'todos' ? '待办'
@@ -209,16 +295,19 @@ function InformationTrigger({
       className={`${styles.trigger} ${active ? styles.triggerActive : ''}`}
       aria-label={`${label}：${summary}`}
       aria-expanded={active}
-      aria-controls="chat-topbar-detail"
+      aria-controls={controlsId}
       onClick={onClick}
     >
       <span className={styles.triggerIcon} aria-hidden="true">{icon}</span>
       <span className={styles.triggerSummary}>{summary}</span>
-      <ChevronDown className={styles.chevron} size={12} aria-hidden="true" />
+      <ChevronDown className={styles.chevron} size={11} aria-hidden="true" />
     </button>
   );
 }
 
+/* ============================
+   Date & Holiday 详情组件
+   ============================ */
 function DateDetail({
   date,
   showHoliday,
@@ -228,101 +317,402 @@ function DateDetail({
   showHoliday: boolean;
   resource: ResourceState<DailyContextSummary>;
 }) {
-  const fullDate = new Intl.DateTimeFormat('zh-CN', {
+  const fullDateText = new Intl.DateTimeFormat('zh-CN', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
     weekday: 'long',
   }).format(date);
-  const dayOfYear = Math.floor((date.getTime() - new Date(date.getFullYear(), 0, 0).getTime()) / 86_400_000);
-  const remaining = (isLeapYear(date.getFullYear()) ? 366 : 365) - dayOfYear;
+
+  const monthDayText = new Intl.DateTimeFormat('zh-CN', {
+    month: 'long',
+    day: 'numeric',
+  }).format(date);
+
+  const weekdayText = new Intl.DateTimeFormat('zh-CN', {
+    weekday: 'long',
+  }).format(date);
+
+  const year = date.getFullYear();
+  const totalDays = isLeapYear(year) ? 366 : 365;
+  const startOfYear = new Date(year, 0, 0);
+  const dayOfYear = Math.floor((date.getTime() - startOfYear.getTime()) / 86_400_000);
+  const remaining = totalDays - dayOfYear;
+  const progressPercent = Math.min(100, Math.max(0, ((dayOfYear / totalDays) * 100))).toFixed(1);
+
+  const holiday = resource.data?.holiday;
+
   return (
-    <section className={styles.detailSection} aria-labelledby="topbar-date-title">
-      <div className={styles.detailHeading}>
-        <CalendarDays size={18} aria-hidden="true" />
-        <div>
-          <h2 id="topbar-date-title">{fullDate}</h2>
-          <p>今天是今年的第 {dayOfYear} 天，还剩 {remaining} 天。</p>
-          {showHoliday && <HolidayStatus resource={resource} />}
+    <div aria-labelledby="topbar-date-title">
+      {/* 头部标题与标识 */}
+      <div className={styles.cardHeader}>
+        <div className={styles.cardTitleBlock}>
+          <div className={`${styles.cardIconBadge} ${styles.date}`}>
+            <CalendarDays size={17} />
+          </div>
+          <div>
+            <h2 id="topbar-date-title" className={styles.cardTitle}>{weekdayText}</h2>
+            <p className={styles.cardSubtitle}>{year} 年 · 第 {Math.ceil(dayOfYear / 7)} 周</p>
+          </div>
         </div>
       </div>
-    </section>
-  );
-}
 
-function HolidayStatus({ resource }: { resource: ResourceState<DailyContextSummary> }) {
-  if (resource.loading && !resource.data) return <p className={styles.contextState}>正在读取节假日信息…</p>;
-  if (resource.error && !resource.data) return <p className={styles.contextError}>{resource.error}</p>;
-  if (resource.data?.holidayError) return <p className={styles.contextError}>{resource.data.holidayError}</p>;
-  const holiday = resource.data?.holiday;
-  if (!holiday) return <p className={styles.contextState}>暂无节假日信息。</p>;
-  return (
-    <div className={styles.holidayDetail}>
-      <strong>{holiday.name || holiday.description}</strong>
-      <span className={styles.holidayBadge}>{holiday.dayOff ? '今日休息' : holiday.dayCode === 3 ? '今日调休上班' : '今日工作'}</span>
-      {holiday.lunarDate && <span className={styles.holidayBadge}>农历 {holiday.lunarDate}</span>}
-      {holiday.tip && <p>{holiday.tip}</p>}
+      {/* Hero 日期卡片 */}
+      <div className={styles.dateHeroCard}>
+        <div className={styles.dateHeroTop}>
+          <div>
+            <div className={styles.dateBigNumber}>{monthDayText}</div>
+            <div className={styles.dateFullText}>{fullDateText}</div>
+          </div>
+          <div className={styles.badgeRow}>
+            {holiday?.lunarDate && (
+              <span className={`${styles.badge} ${styles.badgeLunar}`}>
+                农历 {holiday.lunarDate}
+              </span>
+            )}
+            {showHoliday && holiday && (
+              <span
+                className={`${styles.badge} ${
+                  holiday.dayOff
+                    ? styles.badgeRest
+                    : holiday.dayCode === 3
+                    ? styles.badgeWorkShift
+                    : styles.badgeNormal
+                }`}
+              >
+                {holiday.dayOff
+                  ? '今日放假休息'
+                  : holiday.dayCode === 3
+                  ? '调休工作日'
+                  : '工作日'}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {holiday?.name && (
+          <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Sparkles size={13} color="#d97706" />
+            <span style={{ fontSize: 11.5, fontWeight: 600, color: '#92400e' }}>
+              {holiday.name}
+            </span>
+          </div>
+        )}
+
+        {holiday?.tip && (
+          <div className={styles.tipBox}>
+            {holiday.tip}
+          </div>
+        )}
+      </div>
+
+      {/* 当周日历带 (Week Strip) */}
+      <WeekStrip currentDate={date} />
+
+      {/* 年度进度可视化条 */}
+      <div className={styles.progressCard}>
+        <div className={styles.progressInfo}>
+          <span className={styles.progressLabel}>{year} 年度进度</span>
+          <span className={styles.progressValue}>
+            第 {dayOfYear} 天 / 剩余 {remaining} 天 · {progressPercent}%
+          </span>
+        </div>
+        <div className={styles.progressBarTrack}>
+          <div
+            className={styles.progressBarFill}
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
+      </div>
     </div>
   );
 }
 
+/** 渲染当周 7 天迷你日历带 */
+function WeekStrip({ currentDate }: { currentDate: Date }) {
+  const currentDayOfWeek = currentDate.getDay(); // 0 is Sunday, 1 is Monday...
+  // 按照周一到周日排列 (Monday = 0, Sunday = 6)
+  const mondayOffset = currentDayOfWeek === 0 ? -6 : 1 - currentDayOfWeek;
+  const monday = new Date(currentDate);
+  monday.setDate(currentDate.getDate() + mondayOffset);
+
+  const weekDays = ['一', '二', '三', '四', '五', '六', '日'].map((label, index) => {
+    const dayDate = new Date(monday);
+    dayDate.setDate(monday.getDate() + index);
+    const isToday = dayDate.toDateString() === currentDate.toDateString();
+    const isWeekend = index >= 5;
+    return {
+      label,
+      dateNum: dayDate.getDate(),
+      isToday,
+      isWeekend,
+    };
+  });
+
+  return (
+    <div className={styles.weekStrip} aria-label="本周日程带">
+      {weekDays.map((day) => (
+        <div key={day.label} className={styles.weekDayCol}>
+          <span className={styles.weekDayLabel}>周{day.label}</span>
+          <span
+            className={`${styles.weekDayNumber} ${
+              day.isToday
+                ? styles.weekDayToday
+                : day.isWeekend
+                ? styles.weekDayWeekend
+                : ''
+            }`}
+          >
+            {day.dateNum}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ============================
+   Weather 天气详情组件
+   ============================ */
 function WeatherDetail({ resource }: { resource: ResourceState<DailyContextSummary> }) {
   if (resource.loading && !resource.data) {
-    return <section className={styles.detailSection}><p className={styles.state}>正在读取天气…</p></section>;
+    return <div className={styles.stateContainer}>正在获取实时天气信息…</div>;
   }
   if (resource.error && !resource.data) {
-    return <section className={styles.detailSection}><p className={styles.contextError}>{resource.error}</p></section>;
+    return (
+      <div className={styles.stateContainer}>
+        <CircleAlert size={20} color="#ef4444" style={{ margin: '0 auto 8px' }} />
+        <div>{resource.error}</div>
+        <button type="button" className={styles.retryBtn} onClick={resource.reload}>
+          <RefreshCw size={12} /> 重新获取
+        </button>
+      </div>
+    );
   }
   if (resource.data?.weatherError) {
-    return <section className={styles.detailSection}><p className={styles.contextError}>{resource.data.weatherError}</p></section>;
-  }
-  const weather = resource.data?.weather;
-  if (!weather) return <section className={styles.detailSection}><p className={styles.state}>暂无天气信息。</p></section>;
-  return (
-    <section className={styles.detailSection} aria-labelledby="topbar-weather-title">
-      <div className={styles.detailHeading}>
-        <CloudSun size={18} aria-hidden="true" />
-        <div><h2 id="topbar-weather-title">{weather.locationName} · {weather.condition}</h2><p>数据来源：和风天气</p></div>
+    return (
+      <div className={styles.stateContainer}>
+        <CircleAlert size={20} color="#f59e0b" style={{ margin: '0 auto 8px' }} />
+        <div>{resource.data.weatherError}</div>
+        <button type="button" className={styles.retryBtn} onClick={resource.reload}>
+          <RefreshCw size={12} /> 重新获取
+        </button>
       </div>
-      <dl className={styles.weatherMetrics}>
-        <div><dt>当前温度</dt><dd>{roundWeather(weather.temperature)}{weather.temperatureUnit}</dd></div>
-        <div><dt>体感温度</dt><dd>{roundWeather(weather.feelsLike)}{weather.temperatureUnit}</dd></div>
-        <div><dt>相对湿度</dt><dd>{weather.humidityPercent}%</dd></div>
-        <div><dt>风速</dt><dd>{roundWeather(weather.windSpeed)} {weather.windSpeedUnit}</dd></div>
-      </dl>
-      <a className={styles.attribution} href={weather.attributionUrl} target="_blank" rel="noreferrer">和风天气数据来源说明</a>
-    </section>
-  );
-}
+    );
+  }
 
-function TodoDetail({ resource, onOpen }: { resource: ResourceState<DailyDay>; onOpen: () => void }) {
-  const todos = resource.data ? overviewTodos(resource.data) : [];
-  const remaining = todos.filter((todo) => !todo.details.completed);
+  const weather = resource.data?.weather;
+  if (!weather) {
+    return (
+      <div className={styles.stateContainer}>
+        <CloudSun size={24} color="#94a3b8" style={{ margin: '0 auto 8px' }} />
+        <div>未配置和风天气密钥或暂无实时数据</div>
+      </div>
+    );
+  }
+
   return (
-    <section className={styles.detailSection} aria-labelledby="topbar-todo-title">
-      <DetailHeader
-        icon={<ListChecks size={18} />}
-        title="今日待办"
-        description={todos.length ? `已完成 ${todos.length - remaining.length} 项，共 ${todos.length} 项` : '今天的任务安排'}
-        action="打开日历"
-        onAction={onOpen}
-      />
-      <ResourceBody resource={resource} empty="今天暂无待办事项。">
-        {todos.length === 0 ? <p className={styles.state}>今天暂无待办事项。</p> : <div className={styles.itemList}>
-          {remaining.slice(0, 5).map((todo) => (
-            <div className={styles.itemRow} key={todo.id}>
-              <span className={styles.todoMarker} aria-hidden="true" />
-              <span>{todo.title}</span>
-              <time>{todo.details.time || priorityLabel(todo.details.priority)}</time>
-            </div>
-          ))}
-          {remaining.length === 0 && todos.length > 0 && <p className={styles.success}>今日待办已全部完成。</p>}
-        </div>}
-      </ResourceBody>
-    </section>
+    <div aria-labelledby="topbar-weather-title">
+      <div className={styles.cardHeader}>
+        <div className={styles.cardTitleBlock}>
+          <div className={`${styles.cardIconBadge} ${styles.weather}`}>
+            <CloudSun size={17} />
+          </div>
+          <div>
+            <h2 id="topbar-weather-title" className={styles.cardTitle}>实时天气</h2>
+            <p className={styles.cardSubtitle}>和风天气权威气象服务</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Hero 天气主卡 */}
+      <div className={styles.weatherHeroCard}>
+        <div className={styles.weatherHeroTop}>
+          <div className={styles.locationBadge}>
+            <MapPin size={13} />
+            <span>{weather.locationName}</span>
+          </div>
+          <span className={styles.weatherConditionTag}>{weather.condition}</span>
+        </div>
+
+        <div className={styles.weatherHeroMain}>
+          <div className={styles.weatherDegree}>
+            {roundWeather(weather.temperature)}°
+          </div>
+          <div className={styles.weatherDegreeSub}>
+            体感温度 {roundWeather(weather.feelsLike)}{weather.temperatureUnit}
+          </div>
+        </div>
+      </div>
+
+      {/* 2x2 Bento 指标卡片 */}
+      <div className={styles.weatherBentoGrid}>
+        <div className={styles.weatherBentoItem}>
+          <div className={styles.weatherBentoHeader}>
+            <Thermometer size={13} color="#f97316" />
+            <span>体感温差</span>
+          </div>
+          <div className={styles.weatherBentoVal}>
+            {roundWeather(weather.feelsLike)}{weather.temperatureUnit}
+          </div>
+        </div>
+
+        <div className={styles.weatherBentoItem}>
+          <div className={styles.weatherBentoHeader}>
+            <Droplets size={13} color="#0284c7" />
+            <span>相对湿度</span>
+          </div>
+          <div className={styles.weatherBentoVal}>
+            {weather.humidityPercent}%
+          </div>
+        </div>
+
+        <div className={styles.weatherBentoItem}>
+          <div className={styles.weatherBentoHeader}>
+            <Wind size={13} color="#059669" />
+            <span>风向与风速</span>
+          </div>
+          <div className={styles.weatherBentoVal} style={{ fontSize: 13 }}>
+            {weather.windDirection || '微风'} · {roundWeather(weather.windSpeed)} {weather.windSpeedUnit}
+          </div>
+        </div>
+
+        <div className={styles.weatherBentoItem}>
+          <div className={styles.weatherBentoHeader}>
+            <Compass size={13} color="#8b5cf6" />
+            <span>数据提供方</span>
+          </div>
+          <div className={styles.weatherBentoVal} style={{ fontSize: 13 }}>
+            和风天气官方
+          </div>
+        </div>
+      </div>
+
+      {weather.attributionUrl && (
+        <a
+          className={styles.attributionLink}
+          href={weather.attributionUrl}
+          target="_blank"
+          rel="noreferrer"
+        >
+          查看和风天气数据来源说明 ↗
+        </a>
+      )}
+    </div>
   );
 }
 
+/* ============================
+   Todos 待办详情组件
+   ============================ */
+function TodoDetail({
+  resource,
+  onOpen,
+}: {
+  resource: ResourceState<DailyDay>;
+  onOpen: () => void;
+}) {
+  const todos = resource.data ? overviewTodos(resource.data) : [];
+  const completed = todos.filter((t) => t.details.completed).length;
+  const remaining = todos.filter((t) => !t.details.completed);
+  const percent = todos.length > 0 ? Math.round((completed / todos.length) * 100) : 0;
+
+  return (
+    <div aria-labelledby="topbar-todo-title">
+      <div className={styles.cardHeader}>
+        <div className={styles.cardTitleBlock}>
+          <div className={`${styles.cardIconBadge} ${styles.todos}`}>
+            <ListChecks size={17} />
+          </div>
+          <div>
+            <h2 id="topbar-todo-title" className={styles.cardTitle}>今日待办</h2>
+            <p className={styles.cardSubtitle}>
+              {todos.length ? `共 ${todos.length} 项任务，已完成 ${completed} 项` : '今日暂无安排'}
+            </p>
+          </div>
+        </div>
+        <button type="button" className={styles.actionBtn} onClick={onOpen}>
+          <span>日历看板</span>
+          <ArrowUpRight size={13} />
+        </button>
+      </div>
+
+      <ResourceBody resource={resource} empty="今天还没有待办事项。">
+        {todos.length > 0 && (
+          <div className={styles.todoProgressBanner}>
+            <div className={styles.todoProgressText}>
+              <strong>任务推进</strong>
+              <span>{completed}/{todos.length} ({percent}%)</span>
+            </div>
+            <div className={styles.progressBarTrack}>
+              <div
+                className={styles.progressBarFill}
+                style={{
+                  width: `${percent}%`,
+                  background: 'linear-gradient(90deg, #10b981 0%, #059669 100%)',
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {remaining.length === 0 && todos.length > 0 ? (
+          <div className={styles.emptyCelebration}>
+            <CheckCircle2 size={28} color="#10b981" style={{ margin: '0 auto 6px' }} />
+            <strong style={{ fontSize: 13, color: '#0f172a' }}>任务已全部搞定！</strong>
+            <p>今天的既定待办均已完成，适度放松一下吧。</p>
+          </div>
+        ) : remaining.length === 0 && todos.length === 0 ? (
+          <div className={styles.emptyCelebration}>
+            <ListChecks size={28} color="#94a3b8" style={{ margin: '0 auto 6px' }} />
+            <p>今天没有未完成的待办事项，尽情专注对话吧。</p>
+          </div>
+        ) : (
+          <div className={styles.todoList}>
+            {remaining.slice(0, 6).map((todo) => (
+              <div key={todo.id} className={styles.todoRow}>
+                <div className={styles.todoLeft}>
+                  <span className={styles.todoCheck}>
+                    <Circle size={14} />
+                  </span>
+                  <span className={styles.todoTitle}>{todo.title}</span>
+                </div>
+                <div className={styles.todoMeta}>
+                  {todo.details.time && (
+                    <span className={styles.todoTime}>
+                      <Clock size={11} />
+                      {todo.details.time}
+                    </span>
+                  )}
+                  <span
+                    className={
+                      todo.details.priority === 'high'
+                        ? styles.priorityHigh
+                        : todo.details.priority === 'medium'
+                        ? styles.priorityMedium
+                        : styles.priorityLow
+                    }
+                  >
+                    {priorityLabel(todo.details.priority)}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <button type="button" className={styles.fullActionBtn} onClick={onOpen}>
+          <span>在日历看板中管理全部日程</span>
+          <ArrowUpRight size={13} />
+        </button>
+      </ResourceBody>
+    </div>
+  );
+}
+
+/* ============================
+   Finance 财务详情组件
+   ============================ */
 function FinanceDetail({
   date,
   resource,
@@ -332,80 +722,136 @@ function FinanceDetail({
   resource: ResourceState<{ overview: FinanceOverview; chart: FinanceExpenseChart }>;
   onOpen: () => void;
 }) {
-  const today = resource.data?.chart.days.find((day) => day.date === date);
+  const todayDay = resource.data?.chart.days.find((day) => day.date === date);
+  const todayExpense = todayDay?.total ?? 0;
+  const todayIncome = todayDay?.income ?? 0;
+
+  const monthExpense = resource.data?.overview.monthExpense ?? 0;
+  const monthIncome = resource.data?.overview.monthIncome ?? 0;
+  const monthBalance = monthIncome - monthExpense;
+
   const transactions = resource.data?.overview.transactions.filter((item) => item.date === date).slice(0, 4) ?? [];
+
   return (
-    <section className={styles.detailSection} aria-labelledby="topbar-finance-title">
-      <DetailHeader
-        icon={<WalletCards size={18} />}
-        title="今日收支"
-        description="今日流水与本月累计"
-        action="打开财务"
-        onAction={onOpen}
-      />
-      <ResourceBody resource={resource} empty="今天暂无收支记录。">
-        {resource.data && (
-          <div className={styles.financeLayout}>
-            <dl className={styles.metrics}>
-              <div><dt>今日支出</dt><dd className={styles.expense}>{formatMoney(today?.total ?? 0)}</dd></div>
-              <div><dt>今日收入</dt><dd className={styles.income}>{formatMoney(today?.income ?? 0)}</dd></div>
-              <div><dt>本月支出</dt><dd>{formatMoney(resource.data.overview.monthExpense)}</dd></div>
-              <div><dt>本月收入</dt><dd>{formatMoney(resource.data.overview.monthIncome)}</dd></div>
-            </dl>
-            {transactions.length > 0 && (
-              <div className={styles.itemList}>
-                {transactions.map((item) => (
-                  <div className={styles.itemRow} key={item.id}>
-                    <span>{item.note || item.category}</span>
-                    <small>{item.accountName}</small>
-                    <strong className={item.transactionType === 'expense' ? styles.expense : styles.income}>
-                      {item.transactionType === 'expense' ? '−' : '+'}{formatMoney(item.amount, item.currency)}
-                    </strong>
+    <div aria-labelledby="topbar-finance-title">
+      <div className={styles.cardHeader}>
+        <div className={styles.cardTitleBlock}>
+          <div className={`${styles.cardIconBadge} ${styles.finance}`}>
+            <WalletCards size={17} />
+          </div>
+          <div>
+            <h2 id="topbar-finance-title" className={styles.cardTitle}>今日收支</h2>
+            <p className={styles.cardSubtitle}>今日流水与本月资产结余</p>
+          </div>
+        </div>
+        <button type="button" className={styles.actionBtn} onClick={onOpen}>
+          <span>财务中心</span>
+          <ArrowUpRight size={13} />
+        </button>
+      </div>
+
+      <ResourceBody resource={resource} empty="暂无财务记录。">
+        {/* 今日双核收支 Hero 卡 */}
+        <div className={styles.financeDualHero}>
+          <div className={styles.financeCard}>
+            <div className={styles.financeCardHeader}>
+              <TrendingDown size={14} color="#e11d48" />
+              <span>今日支出</span>
+            </div>
+            <div className={`${styles.financeCardVal} ${styles.expenseVal}`}>
+              {todayExpense > 0 ? `-${formatMoney(todayExpense)}` : '¥0.00'}
+            </div>
+          </div>
+
+          <div className={styles.financeCard}>
+            <div className={styles.financeCardHeader}>
+              <TrendingUp size={14} color="#059669" />
+              <span>今日收入</span>
+            </div>
+            <div className={`${styles.financeCardVal} ${styles.incomeVal}`}>
+              {todayIncome > 0 ? `+${formatMoney(todayIncome)}` : '¥0.00'}
+            </div>
+          </div>
+        </div>
+
+        {/* 本月汇总与结余条 */}
+        <div className={styles.monthSummaryBar}>
+          <span>本月支出 <strong>{formatMoney(monthExpense)}</strong></span>
+          <span>本月收入 <strong>{formatMoney(monthIncome)}</strong></span>
+          <span>
+            月净结余{' '}
+            <strong style={{ color: monthBalance >= 0 ? '#059669' : '#e11d48' }}>
+              {formatMoney(monthBalance)}
+            </strong>
+          </span>
+        </div>
+
+        {/* 今日流水清单 */}
+        <div className={styles.transactionHeader}>今日流水记录</div>
+        {transactions.length > 0 ? (
+          <div className={styles.transactionList}>
+            {transactions.map((item) => (
+              <div key={item.id} className={styles.transactionRow}>
+                <div className={styles.transactionLeft}>
+                  <span className={styles.categoryTag}>{item.category || '其它'}</span>
+                  <div>
+                    <span className={styles.transactionTitle}>{item.note || item.category}</span>
+                    <span className={styles.transactionAccount}>{item.accountName}</span>
                   </div>
-                ))}
+                </div>
+                <span
+                  className={styles.transactionAmount}
+                  style={{
+                    color: item.transactionType === 'expense' ? '#e11d48' : '#059669',
+                  }}
+                >
+                  {item.transactionType === 'expense' ? '-' : '+'}
+                  {formatMoney(item.amount, item.currency)}
+                </span>
               </div>
-            )}
+            ))}
+          </div>
+        ) : (
+          <div style={{ padding: '12px 0 14px', textAlign: 'center', fontSize: 11.5, color: '#94a3b8' }}>
+            今日暂无明细流水记账
           </div>
         )}
-      </ResourceBody>
-    </section>
-  );
-}
 
-function DetailHeader({ icon, title, description, action, onAction }: {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-  action: string;
-  onAction: () => void;
-}) {
-  return (
-    <div className={styles.detailHeader}>
-      <div className={styles.detailHeading}>
-        <span aria-hidden="true">{icon}</span>
-        <div><h2>{title}</h2><p>{description}</p></div>
-      </div>
-      <button type="button" className={styles.openFeature} onClick={onAction}>{action}</button>
+        <button type="button" className={styles.fullActionBtn} onClick={onOpen}>
+          <span>进入财务中心记一笔或查看资产</span>
+          <ArrowUpRight size={13} />
+        </button>
+      </ResourceBody>
     </div>
   );
 }
 
-function ResourceBody<T>({ resource, empty, children }: {
+function ResourceBody<T>({
+  resource,
+  empty,
+  children,
+}: {
   resource: ResourceState<T>;
   empty: string;
   children: React.ReactNode;
 }) {
-  if (resource.loading && !resource.data) return <p className={styles.state}>正在加载…</p>;
+  if (resource.loading && !resource.data) {
+    return <div className={styles.stateContainer}>正在加载数据…</div>;
+  }
   if (resource.error && !resource.data) {
     return (
-      <button type="button" className={styles.errorState} onClick={resource.reload}>
-        <CircleAlert size={15} aria-hidden="true" />
-        <span>{resource.error}</span>
-        <RefreshCw size={14} aria-hidden="true" />
-      </button>
+      <div className={styles.stateContainer}>
+        <CircleAlert size={20} color="#ef4444" style={{ margin: '0 auto 8px' }} />
+        <div>{resource.error}</div>
+        <button type="button" className={styles.retryBtn} onClick={resource.reload}>
+          <RefreshCw size={12} /> 点击重试
+        </button>
+      </div>
     );
   }
-  if (!resource.data) return <p className={styles.state}>{empty}</p>;
+  if (!resource.data) {
+    return <div className={styles.stateContainer}>{empty}</div>;
+  }
   return <>{children}</>;
 }
 
@@ -455,7 +901,7 @@ function useTopBarResource<T>(enabled: boolean, load: () => Promise<T>, refreshK
 
 function todoSummary(resource: ResourceState<DailyDay>): string {
   if (resource.loading && !resource.data) return '待办加载中';
-  if (resource.error && !resource.data) return '待办暂不可用';
+  if (resource.error && !resource.data) return '待办不可用';
   const todos = resource.data ? overviewTodos(resource.data) : [];
   const completed = todos.filter((todo) => todo.details.completed).length;
   return todos.length ? `待办 ${completed}/${todos.length}` : '今日无待办';
@@ -466,7 +912,7 @@ function financeSummary(
   date: string,
 ): string {
   if (resource.loading && !resource.data) return '收支加载中';
-  if (resource.error && !resource.data) return '收支暂不可用';
+  if (resource.error && !resource.data) return '收支不可用';
   const today = resource.data?.chart.days.find((day) => day.date === date);
   return `支 ${formatCompactMoney(today?.total ?? 0)} · 收 ${formatCompactMoney(today?.income ?? 0)}`;
 }
@@ -478,16 +924,16 @@ function formatCompactDate(date: Date): string {
 function dateSummary(date: Date, resource: ResourceState<DailyContextSummary> | null): string {
   const dateText = formatCompactDate(date);
   if (!resource) return dateText;
-  if (resource.loading && !resource.data) return `${dateText} · 节假日加载中`;
+  if (resource.loading && !resource.data) return `${dateText} · 加载中`;
   const holiday = resource.data?.holiday;
   if (!holiday) return dateText;
-  const status = holiday.name || (holiday.dayOff ? '休息日' : holiday.dayCode === 3 ? '调休上班' : '工作日');
+  const status = holiday.name || (holiday.dayOff ? '休假' : holiday.dayCode === 3 ? '调休' : '工作日');
   return `${dateText} · ${status}`;
 }
 
 function weatherSummary(resource: ResourceState<DailyContextSummary>): string {
   if (resource.loading && !resource.data) return '天气加载中';
-  if (resource.data?.weatherError || resource.error) return '天气暂不可用';
+  if (resource.data?.weatherError || resource.error) return '天气不可用';
   const weather = resource.data?.weather;
   return weather ? `${weather.condition} ${roundWeather(weather.temperature)}${weather.temperatureUnit}` : '天气未配置';
 }
@@ -516,3 +962,4 @@ function priorityLabel(priority: 'high' | 'medium' | 'low'): string {
 function isLeapYear(year: number): boolean {
   return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
 }
+
