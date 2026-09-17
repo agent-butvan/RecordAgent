@@ -69,7 +69,7 @@ function getRiskBadge(toolName: string, riskDescription?: string): string {
   if (toolName.includes('delete')) return '删除操作';
   if (toolName.includes('update') || toolName.includes('edit') || toolName.includes('write')) return '修改操作';
   if (toolName.includes('execute') || toolName.includes('bash') || toolName.includes('terminal')) return '系统命令';
-  if (toolName.includes('http') || toolName.includes('search')) return '网络访问';
+  if (toolName.includes('http') || toolName.includes('search')) return '网络请求';
   return '高风险操作';
 }
 
@@ -97,13 +97,8 @@ export const ToolApprovalCard: React.FC<ToolApprovalCardProps> = ({
   className,
 }) => {
   const [rememberForSession, setRememberForSession] = useState(false);
-  // 控制各个工具参数区的展开/折叠状态，单工具默认展开
-  const [openParams, setOpenParams] = useState<Record<string, boolean>>(() => {
-    if (tools.length === 1) {
-      return { [tools[0].toolCallId]: true };
-    }
-    return {};
-  });
+  // 参数列表默认全部折叠，需主动点击才展开
+  const [openParams, setOpenParams] = useState<Record<string, boolean>>({});
 
   // 多工具时逐项决定的状态
   const [decisions, setDecisions] = useState<Record<string, DecisionType>>(() =>
@@ -112,7 +107,8 @@ export const ToolApprovalCard: React.FC<ToolApprovalCardProps> = ({
 
   useEffect(() => {
     setRememberForSession(false);
-    setOpenParams(tools.length === 1 ? { [tools[0].toolCallId]: true } : {});
+    // 默认保持参数折叠
+    setOpenParams({});
     setDecisions(Object.fromEntries(tools.map((t) => [t.toolCallId, 'allow'])));
   }, [tools]);
 
