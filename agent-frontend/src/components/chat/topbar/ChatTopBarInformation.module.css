@@ -1,8 +1,9 @@
-/* 根容器：相对定位，容纳触发区与浮动面板 */
+/* 根容器：相对定位，容纳触发区与浮动面板；靠右对齐展示 */
 .root {
   position: relative;
   display: flex;
   flex: 0 1 auto;
+  margin-left: auto;
   justify-content: flex-end;
   min-width: 0;
 }
@@ -11,6 +12,7 @@
 .triggers {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 2px;
   min-width: 0;
   height: 48px;
