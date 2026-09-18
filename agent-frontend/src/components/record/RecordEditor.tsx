@@ -70,6 +70,6 @@ export function RecordEditor({ date, entry, initialType = 'quick', initialTabId,
         finally { setUploading(false); event.target.value = ''; }
       }} /></label></div>}
     </div>}
-    onSave={({ title, body }) => onSave({ recordDate, type, title, contentHtml: textToHtml(body), contentText: body,
+    onSave={({ title, body, html }) => onSave({ recordDate, type, title, contentHtml: html || textToHtml(body), contentText: body,
       tags: tags.split(/[，,]/).map((item) => item.trim()).filter(Boolean), tabId: tabId || undefined })} />;
 }
