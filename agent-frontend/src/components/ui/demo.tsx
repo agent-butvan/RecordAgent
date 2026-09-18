@@ -9,6 +9,7 @@ import {
   ModelSelectorValue,
   type AiModelSelection,
 } from "./ai-model-select"
+import { CodeBlock, CodeBlockCode } from "./code-block"
 
 // ONLY DEFAULT EXPORT WILL BE TREATED AS A DEMO
 export default function DemoOne() {
@@ -44,3 +45,21 @@ export default function DemoOne() {
     </div>
   )
 }
+
+export function CodeBlockBasic() {
+  const code = `function greet(name: string) {
+  return \`Hello, \${name}!\`;
+}
+
+// Call the function
+greet("World");`
+
+  return (
+    <div className="w-full max-w-[400px]">
+      <CodeBlock>
+        <CodeBlockCode code={code} language="javascript" />
+      </CodeBlock>
+    </div>
+  )
+}
+
