@@ -43,7 +43,7 @@ export function CodeBlock({
     return (
       <div
         className={cn(
-          "not-prose my-3 flex w-full flex-col overflow-clip rounded-xl border border-[#e2e8f0] bg-white text-[#1f2937] shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-colors duration-150 hover:border-[#cbd5e1]",
+          "not-prose my-3 flex w-full flex-col overflow-clip rounded-xl border border-[#e2e8f0] bg-white text-[#1f2937]",
           className
         )}
         {...props}
@@ -74,7 +74,7 @@ export function CodeBlock({
   return (
     <div
       className={cn(
-        "not-prose my-3 flex w-full flex-col overflow-clip rounded-xl border border-[#e2e8f0] bg-white text-[#1f2937] shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-colors duration-150 hover:border-[#cbd5e1]",
+        "not-prose my-3 flex w-full flex-col overflow-clip rounded-xl border border-[#e2e8f0] bg-white text-[#1f2937]",
         className
       )}
       {...props}
