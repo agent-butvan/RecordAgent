@@ -2,32 +2,11 @@ import { useMemo, useState } from "react"
 import { Check, Copy } from "lucide-react"
 import { NodeViewWrapper, NodeViewContent, type NodeViewProps } from "@tiptap/react"
 import {
+  COMMON_CODE_LANGUAGES,
   getLanguageDisplayName,
   resolveLanguage,
 } from "./codeBlockLanguages"
 import styles from "./TiptapCodeBlockView.module.css"
-
-const COMMON_LANGUAGES = [
-  { value: "", label: "自动识别" },
-  { value: "javascript", label: "JavaScript" },
-  { value: "typescript", label: "TypeScript" },
-  { value: "tsx", label: "TSX / React" },
-  { value: "python", label: "Python" },
-  { value: "java", label: "Java" },
-  { value: "c", label: "C" },
-  { value: "cpp", label: "C++" },
-  { value: "csharp", label: "C#" },
-  { value: "go", label: "Go" },
-  { value: "rust", label: "Rust" },
-  { value: "bash", label: "Bash / Shell" },
-  { value: "sql", label: "SQL" },
-  { value: "json", label: "JSON" },
-  { value: "yaml", label: "YAML" },
-  { value: "html", label: "HTML" },
-  { value: "css", label: "CSS" },
-  { value: "markdown", label: "Markdown" },
-  { value: "dockerfile", label: "Dockerfile" },
-]
 
 export function TiptapCodeBlockView({ node, updateAttributes }: NodeViewProps) {
   const [copied, setCopied] = useState(false)
@@ -52,24 +31,29 @@ export function TiptapCodeBlockView({ node, updateAttributes }: NodeViewProps) {
 
   return (
     <NodeViewWrapper className={styles.wrapper}>
-      <div className={styles.header}>
-        <div className={styles.left}>
-          <span className={styles.dot} />
+      <div className={styles.floatingToolbar} contentEditable={false}>
+        <div className={styles.langSelectorWrapper}>
           <select
+            tabIndex={-1}
             contentEditable={false}
             value={currentLang}
             onChange={(e) => updateAttributes({ language: e.target.value })}
             className={styles.select}
             title="切换代码语言"
           >
-            {COMMON_LANGUAGES.map((lang) => (
+            {COMMON_CODE_LANGUAGES.map((lang) => (
               <option key={lang.value} value={lang.value}>
-                {lang.value === "" ? `自动识别 (${displayName})` : lang.label}
+                {lang.value === ""
+                  ? detectedLang && detectedLang !== "plaintext"
+                    ? `${displayName} (自动)`
+                    : "自动识别"
+                  : lang.label}
               </option>
             ))}
           </select>
         </div>
         <button
+          tabIndex={-1}
           contentEditable={false}
           type="button"
           onClick={handleCopy}
@@ -77,10 +61,12 @@ export function TiptapCodeBlockView({ node, updateAttributes }: NodeViewProps) {
           title={copied ? "已复制" : "复制代码"}
           aria-label={copied ? "代码已复制" : "复制代码"}
         >
-          {copied ? <Check size={14} className={styles.copiedIcon} /> : <Copy size={14} />}
+          {copied ? <Check size={13} className={styles.copiedIcon} /> : <Copy size={13} />}
         </button>
       </div>
-      <NodeViewContent<'pre'> as="pre" className={styles.codeArea} />
+      <pre className={styles.codeArea}>
+        <NodeViewContent<'code'> as="code" className={styles.code} />
+      </pre>
     </NodeViewWrapper>
   )
 }

@@ -3,19 +3,111 @@ import { CaretLeftIcon, CheckIcon, NotePencilIcon } from '@phosphor-icons/react'
 import { EditorContent, ReactNodeViewRenderer, useEditor } from '@tiptap/react';
 import type { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
-import CodeBlock from '@tiptap/extension-code-block';
+import { CodeBlockLowlight } from '@tiptap/extension-code-block-lowlight';
 import Placeholder from '@tiptap/extension-placeholder';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import { Markdown } from '@tiptap/markdown';
+import { all, createLowlight } from 'lowlight';
 import { TiptapCodeBlockView } from '../ui/TiptapCodeBlockView';
+import { createSmartLowlight } from '../ui/codeBlockLanguages';
 import { useMessage } from './Message';
 import styles from './WritingEditorPage.module.css';
 
-const CustomCodeBlock = CodeBlock.extend({
+const smartLowlight = createSmartLowlight(createLowlight(all));
+
+const CustomCodeBlock = CodeBlockLowlight.extend({
   addNodeView() {
     return ReactNodeViewRenderer(TiptapCodeBlockView);
   },
+  addKeyboardShortcuts() {
+    return {
+      ...this.parent?.(),
+      Tab: ({ editor }) => {
+        const { state } = editor;
+        const { selection } = state;
+        const { $from, empty } = selection;
+        if ($from.parent.type.name !== this.name) {
+          return false;
+        }
+        const indent = '  ';
+        if (empty) {
+          return editor.commands.insertContent(indent);
+        }
+        return editor.commands.command(({ tr }) => {
+          const { from, to } = selection;
+          const text = state.doc.textBetween(from, to, '\n', '\n');
+          const lines = text.split('\n');
+          const indentedText = lines.map((line) => indent + line).join('\n');
+          tr.replaceWith(from, to, state.schema.text(indentedText));
+          return true;
+        });
+      },
+      'Shift-Tab': ({ editor }) => {
+        const { state } = editor;
+        const { selection } = state;
+        const { $from, empty } = selection;
+        if ($from.parent.type.name !== this.name) {
+          return false;
+        }
+        const tabSize = 2;
+        if (empty) {
+          return editor.commands.command(({ tr }) => {
+            const { pos } = $from;
+            const codeBlockStart = $from.start();
+            const codeBlockEnd = $from.end();
+            const allText = state.doc.textBetween(codeBlockStart, codeBlockEnd, '\n', '\n');
+            const lines = allText.split('\n');
+
+            let currentLineIndex = 0;
+            let charCount = 0;
+            const relativeCursorPos = pos - codeBlockStart;
+
+            for (let i = 0; i < lines.length; i += 1) {
+              if (charCount + lines[i].length >= relativeCursorPos) {
+                currentLineIndex = i;
+                break;
+              }
+              charCount += lines[i].length + 1;
+            }
+
+            const currentLine = lines[currentLineIndex];
+            const leadingSpaces = currentLine.match(/^ */)?.[0] || '';
+            const spacesToRemove = Math.min(leadingSpaces.length, tabSize);
+            if (spacesToRemove === 0) return true;
+
+            let lineStartPos = codeBlockStart;
+            for (let i = 0; i < currentLineIndex; i += 1) {
+              lineStartPos += lines[i].length + 1;
+            }
+
+            tr.delete(lineStartPos, lineStartPos + spacesToRemove);
+            return true;
+          });
+        }
+
+        return editor.commands.command(({ tr }) => {
+          const { from, to } = selection;
+          const text = state.doc.textBetween(from, to, '\n', '\n');
+          const lines = text.split('\n');
+          const reverseIndentText = lines
+            .map((line) => {
+              const leadingSpaces = line.match(/^ */)?.[0] || '';
+              const spacesToRemove = Math.min(leadingSpaces.length, tabSize);
+              return line.slice(spacesToRemove);
+            })
+            .join('\n');
+          tr.replaceWith(from, to, state.schema.text(reverseIndentText));
+          return true;
+        });
+      },
+    };
+  },
+}).configure({
+  lowlight: smartLowlight,
+  enableTabIndentation: true,
+  tabSize: 2,
+  defaultLanguage: null,
 });
 
 interface WritingEditorPageProps {

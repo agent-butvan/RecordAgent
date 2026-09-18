@@ -1,85 +1,84 @@
 .wrapper {
-  margin: 16px 0;
+  position: relative;
+  margin: 18px 0;
   border: 1px solid var(--border-subtle, #e2e8f0);
-  border-radius: 12px;
+  border-radius: 16px;
   background: #ffffff;
   overflow: hidden;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
-  transition: border-color 150ms ease;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.02);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 
 .wrapper:hover {
   border-color: #cbd5e1;
+  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.06);
 }
 
-.header {
-  display: flex;
+.floatingToolbar {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 10;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  min-height: 38px;
-  padding: 0 12px;
-  background: #f8fafc;
-  border-bottom: 1px solid #f1f5f9;
+  gap: 4px;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  opacity: 0.35;
+  transition: opacity 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
   user-select: none;
 }
 
-.left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.wrapper:hover .floatingToolbar,
+.wrapper:focus-within .floatingToolbar {
+  opacity: 1;
+  border-color: #cbd5e1;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
 }
 
-.dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 9999px;
-  background: var(--accent-blue, #2563eb);
-  opacity: 0.85;
+.langSelectorWrapper {
+  display: flex;
+  align-items: center;
 }
 
 .select {
-  border: 1px solid transparent;
+  border: none;
   background: transparent;
-  padding: 2px 6px;
+  padding: 3px 6px;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
-  color: #0f172a;
+  color: #475569;
   cursor: pointer;
   outline: none;
-  transition: background-color 150ms ease, border-color 150ms ease;
+  transition: color 150ms ease;
 }
 
 .select:hover {
-  background: #ffffff;
-  border-color: #cbd5e1;
-}
-
-.select:focus-visible {
-  border-color: var(--accent-blue, #2563eb);
+  color: #0f172a;
 }
 
 .copyBtn {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border: none;
   background: transparent;
-  border-radius: 6px;
+  border-radius: 5px;
   color: #64748b;
   cursor: pointer;
   transition: background-color 150ms ease, color 150ms ease;
 }
 
 .copyBtn:hover {
-  background: #e2e8f0;
+  background: #f1f5f9;
   color: #0f172a;
-}
-
-.copyBtn:focus-visible {
-  outline: 2px solid var(--accent-blue, #2563eb);
 }
 
 .copiedIcon {
@@ -88,13 +87,14 @@
 
 .codeArea {
   margin: 0 !important;
-  padding: 14px 18px !important;
-  background: #fcfcfd !important;
-  color: #1f2937 !important;
+  padding: 20px 90px 20px 22px !important;
+  background: transparent !important;
+  color: #24292f !important;
   overflow-x: auto;
-  font-family: var(--font-mono, monospace) !important;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace !important;
   font-size: 13.5px !important;
-  line-height: 1.65 !important;
+  line-height: 1.7 !important;
+  tab-size: 2 !important;
   border: none !important;
 }
 
@@ -104,5 +104,79 @@
   line-height: inherit !important;
   background: transparent !important;
   padding: 0 !important;
+  border-radius: 0 !important;
   color: inherit !important;
+  white-space: pre !important;
+}
+
+/* --------------------------------------------------------------------------
+ * GitHub Light 实时语法高亮主题规则（与参考图 2 及 Shiki github-light 保持像素级一致）
+ * -------------------------------------------------------------------------- */
+.codeArea :global(.hljs-keyword),
+.codeArea :global(.hljs-tag),
+.codeArea :global(.hljs-selector-tag) {
+  color: #cf222e !important; /* 红/品红：function, return, public, class, if, import 等关键字 */
+  font-weight: 500;
+}
+
+.codeArea :global(.hljs-title),
+.codeArea :global(.hljs-title.function_),
+.codeArea :global(.hljs-title.class_),
+.codeArea :global(.hljs-title.class_.inherited__),
+.codeArea :global(.hljs-section) {
+  color: #8250df !important; /* 紫色：函数名 greet、类名 Main 等标识符 */
+  font-weight: 500;
+}
+
+.codeArea :global(.hljs-params),
+.codeArea :global(.hljs-variable),
+.codeArea :global(.hljs-variable.language_) {
+  color: #953800 !important; /* 橙红/琥珀：函数形参 name、局部变量 */
+}
+
+.codeArea :global(.hljs-string),
+.codeArea :global(.hljs-regexp),
+.codeArea :global(.hljs-meta .hljs-string) {
+  color: #0a3069 !important; /* 深海蓝：字符串字面量、模板字符串 */
+}
+
+.codeArea :global(.hljs-subst) {
+  color: #24292f !important; /* 模板字符串内嵌符号 ${...} */
+}
+
+.codeArea :global(.hljs-comment),
+.codeArea :global(.hljs-doctag),
+.codeArea :global(.hljs-quote) {
+  color: #6e7781 !important; /* 灰色斜体：注释内容 */
+  font-style: italic !important;
+}
+
+.codeArea :global(.hljs-number),
+.codeArea :global(.hljs-literal) {
+  color: #0550ae !important; /* 亮蓝：数字和布尔/空字面量 */
+}
+
+.codeArea :global(.hljs-built_in),
+.codeArea :global(.hljs-symbol) {
+  color: #0550ae !important; /* 内置对象或全局类型 */
+}
+
+.codeArea :global(.hljs-type),
+.codeArea :global(.hljs-class) {
+  color: #cf222e !important; /* 类型声明与类修饰 */
+}
+
+.codeArea :global(.hljs-attr),
+.codeArea :global(.hljs-attribute) {
+  color: #0550ae !important; /* 属性名与配置项 */
+}
+
+.codeArea :global(.hljs-meta),
+.codeArea :global(.hljs-meta .hljs-keyword) {
+  color: #6e7781 !important; /* 注解与预处理指令 */
+}
+
+.codeArea :global(.hljs-punctuation),
+.codeArea :global(.hljs-operator) {
+  color: #24292f !important; /* 括号、分号与算符 */
 }

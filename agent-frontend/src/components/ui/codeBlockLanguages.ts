@@ -246,3 +246,58 @@ export function resolveLanguage(lang?: string, code = ""): string {
 export function getLanguageDisplayName(lang: string): string {
   return DISPLAY_NAMES[lang] || lang.toUpperCase();
 }
+
+/** 常见代码语言预设列表 */
+export const COMMON_CODE_LANGUAGES = [
+  { value: "", label: "自动识别" },
+  { value: "javascript", label: "JavaScript" },
+  { value: "typescript", label: "TypeScript" },
+  { value: "tsx", label: "TSX / React" },
+  { value: "python", label: "Python" },
+  { value: "java", label: "Java" },
+  { value: "c", label: "C" },
+  { value: "cpp", label: "C++" },
+  { value: "csharp", label: "C#" },
+  { value: "go", label: "Go" },
+  { value: "rust", label: "Rust" },
+  { value: "bash", label: "Bash / Shell" },
+  { value: "sql", label: "SQL" },
+  { value: "json", label: "JSON" },
+  { value: "yaml", label: "YAML" },
+  { value: "html", label: "HTML" },
+  { value: "css", label: "CSS" },
+  { value: "markdown", label: "Markdown" },
+  { value: "dockerfile", label: "Dockerfile" },
+]
+
+/**
+ * 包装 lowlight 实例，当未指定具体语言时，优先使用启发式推断进行高亮，
+ * 避免通用 highlightAuto 将极简代码（如 public class main）误判为冷门语言
+ */
+export function createSmartLowlight(baseLowlight: any) {
+  const languages = new Set<string>(baseLowlight.listLanguages())
+
+  return {
+    ...baseLowlight,
+    listLanguages: () => baseLowlight.listLanguages(),
+    registered: (lang: string) => baseLowlight.registered?.(lang) || languages.has(lang),
+    highlight: (lang: string, value: string) => {
+      const resolved = LANGUAGE_ALIASES[lang.toLowerCase()] || lang
+      if (languages.has(resolved)) {
+        return baseLowlight.highlight(resolved, value)
+      }
+      return baseLowlight.highlightAuto(value)
+    },
+    highlightAuto: (value: string) => {
+      const detected = resolveLanguage("", value)
+      if (detected && detected !== "plaintext" && languages.has(detected)) {
+        try {
+          return baseLowlight.highlight(detected, value)
+        } catch {
+          // ignore fallback
+        }
+      }
+      return baseLowlight.highlightAuto(value)
+    },
+  }
+}
