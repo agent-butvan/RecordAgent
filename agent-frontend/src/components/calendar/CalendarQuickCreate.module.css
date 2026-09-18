@@ -8,20 +8,23 @@
   align-items: center;
   gap: 6px;
   padding: 0 10px;
-  border: none;
+  border: 1px solid #cbdbee;
   border-radius: var(--radius-md);
-  background: var(--accent-blue);
-  color: var(--text-inverse);
+  background: #e6edf5;
+  color: #1d4ed8;
   font-size: 11px;
   font-weight: 650;
-  transition: background-color var(--transition-fast), transform var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
 }
 
 .trigger:hover {
-  background: #285fc6;
+  background: #d8e3f0;
+  border-color: #b9d0e8;
+  color: #1e40af;
 }
 
 .trigger:active {
+  background: #cad8e8;
   transform: translateY(1px);
 }
 
@@ -234,12 +237,15 @@
 }
 
 .submitButton {
-  background: var(--accent-blue);
-  color: var(--text-inverse);
+  background: #e6edf5;
+  color: #1d4ed8;
+  border: 1px solid #cbdbee;
 }
 
 .submitButton:hover {
-  background: #285fc6;
+  background: #d8e3f0;
+  border-color: #b9d0e8;
+  color: #1e40af;
 }
 
 @media (max-width: 620px) {
