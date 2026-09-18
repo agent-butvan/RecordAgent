@@ -15,7 +15,9 @@
 .bodyEditor h3 { margin: 18px 0 8px; font-size: 16px; font-weight: 600; line-height: 1.4; color: var(--text-primary); }
 .bodyEditor h4 { margin: 14px 0 6px; font-size: 15px; font-weight: 600; line-height: 1.4; color: var(--text-primary); }
 .bodyEditor p { margin: 0 0 10px; min-height: 1.85em; }
-.bodyEditor blockquote { margin: 14px 0; padding: 6px 14px; border-left: 3px solid var(--accent-blue); background: var(--bg-surface); border-radius: 0 6px 6px 0; color: var(--text-secondary); }
+.bodyEditor blockquote { margin: 16px 0; padding: 2px 0 2px 16px; border-left: 3px solid #cbd5e1; background: transparent; color: #475569; font-style: normal; }
+.bodyEditor blockquote p { margin: 0 0 6px; color: inherit; line-height: 1.8; }
+.bodyEditor blockquote p:last-child { margin-bottom: 0; }
 .bodyEditor ul { margin: 8px 0 12px; padding-left: 24px; list-style-type: disc; }
 .bodyEditor ol { margin: 8px 0 12px; padding-left: 24px; list-style-type: decimal; }
 .bodyEditor li { margin: 4px 0; }

@@ -186,9 +186,19 @@ export function WritingEditorPage({
         nested: true,
       }),
       Placeholder.configure({
-        placeholder: ({ node }) => {
+        placeholder: ({ node, pos, editor: ed }) => {
           if (node.type.name === 'heading') {
             return `标题 ${node.attrs.level}`;
+          }
+          if (pos !== undefined && ed) {
+            try {
+              const $pos = ed.state.doc.resolve(pos);
+              if ($pos.parent.type.name === 'blockquote') {
+                return '输入引用内容……';
+              }
+            } catch {
+              // ignore
+            }
           }
           return bodyPlaceholder || '输入正文，或按 ## 创建二级标题……';
         },

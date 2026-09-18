@@ -116,12 +116,11 @@
 
 /* 引用 */
 .markdown blockquote {
-  margin: 10px 0;
-  padding: 8px 12px;
+  margin: 14px 0;
+  padding: 2px 0 2px 16px;
   border-left: 3px solid #cbd5e1;
-  border-radius: 0 6px 6px 0;
-  background: var(--bg-surface);
-  color: var(--text-secondary);
+  background: transparent;
+  color: #475569;
 }
 
 .markdown blockquote > :first-child {
