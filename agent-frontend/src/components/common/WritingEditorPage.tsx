@@ -1,14 +1,22 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { CaretLeftIcon, CheckIcon, NotePencilIcon } from '@phosphor-icons/react';
-import { EditorContent, useEditor } from '@tiptap/react';
+import { EditorContent, ReactNodeViewRenderer, useEditor } from '@tiptap/react';
 import type { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
+import CodeBlock from '@tiptap/extension-code-block';
 import Placeholder from '@tiptap/extension-placeholder';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import { Markdown } from '@tiptap/markdown';
+import { TiptapCodeBlockView } from '../ui/TiptapCodeBlockView';
 import { useMessage } from './Message';
 import styles from './WritingEditorPage.module.css';
+
+const CustomCodeBlock = CodeBlock.extend({
+  addNodeView() {
+    return ReactNodeViewRenderer(TiptapCodeBlockView);
+  },
+});
 
 interface WritingEditorPageProps {
   backLabel: string;
@@ -77,7 +85,9 @@ export function WritingEditorPage({
         heading: {
           levels: [1, 2, 3, 4],
         },
+        codeBlock: false,
       }),
+      CustomCodeBlock,
       Markdown,
       TaskList,
       TaskItem.configure({

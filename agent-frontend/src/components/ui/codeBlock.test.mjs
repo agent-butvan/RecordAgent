@@ -52,6 +52,10 @@ test('detectLanguage: 未声明语言时的智能语法推断', () => {
   assert.equal(detectLanguage('npm install shiki\npnpm build'), 'bash');
   assert.equal(detectLanguage('#!/bin/bash\necho "hello"'), 'bash');
 
+  // C / C++
+  assert.equal(detectLanguage('int a = 0;'), 'c');
+  assert.equal(detectLanguage('#include <iostream>\nusing namespace std;'), 'cpp');
+
   // Python
   assert.equal(detectLanguage('def calculate_sum(a, b):\n    return a + b'), 'python');
   assert.equal(detectLanguage('import os\nfrom pathlib import Path'), 'python');

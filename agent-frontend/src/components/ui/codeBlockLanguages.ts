@@ -205,6 +205,22 @@ export function detectLanguage(code: string): string {
     return "go";
   }
 
+  // C / C++ / Java
+  if (
+    /^(int|float|double|char|void|long|short|bool|boolean|string)\s+\w+\s*(=|;|\()/m.test(
+      trimmed
+    ) ||
+    /^(#include\s+<[\w.]+>|#define\s+\w+|public\s+class\s+\w+|std::)/m.test(trimmed)
+  ) {
+    if (/#include\s+<iostream>|std::|cout\s*<<|cin\s*>>/.test(trimmed)) {
+      return "cpp";
+    }
+    if (/public\s+class\s+\w+|System\.out\.println/.test(trimmed)) {
+      return "java";
+    }
+    return "c";
+  }
+
   // CSS
   if (
     /^[.#]?[\w-]+(?:\s*,\s*[.#]?[\w-]+)*\s*\{\s*[\w-]+\s*:\s*[^;]+;/m.test(

@@ -27,8 +27,8 @@
 .bodyEditor ul[data-type="taskList"] li > div { flex: 1 1 auto; }
 .bodyEditor ul[data-type="taskList"] li[data-checked="true"] > div { text-decoration: line-through; color: var(--text-muted); }
 .bodyEditor code { background: var(--bg-surface-hover); color: #be185d; padding: 2px 6px; border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 13px; }
-.bodyEditor pre { background: #1e293b; color: #f8fafc; padding: 14px 18px; border-radius: var(--radius-md); margin: 14px 0; overflow-x: auto; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; }
-.bodyEditor pre code { background: transparent; padding: 0; border-radius: 0; color: inherit; }
+.bodyEditor > pre { background: #1e293b; color: #f8fafc; padding: 14px 18px; border-radius: var(--radius-md); margin: 14px 0; overflow-x: auto; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.6; }
+.bodyEditor > pre code { background: transparent; padding: 0; border-radius: 0; color: inherit; }
 .bodyEditor hr { border: 0; border-top: 1px solid var(--border-subtle); margin: 24px 0; }
 .bodyEditor p.is-empty::before, .bodyEditor h1.is-empty::before, .bodyEditor h2.is-empty::before, .bodyEditor h3.is-empty::before, .bodyEditor h4.is-empty::before { content: attr(data-placeholder); float: left; color: #c4c9d0; pointer-events: none; height: 0; }
 .saveHint { margin: 32px 0 0; color: var(--text-muted); font-size: 10px; }
