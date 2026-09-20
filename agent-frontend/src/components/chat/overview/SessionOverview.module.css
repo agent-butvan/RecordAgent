@@ -524,6 +524,7 @@
 
 .flowMoney.out { color: #b5473d; }
 .flowMoney.in { color: #177245; }
+.flowMoney.adjustment { color: #a16207; }
 
 .docCount {
   display: flex;

@@ -1,14 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
-import type { AccountStatus } from '../../services/api';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Camera, LoaderCircle, RefreshCw } from 'lucide-react';
+import { getAccountAvatarUrl, uploadAccountAvatar, type AccountStatus } from '../../services/api';
 import { fetchTokenUsageOverview } from '../../services/tokenUsageService';
 import type { DailyTokenUsage, TokenUsageOverview } from '../../types/tokenUsage';
 import { formatTokenCount } from '../chat/tokenUsageFormat';
 import { Button } from '../common/Button';
+import { useMessage } from '../common/Message';
 import styles from './ProfileSettingsPage.module.css';
 
 interface ProfileSettingsPageProps {
   accountStatus: AccountStatus | null;
+  onAccountStatusChange?: (status: AccountStatus) => void;
 }
 
 interface ActivityDay {
@@ -25,10 +27,15 @@ interface ActivityWeek {
 }
 
 /** 将本地账户资料与真实 Token 统计汇总到同一资料页。 */
-export function ProfileSettingsPage({ accountStatus }: ProfileSettingsPageProps) {
+export function ProfileSettingsPage({ accountStatus, onAccountStatusChange }: ProfileSettingsPageProps) {
+  const { showMessage } = useMessage();
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const [overview, setOverview] = useState<TokenUsageOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [avatarVersion, setAvatarVersion] = useState(accountStatus?.avatarVersion ?? null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarFailed, setAvatarFailed] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -43,6 +50,36 @@ export function ProfileSettingsPage({ accountStatus }: ProfileSettingsPageProps)
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    setAvatarVersion(accountStatus?.avatarVersion ?? null);
+    setAvatarFailed(false);
+  }, [accountStatus?.avatarVersion]);
+
+  const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!['image/png', 'image/jpeg'].includes(file.type)) {
+      showMessage('error', '请选择 PNG 或 JPEG 格式的头像图片');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showMessage('error', '头像图片不能超过 5 MB');
+      return;
+    }
+    setAvatarUploading(true);
+    try {
+      const status = await uploadAccountAvatar(file);
+      setAvatarVersion(status.avatarVersion);
+      setAvatarFailed(false);
+      onAccountStatusChange?.(status);
+      showMessage('success', '头像已更新');
+    } catch (cause) {
+      showMessage('error', cause instanceof Error ? cause.message : '头像上传失败，请重试');
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
 
   const activity = useMemo(() => buildActivity(overview?.daily ?? []), [overview]);
   const displayName = accountStatus?.bound ? '本地用户' : '未绑定用户';
@@ -59,7 +96,37 @@ export function ProfileSettingsPage({ accountStatus }: ProfileSettingsPageProps)
       </header>
 
       <div className={styles.identity}>
-        <div className={styles.avatar} aria-hidden="true">{avatarText}</div>
+        <button
+          type="button"
+          className={styles.avatarButton}
+          onClick={() => avatarInputRef.current?.click()}
+          disabled={avatarUploading}
+          aria-label={avatarUploading ? '正在上传头像' : avatarVersion ? '更换头像' : '上传头像'}
+          title="点击更换头像"
+        >
+          {avatarVersion && !avatarFailed ? (
+            <img
+              className={styles.avatarImage}
+              src={getAccountAvatarUrl(avatarVersion)}
+              alt="当前头像"
+              onError={() => setAvatarFailed(true)}
+            />
+          ) : (
+            <span className={styles.avatarFallback} aria-hidden="true">{avatarText}</span>
+          )}
+          <span className={styles.avatarAction} aria-hidden="true">
+            {avatarUploading ? <LoaderCircle size={17} className={styles.avatarSpinner} /> : <Camera size={17} />}
+          </span>
+        </button>
+        <input
+          ref={avatarInputRef}
+          className={styles.avatarInput}
+          type="file"
+          accept="image/png,image/jpeg"
+          onChange={(event) => void handleAvatarChange(event)}
+          tabIndex={-1}
+          aria-hidden="true"
+        />
         <h2>{displayName}</h2>
         <div className={styles.accountLine}>
           <span>{email}</span>

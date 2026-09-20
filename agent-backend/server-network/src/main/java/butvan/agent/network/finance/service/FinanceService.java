@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.ArrayList;
@@ -36,6 +37,7 @@ public class FinanceService {
             "wechat_balance", "wechat_yield", "alipay_balance", "alipay_yuebao", "bank", "other",
             "wechat", "alipay", "cash");
     private static final Set<String> TRANSACTION_TYPES = Set.of("income", "expense");
+    private static final Set<String> ADJUSTMENT_DIRECTIONS = Set.of("increase", "decrease");
     private static final BigDecimal DAYS_PER_YEAR = new BigDecimal("36500");
 
     private final FinanceRepository repository;
@@ -146,6 +148,36 @@ public class FinanceService {
                 .orElseThrow(() -> new IllegalStateException("账户创建后无法读取"));
     }
 
+    /** 手动校准单个账户余额，并写入不参与真实收支统计的特别流水。 */
+    @Transactional
+    public FinanceTransaction adjustAccountBalance(
+            String ownerId, String accountId, String direction, BigDecimal amount, String note) {
+        requireOwner(ownerId);
+        if (!ADJUSTMENT_DIRECTIONS.contains(direction)) throw new IllegalArgumentException("资产调整方向不合法");
+        if (note == null || note.isBlank()) throw new IllegalArgumentException("资产调整备注不能为空");
+        String normalizedNote = note.trim();
+        if (normalizedNote.length() > 100) throw new IllegalArgumentException("资产调整备注不能超过 100 个字符");
+        BigDecimal normalizedAmount = requireMoney(amount, false, "调整金额");
+        FinanceAccount account = repository.findAccount(ownerId, accountId)
+                .orElseThrow(() -> new IllegalArgumentException("资产账户不存在"));
+        accrueYield(ownerId, account, LocalDate.now());
+
+        long amountMinor = toMinor(normalizedAmount);
+        long delta = "decrease".equals(direction) ? -amountMinor : amountMinor;
+        Instant now = Instant.now();
+        if (!repository.adjustBalance(ownerId, account.id(), delta, now)) {
+            throw new IllegalArgumentException("账户余额不足，无法完成手动减少");
+        }
+
+        String id = UUID.randomUUID().toString();
+        String transactionType = "decrease".equals(direction) ? "adjustment_decrease" : "adjustment_increase";
+        LocalDateTime occurredAt = LocalDateTime.now();
+        repository.insertTransaction(id, ownerId, account.id(), occurredAt.toLocalDate(), occurredAt.toLocalTime(),
+                transactionType, "余额校准", normalizedNote, amountMinor, account.currency(), "adjustment", now);
+        return repository.findTransaction(ownerId, id)
+                .orElseThrow(() -> new IllegalStateException("资产调整流水创建后无法读取"));
+    }
+
     /** 创建收入或支出流水并同步调整所选账户余额。 */
     @Transactional
     public FinanceTransaction createTransaction(
@@ -176,6 +208,64 @@ public class FinanceService {
                 .filter(transaction -> transaction.id().equals(id))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("流水创建后无法读取"));
+    }
+
+    /**
+     * 修改单条手工收入或支出，并在同一事务内撤销旧余额影响后应用新余额影响。
+     * 自动收益、划账及日历兼容记录不允许通过该入口修改。
+     */
+    @Transactional
+    public FinanceTransaction updateTransaction(
+            String ownerId, String transactionId, String accountId, String transactionType, String category,
+            String note, BigDecimal amount, LocalDate date, LocalTime time) {
+        requireOwner(ownerId);
+        if (transactionId == null || transactionId.isBlank()) throw new IllegalArgumentException("流水不能为空");
+        if (!TRANSACTION_TYPES.contains(transactionType)) throw new IllegalArgumentException("流水类型不合法");
+        if (category == null || category.isBlank()) throw new IllegalArgumentException("分类不能为空");
+        String normalizedCategory = category.trim();
+        if (normalizedCategory.length() > 40) throw new IllegalArgumentException("分类不能超过 40 个字符");
+        if (note == null || note.isBlank()) throw new IllegalArgumentException("说明不能为空");
+        if (date == null || time == null) throw new IllegalArgumentException("流水日期和时间不能为空");
+        BigDecimal normalizedAmount = requireMoney(amount, false, "流水金额");
+
+        FinanceTransaction existing = repository.findTransaction(ownerId, transactionId.trim())
+                .orElseThrow(() -> new IllegalArgumentException("财务流水不存在"));
+        if (!"manual".equals(existing.source()) || !TRANSACTION_TYPES.contains(existing.transactionType())) {
+            throw new IllegalArgumentException("仅支持修改手工收入或支出流水");
+        }
+        FinanceAccount oldAccount = repository.findAccount(ownerId, existing.accountId())
+                .orElseThrow(() -> new IllegalStateException("原资产账户不存在"));
+        FinanceAccount newAccount = repository.findAccount(ownerId, accountId)
+                .orElseThrow(() -> new IllegalArgumentException("资产账户不存在"));
+
+        LocalDate today = LocalDate.now();
+        accrueYield(ownerId, oldAccount, today);
+        if (!oldAccount.id().equals(newAccount.id())) accrueYield(ownerId, newAccount, today);
+
+        long oldAmountMinor = toMinor(existing.amount());
+        long newAmountMinor = toMinor(normalizedAmount);
+        long reversalDelta = "expense".equals(existing.transactionType()) ? oldAmountMinor : -oldAmountMinor;
+        long replacementDelta = "expense".equals(transactionType) ? -newAmountMinor : newAmountMinor;
+        Instant now = Instant.now();
+        if (oldAccount.id().equals(newAccount.id())) {
+            long combinedDelta = Math.addExact(reversalDelta, replacementDelta);
+            if (combinedDelta != 0 && !repository.adjustBalance(ownerId, oldAccount.id(), combinedDelta, now)) {
+                throw new IllegalArgumentException("修改后账户余额不足，无法保存");
+            }
+        } else {
+            if (!repository.adjustBalance(ownerId, oldAccount.id(), reversalDelta, now)) {
+                throw new IllegalArgumentException("原账户余额不足，无法撤销原流水");
+            }
+            if (!repository.adjustBalance(ownerId, newAccount.id(), replacementDelta, now)) {
+                throw new IllegalArgumentException("新账户余额不足，无法保存这笔支出");
+            }
+        }
+
+        repository.rememberTransactionCategory(ownerId, transactionType, normalizedCategory, now);
+        repository.updateTransaction(ownerId, existing.id(), newAccount.id(), date, time, transactionType,
+                normalizedCategory, note.trim(), newAmountMinor, newAccount.currency());
+        return repository.findTransaction(ownerId, existing.id())
+                .orElseThrow(() -> new IllegalStateException("流水修改后无法读取"));
     }
 
     /** 在两个资产账户之间进行划账，并成对写入划出与划入流水。 */

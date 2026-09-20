@@ -38,20 +38,14 @@
 
 /* Variants */
 .primary {
-  background-color: #e6edf5;
-  color: #1d4ed8;
-  border-color: #cbdbee;
+  background-color: var(--accent-blue);
+  color: #ffffff;
+  border-color: var(--accent-blue);
 }
 
 .primary:hover:not(:disabled) {
-  background-color: #d8e3f0;
-  border-color: #b9d0e8;
-  color: #1e40af;
-}
-
-.primary:active:not(:disabled) {
-  background-color: #cad8e8;
-  border-color: #9cbddf;
+  background-color: #1d4ed8;
+  border-color: #1d4ed8;
 }
 
 .secondary {

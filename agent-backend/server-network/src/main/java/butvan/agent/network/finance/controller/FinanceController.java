@@ -6,20 +6,24 @@ import butvan.agent.network.common.Result;
 import butvan.agent.network.finance.dto.FinanceDtos;
 import butvan.agent.network.finance.dto.FinanceDtos.AccountResponse;
 import butvan.agent.network.finance.dto.FinanceDtos.CreateAccountRequest;
+import butvan.agent.network.finance.dto.FinanceDtos.CreateBalanceAdjustmentRequest;
 import butvan.agent.network.finance.dto.FinanceDtos.CreateTransactionRequest;
 import butvan.agent.network.finance.dto.FinanceDtos.CreateTransferRequest;
 import butvan.agent.network.finance.dto.FinanceDtos.OverviewResponse;
 import butvan.agent.network.finance.dto.FinanceDtos.TransactionResponse;
 import butvan.agent.network.finance.dto.FinanceDtos.TransferResponse;
+import butvan.agent.network.finance.dto.FinanceDtos.UpdateTransactionRequest;
 import butvan.agent.network.finance.model.FinanceModels.FinanceTransaction;
 import butvan.agent.network.finance.service.FinanceService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -70,11 +74,28 @@ public class FinanceController {
                 request.initialBalance(), request.interestEnabled(), request.annualRatePercent())));
     }
 
+    @ApiLog("手动校准资产账户余额")
+    @PostMapping("/accounts/{accountId}/adjustments")
+    public Result<TransactionResponse> adjustAccountBalance(
+            @PathVariable String accountId, @RequestBody CreateBalanceAdjustmentRequest request) {
+        return Result.success(FinanceDtos.from(financeService.adjustAccountBalance(
+                currentUserProvider.currentUserId(), accountId, request.direction(), request.amount(), request.note())));
+    }
+
     @ApiLog("创建收入或支出流水")
     @PostMapping("/transactions")
     public Result<TransactionResponse> createTransaction(@RequestBody CreateTransactionRequest request) {
         return Result.success(FinanceDtos.from(financeService.createTransaction(
                 currentUserProvider.currentUserId(), request.accountId(), request.transactionType(),
+                request.category(), request.note(), request.amount(), request.date(), request.time())));
+    }
+
+    @ApiLog("修改手工收入或支出流水")
+    @PutMapping("/transactions/{transactionId}")
+    public Result<TransactionResponse> updateTransaction(
+            @PathVariable String transactionId, @RequestBody UpdateTransactionRequest request) {
+        return Result.success(FinanceDtos.from(financeService.updateTransaction(
+                currentUserProvider.currentUserId(), transactionId, request.accountId(), request.transactionType(),
                 request.category(), request.note(), request.amount(), request.date(), request.time())));
     }
 
