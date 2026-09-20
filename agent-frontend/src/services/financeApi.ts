@@ -9,6 +9,7 @@ import type {
   FinanceOverview,
   FinanceTransaction,
   FinanceTransferResponse,
+  UpdateFinanceTransactionInput,
 } from '../types/finance';
 import { getApiBaseUrl, type ApiResponse } from './api';
 
@@ -31,8 +32,8 @@ async function financeRequest<T>(path: string, init?: RequestInit): Promise<T> {
   return payload.data;
 }
 
-const jsonInit = (body: object): RequestInit => ({
-  method: 'POST',
+const jsonInit = (body: object, method = 'POST'): RequestInit => ({
+  method,
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(body),
 });
@@ -75,6 +76,14 @@ export function createFinanceAccount(input: CreateFinanceAccountInput): Promise<
 /** 新建一条关联资产账户的收入或支出。 */
 export function createFinanceTransaction(input: CreateFinanceTransactionInput): Promise<FinanceTransaction> {
   return financeRequest<FinanceTransaction>('/agent/finance/transactions', jsonInit(input));
+}
+
+/** 修改一条手工收入或支出，后端会原子撤销旧余额影响并应用新值。 */
+export function updateFinanceTransaction(
+  transactionId: string,
+  input: UpdateFinanceTransactionInput,
+): Promise<FinanceTransaction> {
+  return financeRequest<FinanceTransaction>(`/agent/finance/transactions/${encodeURIComponent(transactionId)}`, jsonInit(input, 'PUT'));
 }
 
 /** 在两个资产账户之间进行划账并同步调整双方余额。 */

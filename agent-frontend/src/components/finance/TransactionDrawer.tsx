@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { CalendarDotsIcon, MagnifyingGlassIcon, WalletIcon } from '@phosphor-icons/react';
+import { CalendarDotsIcon, MagnifyingGlassIcon, PencilSimpleIcon, WalletIcon } from '@phosphor-icons/react';
 import type { FinanceAccount, FinanceTransaction } from '../../types/finance';
 import { Drawer } from '../common/Drawer';
 import { TransactionTypeIcon } from './TransactionTypeIcon';
@@ -13,13 +13,14 @@ interface TransactionDrawerProps {
   error: string | null;
   onClose: () => void;
   onRetry: () => void;
+  onEdit: (transaction: FinanceTransaction) => void;
 }
 
 const money = (value: number) => new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY' }).format(value);
 
 /** 全部流水抽屉：支持按支付分类、不同资产支付、交易类型、日期和关键词多维筛选。 */
 export const TransactionDrawer: React.FC<TransactionDrawerProps> = ({
-  open, transactions, accounts, loading, error, onClose, onRetry,
+  open, transactions, accounts, loading, error, onClose, onRetry, onEdit,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedAccountId, setSelectedAccountId] = useState('');
@@ -141,7 +142,16 @@ export const TransactionDrawer: React.FC<TransactionDrawerProps> = ({
               <div className={styles.content}>
                 <div className={styles.primary}>
                   <strong>{transaction.note}</strong>
-                  <b className={amountClass}>{isOutflow ? '-' : '+'}{money(transaction.amount)}</b>
+                  <div className={styles.primaryActions}>
+                    <b className={amountClass}>{isOutflow ? '-' : '+'}{money(transaction.amount)}</b>
+                    {transaction.source === 'manual' && (isExpense || transaction.transactionType === 'income') && <button
+                      type="button"
+                      className={styles.editButton}
+                      onClick={() => onEdit(transaction)}
+                      aria-label={`编辑流水：${transaction.note}`}
+                      title="编辑流水"
+                    ><PencilSimpleIcon size={13} /></button>}
+                  </div>
                 </div>
                 <div className={styles.meta}>
                   <span><CalendarDotsIcon size={12} />{transaction.date} {transaction.time.slice(0, 5)}</span>

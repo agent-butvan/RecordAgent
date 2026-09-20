@@ -178,6 +178,64 @@ public class FinanceService {
                 .orElseThrow(() -> new IllegalStateException("流水创建后无法读取"));
     }
 
+    /**
+     * 修改单条手工收入或支出，并在同一事务内撤销旧余额影响后应用新余额影响。
+     * 自动收益、划账及日历兼容记录不允许通过该入口修改。
+     */
+    @Transactional
+    public FinanceTransaction updateTransaction(
+            String ownerId, String transactionId, String accountId, String transactionType, String category,
+            String note, BigDecimal amount, LocalDate date, LocalTime time) {
+        requireOwner(ownerId);
+        if (transactionId == null || transactionId.isBlank()) throw new IllegalArgumentException("流水不能为空");
+        if (!TRANSACTION_TYPES.contains(transactionType)) throw new IllegalArgumentException("流水类型不合法");
+        if (category == null || category.isBlank()) throw new IllegalArgumentException("分类不能为空");
+        String normalizedCategory = category.trim();
+        if (normalizedCategory.length() > 40) throw new IllegalArgumentException("分类不能超过 40 个字符");
+        if (note == null || note.isBlank()) throw new IllegalArgumentException("说明不能为空");
+        if (date == null || time == null) throw new IllegalArgumentException("流水日期和时间不能为空");
+        BigDecimal normalizedAmount = requireMoney(amount, false, "流水金额");
+
+        FinanceTransaction existing = repository.findTransaction(ownerId, transactionId.trim())
+                .orElseThrow(() -> new IllegalArgumentException("财务流水不存在"));
+        if (!"manual".equals(existing.source()) || !TRANSACTION_TYPES.contains(existing.transactionType())) {
+            throw new IllegalArgumentException("仅支持修改手工收入或支出流水");
+        }
+        FinanceAccount oldAccount = repository.findAccount(ownerId, existing.accountId())
+                .orElseThrow(() -> new IllegalStateException("原资产账户不存在"));
+        FinanceAccount newAccount = repository.findAccount(ownerId, accountId)
+                .orElseThrow(() -> new IllegalArgumentException("资产账户不存在"));
+
+        LocalDate today = LocalDate.now();
+        accrueYield(ownerId, oldAccount, today);
+        if (!oldAccount.id().equals(newAccount.id())) accrueYield(ownerId, newAccount, today);
+
+        long oldAmountMinor = toMinor(existing.amount());
+        long newAmountMinor = toMinor(normalizedAmount);
+        long reversalDelta = "expense".equals(existing.transactionType()) ? oldAmountMinor : -oldAmountMinor;
+        long replacementDelta = "expense".equals(transactionType) ? -newAmountMinor : newAmountMinor;
+        Instant now = Instant.now();
+        if (oldAccount.id().equals(newAccount.id())) {
+            long combinedDelta = Math.addExact(reversalDelta, replacementDelta);
+            if (combinedDelta != 0 && !repository.adjustBalance(ownerId, oldAccount.id(), combinedDelta, now)) {
+                throw new IllegalArgumentException("修改后账户余额不足，无法保存");
+            }
+        } else {
+            if (!repository.adjustBalance(ownerId, oldAccount.id(), reversalDelta, now)) {
+                throw new IllegalArgumentException("原账户余额不足，无法撤销原流水");
+            }
+            if (!repository.adjustBalance(ownerId, newAccount.id(), replacementDelta, now)) {
+                throw new IllegalArgumentException("新账户余额不足，无法保存这笔支出");
+            }
+        }
+
+        repository.rememberTransactionCategory(ownerId, transactionType, normalizedCategory, now);
+        repository.updateTransaction(ownerId, existing.id(), newAccount.id(), date, time, transactionType,
+                normalizedCategory, note.trim(), newAmountMinor, newAccount.currency());
+        return repository.findTransaction(ownerId, existing.id())
+                .orElseThrow(() -> new IllegalStateException("流水修改后无法读取"));
+    }
+
     /** 在两个资产账户之间进行划账，并成对写入划出与划入流水。 */
     @Transactional
     public List<FinanceTransaction> transfer(

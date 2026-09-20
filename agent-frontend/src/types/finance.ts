@@ -85,6 +85,8 @@ export interface CreateFinanceTransactionInput {
   time: string;
 }
 
+export type UpdateFinanceTransactionInput = CreateFinanceTransactionInput;
+
 export interface CreateFinanceTransferInput {
   fromAccountId: string;
   toAccountId: string;

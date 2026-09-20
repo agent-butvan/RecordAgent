@@ -28,6 +28,11 @@ public final class FinanceDtos {
             BigDecimal amount, LocalDate date, LocalTime time) {
     }
 
+    public record UpdateTransactionRequest(
+            String accountId, String transactionType, String category, String note,
+            BigDecimal amount, LocalDate date, LocalTime time) {
+    }
+
     public record CreateTransferRequest(
             String fromAccountId, String toAccountId, BigDecimal amount, String note,
             LocalDate date, LocalTime time) {

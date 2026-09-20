@@ -11,15 +11,18 @@ import butvan.agent.network.finance.dto.FinanceDtos.CreateTransferRequest;
 import butvan.agent.network.finance.dto.FinanceDtos.OverviewResponse;
 import butvan.agent.network.finance.dto.FinanceDtos.TransactionResponse;
 import butvan.agent.network.finance.dto.FinanceDtos.TransferResponse;
+import butvan.agent.network.finance.dto.FinanceDtos.UpdateTransactionRequest;
 import butvan.agent.network.finance.model.FinanceModels.FinanceTransaction;
 import butvan.agent.network.finance.service.FinanceService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -75,6 +78,15 @@ public class FinanceController {
     public Result<TransactionResponse> createTransaction(@RequestBody CreateTransactionRequest request) {
         return Result.success(FinanceDtos.from(financeService.createTransaction(
                 currentUserProvider.currentUserId(), request.accountId(), request.transactionType(),
+                request.category(), request.note(), request.amount(), request.date(), request.time())));
+    }
+
+    @ApiLog("修改手工收入或支出流水")
+    @PutMapping("/transactions/{transactionId}")
+    public Result<TransactionResponse> updateTransaction(
+            @PathVariable String transactionId, @RequestBody UpdateTransactionRequest request) {
+        return Result.success(FinanceDtos.from(financeService.updateTransaction(
+                currentUserProvider.currentUserId(), transactionId, request.accountId(), request.transactionType(),
                 request.category(), request.note(), request.amount(), request.date(), request.time())));
     }
 

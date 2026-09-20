@@ -109,6 +109,37 @@ public class FinanceRepository {
                 amountMinor, currency, source, now.toString());
     }
 
+    /** 按所有者读取单条财务流水。 */
+    public Optional<FinanceTransaction> findTransaction(String ownerId, String transactionId) {
+        return jdbcTemplate.query("""
+                SELECT t.id, t.account_id, a.name AS account_name, t.transaction_date, t.transaction_time,
+                       t.transaction_type, t.category, t.note, t.amount_minor, t.currency, t.source, t.created_at
+                FROM finance_transaction t
+                JOIN finance_account a ON a.id = t.account_id
+                WHERE t.owner_id = ? AND t.id = ?
+                """, (rs, rowNum) -> new FinanceTransaction(
+                rs.getString("id"), rs.getString("account_id"), rs.getString("account_name"),
+                LocalDate.parse(rs.getString("transaction_date")), LocalTime.parse(rs.getString("transaction_time")),
+                rs.getString("transaction_type"), rs.getString("category"), rs.getString("note"),
+                BigDecimal.valueOf(rs.getLong("amount_minor"), 2), rs.getString("currency"),
+                rs.getString("source"), Instant.parse(rs.getString("created_at"))), ownerId, transactionId)
+                .stream().findFirst();
+    }
+
+    /** 更新一条归属当前用户的手工流水内容。 */
+    public void updateTransaction(
+            String ownerId, String transactionId, String accountId, LocalDate date, LocalTime time,
+            String type, String category, String note, long amountMinor, String currency) {
+        int updated = jdbcTemplate.update("""
+                UPDATE finance_transaction
+                SET account_id = ?, transaction_date = ?, transaction_time = ?, transaction_type = ?,
+                    category = ?, note = ?, amount_minor = ?, currency = ?
+                WHERE owner_id = ? AND id = ?
+                """, accountId, date.toString(), time.toString(), type, category, note, amountMinor,
+                currency, ownerId, transactionId);
+        if (updated != 1) throw new IllegalArgumentException("财务流水不存在");
+    }
+
     /** 查询最近流水。 */
     public List<FinanceTransaction> findTransactions(String ownerId, int limit) {
         return jdbcTemplate.query("""
