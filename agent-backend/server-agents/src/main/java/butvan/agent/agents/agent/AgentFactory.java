@@ -8,6 +8,7 @@ import butvan.agent.agents.session.SessionCatalogService;
 import butvan.agent.agents.storage.AgentStorageProperties;
 import butvan.agent.agents.subagent.SubagentCatalog;
 import butvan.agent.agents.tool.ToolRegistry;
+import butvan.agent.agents.tool.ToolSchemaSelectionMiddleware;
 import butvan.agent.agents.usage.TokenUsageMiddleware;
 import io.agentscope.core.model.Model;
 import io.agentscope.core.state.AgentStateStore;
@@ -45,6 +46,7 @@ public class AgentFactory {
     private final SubagentCatalog subagentCatalog;
     private final TokenUsageMiddleware tokenUsageMiddleware;
     private final ContextInjectionMiddleware contextInjectionMiddleware;
+    private final ToolSchemaSelectionMiddleware toolSchemaSelectionMiddleware;
     private final SessionCatalogService sessionCatalogService;
     private final ProjectRegistry projectRegistry;
 
@@ -89,7 +91,8 @@ public class AgentFactory {
                 .name("butvan_agent")
                 .sysPrompt(systemPrompt)
                 .model(model)
-                .middleware(contextInjectionMiddleware)
+                .middleware(contextInjectionMiddleware) // 先向消息列表临时注入有界个人上下文
+                .middleware(toolSchemaSelectionMiddleware)
                 .middleware(tokenUsageMiddleware)
                 .enablePlanMode() // 开启计划模式
                 .planFileDirectory("plans")

@@ -542,9 +542,15 @@ public record TypeSafeConfigData(
      */
     public boolean isReady() {
         return enabled
+                && mode != null
                 && mode != ToolRoutingMode.OFF
                 && apiKey != null
-                && !apiKey.isBlank();
+                && !apiKey.isBlank()
+                && model != null
+                && !model.isBlank()
+                && Double.isFinite(threshold)
+                && threshold >= 0.0
+                && threshold <= 1.0;
     }
 }
 ```
@@ -557,8 +563,8 @@ package butvan.agent.agents.config;
 import butvan.agent.agents.routing.ToolRoutingMode;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -569,15 +575,38 @@ import java.nio.file.Paths;
 /** 从用户级 config.json 动态读取 TypeSafe Jev 配置。 */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class TypeSafeProperties {
 
     /** CONFIG_PATH：ButvanAgent 用户级配置文件的固定位置。 */
-    private static final Path CONFIG_PATH = Paths.get(
+    private static final Path DEFAULT_CONFIG_PATH = Paths.get(
             System.getProperty("user.home"), ".butvan-agent", "config.json");
 
     /** objectMapper：负责解析本地 JSON 配置文件的 Jackson 组件。 */
     private final ObjectMapper objectMapper;
+
+    /** configPath：当前实例读取的配置路径；测试可以传入临时文件。 */
+    private final Path configPath;
+
+    /**
+     * 创建生产环境配置读取器。
+     *
+     * @param objectMapper Spring 统一配置的 JSON 解析器
+     */
+    @Autowired
+    public TypeSafeProperties(ObjectMapper objectMapper) {
+        this(objectMapper, DEFAULT_CONFIG_PATH);
+    }
+
+    /**
+     * 创建可指定配置路径的读取器，供同包测试使用。
+     *
+     * @param objectMapper JSON 解析器
+     * @param configPath 待读取的配置文件路径
+     */
+    TypeSafeProperties(ObjectMapper objectMapper, Path configPath) {
+        this.objectMapper = objectMapper;
+        this.configPath = configPath;
+    }
 
     /**
      * 每次路由前读取最新的 TypeSafe 配置。
@@ -586,26 +615,32 @@ public class TypeSafeProperties {
      */
     public TypeSafeConfigData load() {
         try {
-            if (!Files.isRegularFile(CONFIG_PATH)) return TypeSafeConfigData.disabled();
+            if (!Files.isRegularFile(configPath)) return TypeSafeConfigData.disabled();
 
             // node：config.json 根对象中的 typesafe 配置节点。
-            JsonNode node = objectMapper.readTree(CONFIG_PATH.toFile()).path("typesafe");
+            JsonNode node = objectMapper.readTree(configPath.toFile()).path("typesafe");
             if (node.isMissingNode() || node.isNull()) return TypeSafeConfigData.disabled();
 
             // threshold：Noul 概率达到该值时，能力组才会被选中。
             double threshold = node.path("threshold").asDouble(0.75);
-            if (threshold < 0.0 || threshold > 1.0) threshold = 0.75;
+            if (!Double.isFinite(threshold) || threshold < 0.0 || threshold > 1.0) {
+                threshold = 0.75;
+            }
+
+            // model：空字符串也统一回退到稳定别名。
+            String model = node.path("model").asText("jev-latest").strip();
+            if (model.isEmpty()) model = "jev-latest";
 
             return new TypeSafeConfigData(
                     node.path("enabled").asBoolean(false),
                     ToolRoutingMode.parse(node.path("mode").asText("off")),
                     node.path("apiKey").asText(""),
-                    node.path("model").asText("jev-latest"),
+                    model,
                     threshold
             );
-        } catch (IOException exception) {
-            // exception：读取或解析本地配置时发生的 I/O 异常；禁止记录配置内容。
-            log.error("读取 TypeSafe 配置失败，Jev 路由将保持关闭：{}", CONFIG_PATH, exception);
+        } catch (IOException | RuntimeException exception) {
+            // exception：读取或解析配置时发生的异常；禁止记录配置内容。
+            log.error("读取 TypeSafe 配置失败，Jev 路由将保持关闭：{}", configPath, exception);
             return TypeSafeConfigData.disabled();
         }
     }
@@ -1095,13 +1130,14 @@ public class JevToolCapabilityRouter implements ToolCapabilityRouter {
      */
     @Override
     public ToolRoutingDecision route(ToolRoutingRequest request) {
-        // config：本次路由开始时读取到的 TypeSafe 配置快照。
-        TypeSafeConfigData config = properties.load();
-        if (!config.isReady()) return ToolRoutingDecision.off();
-
         // startedAt：单调时钟起点，只用于计算路由耗时，不代表墙上时间。
         long startedAt = System.nanoTime();
         try {
+            // config：本次路由开始时读取到的 TypeSafe 配置快照。
+            // 必须放在 try 内，保证配置读取异常也能 fail-open。
+            TypeSafeConfigData config = properties.load();
+            if (!config.isReady()) return ToolRoutingDecision.off();
+
             // state：去除首尾空白并执行长度限制后的 Jev 输入文本。
             String state = normalizeInput(request.userInput());
 
@@ -1312,6 +1348,7 @@ import butvan.agent.agents.routing.ToolRoutingDecision;
 import io.agentscope.core.agent.Agent;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.AgentEvent;
+import io.agentscope.core.middleware.ActingInput;
 import io.agentscope.core.middleware.MiddlewareBase;
 import io.agentscope.core.middleware.ModelCallInput;
 import io.agentscope.core.model.ToolSchema;
@@ -1327,6 +1364,10 @@ import java.util.function.Function;
 @Component
 public class ToolSchemaSelectionMiddleware implements MiddlewareBase {
 
+    /** MANUAL_OVERRIDE_KEY：标记主模型已经显式接管本轮 Tool Group 选择。 */
+    private static final String MANUAL_OVERRIDE_KEY =
+            "butvan.tool-schema-routing.manual-override";
+
     /** capabilityCatalog：用于判断一个 Tool 是分组工具还是常驻兼容工具。 */
     private final ToolCapabilityCatalog capabilityCatalog;
 
@@ -1337,6 +1378,33 @@ public class ToolSchemaSelectionMiddleware implements MiddlewareBase {
      */
     public ToolSchemaSelectionMiddleware(ToolCapabilityCatalog capabilityCatalog) {
         this.capabilityCatalog = capabilityCatalog;
+    }
+
+    /**
+     * 观察主模型是否调用 reset_equipped_tools。
+     *
+     * @param agent 当前执行工具的 Agent
+     * @param context 当前运行独享的上下文
+     * @param input 本轮准备执行的工具调用
+     * @param next Middleware 链的下一个处理函数
+     * @return 下游工具执行事件流
+     */
+    @Override
+    public Flux<AgentEvent> onActing(
+            Agent agent,
+            RuntimeContext context,
+            ActingInput input,
+            Function<ActingInput, Flux<AgentEvent>> next
+    ) {
+        // resetsEquippedTools：本批工具调用是否包含能力组重置元工具。
+        boolean resetsEquippedTools = input != null
+                && input.toolCalls() != null
+                && input.toolCalls().stream().anyMatch(toolCall ->
+                ToolCapabilityCatalog.META_TOOL_NAME.equals(toolCall.getName()));
+        if (resetsEquippedTools && context != null) {
+            context.put(MANUAL_OVERRIDE_KEY, true);
+        }
+        return next.apply(input);
     }
 
     /**
@@ -1362,6 +1430,11 @@ public class ToolSchemaSelectionMiddleware implements MiddlewareBase {
 
         if (decision == null || !decision.appliesToModelCall()
                 || agent == null || agent.getToolkit() == null) {
+            return next.apply(input);
+        }
+
+        // 调用过元工具后，AgentScope 的会话级能力组成为权威来源。
+        if (Boolean.TRUE.equals(context.get(MANUAL_OVERRIDE_KEY))) {
             return next.apply(input);
         }
 
@@ -1412,6 +1485,7 @@ public class ToolSchemaSelectionMiddleware implements MiddlewareBase {
 
 1. 不是只对 `input.tools()` 做过滤，因为未激活组原本不在 `input.tools()` 中，仅过滤无法加入 Jev 选中的组。
 2. 不是直接把选中组追加到 `input.tools()`，因为共享 Toolkit 可能已被其他会话改变；应先取“常驻基线”，再加入本轮选中组。
+3. 一旦主模型调用 `reset_equipped_tools`，Middleware 必须停止覆盖后续 Model Call，让 AgentScope 的会话级工具状态真正承担误路由补救。
 
 ### 12.1 Middleware 顺序
 
