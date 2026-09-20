@@ -3,6 +3,11 @@ server:
   shutdown: graceful
 
 spring:
+  servlet:
+    multipart:
+      # 全局入口覆盖当前最大的备份导入需求，各业务接口仍执行自身的文件大小校验。
+      max-file-size: 512MB
+      max-request-size: 520MB
   lifecycle:
     timeout-per-shutdown-phase: 5s
   config:
