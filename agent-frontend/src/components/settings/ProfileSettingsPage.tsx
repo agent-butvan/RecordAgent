@@ -127,7 +127,6 @@ export function ProfileSettingsPage({ accountStatus, onAccountStatusChange }: Pr
           tabIndex={-1}
           aria-hidden="true"
         />
-        <p className={styles.avatarHint}>点击头像更换 · PNG 或 JPEG · 最大 5 MB</p>
         <h2>{displayName}</h2>
         <div className={styles.accountLine}>
           <span>{email}</span>
