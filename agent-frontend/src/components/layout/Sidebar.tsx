@@ -24,7 +24,7 @@ import { TextInput } from '../common/TextInput';
 import { Modal } from '../common/Modal';
 import { useMessage } from '../common/Message';
 import { EmailBindingModal } from '../account/EmailBindingModal';
-import { fetchAccountStatus } from '../../services/api';
+import { fetchAccountStatus, getAccountAvatarUrl } from '../../services/api';
 import { canPickProjectDirectory, pickProjectDirectory } from '../../services/projectPicker';
 import styles from './Sidebar.module.css';
 
@@ -113,6 +113,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { showMessage } = useMessage();
   const [isEmailBindingOpen, setIsEmailBindingOpen] = useState(false);
   const [maskedEmail, setMaskedEmail] = useState<string | null>(null);
+  const [storedAvatarVersion, setStoredAvatarVersion] = useState<string | null>(null);
+  const [avatarFailed, setAvatarFailed] = useState(false);
 
   // 双击 / 菜单重命名会话标题
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
@@ -215,8 +217,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }, [menuSession]);
 
   useEffect(() => {
-    fetchAccountStatus().then((status) => setMaskedEmail(status?.bound ? status.maskedEmail : null));
+    fetchAccountStatus().then((status) => {
+      setMaskedEmail(status?.bound ? status.maskedEmail : null);
+      setStoredAvatarVersion(status?.avatarVersion ?? null);
+      setAvatarFailed(false);
+    });
   }, []);
+
+  const resolvedAvatarUrl = avatarUrl
+    ?? (storedAvatarVersion ? getAccountAvatarUrl(storedAvatarVersion) : undefined);
 
   const generalSessions = sessions.filter((s) => !s.projectId);
   const sortedGeneral = [...generalSessions].sort(sortByUpdatedDesc);
@@ -782,8 +791,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           title={maskedEmail ? `已绑定账号：${maskedEmail}（点击进入个人资料）` : '点击绑定邮箱'}
         >
           <div className={styles.avatarWrapper}>
-            {avatarUrl ? (
-              <img src={avatarUrl} alt="用户头像" className={styles.avatarImage} />
+            {resolvedAvatarUrl && !avatarFailed ? (
+              <img
+                src={resolvedAvatarUrl}
+                alt="用户头像"
+                className={styles.avatarImage}
+                onError={() => setAvatarFailed(true)}
+              />
             ) : (
               <div className={styles.avatar}>
                 {maskedEmail ? getAvatarText(maskedEmail) : <User size={13} />}

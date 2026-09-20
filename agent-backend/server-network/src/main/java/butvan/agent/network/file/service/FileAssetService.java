@@ -21,7 +21,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class FileAssetService {
     public static final String DOMAIN_RECORD = "RECORD";
+    public static final String DOMAIN_ACCOUNT = "ACCOUNT";
     public static final String ROLE_ATTACHMENT = "ATTACHMENT";
+    public static final String ROLE_AVATAR = "AVATAR";
     private static final String LOCAL_BACKEND = "LOCAL";
     private static final String AVAILABLE = "AVAILABLE";
 
