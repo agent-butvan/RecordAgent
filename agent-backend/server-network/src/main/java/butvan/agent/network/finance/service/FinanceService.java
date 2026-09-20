@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.ArrayList;
@@ -36,6 +37,7 @@ public class FinanceService {
             "wechat_balance", "wechat_yield", "alipay_balance", "alipay_yuebao", "bank", "other",
             "wechat", "alipay", "cash");
     private static final Set<String> TRANSACTION_TYPES = Set.of("income", "expense");
+    private static final Set<String> ADJUSTMENT_DIRECTIONS = Set.of("increase", "decrease");
     private static final BigDecimal DAYS_PER_YEAR = new BigDecimal("36500");
 
     private final FinanceRepository repository;
@@ -144,6 +146,36 @@ public class FinanceService {
                 interestEnabled, rate.stripTrailingZeros(), LocalDate.now(), now);
         return repository.findAccount(ownerId, id)
                 .orElseThrow(() -> new IllegalStateException("账户创建后无法读取"));
+    }
+
+    /** 手动校准单个账户余额，并写入不参与真实收支统计的特别流水。 */
+    @Transactional
+    public FinanceTransaction adjustAccountBalance(
+            String ownerId, String accountId, String direction, BigDecimal amount, String note) {
+        requireOwner(ownerId);
+        if (!ADJUSTMENT_DIRECTIONS.contains(direction)) throw new IllegalArgumentException("资产调整方向不合法");
+        if (note == null || note.isBlank()) throw new IllegalArgumentException("资产调整备注不能为空");
+        String normalizedNote = note.trim();
+        if (normalizedNote.length() > 100) throw new IllegalArgumentException("资产调整备注不能超过 100 个字符");
+        BigDecimal normalizedAmount = requireMoney(amount, false, "调整金额");
+        FinanceAccount account = repository.findAccount(ownerId, accountId)
+                .orElseThrow(() -> new IllegalArgumentException("资产账户不存在"));
+        accrueYield(ownerId, account, LocalDate.now());
+
+        long amountMinor = toMinor(normalizedAmount);
+        long delta = "decrease".equals(direction) ? -amountMinor : amountMinor;
+        Instant now = Instant.now();
+        if (!repository.adjustBalance(ownerId, account.id(), delta, now)) {
+            throw new IllegalArgumentException("账户余额不足，无法完成手动减少");
+        }
+
+        String id = UUID.randomUUID().toString();
+        String transactionType = "decrease".equals(direction) ? "adjustment_decrease" : "adjustment_increase";
+        LocalDateTime occurredAt = LocalDateTime.now();
+        repository.insertTransaction(id, ownerId, account.id(), occurredAt.toLocalDate(), occurredAt.toLocalTime(),
+                transactionType, "余额校准", normalizedNote, amountMinor, account.currency(), "adjustment", now);
+        return repository.findTransaction(ownerId, id)
+                .orElseThrow(() -> new IllegalStateException("资产调整流水创建后无法读取"));
     }
 
     /** 创建收入或支出流水并同步调整所选账户余额。 */

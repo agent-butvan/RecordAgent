@@ -19,7 +19,7 @@ public final class FinanceModels {
             int version, Instant createdAt, Instant updatedAt) {
     }
 
-    /** 一条收入、支出或系统收益流水。 */
+    /** 一条收入、支出、划账、余额校准或系统收益流水。 */
     public record FinanceTransaction(
             String id, String accountId, String accountName, LocalDate date, LocalTime time,
             String transactionType, String category, String note, BigDecimal amount,

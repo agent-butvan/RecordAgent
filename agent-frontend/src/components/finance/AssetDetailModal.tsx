@@ -1,5 +1,5 @@
 import React from 'react';
-import { PlusIcon } from '@phosphor-icons/react';
+import { PlusIcon, SlidersHorizontalIcon } from '@phosphor-icons/react';
 import type { FinanceAccount, FinanceAccountType } from '../../types/finance';
 import { Button } from '../common/Button';
 import { Modal } from '../common/Modal';
@@ -28,6 +28,7 @@ interface AssetDetailModalProps {
   totalAssets: number;
   onClose: () => void;
   onAddAccount?: () => void;
+  onAdjustAccount?: (account: FinanceAccount) => void;
 }
 
 function accountToneClass(type: FinanceAccountType): string {
@@ -44,6 +45,7 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
   totalAssets,
   onClose,
   onAddAccount,
+  onAdjustAccount,
 }) => {
   const yieldCount = accounts.filter((item) => item.interestEnabled).length;
 
@@ -89,7 +91,15 @@ export const AssetDetailModal: React.FC<AssetDetailModalProps> = ({
 
                 <div className={styles.right}>
                   <strong className={styles.accountAmount}>{money(account.balance)}</strong>
-                  <span className={styles.accountRatio}>{ratio.toFixed(1)}%</span>
+                  <div className={styles.accountMeta}>
+                    <span className={styles.accountRatio}>{ratio.toFixed(1)}%</span>
+                    {onAdjustAccount && <button
+                      type="button"
+                      className={styles.adjustBtn}
+                      onClick={() => onAdjustAccount(account)}
+                      aria-label={`调整${account.name}余额`}
+                    ><SlidersHorizontalIcon size={11} />调整</button>}
+                  </div>
                 </div>
               </div>
             );

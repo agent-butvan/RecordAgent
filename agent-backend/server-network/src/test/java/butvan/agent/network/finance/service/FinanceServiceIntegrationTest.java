@@ -172,6 +172,49 @@ class FinanceServiceIntegrationTest {
     }
 
     @Test
+    void balanceAdjustmentsCreateAuditTransactionsWithoutChangingIncomeOrExpenseTotals() {
+        String ownerId = "finance-adjustment-user";
+        FinanceAccount account = financeService.createAccount(
+                ownerId, "银行卡", "bank", "CNY", new BigDecimal("100.00"), false, BigDecimal.ZERO);
+
+        var increase = financeService.adjustAccountBalance(
+                ownerId, account.id(), "increase", new BigDecimal("25.00"), "对账补差");
+        var decrease = financeService.adjustAccountBalance(
+                ownerId, account.id(), "decrease", new BigDecimal("40.00"), "修正重复录入余额");
+
+        FinanceOverview overview = financeService.getOverview(ownerId);
+        ExpenseChart chart = financeService.getExpenseChart(ownerId, "month");
+        assertEquals(new BigDecimal("85.00"), overview.totalAssets());
+        assertEquals(0, overview.monthIncome().compareTo(BigDecimal.ZERO));
+        assertEquals(0, overview.monthExpense().compareTo(BigDecimal.ZERO));
+        assertEquals(0, chart.totalIncome().compareTo(BigDecimal.ZERO));
+        assertEquals(0, chart.totalExpense().compareTo(BigDecimal.ZERO));
+        assertEquals("adjustment_increase", increase.transactionType());
+        assertEquals("adjustment_decrease", decrease.transactionType());
+        assertEquals("adjustment", increase.source());
+        assertEquals("余额校准", increase.category());
+        assertEquals("对账补差", increase.note());
+    }
+
+    @Test
+    void balanceAdjustmentRequiresNoteAndCannotReduceBelowZero() {
+        String ownerId = "finance-adjustment-validation-user";
+        FinanceAccount account = financeService.createAccount(
+                ownerId, "现金", "cash", "CNY", new BigDecimal("20.00"), false, BigDecimal.ZERO);
+
+        var noteError = assertThrows(IllegalArgumentException.class, () -> financeService.adjustAccountBalance(
+                ownerId, account.id(), "increase", BigDecimal.ONE, " "));
+        var balanceError = assertThrows(IllegalArgumentException.class, () -> financeService.adjustAccountBalance(
+                ownerId, account.id(), "decrease", new BigDecimal("20.01"), "现金盘点"));
+
+        assertEquals("资产调整备注不能为空", noteError.getMessage());
+        assertEquals("账户余额不足，无法完成手动减少", balanceError.getMessage());
+        FinanceOverview overview = financeService.getOverview(ownerId);
+        assertEquals(new BigDecimal("20.00"), overview.totalAssets());
+        assertEquals(0, overview.transactions().size());
+    }
+
+    @Test
     void editingExpenseRestoresOriginalAccountAndAppliesChangesToNewAccount() {
         String ownerId = "finance-edit-expense-user";
         LocalDate correctedDate = LocalDate.now().minusDays(1);

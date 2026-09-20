@@ -68,6 +68,8 @@ export const TransactionDrawer: React.FC<TransactionDrawerProps> = ({
       if (selectedType && selectedType !== 'all') {
         if (selectedType === 'transfer') {
           if (transaction.transactionType !== 'transfer_out' && transaction.transactionType !== 'transfer_in') return false;
+        } else if (selectedType === 'adjustment') {
+          if (transaction.transactionType !== 'adjustment_increase' && transaction.transactionType !== 'adjustment_decrease') return false;
         } else if (transaction.transactionType !== selectedType) {
           return false;
         }
@@ -111,6 +113,7 @@ export const TransactionDrawer: React.FC<TransactionDrawerProps> = ({
             <option value="income">收入</option>
             <option value="yield">收益</option>
             <option value="transfer">划账</option>
+            <option value="adjustment">余额校准</option>
           </select>
         </label>
       </div>
@@ -129,8 +132,12 @@ export const TransactionDrawer: React.FC<TransactionDrawerProps> = ({
             const isExpense = transaction.transactionType === 'expense';
             const isTransferOut = transaction.transactionType === 'transfer_out';
             const isTransferIn = transaction.transactionType === 'transfer_in';
-            const isOutflow = isExpense || isTransferOut;
-            const amountClass = isExpense
+            const isAdjustment = transaction.transactionType === 'adjustment_increase'
+              || transaction.transactionType === 'adjustment_decrease';
+            const isOutflow = isExpense || isTransferOut || transaction.transactionType === 'adjustment_decrease';
+            const amountClass = isAdjustment
+              ? styles.adjustmentAmount
+              : isExpense
               ? styles.expenseAmount
               : isTransferOut
               ? styles.transferOutAmount
@@ -157,7 +164,13 @@ export const TransactionDrawer: React.FC<TransactionDrawerProps> = ({
                   <span><CalendarDotsIcon size={12} />{transaction.date} {transaction.time.slice(0, 5)}</span>
                   <span><WalletIcon size={12} />{transaction.accountName}</span>
                   <span>{transaction.category}</span>
-                  <span>{transaction.source === 'calendar' ? '日历记录' : transaction.source === 'automatic' ? '自动收益' : '手工记录'}</span>
+                  <span>{transaction.source === 'calendar'
+                    ? '日历记录'
+                    : transaction.source === 'automatic'
+                    ? '自动收益'
+                    : transaction.source === 'adjustment'
+                    ? '余额校准（非收支）'
+                    : '手工记录'}</span>
                 </div>
               </div>
             </article>;

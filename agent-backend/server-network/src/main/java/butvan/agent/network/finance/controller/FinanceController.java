@@ -6,6 +6,7 @@ import butvan.agent.network.common.Result;
 import butvan.agent.network.finance.dto.FinanceDtos;
 import butvan.agent.network.finance.dto.FinanceDtos.AccountResponse;
 import butvan.agent.network.finance.dto.FinanceDtos.CreateAccountRequest;
+import butvan.agent.network.finance.dto.FinanceDtos.CreateBalanceAdjustmentRequest;
 import butvan.agent.network.finance.dto.FinanceDtos.CreateTransactionRequest;
 import butvan.agent.network.finance.dto.FinanceDtos.CreateTransferRequest;
 import butvan.agent.network.finance.dto.FinanceDtos.OverviewResponse;
@@ -71,6 +72,14 @@ public class FinanceController {
         return Result.success(FinanceDtos.from(financeService.createAccount(
                 currentUserProvider.currentUserId(), request.name(), request.accountType(), request.currency(),
                 request.initialBalance(), request.interestEnabled(), request.annualRatePercent())));
+    }
+
+    @ApiLog("手动校准资产账户余额")
+    @PostMapping("/accounts/{accountId}/adjustments")
+    public Result<TransactionResponse> adjustAccountBalance(
+            @PathVariable String accountId, @RequestBody CreateBalanceAdjustmentRequest request) {
+        return Result.success(FinanceDtos.from(financeService.adjustAccountBalance(
+                currentUserProvider.currentUserId(), accountId, request.direction(), request.amount(), request.note())));
     }
 
     @ApiLog("创建收入或支出流水")

@@ -225,7 +225,11 @@ export function FinanceMiniTile({ date, refreshKey, onOpenFinance }: Pick<Financ
           <p className={styles.empty}>暂无流水记录。</p>
         ) : data ? (
           data.transactions.slice(0, 3).map((item) => {
-            const isOut = item.transactionType === 'expense';
+            const isAdjustment = item.transactionType === 'adjustment_increase'
+              || item.transactionType === 'adjustment_decrease';
+            const isOut = item.transactionType === 'expense'
+              || item.transactionType === 'transfer_out'
+              || item.transactionType === 'adjustment_decrease';
             return (
               <button
                 type="button"
@@ -237,7 +241,7 @@ export function FinanceMiniTile({ date, refreshKey, onOpenFinance }: Pick<Financ
                   <div className={styles.flowName}>{item.note || item.category}</div>
                   <div className={styles.flowMeta}>{item.accountName} · {item.time}</div>
                 </div>
-                <div className={`${styles.flowMoney} ${isOut ? styles.out : styles.in}`}>
+                <div className={`${styles.flowMoney} ${isAdjustment ? styles.adjustment : isOut ? styles.out : styles.in}`}>
                   {isOut ? '−' : '+'}{money(item.amount, item.currency)}
                 </div>
               </button>
@@ -250,8 +254,18 @@ export function FinanceMiniTile({ date, refreshKey, onOpenFinance }: Pick<Financ
         {selected && (
           <>
             <div className={styles.metric}>
-              <strong>{selected.transactionType === 'expense' ? '−' : '+'}{money(selected.amount, selected.currency)}</strong>
-              <span>{selected.transactionType === 'expense' ? '支出' : selected.transactionType === 'yield' ? '收益' : '收入'}</span>
+              <strong>{selected.transactionType === 'expense'
+                || selected.transactionType === 'transfer_out'
+                || selected.transactionType === 'adjustment_decrease' ? '−' : '+'}{money(selected.amount, selected.currency)}</strong>
+              <span>{selected.transactionType === 'expense'
+                ? '支出'
+                : selected.transactionType === 'yield'
+                ? '收益'
+                : selected.transactionType === 'transfer_out' || selected.transactionType === 'transfer_in'
+                ? '划账'
+                : selected.transactionType === 'adjustment_increase' || selected.transactionType === 'adjustment_decrease'
+                ? '余额校准（非收支）'
+                : '收入'}</span>
             </div>
             <p>{selected.note || selected.category}</p>
             <dl className={styles.stats}>

@@ -1,0 +1,20 @@
+.form { display: flex; flex-direction: column; gap: 14px; }
+.warning { padding: 10px 12px; border: 1px solid #ead9b1; border-radius: var(--radius-md); background: #fffaf0; color: #75551f; }
+.warning strong { font-size: 11px; font-weight: 650; }
+.warning p { margin-top: 3px; font-size: 10px; line-height: 1.5; }
+.error { padding: 8px 10px; border: 1px solid #e6c8c4; border-radius: var(--radius-md); background: #fff7f5; color: #9a4038; font-size: 11px; }
+.accountSummary { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+.accountSummary span { color: var(--text-secondary); font-size: 11px; }
+.accountSummary strong { color: var(--text-primary); font-size: 14px; font-variant-numeric: tabular-nums; }
+.directionSwitch { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; border-radius: var(--radius-md); background: var(--bg-surface); }
+.directionSwitch button { height: 32px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-secondary); font: 600 11px var(--font-sans); cursor: pointer; }
+.directionSwitch button:hover { color: var(--text-primary); }
+.directionSwitch .active { outline: 1px solid var(--border-subtle); outline-offset: -1px; background: var(--bg-app); color: var(--text-primary); }
+.form label > span { display: block; margin-bottom: 6px; color: var(--text-secondary); font-size: 11px; font-weight: 550; }
+.amountField > div { display: flex; align-items: baseline; border-bottom: 1px solid var(--border-medium); }
+.amountField > div:focus-within { border-color: var(--accent-blue); }
+.amountField b { color: var(--text-muted); font-size: 17px; font-weight: 550; }
+.amountField input { min-width: 0; width: 100%; padding: 2px 8px 8px; border: 0; outline: 0; background: transparent; color: var(--text-primary); font: 650 26px var(--font-sans); font-variant-numeric: tabular-nums; }
+.form textarea { width: 100%; min-height: 78px; resize: vertical; padding: 9px 10px; border: 1px solid var(--border-medium); border-radius: var(--radius-md); outline: 0; background: var(--bg-app); color: var(--text-primary); font: 12px/1.5 var(--font-sans); }
+.form textarea:focus { border-color: var(--accent-blue); }
+.actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 2px; }

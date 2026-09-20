@@ -172,6 +172,27 @@ class FinanceApiIntegrationTest {
         mockMvc.perform(get("/agent/finance/overview"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.totalAssets").value(1700.00));
+
+        mockMvc.perform(post("/agent/finance/accounts/{accountId}/adjustments", secondAccountId)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "direction": "increase",
+                                  "amount": 25.00,
+                                  "note": "余额对账补差"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.transactionType").value("adjustment_increase"))
+                .andExpect(jsonPath("$.data.source").value("adjustment"))
+                .andExpect(jsonPath("$.data.category").value("余额校准"))
+                .andExpect(jsonPath("$.data.note").value("余额对账补差"));
+
+        mockMvc.perform(get("/agent/finance/overview"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalAssets").value(1725.00))
+                .andExpect(jsonPath("$.data.monthIncome").value(500.00))
+                .andExpect(jsonPath("$.data.monthExpense").value(0));
     }
 
     private static Path createDatabasePath() {

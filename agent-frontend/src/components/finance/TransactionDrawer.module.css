@@ -24,6 +24,7 @@
 .incomeAmount { color: #287052; }
 .transferOutAmount { color: #1d4ed8; }
 .transferInAmount { color: #0284c7; }
+.adjustmentAmount { color: #8a6118; }
 .meta { display: flex; flex-wrap: wrap; gap: 5px 12px; margin-top: 5px; color: var(--text-muted); font-size: 9.5px; }
 .meta span { display: inline-flex; align-items: center; gap: 4px; }
 .state { min-height: 240px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); font-size: 11px; text-align: center; }

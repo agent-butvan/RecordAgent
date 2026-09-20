@@ -50,6 +50,7 @@
 .inAmount { color: #31725a; }
 .transferOutAmount { color: #1d4ed8; }
 .transferInAmount { color: #0284c7; }
+.adjustmentAmount { color: #8a6118; }
 .transactionActions { display: inline-flex; align-items: center; gap: 7px; }
 .transactionEditButton { width: 22px; height: 22px; display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-muted); cursor: pointer; }
 .transactionEditButton:hover { background: var(--bg-surface-hover); color: var(--text-primary); }

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowClockwiseIcon, ArrowsLeftRightIcon, CaretRightIcon, PencilSimpleIcon, PlusIcon, SparkleIcon, WalletIcon } from '@phosphor-icons/react';
-import { createFinanceAccount, createFinanceTransaction, createFinanceTransfer, fetchFinanceCategories, fetchFinanceExpenseChart, fetchFinanceOverview, fetchFinanceTransactions, updateFinanceTransaction } from '../../services/financeApi';
-import type { CreateFinanceTransactionInput, CreateFinanceTransferInput, FinanceAccountType, FinanceCategoryOptions, FinanceChartRange, FinanceExpenseChart, FinanceOverview, FinanceTransaction } from '../../types/finance';
+import { createFinanceAccount, createFinanceBalanceAdjustment, createFinanceTransaction, createFinanceTransfer, fetchFinanceCategories, fetchFinanceExpenseChart, fetchFinanceOverview, fetchFinanceTransactions, updateFinanceTransaction } from '../../services/financeApi';
+import type { CreateFinanceBalanceAdjustmentInput, CreateFinanceTransactionInput, CreateFinanceTransferInput, FinanceAccount, FinanceAccountType, FinanceCategoryOptions, FinanceChartRange, FinanceExpenseChart, FinanceOverview, FinanceTransaction } from '../../types/finance';
 import { Button } from '../common/Button';
 import { useMessage } from '../common/Message';
 import { Modal } from '../common/Modal';
@@ -9,6 +9,7 @@ import { TopBar } from '../common/TopBar';
 import styles from './FinancePage.module.css';
 import { AccountTypeIcon } from './AccountTypeIcon';
 import { AssetAccountDeck } from './AssetAccountDeck';
+import { AssetAdjustmentModal } from './AssetAdjustmentModal';
 import { SpendingTrendChart } from './SpendingTrendChart';
 import { TransactionTypeIcon } from './TransactionTypeIcon';
 import { TransactionDrawer } from './TransactionDrawer';
@@ -46,6 +47,7 @@ export const FinancePage: React.FC = () => {
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [isTransactionDrawerOpen, setIsTransactionDrawerOpen] = useState(false);
   const [isAssetDetailModalOpen, setIsAssetDetailModalOpen] = useState(false);
+  const [adjustmentAccount, setAdjustmentAccount] = useState<FinanceAccount | null>(null);
   const [allTransactions, setAllTransactions] = useState<FinanceTransaction[]>([]);
   const [isTransactionsLoading, setIsTransactionsLoading] = useState(false);
   const [transactionsError, setTransactionsError] = useState<string | null>(null);
@@ -175,6 +177,19 @@ export const FinancePage: React.FC = () => {
     }
   };
 
+  const openBalanceAdjustment = (account: FinanceAccount) => {
+    setIsAssetDetailModalOpen(false);
+    setAdjustmentAccount(account);
+  };
+
+  const submitBalanceAdjustment = async (input: CreateFinanceBalanceAdjustmentInput) => {
+    if (!adjustmentAccount) return;
+    await createFinanceBalanceAdjustment(adjustmentAccount.id, input);
+    setAdjustmentAccount(null);
+    showMessage('success', '资产余额已调整，并记录为余额校准流水');
+    await load();
+  };
+
   return <main className={styles.workspace}>
     <TopBar icon={<WalletIcon size={16} />} title="财务" subtitle="本地数据" actions={<>
       <button type="button" className={styles.iconButton} title="刷新财务数据" aria-label="刷新财务数据"
@@ -234,8 +249,12 @@ export const FinancePage: React.FC = () => {
               const isExpense = transaction.transactionType === 'expense';
               const isTransferOut = transaction.transactionType === 'transfer_out';
               const isTransferIn = transaction.transactionType === 'transfer_in';
-              const isOutflow = isExpense || isTransferOut;
-              const amountClass = isExpense
+              const isAdjustment = transaction.transactionType === 'adjustment_increase'
+                || transaction.transactionType === 'adjustment_decrease';
+              const isOutflow = isExpense || isTransferOut || transaction.transactionType === 'adjustment_decrease';
+              const amountClass = isAdjustment
+                ? styles.adjustmentAmount
+                : isExpense
                 ? styles.outAmount
                 : isTransferOut
                 ? styles.transferOutAmount
@@ -325,6 +344,14 @@ export const FinancePage: React.FC = () => {
       totalAssets={overview?.totalAssets ?? 0}
       onClose={() => setIsAssetDetailModalOpen(false)}
       onAddAccount={openAccountModal}
+      onAdjustAccount={openBalanceAdjustment}
+    />
+
+    <AssetAdjustmentModal
+      open={adjustmentAccount !== null}
+      account={adjustmentAccount}
+      onClose={() => setAdjustmentAccount(null)}
+      onSubmit={submitBalanceAdjustment}
     />
   </main>;
 };

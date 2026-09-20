@@ -1,5 +1,6 @@
 import type {
   CreateFinanceAccountInput,
+  CreateFinanceBalanceAdjustmentInput,
   CreateFinanceTransactionInput,
   CreateFinanceTransferInput,
   FinanceAccount,
@@ -71,6 +72,14 @@ export async function fetchFinanceExpenseChart(range: FinanceChartRange): Promis
 /** 新建微信、支付宝、银行卡、现金或其他账户。 */
 export function createFinanceAccount(input: CreateFinanceAccountInput): Promise<FinanceAccount> {
   return financeRequest<FinanceAccount>('/agent/finance/accounts', jsonInit(input));
+}
+
+/** 手动校准单个资产账户余额，并生成不参与真实收支统计的审计流水。 */
+export function createFinanceBalanceAdjustment(
+  accountId: string,
+  input: CreateFinanceBalanceAdjustmentInput,
+): Promise<FinanceTransaction> {
+  return financeRequest<FinanceTransaction>(`/agent/finance/accounts/${encodeURIComponent(accountId)}/adjustments`, jsonInit(input));
 }
 
 /** 新建一条关联资产账户的收入或支出。 */
