@@ -83,6 +83,8 @@ Noul 返回的是“答案为 yes 的概率”，字段名为 `noul`，范围是
 当前 `AgentFactory` 按“项目根目录”缓存 `HarnessAgent`，不是每个会话创建一份 Agent。因此绝对不要这样实现 Jev 路由：
 
 ```java
+// agent：按项目根目录缓存、可能被多个会话共享的 HarnessAgent。
+// selectedGroups：Jev 为当前用户轮次选出的能力组名称。
 // 错误示例：会修改共享 Toolkit 的激活状态
 agent.getToolkit().updateToolGroups(selectedGroups, true);
 ```
@@ -172,6 +174,8 @@ agent-backend/server-agents/src/main/java/butvan/agent/agents/tool/ToolCapabilit
 
 核心结构可以写成：
 
+为方便你边写边理解，下面的示例采用“教学型注释”：字段、Record 组件、方法参数、返回值和重要局部变量都会说明职责。实际落地时可以保留这些注释，再按团队习惯精简显而易见的部分。
+
 ```java
 package butvan.agent.agents.tool;
 
@@ -186,8 +190,10 @@ import java.util.function.Predicate;
 @Component
 public class ToolCapabilityCatalog {
 
+    /** AgentScope 元工具名称；主模型可通过它补充启用能力组。 */
     public static final String META_TOOL_NAME = "reset_equipped_tools";
 
+    /** capabilities：项目当前支持的全部能力组及其 Tool 名称匹配规则。 */
     private final List<Capability> capabilities = List.of(
             capability("workspace", "读写、搜索项目文件以及执行本地命令；代码和本机任务需要启用。",
                     names("read_file", "write_file", "edit_file", "list_files", "glob_files",
@@ -212,19 +218,44 @@ public class ToolCapabilityCatalog {
                     prefixes("study_"))
     );
 
+    /**
+     * 返回全部能力组定义。
+     *
+     * @return 不可变的能力组定义列表
+     */
     public List<Capability> capabilities() {
         return capabilities;
     }
 
+    /**
+     * 提取全部能力组名称，供 Jev 构建候选问题。
+     *
+     * @return 不可变且不重复的能力组名称集合
+     */
     public Set<String> groupNames() {
         return capabilities.stream().map(Capability::name)
                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 
+    /**
+     * 根据 Tool 名称查找它所属的能力组。
+     *
+     * @param toolName Tool Schema 中的唯一工具名称
+     * @return 匹配到的能力组；未分类时返回空
+     */
     public Optional<Capability> groupFor(String toolName) {
+        // item：流处理中正在检查的单个能力组。
         return capabilities.stream().filter(item -> item.matches(toolName)).findFirst();
     }
 
+    /**
+     * 创建一条能力组定义，减少目录初始化时的重复样板代码。
+     *
+     * @param name 能力组的稳定英文名称
+     * @param description 提供给主模型和 Jev 的中文能力说明
+     * @param matcher 判断某个 Tool 是否属于该组的规则
+     * @return 新的能力组定义
+     */
     private static Capability capability(
             String name,
             String description,
@@ -233,25 +264,61 @@ public class ToolCapabilityCatalog {
         return new Capability(name, description, matcher);
     }
 
+    /**
+     * 创建“精确名称集合”匹配器。
+     *
+     * @param names 允许匹配的 Tool 名称列表
+     * @return Tool 名称匹配规则
+     */
     private static Predicate<String> names(String... names) {
+        // values：由可变参数转换成的不可变名称集合，用于常量时间查找。
         Set<String> values = Set.of(names);
         return values::contains;
     }
 
+    /**
+     * 创建“名称前缀”匹配器。
+     *
+     * @param prefixes 一个或多个 Tool 名称前缀
+     * @return Tool 名称匹配规则
+     */
     private static Predicate<String> prefixes(String... prefixes) {
+        // values：保存全部允许前缀，供返回的 Predicate 闭包读取。
         List<String> values = List.of(prefixes);
+        // toolName：Predicate 每次判断时收到的具体 Tool 名称。
         return toolName -> values.stream().anyMatch(toolName::startsWith);
     }
 
+    /**
+     * 创建“一个精确名称或一个前缀”匹配器。
+     *
+     * @param name 允许精确匹配的 Tool 名称
+     * @param prefix 允许匹配的 Tool 名称前缀
+     * @return Tool 名称匹配规则
+     */
     private static Predicate<String> nameOrPrefix(String name, String prefix) {
+        // toolName：Predicate 每次判断时收到的具体 Tool 名称。
         return toolName -> name.equals(toolName) || toolName.startsWith(prefix);
     }
 
+    /**
+     * 单个 Tool 能力组定义。
+     *
+     * @param name 能力组的稳定英文名称
+     * @param description 能力组用途说明
+     * @param matcher Tool 名称匹配规则
+     */
     public record Capability(
             String name,
             String description,
             Predicate<String> matcher
     ) {
+        /**
+         * 判断给定 Tool 是否属于当前能力组。
+         *
+         * @param toolName 待判断的 Tool 名称
+         * @return 属于当前组时返回 true
+         */
         public boolean matches(String toolName) {
             return matcher.test(toolName);
         }
@@ -268,7 +335,14 @@ public class ToolCapabilityCatalog {
 示意代码：
 
 ```java
+/**
+ * 将 Toolkit 中已注册的工具划入能力组，并注册常驻元工具。
+ *
+ * @param toolkit 当前 HarnessAgent 使用的完整工具容器
+ * @param catalog ButvanAgent 唯一的能力组目录
+ */
 static void apply(Toolkit toolkit, ToolCapabilityCatalog catalog) {
+    // capability：当前正在创建或检查的单个能力组定义。
     for (ToolCapabilityCatalog.Capability capability : catalog.capabilities()) {
         if (toolkit.getToolGroup(capability.name()) == null) {
             toolkit.createToolGroup(
@@ -279,8 +353,10 @@ static void apply(Toolkit toolkit, ToolCapabilityCatalog catalog) {
         }
     }
 
+    // toolName：Toolkit 当前已经注册的单个 Tool 名称。
     for (String toolName : List.copyOf(toolkit.getToolNames())) {
         if (ToolCapabilityCatalog.META_TOOL_NAME.equals(toolName)) continue;
+        // group：toolName 匹配到的能力组。
         catalog.groupFor(toolName)
                 .ifPresent(group -> moveToGroup(toolkit, toolName, group.name()));
     }
@@ -294,9 +370,18 @@ static void apply(Toolkit toolkit, ToolCapabilityCatalog catalog) {
 `ToolRegistry` 增加目录依赖：
 
 ```java
+/** toolkit：保存项目业务 Tool 的基础 AgentScope 工具容器。 */
 private final Toolkit toolkit;
+
+/** capabilityCatalog：Tool 能力组的唯一目录。 */
 private final ToolCapabilityCatalog capabilityCatalog;
 
+/**
+ * 创建工具注册表，并注册所有 Spring 发现的 Tool 模块。
+ *
+ * @param toolModules Spring 收集到的全部业务 Tool 模块
+ * @param capabilityCatalog Tool 能力组目录
+ */
 public ToolRegistry(
         List<AgentToolModule> toolModules,
         ToolCapabilityCatalog capabilityCatalog
@@ -306,6 +391,11 @@ public ToolRegistry(
     toolModules.forEach(this.toolkit::registerTool);
 }
 
+/**
+ * 在 HarnessAgent 完成内置工具注册后应用按需 Schema 分组。
+ *
+ * @param agentToolkit 最终属于 HarnessAgent 的完整 Toolkit
+ */
 public void enableOnDemandSchemas(Toolkit agentToolkit) {
     ToolSchemaRoutingPolicy.apply(agentToolkit, capabilityCatalog);
 }
@@ -314,7 +404,10 @@ public void enableOnDemandSchemas(Toolkit agentToolkit) {
 构造器签名改变后，现有 `ToolRegistryTest` 也要显式传入目录：
 
 ```java
+// catalog：测试专用能力组目录，不依赖 Spring 容器。
 ToolCapabilityCatalog catalog = new ToolCapabilityCatalog();
+
+// registry：待验证的 ToolRegistry，被测实例使用空业务 Tool 列表。
 ToolRegistry registry = new ToolRegistry(List.of(), catalog);
 ```
 
@@ -381,16 +474,29 @@ package butvan.agent.agents.routing;
 
 import java.util.Locale;
 
+/** Jev 工具路由的运行模式。 */
 public enum ToolRoutingMode {
+    /** 完全关闭：不请求 Jev，也不改变 Tool Schema。 */
     OFF,
+
+    /** 影子运行：请求 Jev 并记录结果，但不改变 Tool Schema。 */
     SHADOW,
+
+    /** 正式运行：请求 Jev，并把结果应用到当前模型调用。 */
     ACTIVE;
 
+    /**
+     * 把用户配置文本安全转换为路由模式。
+     *
+     * @param value 配置文件中的模式文本，例如 off、shadow 或 active
+     * @return 对应模式；空值或非法值统一返回 OFF
+     */
     public static ToolRoutingMode parse(String value) {
         if (value == null || value.isBlank()) return OFF;
         try {
             return valueOf(value.strip().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException ignored) {
+            // ignored：表示配置值不是合法枚举；按安全默认值关闭路由。
             return OFF;
         }
     }
@@ -404,6 +510,15 @@ package butvan.agent.agents.config;
 
 import butvan.agent.agents.routing.ToolRoutingMode;
 
+/**
+ * TypeSafe Jev 本地配置快照。
+ *
+ * @param enabled 用户是否总开关启用 Jev 路由
+ * @param mode 当前灰度模式
+ * @param apiKey TypeSafe API Key；禁止写入日志
+ * @param model 调用的 Jev 模型或别名
+ * @param threshold 选中能力组所需的最低 Noul 概率
+ */
 public record TypeSafeConfigData(
         boolean enabled,
         ToolRoutingMode mode,
@@ -411,10 +526,20 @@ public record TypeSafeConfigData(
         String model,
         double threshold
 ) {
+    /**
+     * 创建安全的关闭态默认配置。
+     *
+     * @return 不会发起网络请求的默认配置
+     */
     public static TypeSafeConfigData disabled() {
         return new TypeSafeConfigData(false, ToolRoutingMode.OFF, "", "jev-latest", 0.75);
     }
 
+    /**
+     * 判断当前配置是否具备调用 Jev 的必要条件。
+     *
+     * @return 总开关已启用、模式非 OFF 且 API Key 非空时返回 true
+     */
     public boolean isReady() {
         return enabled
                 && mode != ToolRoutingMode.OFF
@@ -441,23 +566,33 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+/** 从用户级 config.json 动态读取 TypeSafe Jev 配置。 */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class TypeSafeProperties {
 
+    /** CONFIG_PATH：ButvanAgent 用户级配置文件的固定位置。 */
     private static final Path CONFIG_PATH = Paths.get(
             System.getProperty("user.home"), ".butvan-agent", "config.json");
 
+    /** objectMapper：负责解析本地 JSON 配置文件的 Jackson 组件。 */
     private final ObjectMapper objectMapper;
 
+    /**
+     * 每次路由前读取最新的 TypeSafe 配置。
+     *
+     * @return 有效配置；文件缺失、节点缺失或读取失败时返回关闭态
+     */
     public TypeSafeConfigData load() {
         try {
             if (!Files.isRegularFile(CONFIG_PATH)) return TypeSafeConfigData.disabled();
 
+            // node：config.json 根对象中的 typesafe 配置节点。
             JsonNode node = objectMapper.readTree(CONFIG_PATH.toFile()).path("typesafe");
             if (node.isMissingNode() || node.isNull()) return TypeSafeConfigData.disabled();
 
+            // threshold：Noul 概率达到该值时，能力组才会被选中。
             double threshold = node.path("threshold").asDouble(0.75);
             if (threshold < 0.0 || threshold > 1.0) threshold = 0.75;
 
@@ -469,6 +604,7 @@ public class TypeSafeProperties {
                     threshold
             );
         } catch (IOException exception) {
+            // exception：读取或解析本地配置时发生的 I/O 异常；禁止记录配置内容。
             log.error("读取 TypeSafe 配置失败，Jev 路由将保持关闭：{}", CONFIG_PATH, exception);
             return TypeSafeConfigData.disabled();
         }
@@ -501,6 +637,12 @@ package butvan.agent.agents.routing;
 
 import java.util.Set;
 
+/**
+ * 一次用户轮次提交给 Tool 路由器的最小输入。
+ *
+ * @param userInput 当前用户可见的请求文本
+ * @param availableGroups 本次允许 Jev 判断的能力组名称集合
+ */
 public record ToolRoutingRequest(
         String userInput,
         Set<String> availableGroups
@@ -517,6 +659,15 @@ package butvan.agent.agents.routing;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * 一次 Jev Tool 路由的不可变结果。
+ *
+ * @param status 本次路由处于关闭、影子、启用还是降级状态
+ * @param selectedGroups 达到阈值的能力组名称
+ * @param probabilities 每个能力组对应的 Noul yes 概率
+ * @param providerModel TypeSafe 实际返回的模型版本
+ * @param durationMillis 本次路由请求的总耗时毫秒数
+ */
 public record ToolRoutingDecision(
         Status status,
         Set<String> selectedGroups,
@@ -524,21 +675,45 @@ public record ToolRoutingDecision(
         String providerModel,
         long durationMillis
 ) {
+    /** 路由决策的生命周期状态。 */
     public enum Status {
+        /** 未启用 Jev。 */
         OFF,
+
+        /** 已获得 Jev 结果，但只观察、不应用。 */
         SHADOW,
+
+        /** 已获得 Jev 结果，并应用于本轮模型调用。 */
         ACTIVE,
+
+        /** Jev 调用或响应校验失败，回退原流程。 */
         FALLBACK
     }
 
+    /**
+     * 判断 Middleware 是否应该应用本决策。
+     *
+     * @return 只有 ACTIVE 状态返回 true
+     */
     public boolean appliesToModelCall() {
         return status == Status.ACTIVE;
     }
 
+    /**
+     * 创建“Jev 未启用”的决策。
+     *
+     * @return OFF 状态的空决策
+     */
     public static ToolRoutingDecision off() {
         return new ToolRoutingDecision(Status.OFF, Set.of(), Map.of(), "", 0L);
     }
 
+    /**
+     * 创建“Jev 失败并回退”的决策。
+     *
+     * @param durationMillis 失败前已经消耗的时间
+     * @return FALLBACK 状态的空决策
+     */
     public static ToolRoutingDecision fallback(long durationMillis) {
         return new ToolRoutingDecision(
                 Status.FALLBACK, Set.of(), Map.of(), "", durationMillis);
@@ -553,7 +728,15 @@ public record ToolRoutingDecision(
 ```java
 package butvan.agent.agents.routing;
 
+/** 主流程依赖的 Tool 能力路由抽象。 */
 public interface ToolCapabilityRouter {
+
+    /**
+     * 根据当前用户请求选择可能需要的能力组。
+     *
+     * @param request 当前用户轮次的最小路由输入
+     * @return 不会为 null 的路由决策
+     */
     ToolRoutingDecision route(ToolRoutingRequest request);
 }
 ```
@@ -587,11 +770,24 @@ package butvan.agent.agents.routing.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+/**
+ * 发送给 System One 的一个 Noul 二分类问题。
+ *
+ * @param type 固定为 noul
+ * @param instructions Jev 需要判断的问题文本
+ * @param criteria yes/no 两种结果的业务含义
+ */
 public record JevNoulQuestion(
         String type,
         String instructions,
         Criteria criteria
 ) {
+    /**
+     * 用统一标准创建能力组判断问题。
+     *
+     * @param instructions 针对某个能力组的判断说明
+     * @return 可直接加入 questions Map 的 Noul 问题
+     */
     public static JevNoulQuestion of(String instructions) {
         return new JevNoulQuestion(
                 "noul",
@@ -600,6 +796,12 @@ public record JevNoulQuestion(
         );
     }
 
+    /**
+     * Noul 两端概率的语义说明。
+     *
+     * @param yes 概率接近 1 时代表的含义，序列化字段名为 true
+     * @param no 概率接近 0 时代表的含义，序列化字段名为 false
+     */
     public record Criteria(
             @JsonProperty("true") String yes,
             @JsonProperty("false") String no
@@ -610,22 +812,48 @@ public record JevNoulQuestion(
 其余 DTO：
 
 ```java
+/**
+ * System One HTTP 请求体。
+ *
+ * @param state 本次需要判断的用户文本
+ * @param model Jev 模型名称或别名
+ * @param questions 以能力组名为键的 Noul 问题
+ */
 public record JevSystemOneRequest(
         String state,
         String model,
         Map<String, JevNoulQuestion> questions
 ) {}
 
+/**
+ * 单个 Noul 问题的响应。
+ *
+ * @param type 响应类型，预期为 noul
+ * @param noul 答案为 yes 的概率，范围为 0..1
+ */
 public record JevNoulAnswer(
         String type,
         Double noul
 ) {}
 
+/**
+ * TypeSafe 返回的本次请求 Token 用量。
+ *
+ * @param inputTokens TypeSafe 统计的输入 Token 数
+ * @param outputTokens TypeSafe 统计的输出 Token 数
+ */
 public record JevUsage(
         @JsonProperty("input_tokens") long inputTokens,
         @JsonProperty("output_tokens") long outputTokens
 ) {}
 
+/**
+ * System One HTTP 响应体。
+ *
+ * @param model 实际执行判断的 Jev 模型版本
+ * @param answers 以请求 question id 为键的 Noul 答案
+ * @param usage 本次 Jev 请求的 Token 用量
+ */
 public record JevSystemOneResponse(
         String model,
         Map<String, JevNoulAnswer> answers,
@@ -651,15 +879,24 @@ import org.springframework.web.client.RestClient;
 import java.net.http.HttpClient;
 import java.time.Duration;
 
+/** 创建与其他外部服务隔离的 TypeSafe 专用 HTTP Client。 */
 @Configuration
 public class TypeSafeHttpConfiguration {
 
+    /**
+     * 创建 TypeSafe 专用的短超时 HTTP Client。
+     *
+     * @return 只配置 TypeSafe base URL 和超时策略的 RestClient
+     */
     @Bean
     @Qualifier("typeSafeRestClient")
     RestClient typeSafeRestClient() {
+        // httpClient：JDK 底层客户端，连接建立最多等待 500ms。
         HttpClient httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofMillis(500))
                 .build();
+
+        // requestFactory：把 JDK HttpClient 接入 Spring，并限制响应读取时间。
         JdkClientHttpRequestFactory requestFactory =
                 new JdkClientHttpRequestFactory(httpClient);
         requestFactory.setReadTimeout(Duration.ofMillis(1000));
@@ -684,7 +921,18 @@ import butvan.agent.agents.routing.dto.JevSystemOneResponse;
 
 import java.util.Map;
 
+/** 对 TypeSafe System One HTTP API 的项目内抽象。 */
 public interface SystemOneGateway {
+
+    /**
+     * 调用 System One，批量判断多个 Noul 问题。
+     *
+     * @param apiKey 当前用户配置的 TypeSafe API Key
+     * @param model Jev 模型名称或别名
+     * @param state 本次需要判断的用户文本
+     * @param questions 以能力组名称为键的 Noul 问题
+     * @return TypeSafe 的结构化响应
+     */
     JevSystemOneResponse evaluate(
             String apiKey,
             String model,
@@ -697,17 +945,34 @@ public interface SystemOneGateway {
 Adapter 的核心代码：
 
 ```java
+/** 使用 Spring RestClient 调用 TypeSafe System One 的 HTTP Adapter。 */
 @Component
 public class JevSystemOneAdapter implements SystemOneGateway {
 
+    /** restClient：只用于访问 TypeSafe API 的短超时 HTTP Client。 */
     private final RestClient restClient;
 
+    /**
+     * 创建 System One HTTP Adapter。
+     *
+     * @param restClient 由 TypeSafeHttpConfiguration 创建的专用客户端
+     */
     public JevSystemOneAdapter(
             @Qualifier("typeSafeRestClient") RestClient restClient
     ) {
         this.restClient = restClient;
     }
 
+    /**
+     * 向 System One 发送一次批量 Noul 判断请求。
+     *
+     * @param apiKey 当前用户的 TypeSafe API Key
+     * @param model Jev 模型名称或别名
+     * @param state 当前用户可见的请求文本
+     * @param questions 需要同时判断的能力组问题
+     * @return 非空的结构化 Jev 响应
+     * @throws JevGatewayException 网络失败、HTTP 错误或空响应时抛出
+     */
     @Override
     public JevSystemOneResponse evaluate(
             String apiKey,
@@ -715,11 +980,16 @@ public class JevSystemOneAdapter implements SystemOneGateway {
             String state,
             Map<String, JevNoulQuestion> questions
     ) {
+        // request：即将序列化为 JSON 的 System One 请求体。
         JevSystemOneRequest request = new JevSystemOneRequest(state, model, questions);
         try {
+            // response：RestClient 反序列化得到的 System One 响应。
             JevSystemOneResponse response = restClient.post()
                     .uri("/v1/systemone")
-                    .headers(headers -> headers.setBearerAuth(apiKey))
+                    .headers(headers -> {
+                        // headers：仅属于当前请求的 HTTP Header 集合，用于写入最新 API Key。
+                        headers.setBearerAuth(apiKey);
+                    })
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(request)
                     .retrieve()
@@ -730,13 +1000,44 @@ public class JevSystemOneAdapter implements SystemOneGateway {
             }
             return response;
         } catch (RestClientResponseException exception) {
+            // exception：TypeSafe 返回 4xx/5xx 时由 RestClient 抛出的 HTTP 异常。
             throw new JevGatewayException(
                     "TypeSafe 请求失败，HTTP " + exception.getStatusCode().value(),
                     exception
             );
         } catch (RestClientException exception) {
+            // exception：连接、超时或响应解析失败时产生的客户端异常。
             throw new JevGatewayException("TypeSafe 网络请求失败", exception);
         }
+    }
+}
+```
+
+同时新建一个只表达外部网关失败的异常，避免业务层依赖 Spring HTTP 异常：
+
+```java
+package butvan.agent.agents.routing;
+
+/** 表示 TypeSafe System One 调用或响应校验失败。 */
+public class JevGatewayException extends RuntimeException {
+
+    /**
+     * 创建不携带底层原因的网关异常。
+     *
+     * @param message 可安全写入内部日志的错误摘要；不得包含 Key 或用户原文
+     */
+    public JevGatewayException(String message) {
+        super(message);
+    }
+
+    /**
+     * 创建保留底层原因的网关异常。
+     *
+     * @param message 可安全写入内部日志的错误摘要；不得包含 Key 或用户原文
+     * @param cause RestClient 抛出的原始异常，仅用于内部诊断
+     */
+    public JevGatewayException(String message, Throwable cause) {
+        super(message, cause);
     }
 }
 ```
@@ -768,46 +1069,74 @@ public class JevSystemOneAdapter implements SystemOneGateway {
 建议先限制路由输入长度，例如最多 4000 个 Java 字符，避免误把大段粘贴内容发送给外部服务：
 
 ```java
+/** 使用 Jev Noul 概率为当前用户轮次选择 Tool 能力组。 */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class JevToolCapabilityRouter implements ToolCapabilityRouter {
 
+    /** MAX_INPUT_CHARS：允许发送给 Jev 的最大 Java 字符数，限制隐私范围与成本。 */
     private static final int MAX_INPUT_CHARS = 4_000;
 
+    /** properties：按需读取当前用户 TypeSafe 本地配置。 */
     private final TypeSafeProperties properties;
+
+    /** capabilityCatalog：提供能力组名称、说明和 Tool 分类规则。 */
     private final ToolCapabilityCatalog capabilityCatalog;
+
+    /** gateway：隔离实际的 TypeSafe System One HTTP 调用。 */
     private final SystemOneGateway gateway;
 
+    /**
+     * 为一次新用户轮次生成 Tool 能力组决策。
+     *
+     * @param request 当前用户文本和允许判断的能力组集合
+     * @return OFF、SHADOW、ACTIVE 或 FALLBACK 状态的不可变决策
+     */
     @Override
     public ToolRoutingDecision route(ToolRoutingRequest request) {
+        // config：本次路由开始时读取到的 TypeSafe 配置快照。
         TypeSafeConfigData config = properties.load();
         if (!config.isReady()) return ToolRoutingDecision.off();
 
+        // startedAt：单调时钟起点，只用于计算路由耗时，不代表墙上时间。
         long startedAt = System.nanoTime();
         try {
+            // state：去除首尾空白并执行长度限制后的 Jev 输入文本。
             String state = normalizeInput(request.userInput());
+
+            // questions：以能力组名为键、一次性发送给 Jev 的全部 Noul 问题。
             Map<String, JevNoulQuestion> questions = capabilityCatalog.capabilities()
                     .stream()
+                    // item：目录流中正在检查的能力组定义。
                     .filter(item -> request.availableGroups().contains(item.name()))
                     .collect(java.util.stream.Collectors.toUnmodifiableMap(
                             ToolCapabilityCatalog.Capability::name,
+                            // item：转换为 Noul 问题的单个能力组定义。
                             item -> JevNoulQuestion.of(
                                     "完成当前用户请求是否需要以下能力：" + item.description())
                     ));
 
+            // response：System One 对全部能力组问题返回的原始结构化响应。
             JevSystemOneResponse response = gateway.evaluate(
                     config.apiKey(), config.model(), state, questions);
+
+            // probabilities：校验完成后，以能力组名为键的 yes 概率。
             Map<String, Double> probabilities = validateAnswers(questions, response);
+
+            // selected：概率达到配置阈值、准备暴露给主模型的能力组。
             Set<String> selected = probabilities.entrySet().stream()
+                    // entry：当前正在与阈值比较的“能力组名 -> 概率”条目。
                     .filter(entry -> entry.getValue() >= config.threshold())
                     .map(Map.Entry::getKey)
                     .collect(java.util.stream.Collectors.toUnmodifiableSet());
 
+            // status：决定结果只用于观测，还是实际应用于本轮 Model Call。
             ToolRoutingDecision.Status status = config.mode() == ToolRoutingMode.ACTIVE
                     ? ToolRoutingDecision.Status.ACTIVE
                     : ToolRoutingDecision.Status.SHADOW;
 
+            // decision：准备写入 RuntimeContext 的本轮最终路由决策。
             ToolRoutingDecision decision = new ToolRoutingDecision(
                     status,
                     selected,
@@ -820,6 +1149,8 @@ public class JevToolCapabilityRouter implements ToolCapabilityRouter {
                     decision.probabilities(), decision.durationMillis());
             return decision;
         } catch (RuntimeException exception) {
+            // exception：配置读取之后，构建问题、调用 Jev 或校验响应时发生的异常。
+            // duration：路由失败前已消耗的总时间，用于观察外部依赖影响。
             long duration = elapsedMillis(startedAt);
             log.warn("Jev Tool 路由失败，回退原有 Schema 流程：costMs={}, errorType={}",
                     duration, exception.getClass().getSimpleName());
@@ -827,6 +1158,14 @@ public class JevToolCapabilityRouter implements ToolCapabilityRouter {
         }
     }
 
+    /**
+     * 校验 Jev 是否为每个问题返回合法的 Noul 概率。
+     *
+     * @param questions 本次实际发出的能力组问题
+     * @param response System One 返回的响应体
+     * @return 以能力组名为键的不可变概率 Map
+     * @throws JevGatewayException answers 缺失、类型错误或概率越界时抛出
+     */
     private Map<String, Double> validateAnswers(
             Map<String, JevNoulQuestion> questions,
             JevSystemOneResponse response
@@ -835,8 +1174,12 @@ public class JevToolCapabilityRouter implements ToolCapabilityRouter {
             throw new JevGatewayException("TypeSafe 响应缺少 answers");
         }
 
+        // probabilities：按问题遍历顺序暂存已经校验通过的能力组概率。
         Map<String, Double> probabilities = new LinkedHashMap<>();
+
+        // group：questions 中当前正在校验的能力组名称。
         for (String group : questions.keySet()) {
+            // answer：TypeSafe 为当前能力组返回的 Noul 答案。
             JevNoulAnswer answer = response.answers().get(group);
             if (answer == null || !"noul".equals(answer.type()) || answer.noul() == null) {
                 throw new JevGatewayException("TypeSafe 响应缺少有效 Noul 答案");
@@ -849,16 +1192,30 @@ public class JevToolCapabilityRouter implements ToolCapabilityRouter {
         return Map.copyOf(probabilities);
     }
 
+    /**
+     * 清理并限制发送给 Jev 的用户输入。
+     *
+     * @param value 当前用户可见的原始请求文本
+     * @return 去除首尾空白且不超过 MAX_INPUT_CHARS 的文本
+     * @throws IllegalArgumentException 输入为空时抛出
+     */
     private String normalizeInput(String value) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException("路由输入不能为空");
         }
+        // normalized：去除首尾空白后的用户输入。
         String normalized = value.strip();
         return normalized.length() <= MAX_INPUT_CHARS
                 ? normalized
                 : normalized.substring(0, MAX_INPUT_CHARS);
     }
 
+    /**
+     * 使用单调时钟计算路由耗时。
+     *
+     * @param startedAt 调用 System.nanoTime() 记录的起始值
+     * @return 从 startedAt 到现在的毫秒数
+     */
     private long elapsedMillis(long startedAt) {
         return java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(
                 System.nanoTime() - startedAt);
@@ -898,23 +1255,33 @@ public class JevToolCapabilityRouter implements ToolCapabilityRouter {
 给 `AgentService` 注入：
 
 ```java
+/** toolCapabilityRouter：根据当前用户请求产生本轮 Jev 能力组决策。 */
 private final ToolCapabilityRouter toolCapabilityRouter;
+
+/** toolCapabilityCatalog：提供允许路由的能力组名称集合。 */
 private final ToolCapabilityCatalog toolCapabilityCatalog;
 ```
 
 在 `produceEvents` 中，`AgentRun` 和 checkpoint 已经建立、取消检查已经完成后，主模型调用之前加入：
 
 ```java
+// routingDecision：当前用户轮次的 Jev 路由结果；只存入本轮 RuntimeContext。
 ToolRoutingDecision routingDecision = toolCapabilityRouter.route(
         new ToolRoutingRequest(displayContent, toolCapabilityCatalog.groupNames())
 );
+
+// context：当前 AgentRun 独享的运行上下文；以类型作为决策的读取键。
 context.put(ToolRoutingDecision.class, routingDecision);
 
+// streamSession：当前 SSE 运行会话；路由期间用户也可能发出取消请求。
 if (streamSession.isCancelled()) {
+    // run：已经建立 checkpoint 的当前 AgentRun，用现有取消流程统一收尾。
     finishCancelled(run, streamSession);
     return;
 }
 
+// input：可能包含应用内部展开内容的主模型输入；不会发送给 Jev。
+// request：当前 AgentUserCall，用于取得本轮显式 RAG 上下文。
 runAgentStream(
         run,
         List.of(run.currentUserMessage(input, request.ragContexts())),
@@ -960,12 +1327,27 @@ import java.util.function.Function;
 @Component
 public class ToolSchemaSelectionMiddleware implements MiddlewareBase {
 
+    /** capabilityCatalog：用于判断一个 Tool 是分组工具还是常驻兼容工具。 */
     private final ToolCapabilityCatalog capabilityCatalog;
 
+    /**
+     * 创建本轮 Tool Schema 选择 Middleware。
+     *
+     * @param capabilityCatalog 项目唯一的 Tool 能力组目录
+     */
     public ToolSchemaSelectionMiddleware(ToolCapabilityCatalog capabilityCatalog) {
         this.capabilityCatalog = capabilityCatalog;
     }
 
+    /**
+     * 在每次模型调用前，根据 RuntimeContext 生成本轮专属 Tool Schema。
+     *
+     * @param agent 当前执行 Model Call 的 Agent；从中只读完整 Toolkit
+     * @param context 当前 AgentRun 独享的运行上下文
+     * @param input 上游 Middleware 传入的模型调用参数
+     * @param next Middleware 链的下一个处理函数
+     * @return 下游 AgentEvent 响应流
+     */
     @Override
     public Flux<AgentEvent> onModelCall(
             Agent agent,
@@ -973,6 +1355,7 @@ public class ToolSchemaSelectionMiddleware implements MiddlewareBase {
             ModelCallInput input,
             Function<ModelCallInput, Flux<AgentEvent>> next
     ) {
+        // decision：AgentService 为当前用户轮次写入 RuntimeContext 的路由决策。
         ToolRoutingDecision decision = context == null
                 ? null
                 : context.get(ToolRoutingDecision.class);
@@ -982,6 +1365,7 @@ public class ToolSchemaSelectionMiddleware implements MiddlewareBase {
             return next.apply(input);
         }
 
+        // selectedByName：按 Tool 名称去重，并保持“常驻工具在前、路由工具在后”的顺序。
         Map<String, ToolSchema> selectedByName = new LinkedHashMap<>();
 
         // 只保留元工具和未被能力目录分类的工具。
@@ -989,14 +1373,18 @@ public class ToolSchemaSelectionMiddleware implements MiddlewareBase {
         if (input.tools() != null) {
             input.tools().stream()
                     .filter(this::isAlwaysVisible)
+                    // schema：当前被保留的元工具或未分类 Tool Schema。
                     .forEach(schema -> selectedByName.put(schema.getName(), schema));
         }
 
         // 直接读取指定组的 Schema，不调用 updateToolGroups，不修改共享状态。
+        // routedSchemas：从完整 Toolkit 只读取得的本轮已选能力组 Schema。
         List<ToolSchema> routedSchemas = agent.getToolkit()
                 .getToolSchemas(decision.selectedGroups());
+        // schema：当前加入最终结果并按名称去重的路由 Tool Schema。
         routedSchemas.forEach(schema -> selectedByName.put(schema.getName(), schema));
 
+        // routedInput：复制原模型调用参数，只替换最终发送给模型的 tools 列表。
         ModelCallInput routedInput = new ModelCallInput(
                 input.messages(),
                 List.copyOf(selectedByName.values()),
@@ -1006,6 +1394,12 @@ public class ToolSchemaSelectionMiddleware implements MiddlewareBase {
         return next.apply(routedInput);
     }
 
+    /**
+     * 判断 Tool Schema 是否应无条件保留在模型上下文中。
+     *
+     * @param schema 当前待判断的 Tool Schema
+     * @return 元工具或目录无法分类的兼容工具返回 true
+     */
     private boolean isAlwaysVisible(ToolSchema schema) {
         if (schema == null || schema.getName() == null) return false;
         return ToolCapabilityCatalog.META_TOOL_NAME.equals(schema.getName())
@@ -1024,8 +1418,13 @@ public class ToolSchemaSelectionMiddleware implements MiddlewareBase {
 在 `AgentFactory` 中注入 `ToolSchemaSelectionMiddleware`，然后把顺序改为：
 
 ```java
+// contextInjectionMiddleware：先向消息列表临时注入有界个人上下文。
 .middleware(contextInjectionMiddleware)
+
+// toolSchemaSelectionMiddleware：再为当前 Model Call 组装最终 Tool Schema。
 .middleware(toolSchemaSelectionMiddleware)
+
+// tokenUsageMiddleware：最后按照最终消息和 Schema 做 Token 归因估算。
 .middleware(tokenUsageMiddleware)
 ```
 
