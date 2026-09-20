@@ -12,12 +12,17 @@ import butvan.agent.agents.context.ProfileMaintenanceScheduler;
 import butvan.agent.agents.identity.CurrentUserProvider;
 import butvan.agent.agents.model.ModelHolder;
 import butvan.agent.agents.model.ModelSelector;
+import butvan.agent.agents.routing.ToolCapabilityRouter;
+import butvan.agent.agents.routing.ToolRoutingDecision;
+import butvan.agent.agents.routing.ToolRoutingRequest;
+import butvan.agent.agents.routing.ToolRoutingStateSynchronizer;
 import butvan.agent.agents.session.AgentStreamSession;
 import butvan.agent.agents.session.SessionCatalogService;
 import butvan.agent.agents.session.TranscriptService;
 import butvan.agent.agents.session.dto.TranscriptMessageDto;
 import butvan.agent.agents.session.dto.SessionPermissionMode;
 import butvan.agent.agents.security.AgentSecurity;
+import butvan.agent.agents.tool.ToolCapabilityCatalog;
 import butvan.agent.agents.usage.ModelIdentity;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.*;
@@ -59,6 +64,13 @@ public class AgentService {
     private final ProfileMaintenanceScheduler profileMaintenanceScheduler;
     private final ActiveAgentRunRegistry activeRunRegistry;
     private final OrphanedToolCallRecovery orphanedToolCallRecovery;
+
+    /** toolCapabilityRouter：根据当前用户请求产生本轮 Jev 能力组决策。 */
+    private final ToolCapabilityRouter toolCapabilityRouter;
+    /** toolCapabilityCatalog：提供允许路由的能力组名称集合。 */
+    private final ToolCapabilityCatalog toolCapabilityCatalog;
+    /** toolRoutingStateSynchronizer：让模型可见 Schema 与会话级工具执行状态保持一致。 */
+    private final ToolRoutingStateSynchronizer toolRoutingStateSynchronizer;
 
     /**
      * 创建一次 HTTP 流对应的队列和生产虚拟线程。
@@ -127,9 +139,26 @@ public class AgentService {
                 return;
             }
 
+            // 当前用户轮次的 Jev 路由结果；只存入本轮 RuntimeContext
+            ToolRoutingDecision routingDecision = toolCapabilityRouter.route(
+                    new ToolRoutingRequest(displayContent, toolCapabilityCatalog.groupNames())
+            );
+            // 当前 AgentRun 独享的运行上下文；以类型作为决策的读取键
+            context.put(ToolRoutingDecision.class, routingDecision);
+            synchronizeToolRoutingState(userId, request.sessionId(), routingDecision);
+            // 当前 SSE 运行会话；路由期间用户也可能发出取消请求
+            if (streamSession.isCancelled()) {
+                // 已经建立 checkpoint 的当前 AgentRun，用现有取消流程统一收尾
+                finishCancelled(run, streamSession);
+                return;
+            }
+
             // 3. 初始调用将用户消息交给 AgentScope；后续回复会传入确认消息
-            runAgentStream(run,
-                    List.of(run.currentUserMessage(input, request.ragContexts())), streamSession);
+            runAgentStream(
+                    run,
+                    List.of(run.currentUserMessage(input, request.ragContexts())),
+                    streamSession
+            );
         } catch (Exception e) {
             // 客户端已断开，按照取消收尾
             if (streamSession.isCancelled() || Thread.currentThread().isInterrupted()) {
@@ -168,6 +197,21 @@ public class AgentService {
         if (recovered > 0) {
             agent.getDelegate().saveAgentState(userId, sessionId);
             log.warn("已安全收尾进程遗留工具调用：sessionId={}, 数量={}", sessionId, recovered);
+        }
+    }
+
+    /** 将 ACTIVE 路由决策写入当前会话状态，并在模型调用前持久化。 */
+    private void synchronizeToolRoutingState(
+            String userId,
+            String sessionId,
+            ToolRoutingDecision decision
+    ) {
+        if (decision == null || !decision.appliesToModelCall()) return;
+
+        HarnessAgent agent = agentFactory.currentAgent(sessionId);
+        var state = agent.getDelegate().getAgentState(userId, sessionId);
+        if (toolRoutingStateSynchronizer.apply(state, decision)) {
+            agent.getDelegate().saveAgentState(userId, sessionId);
         }
     }
 

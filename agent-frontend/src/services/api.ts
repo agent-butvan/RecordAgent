@@ -230,6 +230,7 @@ export interface ToolResultPayload {
   toolCallId?: string;
   toolName?: string;
   result?: string;
+  status?: 'running' | 'completed' | 'failed' | 'cancelled';
 }
 
 /** 后端要求用户确认时返回的高风险工具。 */

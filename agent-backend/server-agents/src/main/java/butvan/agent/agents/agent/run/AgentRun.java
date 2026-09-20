@@ -139,7 +139,7 @@ public class AgentRun {
         } else if (event instanceof AgentStreamEvent.ToolCall toolCall) {
             recordToolCall(toolCall);
 
-            // 工具结果返回：追加输出并标记 COMPLETED
+            // 工具结果返回：追加输出并按事件中的真实状态更新
         } else if (event instanceof AgentStreamEvent.ToolResult toolResult) {
             recordToResult(toolResult);
         }
@@ -153,7 +153,12 @@ public class AgentRun {
                         toolResult.toolName(),
                         previous == null ? "" : previous.command(),
                         (previous == null ? "" : previous.output()) + toolResult.result(),
-                        TranscriptMessageDto.ToolStatus.COMPLETED // 已收到完成结果
+                        switch (toolResult.status()) {
+                            case RUNNING -> TranscriptMessageDto.ToolStatus.RUNNING;
+                            case COMPLETED -> TranscriptMessageDto.ToolStatus.COMPLETED;
+                            case FAILED -> TranscriptMessageDto.ToolStatus.FAILED;
+                            case CANCELLED -> TranscriptMessageDto.ToolStatus.CANCELLED;
+                        }
                 ));
     }
 

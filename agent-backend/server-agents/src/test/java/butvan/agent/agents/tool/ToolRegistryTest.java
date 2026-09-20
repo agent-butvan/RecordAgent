@@ -31,7 +31,8 @@ class ToolRegistryTest {
 
     @Test
     void registersEveryDiscoveredToolModule() {
-        ToolRegistry registry = new ToolRegistry(List.of(new FirstTool(), new SecondTool()));
+        ToolRegistry registry = new ToolRegistry(
+                List.of(new FirstTool(), new SecondTool()), new ToolCapabilityCatalog());
 
         assertEquals(List.of("first_test_tool", "second_test_tool"),
                 registry.getToolkit().getToolNames().stream().sorted().toList());
@@ -39,7 +40,7 @@ class ToolRegistryTest {
 
     @Test
     void exposesOnlyMetaAndUnclassifiedToolsUntilAGroupIsActivated() {
-        ToolRegistry registry = new ToolRegistry(List.of());
+        ToolRegistry registry = new ToolRegistry(List.of(), new ToolCapabilityCatalog());
         Toolkit toolkit = registry.getToolkit();
         toolkit.registerTool(new RoutedTools());
         toolkit.registerTool(new AlwaysVisibleTool());
@@ -63,7 +64,7 @@ class ToolRegistryTest {
 
     @Test
     void routesEveryCurrentlyRegisteredToolName() {
-        ToolRegistry registry = new ToolRegistry(List.of());
+        ToolRegistry registry = new ToolRegistry(List.of(), new ToolCapabilityCatalog());
         Toolkit toolkit = registry.getToolkit();
         CURRENT_ROUTED_TOOL_NAMES.forEach(name -> toolkit.registerSchema(ToolSchema.builder()
                 .name(name)

@@ -811,7 +811,7 @@ export const MainLayout: React.FC<{
                       tools[targetIndex] = {
                         ...tools[targetIndex],
                         output: (tools[targetIndex].output || '') + (toolResultPayload.result || ''),
-                        status: 'completed',
+                        status: toolResultPayload.status || 'completed',
                       };
                     }
                     return { ...msg, tools };
@@ -938,7 +938,11 @@ export const MainLayout: React.FC<{
         updateAssistantMessage(current.sessionId, current.assistantMessageId, (message) => ({
           ...message,
           tools: (message.tools || []).map((tool) => tool.toolCallId === result.toolCallId
-            ? { ...tool, status: 'completed', output: (tool.output || '') + (result.result || '') }
+            ? {
+                ...tool,
+                status: result.status || 'completed',
+                output: (tool.output || '') + (result.result || ''),
+              }
             : tool),
         }));
       },

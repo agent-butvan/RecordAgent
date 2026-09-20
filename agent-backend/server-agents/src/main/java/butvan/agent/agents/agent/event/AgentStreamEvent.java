@@ -167,9 +167,20 @@ public sealed interface AgentStreamEvent permits AgentStreamEvent.RunStarted, Ag
      * 工具调用结果
      * @param toolCallId
      * @param toolName
-     * @param result
+     * @param result 本次新增的工具输出片段；终态事件可以为空
+     * @param status 当前工具执行状态
      */
-    record ToolResult(String toolCallId, String toolName, String result) implements AgentStreamEvent {
+    record ToolResult(
+            String toolCallId,
+            String toolName,
+            String result,
+            ToolStatus status
+    ) implements AgentStreamEvent {
+
+        /** 空状态兼容为 RUNNING，终态必须由 ToolResultEndEvent 明确覆盖。 */
+        public ToolResult {
+            status = status == null ? ToolStatus.RUNNING : status;
+        }
 
         @Override
         public String eventName() {
@@ -181,8 +192,29 @@ public sealed interface AgentStreamEvent permits AgentStreamEvent.RunStarted, Ag
             return Map.of(
                     "toolCallId", toolCallId != null ? toolCallId : "",
                     "toolName", toolName != null ? toolName : "",
-                    "result", result != null ? result : ""
+                    "result", result != null ? result : "",
+                    "status", status.payloadValue()
             );
+        }
+    }
+
+    /** Tool Result 在业务 SSE 中使用的稳定状态。 */
+    enum ToolStatus {
+        RUNNING("running"),
+        COMPLETED("completed"),
+        FAILED("failed"),
+        CANCELLED("cancelled");
+
+        /** payloadValue：发送给前端的稳定小写状态值。 */
+        private final String payloadValue;
+
+        ToolStatus(String payloadValue) {
+            this.payloadValue = payloadValue;
+        }
+
+        /** @return SSE payload 使用的小写状态值 */
+        public String payloadValue() {
+            return payloadValue;
         }
     }
 
