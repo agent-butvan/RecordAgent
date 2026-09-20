@@ -18,6 +18,9 @@ ButvanAgent 已经把工具按能力组延迟暴露给主模型，例如 `worksp
   │
   ├─ 把本轮路由结果写入 RuntimeContext
   │
+  ├─ 把 ACTIVE 组同步到当前会话的 AgentState.toolContext
+  │      保证 Schema 可见性与 ToolExecutor 可执行性一致
+  │
   ├─ ToolSchemaSelectionMiddleware 组装本轮 Tool Schema
   │      常驻工具 + 未分类工具 + Jev 选中的能力组
   │
@@ -77,7 +80,7 @@ Noul 返回的是“答案为 yes 的概率”，字段名为 `noul`，范围是
 | --- | --- | --- |
 | `tool/ToolSchemaRoutingPolicy.java` | 定义能力组及工具匹配规则 | 把能力组定义提取为唯一目录，避免 Jev 再复制一份 |
 | `tool/ToolRegistry.java` | 注册 Tool，并对最终 Toolkit 应用分组 | 保持 Tool 所有权不变 |
-| `agent/AgentService.java` | 创建一次运行的 `RuntimeContext` | 在新用户轮次调用路由器，并保存本轮决策 |
+| `agent/AgentService.java` | 创建一次运行的 `RuntimeContext` | 在新用户轮次调用路由器，并同步本轮决策与会话工具状态 |
 | `agent/AgentFactory.java` | 构建并缓存 `HarnessAgent`、注册 Middleware | 增加 Tool Schema 选择 Middleware |
 
 当前 `AgentFactory` 按“项目根目录”缓存 `HarnessAgent`，不是每个会话创建一份 Agent。因此绝对不要这样实现 Jev 路由：
@@ -92,8 +95,14 @@ agent.getToolkit().updateToolGroups(selectedGroups, true);
 两个会话同时运行时，上述写法可能让 A 会话选择的工具泄漏到 B 会话。正确做法是：
 
 1. 路由结果放入本轮独立的 `RuntimeContext`；
-2. Middleware 在每次 Model Call 前生成新的 `List<ToolSchema>`；
-3. 只替换本次 `ModelCallInput.tools()`，不修改共享 Toolkit 状态。
+2. `ACTIVE` 结果写入当前用户、当前会话的 `AgentState.toolContext.activatedGroups`；
+3. Middleware 在每次 Model Call 前生成新的 `List<ToolSchema>`；
+4. 不调用共享 Toolkit 的 `updateToolGroups`，避免跨会话状态污染。
+
+第二步不能省略。`ModelCallInput.tools()` 只决定模型能看见哪些 Schema，AgentScope 的
+`ToolExecutor` 仍会检查会话工具组是否已激活。若只做 Schema 过滤，模型虽然能调用
+`web_search`，执行阶段却会得到 `Unauthorized tool call: 'web_search' is not available`，
+随后只能通过 `reset_equipped_tools` 补救并重复调用。
 
 ---
 
@@ -108,6 +117,7 @@ agent-backend/server-agents/src/main/java/butvan/agent/agents/
 │   ├── ToolRoutingMode.java
 │   ├── ToolRoutingRequest.java
 │   ├── ToolRoutingDecision.java
+│   ├── ToolRoutingStateSynchronizer.java
 │   ├── ToolCapabilityRouter.java
 │   ├── JevToolCapabilityRouter.java
 │   ├── SystemOneGateway.java
@@ -1296,6 +1306,9 @@ private final ToolCapabilityRouter toolCapabilityRouter;
 
 /** toolCapabilityCatalog：提供允许路由的能力组名称集合。 */
 private final ToolCapabilityCatalog toolCapabilityCatalog;
+
+/** toolRoutingStateSynchronizer：让模型可见 Schema 与会话级工具执行状态保持一致。 */
+private final ToolRoutingStateSynchronizer toolRoutingStateSynchronizer;
 ```
 
 在 `produceEvents` 中，`AgentRun` 和 checkpoint 已经建立、取消检查已经完成后，主模型调用之前加入：
@@ -1308,6 +1321,9 @@ ToolRoutingDecision routingDecision = toolCapabilityRouter.route(
 
 // context：当前 AgentRun 独享的运行上下文；以类型作为决策的读取键。
 context.put(ToolRoutingDecision.class, routingDecision);
+
+// 仅 ACTIVE 模式执行：把选中组同步到当前会话的 AgentState 并持久化。
+synchronizeToolRoutingState(userId, request.sessionId(), routingDecision);
 
 // streamSession：当前 SSE 运行会话；路由期间用户也可能发出取消请求。
 if (streamSession.isCancelled()) {
@@ -1324,6 +1340,59 @@ runAgentStream(
         streamSession
 );
 ```
+
+`ToolRoutingStateSynchronizer` 的核心实现如下：
+
+```java
+/** 将 ACTIVE 路由决策同步到 AgentScope 的会话级工具状态。 */
+@Component
+public class ToolRoutingStateSynchronizer {
+
+    /**
+     * @param state 当前用户、当前会话的 AgentScope 状态
+     * @param decision 当前用户轮次的路由决策
+     * @return 会话状态发生变化时返回 true
+     */
+    public boolean apply(AgentState state, ToolRoutingDecision decision) {
+        if (state == null || decision == null || !decision.appliesToModelCall()) {
+            return false;
+        }
+
+        // selectedGroups：排序后的能力组快照，保证状态文件内容稳定。
+        List<String> selectedGroups = decision.selectedGroups().stream().sorted().toList();
+        if (selectedGroups.equals(state.getToolContext().getActivatedGroups())) {
+            return false;
+        }
+
+        state.getToolContext().setActivatedGroups(selectedGroups);
+        return true;
+    }
+}
+```
+
+`AgentService` 中负责取得并保存当前会话状态：
+
+```java
+/** 将 ACTIVE 路由决策写入当前会话状态，并在模型调用前持久化。 */
+private void synchronizeToolRoutingState(
+        String userId,
+        String sessionId,
+        ToolRoutingDecision decision
+) {
+    if (decision == null || !decision.appliesToModelCall()) return;
+
+    // agent：按当前会话所属项目取得的 HarnessAgent。
+    HarnessAgent agent = agentFactory.currentAgent(sessionId);
+    // state：当前用户和当前会话独享的 AgentScope 状态。
+    AgentState state = agent.getDelegate().getAgentState(userId, sessionId);
+    if (toolRoutingStateSynchronizer.apply(state, decision)) {
+        agent.getDelegate().saveAgentState(userId, sessionId);
+    }
+}
+```
+
+这里修改的是会话 `AgentState`，不是共享 Toolkit。HITL 权限恢复会重新加载同一个会话状态，
+因此被 Jev 选中的工具在确认后仍然可执行。
 
 这里选择 `displayContent`，而不是包含隐藏上下文的 `input`，原因是：
 
@@ -1486,6 +1555,7 @@ public class ToolSchemaSelectionMiddleware implements MiddlewareBase {
 1. 不是只对 `input.tools()` 做过滤，因为未激活组原本不在 `input.tools()` 中，仅过滤无法加入 Jev 选中的组。
 2. 不是直接把选中组追加到 `input.tools()`，因为共享 Toolkit 可能已被其他会话改变；应先取“常驻基线”，再加入本轮选中组。
 3. 一旦主模型调用 `reset_equipped_tools`，Middleware 必须停止覆盖后续 Model Call，让 AgentScope 的会话级工具状态真正承担误路由补救。
+4. `ACTIVE` 决策还必须提前同步到会话 `AgentState`；Middleware 只处理 Schema，不能单独保证工具可执行。
 
 ### 12.1 Middleware 顺序
 
@@ -1515,6 +1585,8 @@ public class ToolSchemaSelectionMiddleware implements MiddlewareBase {
 - Context 中没有决策时保持旧行为；
 - 两个不同 RuntimeContext 并发调用，最终 Schema 互不污染；
 - 输出列表按工具名去重。
+- ACTIVE 决策写入当前会话的 `activatedGroups`，SHADOW/FALLBACK 不改变会话状态；
+- 权限暂停与恢复后，Jev 选中的工具不会出现 `not available`。
 
 并发测试非常重要，它是本方案避免共享 Agent 串扰的直接证据。
 
@@ -1668,6 +1740,16 @@ Choice 是单选，而真实请求经常需要 `web + workspace` 等多组能力
 
 先用 Shadow 收集真实请求上的准确率和延迟，再根据数据选阈值。
 
+### 错误八：只暴露 Schema，不同步会话工具状态
+
+`getToolSchemas(selectedGroups)` 只解决模型可见性，不会自动激活 ToolExecutor 使用的工具组。
+ACTIVE 模式必须把相同的组写入当前会话 `AgentState.toolContext.activatedGroups`。
+
+### 错误九：把所有 Tool Result 都显示成成功
+
+AgentScope 会用 `ToolResultEndEvent` 给出 `SUCCESS`、`ERROR`、`DENIED` 或 `INTERRUPTED`。
+后端 SSE 应透传终态，前端只有在真实 `SUCCESS` 时才显示绿色完成。
+
 ---
 
 ## 18. Definition of Done
@@ -1680,9 +1762,12 @@ Choice 是单选，而真实请求经常需要 `web + workspace` 等多组能力
 - [ ] `off` 模式不产生任何 Jev 网络请求；
 - [ ] `shadow` 模式不改变主模型看到的 Schema；
 - [ ] `active` 模式只暴露选中组、元工具和未分类工具；
+- [ ] `active` 模式下模型可见组与当前会话可执行组完全一致；
 - [ ] 路由过程不修改共享 Toolkit 的 active groups；
 - [ ] Jev 超时、限流、过载和格式错误均 fail-open；
 - [ ] HITL 权限审批仍由现有机制处理；
+- [ ] 权限恢复后不会因能力组未激活而重复调用同一工具；
+- [ ] Tool Result 错误或拒绝状态不会在前端显示为成功；
 - [ ] 两个并发 RuntimeContext 的工具组互不污染；
 - [ ] 主模型的 Tool Schema token 归因基于最终 Schema；
 - [ ] Shadow 样本达到团队设定的准确率和延迟目标；
@@ -1703,4 +1788,4 @@ Choice 是单选，而真实请求经常需要 `web + workspace` 等多组能力
 
 ## 20. 一句话复盘
 
-这次接入不是把 Tool 交给 Jev 管理，而是让 Jev 在主模型调用前为当前 `RuntimeContext` 选择能力组，再由 ButvanAgent 的 Middleware 安全地组装本轮 Tool Schema。
+这次接入不是把 Tool 交给 Jev 管理，而是让 Jev 在主模型调用前选择能力组，再由 ButvanAgent 同步当前会话的工具状态，并通过 Middleware 安全地组装本轮 Tool Schema。

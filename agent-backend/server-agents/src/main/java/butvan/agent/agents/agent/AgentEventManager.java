@@ -77,7 +77,21 @@ public class AgentEventManager {
             return new AgentStreamEvent.ToolResult(
                     resultEvent.getToolCallId(),
                     resultEvent.getToolCallName(),
-                    resultEvent.getDelta());
+                    resultEvent.getDelta(),
+                    AgentStreamEvent.ToolStatus.RUNNING);
+        }
+        // 工具结果终态：单独传递真实状态，避免错误结果在 UI 中显示为成功。
+        if (event instanceof ToolResultEndEvent endEvent) {
+            return new AgentStreamEvent.ToolResult(
+                    endEvent.getToolCallId(),
+                    endEvent.getToolCallName(),
+                    "",
+                    switch (endEvent.getState()) {
+                        case SUCCESS -> AgentStreamEvent.ToolStatus.COMPLETED;
+                        case INTERRUPTED -> AgentStreamEvent.ToolStatus.CANCELLED;
+                        case ERROR, DENIED -> AgentStreamEvent.ToolStatus.FAILED;
+                        case RUNNING -> AgentStreamEvent.ToolStatus.RUNNING;
+                    });
         }
         // 其余尚未接入 UI 的事件：显式忽略
         return null;
