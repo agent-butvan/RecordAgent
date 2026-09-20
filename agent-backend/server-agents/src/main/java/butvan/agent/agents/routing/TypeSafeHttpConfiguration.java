@@ -30,7 +30,7 @@ public class TypeSafeHttpConfiguration {
 
         // requestFactory：为 RestClient 补充响应读取超时。
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
-        requestFactory.setReadTimeout(Duration.ofMillis(1000));
+        requestFactory.setReadTimeout(Duration.ofMillis(3000));
 
         return RestClient.builder()
                 .baseUrl("https://api.typesafe.ai")
