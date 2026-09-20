@@ -3,6 +3,9 @@ package butvan.agent.network.record.controller;
 import butvan.agent.agents.identity.CurrentUserProvider;
 import butvan.agent.network.config.database.LocalDatabaseConfiguration;
 import butvan.agent.network.controller.ApiExceptionHandler;
+import butvan.agent.network.file.repository.FileAssetRepository;
+import butvan.agent.network.file.service.FileAssetService;
+import butvan.agent.network.file.storage.LocalBlobStore;
 import butvan.agent.network.record.repository.RecordRepository;
 import butvan.agent.network.record.service.RecordService;
 import butvan.agent.network.record.service.RecordAttachmentService;
@@ -28,6 +31,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -139,6 +143,39 @@ class RecordApiIntegrationTest {
     }
 
     @Test
+    void uploadsDownloadsAndDeletesAttachmentThroughFileAssetModule() throws Exception {
+        String recordResponse = mockMvc.perform(post("/agent/records").contentType("application/json").content("""
+                {"recordDate":"2026-09-20","type":"quick","title":"文件资产测试",
+                 "contentHtml":"<p>附件生命周期</p>","contentText":"附件生命周期","tags":[]}
+                """))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String recordId = new com.fasterxml.jackson.databind.ObjectMapper().readTree(recordResponse)
+                .path("data").path("id").asText();
+        byte[] content = "附件内容".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+
+        String attachmentResponse = mockMvc.perform(multipart("/agent/records/" + recordId + "/attachments")
+                        .file(new MockMultipartFile("file", "notes.txt", "text/plain", content)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.originalName").value("notes.txt"))
+                .andReturn().getResponse().getContentAsString();
+        String attachmentId = new com.fasterxml.jackson.databind.ObjectMapper().readTree(attachmentResponse)
+                .path("data").path("id").asText();
+
+        byte[] downloaded = mockMvc.perform(get("/agent/records/" + recordId + "/attachments/"
+                        + attachmentId + "/content"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsByteArray();
+        assertArrayEquals(content, downloaded);
+
+        mockMvc.perform(delete("/agent/records/" + recordId + "/attachments/" + attachmentId))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/agent/records/" + recordId + "/attachments"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(0));
+    }
+
+    @Test
     void reordersAllRecordTabsAndPersistsTheResult() throws Exception {
         var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
         var originalTabs = mapper.readTree(mockMvc.perform(get("/agent/records/tabs"))
@@ -237,7 +274,8 @@ class RecordApiIntegrationTest {
     @SpringBootConfiguration
     @EnableAutoConfiguration
     @Import({LocalDatabaseConfiguration.class, DailyEventModuleConfiguration.class, RecordRepository.class, RecordService.class,
-            RecordAttachmentService.class, RecordBackupService.class, RecordTabService.class,
+            RecordAttachmentService.class, RecordBackupService.class, RecordTabService.class, FileAssetRepository.class,
+            FileAssetService.class, LocalBlobStore.class,
             RecordController.class, ApiExceptionHandler.class, CurrentUserProvider.class})
     static class TestApplication { }
 }

@@ -13,7 +13,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.util.*;
 import java.util.zip.*;
 
@@ -44,7 +43,8 @@ public class RecordBackupService {
                         + "\n- 标签：" + String.join("、", record.tags()) + "\n\n" + record.contentText() + "\n";
                 put(zip, "markdown/" + record.recordDate() + "-" + record.id() + ".md", markdown.getBytes(StandardCharsets.UTF_8));
                 for (RecordAttachment attachment : item.attachments()) {
-                    put(zip, "attachments/" + record.id() + "/" + attachment.id(), Files.readAllBytes(attachmentService.pathOf(attachment)));
+                    put(zip, "attachments/" + record.id() + "/" + attachment.id(),
+                            attachmentService.readAllBytes(ownerId, record.id(), attachment.id()));
                 }
             }
             zip.finish(); return output.toByteArray();
