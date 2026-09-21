@@ -237,22 +237,23 @@ export function RecordPage({ initialEntry, initialType = 'quick' }: { initialEnt
 
   return <main className={styles.workspace}>
     <div className={styles.commandBar} data-tauri-drag-region>
-      <div className={styles.search}><MagnifyingGlassIcon size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索资料" /></div>
+      <div className={styles.search}><MagnifyingGlassIcon size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} aria-label="搜索资料" placeholder="搜索标题或正文…" /></div>
       <div className={styles.actions}>
         <button className={styles.iconButton} onClick={() => void exportRecordBackup()} title="导出备份"><DownloadSimpleIcon size={14} /></button>
-        <label className={styles.iconButton} title="导入备份"><UploadSimpleIcon size={14} /><input type="file" accept=".zip,application/zip" onChange={async (event) => {
+        <label className={styles.iconButton} title="导入备份"><UploadSimpleIcon size={14} /><input type="file" aria-label="导入备份" accept=".zip,application/zip" onChange={async (event) => {
           const file = event.target.files?.[0]; if (!file) return;
           if (window.confirm('导入会替换当前全部资料，确定继续吗？')) try { const count = await importRecordBackup(file); await load(); showMessage('success', `已恢复 ${count} 条资料`); } catch (reason) { showMessage('error', reason instanceof Error ? reason.message : '导入失败'); }
           event.target.value = '';
         }} /></label>
         <button className={styles.iconButton} onClick={() => void fetchRecordTrash().then(setTrashEntries)} title="回收站"><TrashIcon size={14} /></button>
-        <button className={styles.primaryButton} onClick={beginCreate}><PlusIcon size={15} weight="bold" />新增资料</button>
+        <Button className={styles.primaryButton} size="sm" onClick={beginCreate} icon={<PlusIcon size={15} weight="bold" />}>新增资料</Button>
       </div>
     </div>
     <div className={styles.dashboard}>
+      <header className={styles.pageHeading}><div><span className={styles.eyebrow}>个人资料库</span><h1>记录</h1><p>捕捉想法，沉淀值得留下的内容。</p></div><span className={styles.todayLabel}>{todayKey.replaceAll('-', ' / ')}</span></header>
       <section className={styles.summary} aria-label="本周资料概况">
         <div><strong>{weekRecords.length}</strong><span>本周新增资料</span></div>
-        <div><strong>{weekReviews.length ? <CheckIcon size={20} weight="bold" /> : '—'}</strong><span>{weekReviews.length ? `已完成 ${weekReviews.length} 次复盘` : '本周尚未复盘'}</span></div>
+        <div className={weekReviews.length ? styles.reviewComplete : undefined}><strong>{weekReviews.length ? <CheckIcon size={20} weight="bold" /> : '—'}</strong><span>{weekReviews.length ? `已完成 ${weekReviews.length} 次复盘` : '本周尚未复盘'}</span></div>
         {editingSummaryCopy ? <input className={styles.summaryCopyInput} value={summaryDraft} autoFocus maxLength={120}
           aria-label="学习提示文案" onChange={(event) => setSummaryDraft(event.target.value)} onBlur={() => {
             const nextCopy = summaryDraft.trim() || DEFAULT_SUMMARY_COPY;
@@ -263,29 +264,29 @@ export function RecordPage({ initialEntry, initialType = 'quick' }: { initialEnt
       </section>
 
       <section className={styles.library}>
-        <div className={styles.libraryHeader}><div><h1>{activeTab?.name ?? '全部资料'}</h1><span>{visibleRecords.length} 篇</span></div>
+        <div className={styles.libraryHeader}><div><h2>{activeTab?.name ?? '全部资料'}</h2><span>{visibleRecords.length} 篇</span></div>
           {activeTab && !activeTab.systemKey && <button className={styles.deleteTabButton} onClick={async () => { if (window.confirm(`删除 Tab“${activeTab.name}”？其中资料仍会保留在全部资料中。`)) { await deleteRecordTab(activeTab.id); setActiveTabId('all'); await load(); } }}>删除 Tab</button>}
         </div>
         <nav className={styles.tabs} aria-label="资料分类">
-          <button className={activeTabId === 'all' ? styles.activeTab : ''} onClick={() => setActiveTabId('all')}>全部</button>
-          {tabs.map((tab) => <button key={tab.id} data-record-tab-id={tab.id}
+          <button aria-pressed={activeTabId === 'all'} className={activeTabId === 'all' ? styles.activeTab : ''} onClick={() => setActiveTabId('all')}>全部</button>
+          {tabs.map((tab) => <button key={tab.id} aria-pressed={activeTabId === tab.id} data-record-tab-id={tab.id}
             className={`${styles.tabButton} ${activeTabId === tab.id ? styles.activeTab : ''} ${draggedTabId === tab.id ? styles.draggingTab : ''} ${dragOverTabId === tab.id && draggedTabId !== tab.id ? styles.dragTarget : ''}`}
             aria-label={`${tab.name}，可拖拽排序`} title={`拖拽排序；也可按 ${TAB_SHORTCUT_LABEL} 调整`}
             onClick={() => { if (!suppressTabClickRef.current) setActiveTabId(tab.id); }} onKeyDown={(event) => handleTabKeyDown(event, tab.id)}
             onPointerDown={(event) => handleTabPointerDown(event, tab.id)} onPointerMove={handleTabPointerMove}
             onPointerUp={handleTabPointerUp} onPointerCancel={resetTabPointerDrag}>{tab.name}</button>)}
-          <button className={styles.addTab} onClick={() => setIsNewTabModalOpen(true)}><PlusIcon size={13} weight="bold" />新建 Tab</button>
+          <button className={styles.addTab} onClick={() => setIsNewTabModalOpen(true)}><PlusIcon size={13} weight="bold" />新建分类</button>
         </nav>
 
-        <div className={styles.recordList}>{loading ? <div className={styles.empty}>正在加载…</div> : visibleRecords.length ? visibleRecords.map((entry) => <article key={entry.id} className={styles.recordRow} onClick={() => setEditing({ entry, type: entry.type })} tabIndex={0}>
+        <div key={activeTabId} className={styles.recordList} aria-busy={loading}>{loading ? <div className={styles.empty}>正在加载…</div> : visibleRecords.length ? visibleRecords.map((entry) => <article key={entry.id} className={styles.recordRow}>
           <div className={styles.recordDate}><strong>{entry.recordDate.slice(8)}</strong><span>{entry.recordDate.slice(5, 7)}月</span></div>
-          <div className={styles.recordContent}><div><strong>{displayTitle(entry)}</strong>{entry.pinned && <span>置顶</span>}</div><p>{entry.contentText || '暂无正文'}</p>
-            <footer><span>{TYPE_LABELS[entry.type]}</span>{entry.tags.map((tag) => <span key={tag}>#{tag}</span>)}</footer></div>
+          <div className={styles.recordContent}><div><button className={styles.recordOpen} onClick={() => setEditing({ entry, type: entry.type })}>{displayTitle(entry)}</button>{entry.pinned && <span>置顶</span>}</div><p>{entry.contentText || '暂无正文'}</p>
+            <footer><span className={styles.typeBadge} data-type={entry.type}>{TYPE_LABELS[entry.type]}</span>{entry.tags.map((tag) => <span key={tag}>#{tag}</span>)}</footer></div>
           <div className={styles.rowActions}>
-            <button onClick={async (event) => { event.stopPropagation(); try { await updateRecordFlags(entry.id, entry.version, { favorite: !entry.favorite }); await load(); } catch (reason) { showMessage('error', reason instanceof Error ? reason.message : '收藏失败'); } }} aria-label="收藏"><HeartIcon size={14} weight={entry.favorite ? 'fill' : 'regular'} /></button>
-            <button className={confirmDeleteId === entry.id ? styles.confirmDelete : ''} disabled={deletingId === entry.id} onClick={(event) => { event.stopPropagation(); void remove(entry); }}>{confirmDeleteId === entry.id ? (deletingId === entry.id ? '删除中…' : '确认删除') : <TrashIcon size={14} />}</button>
+            <button className={entry.favorite ? styles.favorite : undefined} aria-pressed={entry.favorite} onClick={async (event) => { event.stopPropagation(); try { await updateRecordFlags(entry.id, entry.version, { favorite: !entry.favorite }); await load(); } catch (reason) { showMessage('error', reason instanceof Error ? reason.message : '收藏失败'); } }} aria-label={entry.favorite ? '取消收藏' : '收藏'}><HeartIcon size={14} weight={entry.favorite ? 'fill' : 'regular'} /></button>
+            <button aria-label={confirmDeleteId === entry.id ? '确认删除资料' : '删除资料'} className={confirmDeleteId === entry.id ? styles.confirmDelete : ''} disabled={deletingId === entry.id} onClick={(event) => { event.stopPropagation(); void remove(entry); }}>{confirmDeleteId === entry.id ? (deletingId === entry.id ? '删除中…' : '确认删除') : <TrashIcon size={14} />}</button>
           </div>
-        </article>) : <div className={styles.empty}><FileTextIcon size={20} /><strong>这个 Tab 还没有资料</strong><span>点击“新增资料”，内容会直接归入当前 Tab。</span><button onClick={beginCreate}>新增第一篇资料</button></div>}</div>
+        </article>) : <div className={styles.empty}><FileTextIcon size={20} /><strong>{query.trim() ? '没有找到匹配的资料' : '从第一篇记录开始'}</strong><span>{query.trim() ? '试试其他关键词，或清空搜索查看全部内容。' : '一个想法、一段心得，都值得留下。'}</span><Button size="sm" onClick={query.trim() ? () => setQuery('') : beginCreate}>{query.trim() ? '清空搜索' : '新增第一篇资料'}</Button></div>}</div>
       </section>
     </div>
 
