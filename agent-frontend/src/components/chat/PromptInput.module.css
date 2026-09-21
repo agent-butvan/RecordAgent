@@ -91,38 +91,33 @@
 
 .jevButton {
   min-height: 28px;
-  padding: 3px 8px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  padding: 3px 5px;
+  border: 0;
   background: transparent;
   color: var(--text-secondary);
   font: 500 12px/1.2 var(--font-sans);
   cursor: pointer;
   white-space: nowrap;
-  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast);
+  transition: color var(--transition-fast);
 }
 
 .jevButton:hover:not(:disabled) {
-  border-color: var(--border-subtle);
-  background: var(--bg-surface-hover);
   color: var(--text-primary);
 }
 
 .jevButton:focus-visible {
-  outline: 2px solid var(--border-focus);
-  outline-offset: 2px;
+  outline: none;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
 }
 
 .jevButtonActive {
-  border-color: #bfdbfe;
-  background: #eff6ff;
   color: var(--accent-blue);
   font-weight: 650;
 }
 
 .jevButtonActive:hover:not(:disabled) {
-  border-color: #93c5fd;
-  background: #dbeafe;
   color: #1d4ed8;
 }
 
