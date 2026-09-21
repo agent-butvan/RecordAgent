@@ -30,6 +30,11 @@ interface PromptInputProps {
   suggestionListId?: string;
   leadingContent?: React.ReactNode;
   canSend?: boolean;
+  jevEnabled?: boolean;
+  onJevEnabledChange?: (enabled: boolean) => void;
+  isJevDisabled?: boolean;
+  isJevSaving?: boolean;
+  jevTitle?: string;
 }
 
 /**
@@ -54,6 +59,11 @@ export const PromptInput: React.FC<PromptInputProps> = ({
   suggestionListId,
   leadingContent,
   canSend,
+  jevEnabled = false,
+  onJevEnabledChange,
+  isJevDisabled = false,
+  isJevSaving = false,
+  jevTitle,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const speechRecognitionRef = useRef<SpeechRecognitionController | null>(null);
@@ -176,6 +186,19 @@ export const PromptInput: React.FC<PromptInputProps> = ({
             disabled={isPermissionModeDisabled}
             isSaving={isPermissionModeSaving}
           />
+
+          <button
+            type="button"
+            className={`${styles.jevButton} ${jevEnabled ? styles.jevButtonActive : ''}`}
+            aria-pressed={jevEnabled}
+            aria-busy={isJevSaving}
+            aria-label={jevEnabled ? '关闭 Jev' : '开启 Jev'}
+            disabled={isJevDisabled || isJevSaving || !onJevEnabledChange}
+            title={jevTitle}
+            onClick={() => onJevEnabledChange?.(!jevEnabled)}
+          >
+            Jev
+          </button>
 
           <ModelSelector onOpenSettings={onOpenSettings} />
         </div>
