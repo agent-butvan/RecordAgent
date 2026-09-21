@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { CaretLeftIcon, CheckIcon, NotePencilIcon } from '@phosphor-icons/react';
+import { CheckIcon, NotePencilIcon } from '@phosphor-icons/react';
 import { EditorContent, ReactNodeViewRenderer, useEditor } from '@tiptap/react';
 import type { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
@@ -11,6 +11,8 @@ import { Markdown } from '@tiptap/markdown';
 import { all, createLowlight } from 'lowlight';
 import { TiptapCodeBlockView } from '../ui/TiptapCodeBlockView';
 import { createSmartLowlight } from '../ui/codeBlockLanguages';
+import { TopBar } from './TopBar';
+import { TopBarAction } from './TopBarAction';
 import { useMessage } from './Message';
 import styles from './WritingEditorPage.module.css';
 
@@ -273,26 +275,23 @@ export function WritingEditorPage({
 
   return (
     <main className={styles.workspace}>
-      <header className={styles.topBar} data-tauri-drag-region>
-        <button type="button" className={styles.backButton} onClick={onBack}>
-          <CaretLeftIcon size={17} />
-          {backLabel}
-        </button>
-        <div className={styles.pageIdentity}>
-          <NotePencilIcon size={15} />
-          <span>{identity}</span>
-          <small>{detail}</small>
-        </div>
-        <button
-          type="button"
-          className={styles.saveButton}
-          disabled={!canSave}
-          onClick={() => void save()}
-        >
-          <CheckIcon size={15} weight="bold" />
-          {saving ? '保存中…' : '保存'}
-        </button>
-      </header>
+      <TopBar
+        onBack={onBack}
+        backLabel={backLabel}
+        icon={<NotePencilIcon size={16} weight="duotone" />}
+        title={identity}
+        subtitle={detail}
+        actions={
+          <TopBarAction
+            variant="primary"
+            disabled={!canSave}
+            onClick={() => void save()}
+            icon={<CheckIcon size={15} weight="bold" />}
+          >
+            {saving ? '保存中…' : '保存'}
+          </TopBarAction>
+        }
+      />
       <div ref={scrollAreaRef} className={styles.scrollArea} onClick={handleContainerClick}>
         <div className={styles.editorLayout}>
           <article className={styles.editor}>
