@@ -1,0 +1,193 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "ButvanAgent 本地优先架构",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [1280, 760]
+  },
+  "components": [
+    {
+      "id": "user",
+      "type": "external",
+      "label": "用户",
+      "sublabel": "对话、审批与业务记录",
+      "pos": [40, 310],
+      "size": [150, 72]
+    },
+    {
+      "id": "desktop",
+      "type": "frontend",
+      "label": "React + Tauri",
+      "sublabel": "桌面界面与原生壳层",
+      "pos": [245, 310],
+      "size": [170, 72]
+    },
+    {
+      "id": "network",
+      "type": "backend",
+      "label": "Spring Boot",
+      "sublabel": "REST / SSE 与业务 Adapter",
+      "pos": [470, 310],
+      "size": [180, 72]
+    },
+    {
+      "id": "agent",
+      "type": "backend",
+      "label": "AgentScope 编排",
+      "sublabel": "运行、Middleware 与多 Agent",
+      "pos": [710, 310],
+      "size": [185, 72]
+    },
+    {
+      "id": "model",
+      "type": "external",
+      "label": "模型供应商",
+      "sublabel": "OpenAI · Gemini · DeepSeek 等",
+      "pos": [975, 310],
+      "size": [205, 72]
+    },
+    {
+      "id": "context",
+      "type": "backend",
+      "label": "有界上下文",
+      "sublabel": "Profile · Memory · RAG",
+      "tag": "按预算临时注入",
+      "pos": [710, 100],
+      "size": [185, 78]
+    },
+    {
+      "id": "routing",
+      "type": "backend",
+      "label": "能力组路由",
+      "sublabel": "本地策略 + 可选 Jev",
+      "tag": "延迟暴露 Tool Schema",
+      "pos": [975, 100],
+      "size": [205, 78]
+    },
+    {
+      "id": "permission",
+      "type": "security",
+      "label": "权限与 HITL",
+      "sublabel": "ALLOW · ASK · DENY",
+      "tag": "绑定原始 runId",
+      "pos": [710, 520],
+      "size": [185, 78]
+    },
+    {
+      "id": "tools",
+      "type": "backend",
+      "label": "本地与业务 Tool",
+      "sublabel": "工作区 · 日历 · 财务 · 资料 · 学习",
+      "pos": [975, 520],
+      "size": [205, 78]
+    },
+    {
+      "id": "storage",
+      "type": "database",
+      "label": "本机数据",
+      "sublabel": "SQLite · JSONL · 文件对象",
+      "tag": "~/.butvan-agent",
+      "pos": [975, 660],
+      "size": [205, 72]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "用户本机",
+      "wraps": ["desktop", "network", "agent", "context", "routing", "permission", "tools", "storage"],
+      "pad": 24
+    },
+    {
+      "kind": "security-group",
+      "label": "模型调用前的统一收口",
+      "wraps": ["agent", "context", "routing", "permission"],
+      "pad": 18
+    }
+  ],
+  "connections": [
+    {
+      "id": "user-desktop",
+      "from": "user",
+      "to": "desktop",
+      "label": "交互与确认",
+      "variant": "emphasis"
+    },
+    {
+      "id": "desktop-network",
+      "from": "desktop",
+      "to": "network",
+      "label": "REST / SSE",
+      "variant": "emphasis"
+    },
+    {
+      "id": "network-agent",
+      "from": "network",
+      "to": "agent",
+      "label": "稳定 runId",
+      "variant": "emphasis"
+    },
+    {
+      "id": "agent-model",
+      "from": "agent",
+      "to": "model",
+      "label": "流式模型调用",
+      "variant": "emphasis"
+    },
+    {
+      "id": "context-agent",
+      "from": "context",
+      "to": "agent",
+      "label": "临时注入",
+      "labelDy": 24
+    },
+    {
+      "id": "routing-model",
+      "from": "routing",
+      "to": "model",
+      "label": "本轮 Schema",
+      "labelDy": 24
+    },
+    {
+      "id": "agent-permission",
+      "from": "agent",
+      "to": "permission",
+      "label": "工具请求",
+      "variant": "security",
+      "labelDy": 24
+    },
+    {
+      "id": "permission-tools",
+      "from": "permission",
+      "to": "tools",
+      "label": "授权后执行",
+      "variant": "security"
+    },
+    {
+      "id": "tools-storage",
+      "from": "tools",
+      "to": "storage",
+      "label": "稳定 ID / 事务",
+      "labelDy": 24
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "本地优先",
+      "items": ["桌面端与后端 sidecar 一起交付", "配置、业务数据和原始用量留在用户目录"]
+    },
+    {
+      "dot": "violet",
+      "title": "按需组装",
+      "items": ["个人上下文受硬预算约束", "Tool Schema 按能力组延迟暴露"]
+    },
+    {
+      "dot": "rose",
+      "title": "风险收口",
+      "items": ["高风险动作进入批量审批", "审批、运行和终态共享同一个 runId"]
+    }
+  ]
+}

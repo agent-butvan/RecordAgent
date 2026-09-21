@@ -62,25 +62,9 @@ Jev 路由是一个可选优化：它先判断本轮可能需要哪些能力组�
 
 ## 一次请求是怎么走完的
 
-```mermaid
-flowchart LR
-    U[用户输入] --> F[React 桌面界面]
-    F -->|REST / SSE| N[Spring Boot 协议层]
-    N --> A[AgentScope 编排层]
-    A --> C[个人上下文组装]
-    A --> R[能力组路由]
-    C --> M[模型调用]
-    R --> S[Tool Schema 选择]
-    S --> M
-    M -->|需要工具| P{权限判断}
-    P -->|ALLOW| T[本地或业务 Tool]
-    P -->|ASK| H[用户审批]
-    P -->|DENY| E[受控失败结果]
-    H --> T
-    T --> A
-    A -->|事件流| F
-    N --> D[(SQLite / JSONL / 本地文件)]
-```
+[![ButvanAgent 本地优先架构](docs/assets/butvan-agent-architecture.png)](docs/assets/butvan-agent-architecture.html)
+
+> 点击架构图可打开交互版本，切换明暗主题、聚焦节点、追踪关系并导出图片。
 
 这里有三个刻意保留的设计决定：
 
