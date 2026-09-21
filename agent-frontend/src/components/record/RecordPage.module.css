@@ -365,7 +365,7 @@
   inset: 0;
   z-index: 50;
   overflow-y: auto;
-  padding: calc(38px + var(--window-titlebar-inset)) max(34px,calc((100% - 760px)/2)) 38px;
+  padding: 38px max(34px,calc((100% - 760px)/2)) 38px;
   background: #fbfcfd;
   scrollbar-width: none;
   -ms-overflow-style: none;
