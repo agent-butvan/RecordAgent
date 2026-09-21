@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { AgentAnalysisContextRequest, ChatMessage, SessionPermissionMode, TokenUsageSummary } from '../../types/chat';
 import type { TaskDto } from '../../types/team';
 import { LoadingTree } from '../common/LoadingTree';
+import { Button } from '../common/Button';
+import { Modal } from '../common/Modal';
 import { ToolApprovalCard } from './ToolApprovalCard';
 import { PlanApprovalCard } from './PlanApprovalCard';
 import { PermissionResumeCard } from './PermissionResumeCard';
@@ -238,6 +240,7 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   const [jevStatus, setJevStatus] = useState<JevStatus | null>(null);
   const [isJevSaving, setIsJevSaving] = useState(false);
   const [jevLoadFailed, setJevLoadFailed] = useState(false);
+  const [confirmingJevEnable, setConfirmingJevEnable] = useState(false);
   const [selectedCommand, setSelectedCommand] = useState<SlashCommandDefinition | null>(null);
   const [commandSelectedIndex, setCommandSelectedIndex] = useState(0);
   const [commandMenuDismissed, setCommandMenuDismissed] = useState(false);
@@ -298,6 +301,22 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     } finally {
       setIsJevSaving(false);
     }
+  };
+
+  const handleJevToggleRequest = (enabled: boolean) => {
+    if (!enabled) {
+      void handleJevEnabledChange(false);
+      return;
+    }
+    if (jevLoadFailed) {
+      showMessage('error', 'Jev 状态读取失败，请确认后端服务已启动后重试。');
+      return;
+    }
+    if (!jevStatus?.available) {
+      showMessage('error', 'Jev 配置不完整，请先设置有效的模式、API Key 与模型。');
+      return;
+    }
+    setConfirmingJevEnable(true);
   };
   const composedInputPrompt = selectedCommand
     ? `/${selectedCommand.name}${inputPrompt.trim() ? ` ${inputPrompt.trim()}` : ''}`
@@ -930,12 +949,14 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
         isPermissionModeDisabled={isPermissionModeDisabled}
         isPermissionModeSaving={isPermissionModeSaving}
         jevEnabled={jevStatus?.enabled ?? false}
-        onJevEnabledChange={handleJevEnabledChange}
-        isJevDisabled={jevLoadFailed || (!jevStatus?.available && !jevStatus?.enabled)}
+        onJevEnabledChange={handleJevToggleRequest}
+        isJevDisabled={isJevSaving}
         isJevSaving={isJevSaving}
         jevTitle={jevLoadFailed
           ? 'Jev 状态读取失败'
-          : jevStatus?.available ? '开启后使用 Jev 进行工具能力路由' : '请先完成 Jev 配置'}
+          : jevStatus?.enabled
+            ? 'Jev 已开启，点击关闭'
+            : jevStatus?.available ? '点击开启 Jev' : 'Jev 配置不完整，点击查看提示'}
         onInputKeyDown={handleComposerKeyDown}
         leadingContent={selectedCommand ? (
           <SlashCommandChip command={selectedCommand} onRemove={removeSelectedCommand} />
@@ -1075,6 +1096,31 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
           ) : null}
         </RightSidePanel>
       </div>
+
+      <Modal
+        open={confirmingJevEnable}
+        title="开启 Jev？"
+        onClose={() => setConfirmingJevEnable(false)}
+        width={440}
+        centered
+      >
+        <div className={styles.jevConfirmation}>
+          <p>开启后，Jev 会在每次发送消息时判断本轮需要的工具能力，并将当前输入发送给已配置的 Jev 服务。</p>
+          <div className={styles.jevConfirmationActions}>
+            <Button variant="outline" onClick={() => setConfirmingJevEnable(false)}>取消</Button>
+            <Button
+              variant="primary"
+              disabled={isJevSaving}
+              onClick={() => {
+                setConfirmingJevEnable(false);
+                void handleJevEnabledChange(true);
+              }}
+            >
+              确认开启
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

@@ -89,6 +89,48 @@
   flex-shrink: 0;
 }
 
+.jevButton {
+  min-height: 28px;
+  padding: 3px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  font: 500 12px/1.2 var(--font-sans);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.jevButton:hover:not(:disabled) {
+  border-color: var(--border-subtle);
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+}
+
+.jevButton:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+.jevButtonActive {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: var(--accent-blue);
+  font-weight: 650;
+}
+
+.jevButtonActive:hover:not(:disabled) {
+  border-color: #93c5fd;
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.jevButton:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
 .iconBtn {
   display: inline-flex;
   align-items: center;

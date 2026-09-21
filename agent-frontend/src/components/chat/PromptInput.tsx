@@ -4,7 +4,6 @@ import { ModelSelector } from '../model/ModelSelector';
 import { PermissionModeSelector } from './PermissionModeSelector';
 import type { SessionPermissionMode } from '../../types/chat';
 import { useMessage } from '../common/Message';
-import { Switch } from '../common/Switch';
 import {
   createSpeechRecognition,
   isSpeechRecognitionSupported,
@@ -188,14 +187,18 @@ export const PromptInput: React.FC<PromptInputProps> = ({
             isSaving={isPermissionModeSaving}
           />
 
-          <Switch
-            label="Jev"
-            checked={jevEnabled}
-            onChange={(enabled) => onJevEnabledChange?.(enabled)}
-            disabled={isJevDisabled || !onJevEnabledChange}
-            busy={isJevSaving}
+          <button
+            type="button"
+            className={`${styles.jevButton} ${jevEnabled ? styles.jevButtonActive : ''}`}
+            aria-pressed={jevEnabled}
+            aria-busy={isJevSaving}
+            aria-label={jevEnabled ? '关闭 Jev' : '开启 Jev'}
+            disabled={isJevDisabled || isJevSaving || !onJevEnabledChange}
             title={jevTitle}
-          />
+            onClick={() => onJevEnabledChange?.(!jevEnabled)}
+          >
+            Jev
+          </button>
 
           <ModelSelector onOpenSettings={onOpenSettings} />
         </div>
