@@ -92,3 +92,9 @@
   background-color: #dc2626;
   border-color: #dc2626;
 }
+
+/* 页面顶栏共用固定高度，避免各业务页覆盖按钮外观。 */
+.toolbar { height: 30px; padding: 0 10px; font-size: 12px; border-radius: var(--radius-md); }
+.iconOnly { width: 30px; padding: 0; flex-shrink: 0; }
+.icon { display: inline-flex; align-items: center; }
+.btn:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }

@@ -8,23 +8,8 @@
   overflow: hidden;
   background: #fff;
 }
-.commandBar{
-  box-sizing: border-box;
-  height: calc(56px + var(--window-titlebar-inset));
-  flex: 0 0 calc(56px + var(--window-titlebar-inset));
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding: var(--window-titlebar-inset) 32px 0;
-}
-.actions{
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
 .search{
-  width: 290px;
+  width: 100%;
   height: 34px;
   display: flex;
   align-items: center;
@@ -46,37 +31,6 @@
   font: inherit;
   font-size: 12px;
   user-select: text;
-}
-.primaryButton{
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--text-primary);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 600;
-}
-.iconButton{
-  width: 30px;
-  height: 30px;
-  display: grid;
-  place-items: center;
-  border: 0;
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-}
-.iconButton:hover{
-  background: var(--bg-surface-hover);
-  color: var(--text-primary);
-}
-.iconButton input{
-  display: none;
 }
 .dashboard{
   flex: 1;
@@ -461,9 +415,6 @@
   font-size: 13px;
 }
 @media (max-width:850px){
-  .commandBar{
-    padding-inline: 20px;
-  }
   .dashboard{
     padding:24px 24px 50px;
   }
@@ -473,9 +424,6 @@
   .summaryCopy, .summaryCopyInput{
     grid-column: 1 / -1;
     justify-self: start;
-  }
-  .search{
-    width:220px;
   }
 }
 /* 留白建立层级，颜色仅用于状态和资料类型。 */
@@ -582,17 +530,9 @@
 .rowActions:has(.favorite), .rowActions:has(.confirmDelete){
   opacity: 1;
 }
-.workspace button:focus-visible, .iconButton:focus-within{
+.dashboard button:focus-visible{
   outline: 2px solid var(--border-focus);
   outline-offset: 3px;
-}
-.iconButton input{
-  display: block;
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  overflow: hidden;
 }
 .tabs > button{
   transition: background-color 160ms ease, color 160ms ease;
@@ -620,18 +560,6 @@
   }
 }
 @media (max-width: 600px){
-  .commandBar{
-    gap: 8px;
-    padding-inline: 16px;
-  }
-  .search{
-    width: auto;
-    min-width: 0;
-    flex: 1;
-  }
-  .actions{
-    flex-shrink: 0;
-  }
   .dashboard{
     padding: 28px 18px 40px;
   }

@@ -1,3 +1,4 @@
+import { TopBarAction } from '../common/TopBarAction';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowRightIcon, BookOpenIcon, CaretLeftIcon, CaretRightIcon, ClockCounterClockwiseIcon, PlayIcon } from '@phosphor-icons/react';
 import { createManualStudySession, deleteStudySession, fetchStudyCategories, fetchStudySessions, fetchStudyStatistics, finishStudySession, startStudySession, updateStudySession } from '../../services/studyApi';
@@ -152,11 +153,11 @@ export function StudyPage() {
   };
 
   return <main className={styles.workspace}>
-    <TopBar title="记录" subtitle="学习与专注" icon={<BookOpenIcon size={15} />} actions={<div className={styles.topActions}>
-      <button type="button" className={styles.textAction} onClick={openManual}>补卡</button>
-      <Button className={styles.startButton} type="button" variant="primary" size="sm" icon={<PlayIcon size={13} weight="fill" />}
-        onClick={() => { setStartError(null); setStartModalOpen(true); }} disabled={Boolean(active)}>{active ? '学习中' : '开始学习'}</Button>
-    </div>} />
+    <TopBar title="记录" subtitle="学习与专注" icon={<BookOpenIcon size={15} />} actions={<>
+      <TopBarAction variant="outline" onClick={openManual}>补卡</TopBarAction>
+      <TopBarAction variant="primary" icon={<PlayIcon size={13} weight="fill" />}
+        onClick={() => { setStartError(null); setStartModalOpen(true); }} disabled={Boolean(active)}>{active ? '学习中' : '开始学习'}</TopBarAction>
+    </>} />
     <div className={styles.page}><div className={styles.content}>
       <header className={styles.pageHeading}><div><h1>让专注有迹可循</h1><p>记录每一次投入，看见日积月累的进步。</p></div><span className={styles.pageDate}>{formatTimelineDate(todayKey, todayKey)}</span></header>
       <section className={styles.overview} aria-label="学习概览">

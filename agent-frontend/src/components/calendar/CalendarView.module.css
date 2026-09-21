@@ -21,49 +21,6 @@
   margin: 0 auto;
 }
 
-.controls,
-.navGroup {
-  display: flex;
-  align-items: center;
-}
-
-.controls {
-  gap: 4px;
-}
-
-.navGroup {
-  gap: 2px;
-}
-
-.todayBtn,
-.navBtn {
-  height: 30px;
-  border: none;
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--text-secondary);
-  transition: background-color var(--transition-fast), color var(--transition-fast);
-}
-
-.todayBtn {
-  padding: 0 10px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.navBtn {
-  width: 30px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.todayBtn:hover,
-.navBtn:hover {
-  background: var(--bg-surface-hover);
-  color: var(--text-primary);
-}
-
 .calendarLayout {
   min-height: calc(100vh - 48px);
   display: grid;

@@ -1,3 +1,4 @@
+import { TopBarAction } from '../common/TopBarAction';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import {
   ArrowCounterClockwiseIcon,
@@ -17,6 +18,7 @@ import type { RecordEntry, RecordTab, RecordType, SaveRecordInput } from '../../
 import { RecordEditor } from './RecordEditor';
 import { RECORD_TYPES } from './recordTypes';
 import { LoadingTree } from '../common/LoadingTree';
+import { TopBar } from '../common/TopBar';
 import { Button } from '../common/Button';
 import { useMessage } from '../common/Message';
 import { Modal } from '../common/Modal';
@@ -61,6 +63,7 @@ export function RecordPage({ initialEntry, initialType = 'quick' }: { initialEnt
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
   const [dragOverTabId, setDragOverTabId] = useState<string | null>(null);
   const [reorderingTabs, setReorderingTabs] = useState(false);
+  const importInputRef = useRef<HTMLInputElement>(null);
   const newTabInputRef = useRef<HTMLInputElement>(null);
   const tabPointerDragRef = useRef<{ tabId: string; pointerId: number; startX: number; startY: number; dragging: boolean } | null>(null);
   const suppressTabClickRef = useRef(false);
@@ -236,21 +239,20 @@ export function RecordPage({ initialEntry, initialType = 'quick' }: { initialEnt
     tabs={tabs} saving={saving} onSave={save} onBack={() => setEditing(null)} />;
 
   return <main className={styles.workspace}>
-    <div className={styles.commandBar} data-tauri-drag-region>
+    <TopBar title="资料" subtitle="个人资料库" icon={<FileTextIcon size={16} />} search={
       <div className={styles.search}><MagnifyingGlassIcon size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} aria-label="搜索资料" placeholder="搜索标题或正文…" /></div>
-      <div className={styles.actions}>
-        <button className={styles.iconButton} onClick={() => void exportRecordBackup()} title="导出备份"><DownloadSimpleIcon size={14} /></button>
-        <label className={styles.iconButton} title="导入备份"><UploadSimpleIcon size={14} /><input type="file" aria-label="导入备份" accept=".zip,application/zip" onChange={async (event) => {
+    } actions={<>
+        <TopBarAction iconOnly aria-label="导出备份" onClick={() => void exportRecordBackup()} title="导出备份"><DownloadSimpleIcon size={14} /></TopBarAction>
+        <TopBarAction iconOnly aria-label="导入备份" title="导入备份" onClick={() => importInputRef.current?.click()}><UploadSimpleIcon size={14} /></TopBarAction><input ref={importInputRef} hidden type="file" aria-label="导入备份" accept=".zip,application/zip" onChange={async (event) => {
           const file = event.target.files?.[0]; if (!file) return;
           if (window.confirm('导入会替换当前全部资料，确定继续吗？')) try { const count = await importRecordBackup(file); await load(); showMessage('success', `已恢复 ${count} 条资料`); } catch (reason) { showMessage('error', reason instanceof Error ? reason.message : '导入失败'); }
           event.target.value = '';
-        }} /></label>
-        <button className={styles.iconButton} onClick={() => void fetchRecordTrash().then(setTrashEntries)} title="回收站"><TrashIcon size={14} /></button>
-        <Button className={styles.primaryButton} size="sm" onClick={beginCreate} icon={<PlusIcon size={15} weight="bold" />}>新增资料</Button>
-      </div>
-    </div>
+        }} />
+        <TopBarAction iconOnly aria-label="回收站" onClick={() => void fetchRecordTrash().then(setTrashEntries)} title="回收站"><TrashIcon size={14} /></TopBarAction>
+        <TopBarAction variant="primary" onClick={beginCreate} icon={<PlusIcon size={15} weight="bold" />}>新增资料</TopBarAction>
+    </>} />
     <div className={styles.dashboard}>
-      <header className={styles.pageHeading}><div><span className={styles.eyebrow}>个人资料库</span><h1>记录</h1><p>捕捉想法，沉淀值得留下的内容。</p></div><span className={styles.todayLabel}>{todayKey.replaceAll('-', ' / ')}</span></header>
+      <header className={styles.pageHeading}><div><span className={styles.eyebrow}>个人资料库</span><h1>资料</h1><p>捕捉想法，沉淀值得留下的内容。</p></div><span className={styles.todayLabel}>{todayKey.replaceAll('-', ' / ')}</span></header>
       <section className={styles.summary} aria-label="本周资料概况">
         <div><strong>{weekRecords.length}</strong><span>本周新增资料</span></div>
         <div className={weekReviews.length ? styles.reviewComplete : undefined}><strong>{weekReviews.length ? <CheckIcon size={20} weight="bold" /> : '—'}</strong><span>{weekReviews.length ? `已完成 ${weekReviews.length} 次复盘` : '本周尚未复盘'}</span></div>

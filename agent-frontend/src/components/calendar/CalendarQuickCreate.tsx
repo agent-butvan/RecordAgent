@@ -1,3 +1,4 @@
+import { TopBarAction } from '../common/TopBarAction';
 import React, { useState } from 'react';
 import {
   ArrowLeftIcon,
@@ -118,16 +119,15 @@ export const CalendarQuickCreate: React.FC<CalendarQuickCreateProps> = ({ select
 
   return (
     <div className={styles.container}>
-      <button
-        type="button"
-        className={styles.trigger}
+      <TopBarAction
+        variant="primary"
         aria-expanded={isOpen}
         aria-haspopup="dialog"
         onClick={() => setIsOpen(true)}
       >
         <PlusIcon size={14} weight="bold" />
         新建记录
-      </button>
+      </TopBarAction>
 
       <Modal
         open={isOpen}

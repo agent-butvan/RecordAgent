@@ -1,3 +1,4 @@
+import { TopBarAction } from '../common/TopBarAction';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   CalendarDotsIcon,
@@ -316,7 +317,7 @@ export const CalendarView: React.FC = () => {
         title="日历"
         subtitle="本地数据"
         actions={(
-          <div className={styles.controls}>
+          <>
             <CalendarQuickCreate
               selectedDate={selected}
               onCreate={createRecord}
@@ -326,12 +327,10 @@ export const CalendarView: React.FC = () => {
               }}
               onCreateFinance={() => { void openFinanceTransactionModal(); }}
             />
-            <button type="button" className={styles.todayBtn} onClick={goToday}>今天</button>
-            <div className={styles.navGroup}>
-              <button type="button" className={styles.navBtn} title="上个月" aria-label="上个月" onClick={() => moveMonth(-1)}><CaretLeftIcon size={17} /></button>
-              <button type="button" className={styles.navBtn} title="下个月" aria-label="下个月" onClick={() => moveMonth(1)}><CaretRightIcon size={17} /></button>
-            </div>
-          </div>
+            <TopBarAction onClick={goToday}>今天</TopBarAction>
+            <TopBarAction iconOnly title="上个月" aria-label="上个月" onClick={() => moveMonth(-1)}><CaretLeftIcon size={17} /></TopBarAction>
+            <TopBarAction iconOnly title="下个月" aria-label="下个月" onClick={() => moveMonth(1)}><CaretRightIcon size={17} /></TopBarAction>
+          </>
         )}
       />
       <div className={styles.page}>

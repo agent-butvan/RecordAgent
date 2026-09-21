@@ -2,29 +2,6 @@
   display: inline-flex;
 }
 
-.trigger {
-  height: 30px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 10px;
-  border: none;
-  border-radius: var(--radius-md);
-  background: var(--accent-blue);
-  color: var(--text-inverse);
-  font-size: 11px;
-  font-weight: 650;
-  transition: background-color var(--transition-fast), transform var(--transition-fast);
-}
-
-.trigger:hover {
-  background: #285fc6;
-}
-
-.trigger:active {
-  transform: translateY(1px);
-}
-
 .modal {
   max-height: min(680px, calc(100vh - 40px));
   overflow-y: auto;
@@ -243,12 +220,6 @@
 }
 
 @media (max-width: 620px) {
-  .trigger {
-    width: 30px;
-    justify-content: center;
-    padding: 0;
-    font-size: 0;
-  }
 
   .modal {
     padding: 18px;
