@@ -31,6 +31,7 @@ import { fetchDailyInsight } from '../../services/dailyInsightApi';
 import { fetchDailyDay } from '../../services/dailyEvents';
 import { fetchFinanceExpenseChart } from '../../services/financeApi';
 import { fetchStudyStatistics } from '../../services/studyApi';
+import { fetchJevStatus, updateJevEnabled, type JevStatus } from '../../services/jevService';
 import type { RecordReferenceOption } from '../../types/record';
 import { useMessage } from '../common/Message';
 import { useModel } from '../../context/ModelContext';
@@ -234,6 +235,9 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
   const { showMessage } = useMessage();
   const { getActiveModel, getActiveProvider } = useModel();
   const [inputPrompt, setInputPrompt] = useState('');
+  const [jevStatus, setJevStatus] = useState<JevStatus | null>(null);
+  const [isJevSaving, setIsJevSaving] = useState(false);
+  const [jevLoadFailed, setJevLoadFailed] = useState(false);
   const [selectedCommand, setSelectedCommand] = useState<SlashCommandDefinition | null>(null);
   const [commandSelectedIndex, setCommandSelectedIndex] = useState(0);
   const [commandMenuDismissed, setCommandMenuDismissed] = useState(false);
@@ -268,6 +272,33 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
     setEnabledSlashCommands(getEnabledSlashCommands());
     setSelectedCommand((current) => current ? findSlashCommand(current.name) ?? null : null);
   }), []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchJevStatus()
+      .then((status) => {
+        if (cancelled) return;
+        setJevStatus(status);
+        setJevLoadFailed(false);
+      })
+      .catch(() => {
+        if (!cancelled) setJevLoadFailed(true);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleJevEnabledChange = async (enabled: boolean) => {
+    setIsJevSaving(true);
+    try {
+      const status = await updateJevEnabled(enabled);
+      setJevStatus(status);
+      showMessage('success', enabled ? 'Jev 已开启' : 'Jev 已关闭');
+    } catch (error) {
+      showMessage('error', error instanceof Error ? error.message : 'Jev 状态更新失败');
+    } finally {
+      setIsJevSaving(false);
+    }
+  };
   const composedInputPrompt = selectedCommand
     ? `/${selectedCommand.name}${inputPrompt.trim() ? ` ${inputPrompt.trim()}` : ''}`
     : inputPrompt;
@@ -898,6 +929,13 @@ export const ChatWorkspace: React.FC<ChatWorkspaceProps> = ({
         onPermissionModeChange={onPermissionModeChange}
         isPermissionModeDisabled={isPermissionModeDisabled}
         isPermissionModeSaving={isPermissionModeSaving}
+        jevEnabled={jevStatus?.enabled ?? false}
+        onJevEnabledChange={handleJevEnabledChange}
+        isJevDisabled={jevLoadFailed || (!jevStatus?.available && !jevStatus?.enabled)}
+        isJevSaving={isJevSaving}
+        jevTitle={jevLoadFailed
+          ? 'Jev 状态读取失败'
+          : jevStatus?.available ? '开启后使用 Jev 进行工具能力路由' : '请先完成 Jev 配置'}
         onInputKeyDown={handleComposerKeyDown}
         leadingContent={selectedCommand ? (
           <SlashCommandChip command={selectedCommand} onRemove={removeSelectedCommand} />

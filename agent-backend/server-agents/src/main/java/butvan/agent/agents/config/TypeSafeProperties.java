@@ -3,6 +3,7 @@ package butvan.agent.agents.config;
 import butvan.agent.agents.routing.ToolRoutingMode;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -77,5 +78,44 @@ public class TypeSafeProperties {
             log.error("读取 TypeSafe 配置失败，Jev 路由将保持关闭：{}", configPath, exception);
             return TypeSafeConfigData.disabled();
         }
+    }
+
+    /**
+     * 更新 Jev 总开关，同时保留 config.json 中的其他配置节点。
+     *
+     * @param enabled 是否开启 Jev 路由
+     * @return 更新后的脱敏配置快照
+     */
+    public synchronized TypeSafeConfigData updateEnabled(boolean enabled) {
+        TypeSafeConfigData current = load();
+        if (enabled && !current.isConfigured()) {
+            throw new IllegalArgumentException("Jev 尚未完成配置，请先设置有效的模式、API Key 与模型");
+        }
+
+        try {
+            ObjectNode root = readConfigRoot();
+            JsonNode existingNode = root.get("typesafe");
+            ObjectNode typeSafeNode = existingNode instanceof ObjectNode objectNode
+                    ? objectNode
+                    : objectMapper.createObjectNode();
+            typeSafeNode.put("enabled", enabled);
+            root.set("typesafe", typeSafeNode);
+
+            Path parent = configPath.getParent();
+            if (parent != null) Files.createDirectories(parent);
+            objectMapper.writerWithDefaultPrettyPrinter().writeValue(configPath.toFile(), root);
+            return load();
+        } catch (IOException exception) {
+            log.error("更新 Jev 开关失败：{}", configPath, exception);
+            throw new IllegalStateException("Jev 开关保存失败", exception);
+        }
+    }
+
+    /** 读取配置根对象；文件不存在时返回空对象，格式异常时拒绝覆盖。 */
+    private ObjectNode readConfigRoot() throws IOException {
+        if (!Files.isRegularFile(configPath)) return objectMapper.createObjectNode();
+        JsonNode root = objectMapper.readTree(configPath.toFile());
+        if (root instanceof ObjectNode objectNode) return objectNode;
+        throw new IOException("config.json 根节点不是对象");
     }
 }

@@ -35,7 +35,16 @@ public record TypeSafeConfigData(
      */
     public boolean isReady() {
         return enabled
-                && mode != null
+                && isConfigured();
+    }
+
+    /**
+     * 判断 Jev 是否具备开启所需的有效配置，不考虑当前开关状态。
+     *
+     * @return 模式、凭据、模型和阈值均有效时返回 true
+     */
+    public boolean isConfigured() {
+        return mode != null
                 && mode != ToolRoutingMode.OFF
                 && apiKey != null
                 && !apiKey.isBlank()

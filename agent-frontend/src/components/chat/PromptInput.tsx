@@ -4,6 +4,7 @@ import { ModelSelector } from '../model/ModelSelector';
 import { PermissionModeSelector } from './PermissionModeSelector';
 import type { SessionPermissionMode } from '../../types/chat';
 import { useMessage } from '../common/Message';
+import { Switch } from '../common/Switch';
 import {
   createSpeechRecognition,
   isSpeechRecognitionSupported,
@@ -30,6 +31,11 @@ interface PromptInputProps {
   suggestionListId?: string;
   leadingContent?: React.ReactNode;
   canSend?: boolean;
+  jevEnabled?: boolean;
+  onJevEnabledChange?: (enabled: boolean) => void;
+  isJevDisabled?: boolean;
+  isJevSaving?: boolean;
+  jevTitle?: string;
 }
 
 /**
@@ -54,6 +60,11 @@ export const PromptInput: React.FC<PromptInputProps> = ({
   suggestionListId,
   leadingContent,
   canSend,
+  jevEnabled = false,
+  onJevEnabledChange,
+  isJevDisabled = false,
+  isJevSaving = false,
+  jevTitle,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const speechRecognitionRef = useRef<SpeechRecognitionController | null>(null);
@@ -175,6 +186,15 @@ export const PromptInput: React.FC<PromptInputProps> = ({
             onChange={onPermissionModeChange}
             disabled={isPermissionModeDisabled}
             isSaving={isPermissionModeSaving}
+          />
+
+          <Switch
+            label="Jev"
+            checked={jevEnabled}
+            onChange={(enabled) => onJevEnabledChange?.(enabled)}
+            disabled={isJevDisabled || !onJevEnabledChange}
+            busy={isJevSaving}
+            title={jevTitle}
           />
 
           <ModelSelector onOpenSettings={onOpenSettings} />
