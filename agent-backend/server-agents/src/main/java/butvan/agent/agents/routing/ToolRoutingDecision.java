@@ -11,19 +11,32 @@ import java.util.Set;
  * @param probabilities 每个能力组对应的 Noul yes 概率
  * @param providerModel TypeSafe 实际返回的模型版本
  * @param durationMillis 本次路由请求的总耗时毫秒
+ * @param failure Jev 失败后的安全摘要；仅 FALLBACK 状态可能存在
  */
 public record ToolRoutingDecision(
         Status status,
         Set<String> selectedGroups,
         Map<String, Double> probabilities,
         String providerModel,
-        long durationMillis
+        long durationMillis,
+        ToolRoutingFailure failure
 ) {
 
     /** 将集合字段复制为不可变快照，避免路由结果被调用方修改。 */
     public ToolRoutingDecision {
         selectedGroups = selectedGroups == null ? Set.of() : Set.copyOf(selectedGroups);
         probabilities = probabilities == null ? Map.of() : Map.copyOf(probabilities);
+    }
+
+    /** 保留成功决策原有构造形式，失败摘要默认为空。 */
+    public ToolRoutingDecision(
+            Status status,
+            Set<String> selectedGroups,
+            Map<String, Double> probabilities,
+            String providerModel,
+            long durationMillis
+    ) {
+        this(status, selectedGroups, probabilities, providerModel, durationMillis, null);
     }
 
     /**
@@ -51,7 +64,7 @@ public record ToolRoutingDecision(
      * @return OFF 状态的空决策
      */
     public static ToolRoutingDecision off() {
-        return new ToolRoutingDecision(Status.OFF, Set.of(), Map.of(), "", 0L);
+        return new ToolRoutingDecision(Status.OFF, Set.of(), Map.of(), "", 0L, null);
     }
 
     /**
@@ -61,7 +74,27 @@ public record ToolRoutingDecision(
      * @return FALLBACK 状态的空决策
      */
     public static ToolRoutingDecision fallback(long durationMillis) {
+        return fallback(durationMillis, ToolRoutingFailure.unknown());
+    }
+
+    /**
+     * 创建携带安全失败摘要的降级决策。
+     *
+     * @param durationMillis 失败前已经消耗的时间
+     * @param failure 可安全传播的失败原因
+     * @return FALLBACK 状态的空决策
+     */
+    public static ToolRoutingDecision fallback(
+            long durationMillis,
+            ToolRoutingFailure failure
+    ) {
         return new ToolRoutingDecision(
-                Status.FALLBACK, Set.of(), Map.of(), "", durationMillis);
+                Status.FALLBACK,
+                Set.of(),
+                Map.of(),
+                "",
+                durationMillis,
+                failure == null ? ToolRoutingFailure.unknown() : failure
+        );
     }
 }

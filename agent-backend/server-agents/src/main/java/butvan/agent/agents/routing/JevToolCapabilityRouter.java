@@ -95,9 +95,15 @@ public class JevToolCapabilityRouter implements ToolCapabilityRouter {
             return decision;
         } catch (RuntimeException exception) {
             long duration = elapsedMillis(startedAt);
-            log.warn("Jev Tool 路由失败，回退原有 Schema 流程：costMs={}, errorType={}",
-                    duration, exception.getClass().getSimpleName());
-            return ToolRoutingDecision.fallback(duration);
+            ToolRoutingFailure failure = exception instanceof JevGatewayException gatewayException
+                    ? gatewayException.failure()
+                    : ToolRoutingFailure.unknown();
+            log.warn("Jev Tool 路由失败，回退原有 Schema 流程：costMs={}, code={}, httpStatus={}, requestId={}",
+                    duration,
+                    failure.code(),
+                    failure.httpStatus(),
+                    failure.requestId());
+            return ToolRoutingDecision.fallback(duration, failure);
         }
     }
 

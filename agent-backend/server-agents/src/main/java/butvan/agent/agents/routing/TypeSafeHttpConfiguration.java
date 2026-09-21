@@ -25,7 +25,7 @@ public class TypeSafeHttpConfiguration {
     RestClient typeSafeRestClient() {
         // httpClient：设置连接超时的 JDK HTTP 客户端。
         HttpClient httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofMillis(500))
+                .connectTimeout(Duration.ofMillis(10000))
                 .build();
 
         // requestFactory：为 RestClient 补充响应读取超时。

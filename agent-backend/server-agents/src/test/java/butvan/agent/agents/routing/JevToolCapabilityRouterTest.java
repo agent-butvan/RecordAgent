@@ -67,6 +67,28 @@ class JevToolCapabilityRouterTest {
                 new ToolRoutingRequest("普通问题", catalog.groupNames()));
 
         assertEquals(ToolRoutingDecision.Status.FALLBACK, decision.status());
+        assertEquals(ToolRoutingFailure.Code.UNKNOWN, decision.failure().code());
+    }
+
+    @Test
+    void preservesSafeGatewayFailureInFallbackDecision() {
+        configured = config(ToolRoutingMode.ACTIVE, 0.75);
+        ToolRoutingFailure failure = new ToolRoutingFailure(
+                ToolRoutingFailure.Code.AUTHENTICATION,
+                401,
+                "req_auth",
+                null,
+                "Jev 鉴权失败，已使用本地工具路由。",
+                false
+        );
+        when(gateway.evaluate(anyString(), anyString(), anyString(), anyMap()))
+                .thenThrow(new JevGatewayException(failure, "provider detail", null));
+
+        ToolRoutingDecision decision = router.route(
+                new ToolRoutingRequest("普通问题", catalog.groupNames()));
+
+        assertEquals(ToolRoutingDecision.Status.FALLBACK, decision.status());
+        assertEquals(failure, decision.failure());
     }
 
     @Test
