@@ -147,6 +147,7 @@ export const MainLayout: React.FC<{
   const [streamingSessionIds, setStreamingSessionIds] = useState<Set<string>>(() => new Set());
   const [stoppingSessionIds, setStoppingSessionIds] = useState<Set<string>>(() => new Set());
   const activeChatRunsRef = useRef<Map<string, ActiveChatRun>>(new Map());
+  const lastRoutingNoticeRef = useRef<{ code: string; shownAt: number } | null>(null);
   const [sessionLoadErrors, setSessionLoadErrors] = useState<Record<string, string>>({});
   const activeSessionIdRef = useRef(activeSessionId);
 
@@ -866,6 +867,17 @@ export const MainLayout: React.FC<{
         updateAssistantMessage(currentSessionId, assistantMsgId,
           (message) => markAssistantTerminal(message, 'CANCELLED'));
         void syncSessionDetail(currentSessionId);
+      },
+      (notice) => {
+        const previous = lastRoutingNoticeRef.current;
+        const now = Date.now();
+        if (previous?.code === notice.code && now - previous.shownAt < 60_000) return;
+        lastRoutingNoticeRef.current = { code: notice.code, shownAt: now };
+        const requestHint = notice.requestId ? `（请求 ID：${notice.requestId}）` : '';
+        const retryHint = notice.retryAfterMillis && notice.retryAfterMillis > 0
+          ? `建议 ${Math.ceil(notice.retryAfterMillis / 1_000)} 秒后重试 Jev。`
+          : '';
+        showMessage('info', `${notice.message}${retryHint}${requestHint}`, { duration: 8_000 });
       },
     );
   };

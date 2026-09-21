@@ -233,6 +233,15 @@ export interface ToolResultPayload {
   status?: 'running' | 'completed' | 'failed' | 'cancelled';
 }
 
+/** Jev 路由失败后由后端发送的非终态降级提示。 */
+export interface RoutingNoticePayload {
+  code: string;
+  message: string;
+  requestId: string;
+  retryable: boolean;
+  retryAfterMillis: number | null;
+}
+
 /** 后端要求用户确认时返回的高风险工具。 */
 export interface PermissionToolPayload {
   toolCallId: string;
@@ -329,7 +338,8 @@ export async function streamAgentChat(
   onThinking?: (thinkingText: string) => void,
   onPermissionRequired?: (payload: PermissionRequiredPayload) => void,
   onSubagentProgress?: (payload: SubagentProgressDto) => void,
-  onCancelled?: () => void
+  onCancelled?: () => void,
+  onRoutingNotice?: (payload: RoutingNoticePayload) => void,
 ): Promise<void> {
   try {
     const payloadContent = params.content || params.context || '';
@@ -415,6 +425,24 @@ export async function streamAgentChat(
           onSubagentProgress?.(payload);
         } catch {
           onError?.(new Error('子 Agent 进度事件格式错误'));
+        }
+      } else if (eventName === 'routing_notice') {
+        try {
+          const payload = JSON.parse(dataStr) as RoutingNoticePayload;
+          if (typeof payload.code !== 'string' || typeof payload.message !== 'string') {
+            throw new Error('invalid payload');
+          }
+          onRoutingNotice?.({
+            code: payload.code,
+            message: payload.message,
+            requestId: typeof payload.requestId === 'string' ? payload.requestId : '',
+            retryable: payload.retryable === true,
+            retryAfterMillis: typeof payload.retryAfterMillis === 'number'
+              ? payload.retryAfterMillis
+              : null,
+          });
+        } catch {
+          console.warn('Jev 路由提示事件格式错误');
         }
       } else if (eventName === 'error') {
         streamFinished = true;

@@ -1656,15 +1656,20 @@ Shadow 数据达到目标后改为：
 | 情况 | 路由结果 | 主聊天行为 |
 | --- | --- | --- |
 | 未配置、disabled、off | `OFF` | 完全保持原流程 |
-| Jev 超时或网络错误 | `FALLBACK` | 完全保持原流程 |
-| 401 | `FALLBACK` | 正常聊天；日志提示配置错误但不打印 Key |
-| 422 | `FALLBACK` | 正常聊天；检查 DTO 或 question 定义 |
-| 429 / 529 | `FALLBACK` | 正常聊天；MVP 不在首 token 前重试 |
-| 响应缺组、类型错误、概率越界 | `FALLBACK` | 正常聊天；记录安全告警 |
+| Jev 超时或网络错误 | `FALLBACK` | 正常聊天；通过非终态 `routing_notice` 提示已降级 |
+| 401 / 403 | `FALLBACK` | 正常聊天；提示检查凭据或权限，不打印 Key |
+| 400 / 404 / 422 | `FALLBACK` | 正常聊天；提示请求或模型配置不兼容 |
+| 429 / 529 | `FALLBACK` | 正常聊天；提示限流或过载，不在首 token 前重试 |
+| 响应缺组、类型错误、概率越界 | `FALLBACK` | 正常聊天；提示响应格式异常并记录安全告警 |
 | 没有组超过阈值 | `ACTIVE + 空集合` | 只提供常驻/未分类 Schema |
 | 用户取消 | 停止后续调用 | 按现有 `runId` 取消流程收尾 |
 
 所谓 fail-open，是 Jev 故障时退回项目原有工具路由行为，而不是给用户返回“Agent 失败”。
+
+`routing_notice` 只携带稳定错误码、脱敏中文提示、可选
+`x-typesafe-request-id`、可重试标记和服务端建议等待时间；它不终止 SSE，也不得携带供应商原始
+body、API Key 或用户输入。前端使用全局 `Message` 展示，并对短时间内的同类
+提示去重，避免外部服务持续故障时反复打扰用户。
 
 ---
 
@@ -1765,6 +1770,8 @@ AgentScope 会用 `ToolResultEndEvent` 给出 `SUCCESS`、`ERROR`、`DENIED` 或
 - [ ] `active` 模式下模型可见组与当前会话可执行组完全一致；
 - [ ] 路由过程不修改共享 Toolkit 的 active groups；
 - [ ] Jev 超时、限流、过载和格式错误均 fail-open；
+- [ ] Jev 降级会发送非终态 `routing_notice`，且不会将 assistant 标记为失败；
+- [ ] 前端降级提示不包含 API Key、用户输入或供应商原始错误 body；
 - [ ] HITL 权限审批仍由现有机制处理；
 - [ ] 权限恢复后不会因能力组未激活而重复调用同一工具；
 - [ ] Tool Result 错误或拒绝状态不会在前端显示为成功；
