@@ -17,7 +17,6 @@
   justify-content: space-between;
   gap: 20px;
   padding: var(--window-titlebar-inset) 32px 0;
-  border-bottom: 1px solid var(--border-subtle);
 }
 .actions{
   display: flex;
@@ -98,8 +97,9 @@
   grid-template-columns: 130px 160px 1fr;
   align-items: center;
   gap: 20px;
-  padding: 20px 0;
-  border-bottom: 1px solid var(--border-subtle);
+  padding: 20px 22px;
+  border-radius: 14px;
+  background: #fafbfc;
 }
 .summary div{
   min-width: 0;
@@ -277,6 +277,9 @@
 }
 .recordList{
   margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 .recordRow{
   min-height: 94px;
@@ -284,18 +287,18 @@
   grid-template-columns: 42px minmax(0, 1fr) auto;
   align-items: center;
   gap: 17px;
-  padding: 20px 12px;
+  padding: 18px 12px;
   position: relative;
-  border-bottom: 1px solid var(--border-subtle);
-  transition: background-color 160ms ease;
+  transition: background-color 160ms ease, transform 160ms ease;
   border-radius: var(--radius-md);
   cursor: pointer;
 }
 .recordRow + .recordRow{
-  margin-top: 2px;
+  margin-top: 0;
 }
 .recordRow:hover{
   background: #f8f9fa;
+  transform: translateY(-1px);
 }
 .recordRow:focus-visible{
   outline: 1px solid var(--border-focus);
@@ -660,5 +663,8 @@
   }
   .recordRow, .rowActions, .tabs > button{
     transition: none;
+  }
+  .recordRow:hover{
+    transform: none;
   }
 }
