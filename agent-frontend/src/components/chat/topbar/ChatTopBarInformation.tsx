@@ -70,6 +70,7 @@ const CATEGORY_TAG_STYLES: Record<string, { bg: string; color: string }> = {
   报销: { bg: '#f0f9ff', color: '#0369a1' },
   转入: { bg: '#f0f9ff', color: '#0369a1' },
   兼职: { bg: '#fefce8', color: '#a16207' },
+  余额校准: { bg: '#fffbeb', color: '#a16207' },
   其他: { bg: '#f8fafc', color: '#475569' },
 };
 
@@ -1004,6 +1005,11 @@ function FinanceDetail({
           <div className={styles.transactionList}>
             {transactions.map((item) => {
               const tagStyle = getCategoryTagStyle(item.category, item.transactionType);
+              const isAdjustment = item.transactionType === 'adjustment_increase'
+                || item.transactionType === 'adjustment_decrease';
+              const isOutflow = item.transactionType === 'expense'
+                || item.transactionType === 'transfer_out'
+                || item.transactionType === 'adjustment_decrease';
               return (
                 <div key={item.id} className={styles.transactionRow}>
                   <div className={styles.transactionLeft}>
@@ -1021,10 +1027,10 @@ function FinanceDetail({
                   <span
                     className={styles.transactionAmount}
                     style={{
-                      color: item.transactionType === 'expense' ? '#dc2626' : '#16a34a',
+                      color: isAdjustment ? '#a16207' : isOutflow ? '#dc2626' : '#16a34a',
                     }}
                   >
-                    {item.transactionType === 'expense' ? '-' : '+'}
+                    {isOutflow ? '-' : '+'}
                     {formatMoney(item.amount, item.currency)}
                   </span>
                 </div>
@@ -1191,5 +1197,4 @@ function priorityLabel(priority: 'high' | 'medium' | 'low'): string {
 function isLeapYear(year: number): boolean {
   return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
 }
-
 

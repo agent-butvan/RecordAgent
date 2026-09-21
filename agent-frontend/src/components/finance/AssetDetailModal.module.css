@@ -157,6 +157,11 @@
   font-weight: 500;
 }
 
+.accountMeta { display: inline-flex; align-items: center; gap: 7px; }
+
+.adjustBtn { display: inline-flex; align-items: center; gap: 3px; padding: 2px 5px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-muted); font: 600 9.5px var(--font-sans); cursor: pointer; }
+.adjustBtn:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
+
 .footer {
   display: flex;
   align-items: center;

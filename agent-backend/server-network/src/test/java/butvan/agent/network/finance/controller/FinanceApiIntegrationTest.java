@@ -23,6 +23,7 @@ import java.time.LocalDate;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.hamcrest.Matchers.hasItem;
@@ -62,7 +63,7 @@ class FinanceApiIntegrationTest {
         String accountId = new com.fasterxml.jackson.databind.ObjectMapper()
                 .readTree(accountJson).path("data").path("id").asText();
 
-        mockMvc.perform(post("/agent/finance/transactions")
+        String transactionJson = mockMvc.perform(post("/agent/finance/transactions")
                         .contentType("application/json")
                         .content("""
                                 {
@@ -76,7 +77,10 @@ class FinanceApiIntegrationTest {
                                 }
                                 """.formatted(accountId)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.transactionType").value("income"));
+                .andExpect(jsonPath("$.data.transactionType").value("income"))
+                .andReturn().getResponse().getContentAsString();
+        String transactionId = new com.fasterxml.jackson.databind.ObjectMapper()
+                .readTree(transactionJson).path("data").path("id").asText();
 
         mockMvc.perform(get("/agent/finance/categories"))
                 .andExpect(status().isOk())
@@ -123,6 +127,30 @@ class FinanceApiIntegrationTest {
         String secondAccountId = new com.fasterxml.jackson.databind.ObjectMapper()
                 .readTree(secondAccountJson).path("data").path("id").asText();
 
+        mockMvc.perform(put("/agent/finance/transactions/{transactionId}", transactionId)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "accountId": "%s",
+                                  "transactionType": "income",
+                                  "category": "稿费",
+                                  "note": "修正后的九月稿费",
+                                  "amount": 500.00,
+                                  "date": "2026-09-05",
+                                  "time": "10:30"
+                                }
+                                """.formatted(secondAccountId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.accountId").value(secondAccountId))
+                .andExpect(jsonPath("$.data.accountName").value("微信零钱"))
+                .andExpect(jsonPath("$.data.date").value("2026-09-05"))
+                .andExpect(jsonPath("$.data.note").value("修正后的九月稿费"));
+
+        mockMvc.perform(get("/agent/finance/overview"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.accounts[0].balance").value(1000.00))
+                .andExpect(jsonPath("$.data.accounts[1].balance").value(700.00));
+
         mockMvc.perform(post("/agent/finance/transfers")
                         .contentType("application/json")
                         .content("""
@@ -144,6 +172,27 @@ class FinanceApiIntegrationTest {
         mockMvc.perform(get("/agent/finance/overview"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.totalAssets").value(1700.00));
+
+        mockMvc.perform(post("/agent/finance/accounts/{accountId}/adjustments", secondAccountId)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "direction": "increase",
+                                  "amount": 25.00,
+                                  "note": "余额对账补差"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.transactionType").value("adjustment_increase"))
+                .andExpect(jsonPath("$.data.source").value("adjustment"))
+                .andExpect(jsonPath("$.data.category").value("余额校准"))
+                .andExpect(jsonPath("$.data.note").value("余额对账补差"));
+
+        mockMvc.perform(get("/agent/finance/overview"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalAssets").value(1725.00))
+                .andExpect(jsonPath("$.data.monthIncome").value(500.00))
+                .andExpect(jsonPath("$.data.monthExpense").value(0));
     }
 
     private static Path createDatabasePath() {

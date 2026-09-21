@@ -338,6 +338,26 @@
   color: #b42318;
 }
 
+.jevConfirmation {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 4px 2px 2px;
+}
+
+.jevConfirmation p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.jevConfirmationActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 /* 消息底部动作工具栏 */
 .messageActions {
   display: flex;

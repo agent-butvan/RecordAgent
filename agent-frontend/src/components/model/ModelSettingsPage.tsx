@@ -337,7 +337,9 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
           </SettingsPageLayout>
         )}
 
-        {activeTab === 'account' && <ProfileSettingsPage accountStatus={accountStatus} />}
+        {activeTab === 'account' && (
+          <ProfileSettingsPage accountStatus={accountStatus} onAccountStatusChange={setAccountStatus} />
+        )}
 
         {activeTab === 'usage' && <TokenUsageSettingsPage />}
 

@@ -10,4 +10,5 @@ public class AccountStatusResponse {
     private boolean bound;
     private String maskedEmail;
     private boolean emailNotificationsEnabled;
+    private String avatarVersion;
 }

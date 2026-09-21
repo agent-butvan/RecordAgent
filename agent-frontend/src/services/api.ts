@@ -26,6 +26,7 @@ export interface AccountStatus {
   bound: boolean;
   maskedEmail: string | null;
   emailNotificationsEnabled: boolean;
+  avatarVersion: string | null;
 }
 
 /** 后端地址：浏览器/非 Tauri 环境回退到开发地址，Tauri 环境由 Rust 端动态注入 */
@@ -178,6 +179,21 @@ export async function fetchAccountStatus(): Promise<AccountStatus | null> {
   }
 }
 
+/** 返回带版本参数的头像地址，确保更换头像后不会命中旧缓存。 */
+export function getAccountAvatarUrl(avatarVersion: string): string {
+  return `${apiBaseUrl}/agent/account/avatar/content?v=${encodeURIComponent(avatarVersion)}`;
+}
+
+/** 上传并替换当前设备用户的头像。 */
+export async function uploadAccountAvatar(file: File): Promise<AccountStatus> {
+  const body = new FormData();
+  body.append('file', file);
+  const response = await fetch(`${apiBaseUrl}/agent/account/avatar`, { method: 'POST', body });
+  const json: ApiResponse<AccountStatus> = await response.json();
+  if (!response.ok || json.code !== 200) throw new Error(json.message || '头像上传失败');
+  return json.data;
+}
+
 async function accountRequest<T>(path: string, body: Record<string, string>): Promise<{ success: boolean; message: string; data?: T }> {
   try {
     const response = await fetch(`${apiBaseUrl}${path}`, {
@@ -214,6 +230,7 @@ export interface ToolResultPayload {
   toolCallId?: string;
   toolName?: string;
   result?: string;
+  status?: 'running' | 'completed' | 'failed' | 'cancelled';
 }
 
 /** 后端要求用户确认时返回的高风险工具。 */

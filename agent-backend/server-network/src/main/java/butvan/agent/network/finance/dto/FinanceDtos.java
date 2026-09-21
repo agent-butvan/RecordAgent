@@ -23,7 +23,15 @@ public final class FinanceDtos {
             boolean interestEnabled, BigDecimal annualRatePercent) {
     }
 
+    public record CreateBalanceAdjustmentRequest(String direction, BigDecimal amount, String note) {
+    }
+
     public record CreateTransactionRequest(
+            String accountId, String transactionType, String category, String note,
+            BigDecimal amount, LocalDate date, LocalTime time) {
+    }
+
+    public record UpdateTransactionRequest(
             String accountId, String transactionType, String category, String note,
             BigDecimal amount, LocalDate date, LocalTime time) {
     }

@@ -5,11 +5,19 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.mail.MailException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 /** 将可预期的参数与配置错误返回为统一的接口响应，并记录带上下文的日志。 */
 @Slf4j
 @RestControllerAdvice
 public class ApiExceptionHandler {
+
+    /** multipart 请求超过全局安全上限时，不向客户端暴露底层容器异常。 */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public Result<Void> handleUploadTooLarge(MaxUploadSizeExceededException exception) {
+        log.warn("[API-LOG] 上传文件超过系统允许大小: maxUploadSize={}", exception.getMaxUploadSize());
+        return Result.error(400, "上传文件过大，请选择符合页面大小要求的文件");
+    }
 
     /** 参数或业务校验错误统一返回 400。 */
     @ExceptionHandler(IllegalArgumentException.class)

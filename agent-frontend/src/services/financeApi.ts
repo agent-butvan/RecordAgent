@@ -1,5 +1,6 @@
 import type {
   CreateFinanceAccountInput,
+  CreateFinanceBalanceAdjustmentInput,
   CreateFinanceTransactionInput,
   CreateFinanceTransferInput,
   FinanceAccount,
@@ -9,6 +10,7 @@ import type {
   FinanceOverview,
   FinanceTransaction,
   FinanceTransferResponse,
+  UpdateFinanceTransactionInput,
 } from '../types/finance';
 import { getApiBaseUrl, type ApiResponse } from './api';
 
@@ -31,8 +33,8 @@ async function financeRequest<T>(path: string, init?: RequestInit): Promise<T> {
   return payload.data;
 }
 
-const jsonInit = (body: object): RequestInit => ({
-  method: 'POST',
+const jsonInit = (body: object, method = 'POST'): RequestInit => ({
+  method,
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(body),
 });
@@ -72,9 +74,25 @@ export function createFinanceAccount(input: CreateFinanceAccountInput): Promise<
   return financeRequest<FinanceAccount>('/agent/finance/accounts', jsonInit(input));
 }
 
+/** 手动校准单个资产账户余额，并生成不参与真实收支统计的审计流水。 */
+export function createFinanceBalanceAdjustment(
+  accountId: string,
+  input: CreateFinanceBalanceAdjustmentInput,
+): Promise<FinanceTransaction> {
+  return financeRequest<FinanceTransaction>(`/agent/finance/accounts/${encodeURIComponent(accountId)}/adjustments`, jsonInit(input));
+}
+
 /** 新建一条关联资产账户的收入或支出。 */
 export function createFinanceTransaction(input: CreateFinanceTransactionInput): Promise<FinanceTransaction> {
   return financeRequest<FinanceTransaction>('/agent/finance/transactions', jsonInit(input));
+}
+
+/** 修改一条手工收入或支出，后端会原子撤销旧余额影响并应用新值。 */
+export function updateFinanceTransaction(
+  transactionId: string,
+  input: UpdateFinanceTransactionInput,
+): Promise<FinanceTransaction> {
+  return financeRequest<FinanceTransaction>(`/agent/finance/transactions/${encodeURIComponent(transactionId)}`, jsonInit(input, 'PUT'));
 }
 
 /** 在两个资产账户之间进行划账并同步调整双方余额。 */

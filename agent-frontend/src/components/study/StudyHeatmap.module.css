@@ -6,14 +6,14 @@
 .plot { display: flex; gap: 8px; }
 .weekdays { width: 18px; flex: none; display: grid; grid-template-rows: repeat(7, 1fr); align-items: center; row-gap: var(--cell-gap); color: var(--text-muted); font-size: 8px; }
 .cells { min-width: 0; flex: 1; display: grid; grid-template-columns: repeat(var(--heatmap-columns), minmax(var(--cell-size), 1fr)); grid-template-rows: repeat(7, auto); grid-auto-flow: column; gap: var(--cell-gap); }
-.cell, .legend i { border: 1px solid transparent; border-radius: 3px; background: #eef1f4; }
+.cell, .legend i { border-radius: 3px; background: #f1f3f5; }
 .cell { position: relative; width: 100%; min-width: var(--cell-size); aspect-ratio: 1; }
-.level0 { border-color: #e4e8ec; background: #eef1f4; }
-.level1 { border-color: #ccebd6; background: #dafbe1; }
-.level2 { border-color: #96dfaa; background: #aceebb; }
-.level3 { border-color: #35ad58; background: #4ac26b; }
-.level4 { border-color: #0d5428; background: #116329; }
-.future { border-color: transparent; background: transparent; }
+.level0 { background: #f1f3f5; }
+.level1 { background: #dbeafe; }
+.level2 { background: #a8c7f5; }
+.level3 { background: #6ea0e8; }
+.level4 { background: #2563eb; }
+.future { background: transparent; visibility: hidden; }
 .legend { display: flex; align-items: center; justify-content: flex-end; gap: 4px; margin-top: 8px; color: var(--text-muted); font-size: 8px; }
 .legend i { width: 10px; height: 10px; }
 .tooltip { position: fixed; z-index: 1100; min-width: 148px; padding: 9px 11px; border-radius: var(--radius-md); background: #fff; color: var(--text-primary); box-shadow: 0 8px 24px rgba(15, 23, 42, .14), 0 2px 6px rgba(15, 23, 42, .08); pointer-events: none; transform: translate(-50%, -100%); }

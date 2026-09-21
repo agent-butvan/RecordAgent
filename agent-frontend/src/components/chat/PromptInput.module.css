@@ -89,6 +89,43 @@
   flex-shrink: 0;
 }
 
+.jevButton {
+  min-height: 28px;
+  padding: 3px 5px;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font: 500 12px/1.2 var(--font-sans);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--transition-fast);
+}
+
+.jevButton:hover:not(:disabled) {
+  color: var(--text-primary);
+}
+
+.jevButton:focus-visible {
+  outline: none;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+
+.jevButtonActive {
+  color: var(--accent-blue);
+  font-weight: 650;
+}
+
+.jevButtonActive:hover:not(:disabled) {
+  color: #1d4ed8;
+}
+
+.jevButton:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
 .iconBtn {
   display: inline-flex;
   align-items: center;

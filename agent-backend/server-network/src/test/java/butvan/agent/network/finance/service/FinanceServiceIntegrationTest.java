@@ -172,6 +172,107 @@ class FinanceServiceIntegrationTest {
     }
 
     @Test
+    void balanceAdjustmentsCreateAuditTransactionsWithoutChangingIncomeOrExpenseTotals() {
+        String ownerId = "finance-adjustment-user";
+        FinanceAccount account = financeService.createAccount(
+                ownerId, "银行卡", "bank", "CNY", new BigDecimal("100.00"), false, BigDecimal.ZERO);
+
+        var increase = financeService.adjustAccountBalance(
+                ownerId, account.id(), "increase", new BigDecimal("25.00"), "对账补差");
+        var decrease = financeService.adjustAccountBalance(
+                ownerId, account.id(), "decrease", new BigDecimal("40.00"), "修正重复录入余额");
+
+        FinanceOverview overview = financeService.getOverview(ownerId);
+        ExpenseChart chart = financeService.getExpenseChart(ownerId, "month");
+        assertEquals(new BigDecimal("85.00"), overview.totalAssets());
+        assertEquals(0, overview.monthIncome().compareTo(BigDecimal.ZERO));
+        assertEquals(0, overview.monthExpense().compareTo(BigDecimal.ZERO));
+        assertEquals(0, chart.totalIncome().compareTo(BigDecimal.ZERO));
+        assertEquals(0, chart.totalExpense().compareTo(BigDecimal.ZERO));
+        assertEquals("adjustment_increase", increase.transactionType());
+        assertEquals("adjustment_decrease", decrease.transactionType());
+        assertEquals("adjustment", increase.source());
+        assertEquals("余额校准", increase.category());
+        assertEquals("对账补差", increase.note());
+    }
+
+    @Test
+    void balanceAdjustmentRequiresNoteAndCannotReduceBelowZero() {
+        String ownerId = "finance-adjustment-validation-user";
+        FinanceAccount account = financeService.createAccount(
+                ownerId, "现金", "cash", "CNY", new BigDecimal("20.00"), false, BigDecimal.ZERO);
+
+        var noteError = assertThrows(IllegalArgumentException.class, () -> financeService.adjustAccountBalance(
+                ownerId, account.id(), "increase", BigDecimal.ONE, " "));
+        var balanceError = assertThrows(IllegalArgumentException.class, () -> financeService.adjustAccountBalance(
+                ownerId, account.id(), "decrease", new BigDecimal("20.01"), "现金盘点"));
+
+        assertEquals("资产调整备注不能为空", noteError.getMessage());
+        assertEquals("账户余额不足，无法完成手动减少", balanceError.getMessage());
+        FinanceOverview overview = financeService.getOverview(ownerId);
+        assertEquals(new BigDecimal("20.00"), overview.totalAssets());
+        assertEquals(0, overview.transactions().size());
+    }
+
+    @Test
+    void editingExpenseRestoresOriginalAccountAndAppliesChangesToNewAccount() {
+        String ownerId = "finance-edit-expense-user";
+        LocalDate correctedDate = LocalDate.now().minusDays(1);
+        FinanceAccount originalAccount = financeService.createAccount(
+                ownerId, "银行卡", "bank", "CNY", new BigDecimal("100.00"), false, BigDecimal.ZERO);
+        FinanceAccount correctedAccount = financeService.createAccount(
+                ownerId, "微信零钱", "wechat_balance", "CNY", new BigDecimal("50.00"), false, BigDecimal.ZERO);
+        var transaction = financeService.createTransaction(
+                ownerId, originalAccount.id(), "expense", "餐饮", "午餐", new BigDecimal("30.00"),
+                LocalDate.now(), LocalTime.NOON);
+
+        var updated = financeService.updateTransaction(
+                ownerId, transaction.id(), correctedAccount.id(), "expense", "交通", "打车",
+                new BigDecimal("20.00"), correctedDate, LocalTime.of(18, 30));
+
+        FinanceOverview overview = financeService.getOverview(ownerId);
+        var restoredAccount = overview.accounts().stream()
+                .filter(account -> account.id().equals(originalAccount.id())).findFirst().orElseThrow();
+        var chargedAccount = overview.accounts().stream()
+                .filter(account -> account.id().equals(correctedAccount.id())).findFirst().orElseThrow();
+        assertEquals(new BigDecimal("100.00"), restoredAccount.balance());
+        assertEquals(new BigDecimal("30.00"), chargedAccount.balance());
+        assertEquals(correctedAccount.id(), updated.accountId());
+        assertEquals(correctedDate, updated.date());
+        assertEquals("交通", updated.category());
+        assertEquals("打车", updated.note());
+        assertEquals(new BigDecimal("20.00"), updated.amount());
+    }
+
+    @Test
+    void failedAccountChangeRollsBackEveryBalanceAdjustment() {
+        String ownerId = "finance-edit-rollback-user";
+        FinanceAccount originalAccount = financeService.createAccount(
+                ownerId, "原账户", "bank", "CNY", BigDecimal.ZERO, false, BigDecimal.ZERO);
+        FinanceAccount targetAccount = financeService.createAccount(
+                ownerId, "目标账户", "wechat_balance", "CNY", BigDecimal.ZERO, false, BigDecimal.ZERO);
+        var income = financeService.createTransaction(
+                ownerId, originalAccount.id(), "income", "工资", "收入", new BigDecimal("100.00"),
+                LocalDate.now(), LocalTime.of(9, 0));
+        financeService.createTransaction(
+                ownerId, originalAccount.id(), "expense", "日常", "支出", new BigDecimal("80.00"),
+                LocalDate.now(), LocalTime.of(10, 0));
+
+        var error = assertThrows(IllegalArgumentException.class, () -> financeService.updateTransaction(
+                ownerId, income.id(), targetAccount.id(), "income", "工资", "收入",
+                new BigDecimal("100.00"), LocalDate.now(), LocalTime.of(9, 0)));
+
+        assertEquals("原账户余额不足，无法撤销原流水", error.getMessage());
+        FinanceOverview overview = financeService.getOverview(ownerId);
+        assertEquals(new BigDecimal("20.00"), overview.accounts().stream()
+                .filter(account -> account.id().equals(originalAccount.id())).findFirst().orElseThrow().balance());
+        assertEquals(BigDecimal.ZERO.setScale(2), overview.accounts().stream()
+                .filter(account -> account.id().equals(targetAccount.id())).findFirst().orElseThrow().balance());
+        assertEquals(originalAccount.id(), financeService.getTransactions(ownerId).stream()
+                .filter(item -> item.id().equals(income.id())).findFirst().orElseThrow().accountId());
+    }
+
+    @Test
     void supportedAccountCategoriesCanBeCreated() {
         List<String> accountTypes = List.of(
                 "wechat_balance", "wechat_yield", "alipay_balance", "alipay_yuebao", "bank", "other");

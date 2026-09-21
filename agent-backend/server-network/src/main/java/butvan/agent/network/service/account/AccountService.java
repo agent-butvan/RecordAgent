@@ -43,7 +43,7 @@ public class AccountService {
         AccountConfigData account = getAccountConfig();
         boolean bound = account != null && account.isEmailVerified() && account.getEmail() != null && !account.getEmail().isBlank();
         return new AccountStatusResponse(bound, bound ? maskEmail(account.getEmail()) : null,
-                bound && account.isEmailNotificationsEnabled());
+                bound && account.isEmailNotificationsEnabled(), null);
     }
 
     /** 生成并发送绑定验证码；同步保证同一邮箱的发送冷却判定不并发穿透。 */

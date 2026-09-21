@@ -10,7 +10,9 @@ import butvan.agent.agents.session.dto.SessionKind;
 import butvan.agent.agents.storage.AgentStorageProperties;
 import butvan.agent.agents.subagent.AgentDefinitionLoader;
 import butvan.agent.agents.subagent.SubagentCatalog;
+import butvan.agent.agents.tool.ToolCapabilityCatalog;
 import butvan.agent.agents.tool.ToolRegistry;
+import butvan.agent.agents.tool.ToolSchemaSelectionMiddleware;
 import butvan.agent.agents.usage.ApproximateTokenCounter;
 import butvan.agent.agents.usage.TokenUsageMiddleware;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -63,10 +65,11 @@ class AgentFactoryTest {
                 return List.of();
             }
         };
+        ToolCapabilityCatalog capabilityCatalog = new ToolCapabilityCatalog();
 
         AgentFactory factory = new AgentFactory(
                 modelHolder,
-                new ToolRegistry(List.of()),
+                new ToolRegistry(List.of(), capabilityCatalog),
                 storage,
                 new InMemoryAgentStateStore(),
                 null,
@@ -74,6 +77,7 @@ class AgentFactoryTest {
                 subagentCatalog,
                 new TokenUsageMiddleware(new ApproximateTokenCounter(), objectMapper),
                 new ContextInjectionMiddleware(),
+                new ToolSchemaSelectionMiddleware(capabilityCatalog),
                 sessionCatalogService,
                 projectRegistry
         );
@@ -86,8 +90,11 @@ class AgentFactoryTest {
             List<Class<?>> middlewareOrder = agent.getDelegate().getMiddlewares().stream()
                     .map(Object::getClass).toList();
             assertTrue(middlewareOrder.indexOf(ContextInjectionMiddleware.class)
+                            < middlewareOrder.indexOf(ToolSchemaSelectionMiddleware.class),
+                    "上下文注入必须先于 Tool Schema 路由");
+            assertTrue(middlewareOrder.indexOf(ToolSchemaSelectionMiddleware.class)
                             < middlewareOrder.indexOf(TokenUsageMiddleware.class),
-                    "上下文注入必须先于 Token 计数，使归因看到最终模型输入");
+                    "Tool Schema 路由必须先于 Token 计数，使归因看到最终工具集合");
             assertEquals(List.of("reset_equipped_tools"), agent.getToolkit().getToolSchemas().stream()
                     .map(ToolSchema::getName).toList());
             assertTrue(schemaTokens(agent.getToolkit().getToolSchemas()) < 800,
@@ -115,9 +122,10 @@ class AgentFactoryTest {
                 return List.of();
             }
         };
+        ToolCapabilityCatalog capabilityCatalog = new ToolCapabilityCatalog();
         AgentFactory factory = new AgentFactory(
                 modelHolder,
-                new ToolRegistry(List.of()),
+                new ToolRegistry(List.of(), capabilityCatalog),
                 storage,
                 new InMemoryAgentStateStore(),
                 null,
@@ -125,6 +133,7 @@ class AgentFactoryTest {
                 subagents,
                 new TokenUsageMiddleware(new ApproximateTokenCounter(), mapper),
                 new ContextInjectionMiddleware(),
+                new ToolSchemaSelectionMiddleware(capabilityCatalog),
                 sessions,
                 projects
         );

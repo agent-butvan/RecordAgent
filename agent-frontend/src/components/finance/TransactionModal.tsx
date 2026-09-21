@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import type { CreateFinanceTransactionInput, FinanceAccount, FinanceCategoryOptions } from '../../types/finance';
+import type { CreateFinanceTransactionInput, FinanceAccount, FinanceCategoryOptions, FinanceTransaction } from '../../types/finance';
 import { formatLocalDate } from '../../services/dailyEvents';
 import { Button } from '../common/Button';
 import { CategoryPicker } from '../common/CategoryPicker';
@@ -23,13 +23,14 @@ interface TransactionModalProps {
   accounts: FinanceAccount[];
   categories: FinanceCategoryOptions;
   defaultDate?: string;
+  transaction?: FinanceTransaction | null;
   onClose: () => void;
   onSubmit: (input: CreateFinanceTransactionInput) => Promise<void>;
 }
 
 /** 统一的收入 / 支出记账弹框，供财务页和日历页共用。 */
 export const TransactionModal: React.FC<TransactionModalProps> = ({
-  open, accounts, categories, defaultDate, onClose, onSubmit,
+  open, accounts, categories, defaultDate, transaction, onClose, onSubmit,
 }) => {
   const [entryType, setEntryType] = useState<'expense' | 'income'>('expense');
   const [category, setCategory] = useState<string>(EXPENSE_CATEGORIES[0]);
@@ -42,10 +43,11 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
 
   useEffect(() => {
     if (!open) return;
-    setEntryType('expense');
-    setCategory(EXPENSE_CATEGORIES[0]);
+    const nextType = transaction?.transactionType === 'income' ? 'income' : 'expense';
+    setEntryType(nextType);
+    setCategory(transaction?.category ?? (nextType === 'expense' ? EXPENSE_CATEGORIES[0] : INCOME_CATEGORIES[0]));
     setError(null);
-  }, [open]);
+  }, [open, transaction]);
 
   const closeModal = () => {
     if (isSaving) return;
@@ -79,29 +81,30 @@ export const TransactionModal: React.FC<TransactionModalProps> = ({
   };
 
   return (
-    <Modal open={open} title="记一笔" onClose={closeModal} width={600} centered>
-      <form key={`${open}-${defaultDate ?? 'today'}`} className={styles.transactionForm} onSubmit={(event) => { void submitTransaction(event); }}>
+    <Modal open={open} title={transaction ? '编辑流水' : '记一笔'} onClose={closeModal} width={600} centered>
+      <form key={`${open}-${transaction?.id ?? defaultDate ?? 'today'}`} className={styles.transactionForm} onSubmit={(event) => { void submitTransaction(event); }}>
         <div className={styles.typeSwitch} aria-label="流水类型">
           <button type="button" className={entryType === 'expense' ? styles.typeActive : ''} onClick={() => { setEntryType('expense'); setCategory(EXPENSE_CATEGORIES[0]); }}>支出</button>
           <button type="button" className={entryType === 'income' ? styles.typeActive : ''} onClick={() => { setEntryType('income'); setCategory(INCOME_CATEGORIES[0]); }}>收入</button>
         </div>
         {error && <div className={styles.modalError} role="alert">{error}</div>}
-        <label className={styles.amountField}><span>金额</span><div><b>¥</b><input name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required autoFocus /></div></label>
+        <label className={styles.amountField}><span>金额</span><div><b>¥</b><input name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" defaultValue={transaction?.amount} required autoFocus /></div></label>
         <div className={styles.formGrid}>
           <Select
             name="accountId"
             label="资产账户"
             options={accounts.map((account) => ({ value: account.id, label: `${account.name} · ${money(account.balance)}` }))}
+            defaultValue={transaction?.accountId}
             fieldSize="md"
             fullWidth
             required
           />
           <CategoryPicker options={availableCategories} value={category} onChange={setCategory} disabled={isSaving} />
-          <label className={styles.wideField}><span>说明</span><input name="note" required placeholder={entryType === 'expense' ? '例如：午餐' : '例如：九月工资'} /></label>
-          <label><span>日期</span><input name="date" type="date" defaultValue={defaultDate ?? formatLocalDate(new Date())} required /></label>
-          <label><span>时间</span><input name="time" type="time" defaultValue={nowTime()} required /></label>
+          <label className={styles.wideField}><span>说明</span><input name="note" defaultValue={transaction?.note} required placeholder={entryType === 'expense' ? '例如：午餐' : '例如：九月工资'} /></label>
+          <label><span>日期</span><input name="date" type="date" defaultValue={transaction?.date ?? defaultDate ?? formatLocalDate(new Date())} required /></label>
+          <label><span>时间</span><input name="time" type="time" defaultValue={transaction?.time.slice(0, 5) ?? nowTime()} required /></label>
         </div>
-        <div className={styles.modalActions}><Button type="button" variant="outline" onClick={closeModal} disabled={isSaving}>取消</Button><Button type="submit" variant="primary" disabled={isSaving || !category.trim()}>{isSaving ? '保存中…' : `保存${entryType === 'expense' ? '支出' : '收入'}`}</Button></div>
+        <div className={styles.modalActions}><Button type="button" variant="outline" onClick={closeModal} disabled={isSaving}>取消</Button><Button type="submit" variant="primary" disabled={isSaving || !category.trim()}>{isSaving ? '保存中…' : transaction ? '保存修改' : `保存${entryType === 'expense' ? '支出' : '收入'}`}</Button></div>
       </form>
     </Modal>
   );

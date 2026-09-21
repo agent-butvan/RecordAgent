@@ -3,7 +3,6 @@ package butvan.agent.network.record.repository;
 import butvan.agent.network.record.model.RecordModels.DaySummary;
 import butvan.agent.network.record.model.RecordModels.RecordEntry;
 import butvan.agent.network.record.model.RecordModels.RecordType;
-import butvan.agent.network.record.model.RecordModels.RecordAttachment;
 import butvan.agent.network.record.model.RecordModels.RecordTab;
 import butvan.agent.network.record.model.RecordModels.RecordReference;
 import lombok.RequiredArgsConstructor;
@@ -186,39 +185,6 @@ public class RecordRepository {
         return jdbcTemplate.update("DELETE FROM record_tab WHERE owner_id = ? AND id = ? AND system_key IS NULL", ownerId, tabId) == 1;
     }
 
-    /** 保存附件元数据。 */
-    public void insertAttachment(RecordAttachment attachment) {
-        jdbcTemplate.update("""
-                INSERT INTO record_attachment (id, record_id, original_name, stored_name, media_type, size_bytes, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, attachment.id(), attachment.recordId(), attachment.originalName(), attachment.storedName(),
-                attachment.mediaType(), attachment.sizeBytes(), attachment.createdAt().toString());
-    }
-
-    /** 查询一条记录的全部附件。 */
-    public List<RecordAttachment> findAttachments(String ownerId, String recordId) {
-        return jdbcTemplate.query("""
-                SELECT a.* FROM record_attachment a JOIN record_entry r ON r.id = a.record_id
-                WHERE r.owner_id = ? AND r.id = ? ORDER BY a.created_at
-                """, (rs, rowNum) -> mapAttachment(rs), ownerId, recordId);
-    }
-
-    /** 查询指定用户拥有的附件。 */
-    public Optional<RecordAttachment> findAttachment(String ownerId, String recordId, String attachmentId) {
-        return jdbcTemplate.query("""
-                SELECT a.* FROM record_attachment a JOIN record_entry r ON r.id = a.record_id
-                WHERE r.owner_id = ? AND r.id = ? AND a.id = ?
-                """, (rs, rowNum) -> mapAttachment(rs), ownerId, recordId, attachmentId).stream().findFirst();
-    }
-
-    /** 删除附件元数据。 */
-    public boolean deleteAttachment(String ownerId, String recordId, String attachmentId) {
-        return jdbcTemplate.update("""
-                DELETE FROM record_attachment WHERE id = ? AND record_id = ?
-                  AND EXISTS (SELECT 1 FROM record_entry WHERE id = ? AND owner_id = ?)
-                """, attachmentId, recordId, recordId, ownerId) == 1;
-    }
-
     /** 替换一条记录的全部标签。 */
     public void replaceTags(String ownerId, String recordId, List<String> tags, Instant now) {
         jdbcTemplate.update("DELETE FROM record_entry_tag WHERE record_id = ?", recordId);
@@ -261,12 +227,6 @@ public class RecordRepository {
                 rs.getBoolean("archived"), trashedAt == null ? null : Instant.parse(trashedAt),
                 (Integer) rs.getObject("week_year"), (Integer) rs.getObject("week_number"), rs.getInt("version"),
                 Instant.parse(rs.getString("created_at")), Instant.parse(rs.getString("updated_at")));
-    }
-
-    private RecordAttachment mapAttachment(ResultSet rs) throws SQLException {
-        return new RecordAttachment(rs.getString("id"), rs.getString("record_id"), rs.getString("original_name"),
-                rs.getString("stored_name"), rs.getString("media_type"), rs.getLong("size_bytes"),
-                Instant.parse(rs.getString("created_at")));
     }
 
     private String safe(String value) { return value == null ? "" : value.trim(); }

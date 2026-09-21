@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowClockwiseIcon, ArrowsLeftRightIcon, CaretRightIcon, PlusIcon, SparkleIcon, WalletIcon } from '@phosphor-icons/react';
-import { createFinanceAccount, createFinanceTransaction, createFinanceTransfer, fetchFinanceCategories, fetchFinanceExpenseChart, fetchFinanceOverview, fetchFinanceTransactions } from '../../services/financeApi';
-import type { CreateFinanceTransactionInput, CreateFinanceTransferInput, FinanceAccountType, FinanceCategoryOptions, FinanceChartRange, FinanceExpenseChart, FinanceOverview, FinanceTransaction } from '../../types/finance';
+import { ArrowClockwiseIcon, ArrowsLeftRightIcon, CaretRightIcon, PencilSimpleIcon, PlusIcon, SparkleIcon, WalletIcon } from '@phosphor-icons/react';
+import { createFinanceAccount, createFinanceBalanceAdjustment, createFinanceTransaction, createFinanceTransfer, fetchFinanceCategories, fetchFinanceExpenseChart, fetchFinanceOverview, fetchFinanceTransactions, updateFinanceTransaction } from '../../services/financeApi';
+import type { CreateFinanceBalanceAdjustmentInput, CreateFinanceTransactionInput, CreateFinanceTransferInput, FinanceAccount, FinanceAccountType, FinanceCategoryOptions, FinanceChartRange, FinanceExpenseChart, FinanceOverview, FinanceTransaction } from '../../types/finance';
 import { Button } from '../common/Button';
 import { useMessage } from '../common/Message';
 import { Modal } from '../common/Modal';
@@ -9,6 +9,7 @@ import { TopBar } from '../common/TopBar';
 import styles from './FinancePage.module.css';
 import { AccountTypeIcon } from './AccountTypeIcon';
 import { AssetAccountDeck } from './AssetAccountDeck';
+import { AssetAdjustmentModal } from './AssetAdjustmentModal';
 import { SpendingTrendChart } from './SpendingTrendChart';
 import { TransactionTypeIcon } from './TransactionTypeIcon';
 import { TransactionDrawer } from './TransactionDrawer';
@@ -42,9 +43,11 @@ export const FinancePage: React.FC = () => {
   const [chartError, setChartError] = useState<string | null>(null);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<FinanceTransaction | null>(null);
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [isTransactionDrawerOpen, setIsTransactionDrawerOpen] = useState(false);
   const [isAssetDetailModalOpen, setIsAssetDetailModalOpen] = useState(false);
+  const [adjustmentAccount, setAdjustmentAccount] = useState<FinanceAccount | null>(null);
   const [allTransactions, setAllTransactions] = useState<FinanceTransaction[]>([]);
   const [isTransactionsLoading, setIsTransactionsLoading] = useState(false);
   const [transactionsError, setTransactionsError] = useState<string | null>(null);
@@ -112,7 +115,19 @@ export const FinancePage: React.FC = () => {
 
   const openTransactionModal = () => {
     if (!overview?.accounts.length) return;
+    setEditingTransaction(null);
     setIsTransactionModalOpen(true);
+  };
+
+  const editTransaction = (transaction: FinanceTransaction) => {
+    setIsTransactionDrawerOpen(false);
+    setEditingTransaction(transaction);
+    setIsTransactionModalOpen(true);
+  };
+
+  const closeTransactionModal = () => {
+    setIsTransactionModalOpen(false);
+    setEditingTransaction(null);
   };
 
   const submitAccount = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -138,8 +153,13 @@ export const FinancePage: React.FC = () => {
   };
 
   const submitTransaction = async (input: CreateFinanceTransactionInput) => {
-    await createFinanceTransaction(input);
-    setIsTransactionModalOpen(false);
+    if (editingTransaction) {
+      await updateFinanceTransaction(editingTransaction.id, input);
+      showMessage('success', '流水已更新，账户余额已同步调整');
+    } else {
+      await createFinanceTransaction(input);
+    }
+    closeTransactionModal();
     try {
       await Promise.all([load(), loadChart(chartRange), ...(isTransactionDrawerOpen ? [loadAllTransactions()] : [])]);
     } catch (cause) {
@@ -155,6 +175,19 @@ export const FinancePage: React.FC = () => {
     } catch (cause) {
       showMessage('error', cause instanceof Error ? `划账已保存，但财务数据刷新失败：${cause.message}` : '划账已保存，但财务数据刷新失败');
     }
+  };
+
+  const openBalanceAdjustment = (account: FinanceAccount) => {
+    setIsAssetDetailModalOpen(false);
+    setAdjustmentAccount(account);
+  };
+
+  const submitBalanceAdjustment = async (input: CreateFinanceBalanceAdjustmentInput) => {
+    if (!adjustmentAccount) return;
+    await createFinanceBalanceAdjustment(adjustmentAccount.id, input);
+    setAdjustmentAccount(null);
+    showMessage('success', '资产余额已调整，并记录为余额校准流水');
+    await load();
   };
 
   return <main className={styles.workspace}>
@@ -216,8 +249,12 @@ export const FinancePage: React.FC = () => {
               const isExpense = transaction.transactionType === 'expense';
               const isTransferOut = transaction.transactionType === 'transfer_out';
               const isTransferIn = transaction.transactionType === 'transfer_in';
-              const isOutflow = isExpense || isTransferOut;
-              const amountClass = isExpense
+              const isAdjustment = transaction.transactionType === 'adjustment_increase'
+                || transaction.transactionType === 'adjustment_decrease';
+              const isOutflow = isExpense || isTransferOut || transaction.transactionType === 'adjustment_decrease';
+              const amountClass = isAdjustment
+                ? styles.adjustmentAmount
+                : isExpense
                 ? styles.outAmount
                 : isTransferOut
                 ? styles.transferOutAmount
@@ -227,7 +264,16 @@ export const FinancePage: React.FC = () => {
               return <div className={styles.transactionRow} key={transaction.id}>
                 <TransactionTypeIcon type={transaction.transactionType} category={transaction.category} />
                 <span className={styles.transactionBody}><strong>{transaction.note}</strong><small>{transaction.accountName} · {transaction.category} · {transaction.date.slice(5)} {transaction.time.slice(0, 5)}</small></span>
-                <strong className={amountClass}>{isOutflow ? '-' : '+'}{money(transaction.amount)}</strong>
+                <div className={styles.transactionActions}>
+                  <strong className={amountClass}>{isOutflow ? '-' : '+'}{money(transaction.amount)}</strong>
+                  {transaction.source === 'manual' && (isExpense || transaction.transactionType === 'income') && <button
+                    type="button"
+                    className={styles.transactionEditButton}
+                    onClick={() => editTransaction(transaction)}
+                    aria-label={`编辑流水：${transaction.note}`}
+                    title="编辑流水"
+                  ><PencilSimpleIcon size={12} /></button>}
+                </div>
               </div>;
             })}</div> : <div className={styles.emptyState}><WalletIcon size={20} /><strong>还没有流水记录</strong><p>{overview?.accounts.length ? '点击右上角“记一笔”开始记录。' : '先添加资产账户，再记录收入或支出。'}</p>{!overview?.accounts.length && <Button type="button" variant="outline" size="sm" onClick={openAccountModal}>添加第一个账户</Button>}</div>}
           </section>
@@ -247,7 +293,8 @@ export const FinancePage: React.FC = () => {
       open={isTransactionModalOpen}
       accounts={overview?.accounts ?? []}
       categories={categoryOptions}
-      onClose={() => setIsTransactionModalOpen(false)}
+      transaction={editingTransaction}
+      onClose={closeTransactionModal}
       onSubmit={submitTransaction}
     />
 
@@ -288,6 +335,7 @@ export const FinancePage: React.FC = () => {
       error={transactionsError}
       onClose={() => setIsTransactionDrawerOpen(false)}
       onRetry={() => void loadAllTransactions()}
+      onEdit={editTransaction}
     />
 
     <AssetDetailModal
@@ -296,6 +344,14 @@ export const FinancePage: React.FC = () => {
       totalAssets={overview?.totalAssets ?? 0}
       onClose={() => setIsAssetDetailModalOpen(false)}
       onAddAccount={openAccountModal}
+      onAdjustAccount={openBalanceAdjustment}
+    />
+
+    <AssetAdjustmentModal
+      open={adjustmentAccount !== null}
+      account={adjustmentAccount}
+      onClose={() => setAdjustmentAccount(null)}
+      onSubmit={submitBalanceAdjustment}
     />
   </main>;
 };
