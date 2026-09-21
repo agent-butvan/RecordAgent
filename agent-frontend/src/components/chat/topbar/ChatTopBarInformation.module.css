@@ -1,5 +1,7 @@
 /* 根容器：相对定位，容纳触发区与浮动面板；靠右对齐展示 */
 .root {
+  --information-expense: #b65d50;
+  --information-income: #328166;
   position: relative;
   display: flex;
   flex: 0 1 auto;
@@ -74,12 +76,12 @@
 }
 
 .triggerExpense {
-  color: var(--text-secondary);
+  color: var(--information-expense);
   font-weight: 500;
 }
 
 .triggerIncome {
-  color: var(--text-secondary);
+  color: var(--information-income);
   font-weight: 500;
 }
 
@@ -206,8 +208,13 @@
 
 .weatherIcon {
   display: inline-flex;
-  color: var(--text-secondary);
 }
+
+.weatherSun { color: #b4812c; }
+.weatherRain { color: #527cac; }
+.weatherStorm { color: #7a68a6; }
+.weatherCool { color: #45868f; }
+.weatherCloud { color: #7b8795; }
 
 .cardTitle {
   margin: 0;
@@ -629,8 +636,8 @@
   padding: 1px 5px;
   border-radius: var(--radius-sm);
   font-size: 10px;
-  background: #fef2f2;
-  color: #991b1b;
+  background: #fbf0e5;
+  color: #9a652e;
 }
 
 .priorityMedium {
@@ -705,8 +712,8 @@
   font-variant-numeric: tabular-nums;
 }
 
-.expenseVal { color: var(--text-secondary); }
-.incomeVal { color: var(--text-secondary); }
+.expenseVal { color: var(--information-expense); }
+.incomeVal { color: var(--information-income); }
 
 .monthSummaryBar {
   flex-wrap: wrap;

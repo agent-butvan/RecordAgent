@@ -53,75 +53,75 @@ interface ResourceState<T> {
   reload: () => void;
 }
 
-/** 根据天气状态匹配不同的天气图标与各具层次的蓝色调 */
+/** 天气以小面积语义色区分晴、雨、雷暴与阴天。 */
 function getWeatherVisual(condition: string = '', size = 13) {
   const c = condition.trim();
   if (c.includes('雷')) {
     return {
       icon: <CloudLightning size={size} />,
-      color: '#4338ca', // 雷暴深电蓝
+      className: styles.weatherStorm,
       label: condition || '雷阵雨',
     };
   }
   if (c.includes('暴雨') || c.includes('大雨')) {
     return {
       icon: <CloudRain size={size} />,
-      color: '#1d4ed8', // 暴雨深蓝
+      className: styles.weatherRain,
       label: condition || '大雨',
     };
   }
   if (c.includes('雨')) {
     return {
       icon: <CloudDrizzle size={size} />,
-      color: '#2563eb', // 细雨/小雨湛蓝
+      className: styles.weatherRain,
       label: condition || '小雨',
     };
   }
   if (c.includes('雪')) {
     return {
       icon: <CloudSnow size={size} />,
-      color: '#06b6d4', // 冰雪霜蓝
+      className: styles.weatherCool,
       label: condition || '雪',
     };
   }
   if (c.includes('阴')) {
     return {
       icon: <Cloud size={size} />,
-      color: '#475569', // 阴天钢灰蓝
+      className: styles.weatherCloud,
       label: condition || '阴',
     };
   }
   if (c.includes('多云')) {
     return {
       icon: <CloudSun size={size} />,
-      color: '#0284c7', // 多云海天蓝
+      className: styles.weatherCloud,
       label: condition || '多云',
     };
   }
   if (c.includes('晴')) {
     return {
       icon: <Sun size={size} />,
-      color: '#0ea5e9', // 晴空澄碧天蓝
+      className: styles.weatherSun,
       label: condition || '晴',
     };
   }
   if (c.includes('风')) {
     return {
       icon: <Wind size={size} />,
-      color: '#0891b2', // 清风青蓝
+      className: styles.weatherCool,
       label: condition || '有风',
     };
   }
   if (c.includes('雾') || c.includes('霾')) {
     return {
       icon: <CloudFog size={size} />,
-      color: '#64748b', // 雾霭青灰
+      className: styles.weatherCloud,
       label: condition || '雾霾',
     };
   }
   return {
     icon: <CloudSun size={size} />,
-    color: '#0284c7',
+    className: styles.weatherCloud,
     label: condition || '多云',
   };
 }
@@ -257,7 +257,7 @@ export function ChatTopBarInformation({ onOpenFeature }: ChatTopBarInformationPr
           <InformationTrigger
             moduleId="weather"
             icon={
-              <span className={styles.weatherIcon}>
+              <span className={`${styles.weatherIcon} ${weatherVisual.className}`}>
                 {weatherVisual.icon}
               </span>
             }
@@ -571,7 +571,7 @@ function WeatherDetail({ resource }: { resource: ResourceState<DailyContextSumma
     <div aria-labelledby="topbar-weather-title">
       <div className={styles.cardHeader}>
         <div className={styles.cardTitleBlock}>
-          <span className={styles.weatherIcon}>
+          <span className={`${styles.weatherIcon} ${weatherVisual.className}`}>
             {weatherVisual.icon}
           </span>
           <div>
@@ -589,7 +589,7 @@ function WeatherDetail({ resource }: { resource: ResourceState<DailyContextSumma
             <span>{weather.locationName}</span>
           </div>
           <span className={styles.weatherConditionTag}>
-            <span className={styles.weatherIcon}>
+            <span className={`${styles.weatherIcon} ${weatherVisual.className}`}>
               {weatherVisual.icon}
             </span>
             <span>{weather.condition}</span>
@@ -598,7 +598,7 @@ function WeatherDetail({ resource }: { resource: ResourceState<DailyContextSumma
 
         <div className={styles.weatherHeroMain}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span className={styles.weatherIcon}>
+            <span className={`${styles.weatherIcon} ${weatherVisual.className}`}>
               {getWeatherVisual(weather.condition, 32).icon}
             </span>
             <div className={styles.weatherDegree}>
@@ -914,7 +914,7 @@ function FinanceDetail({
                     </div>
                   </div>
                   <span
-                    className={styles.transactionAmount}
+                    className={`${styles.transactionAmount} ${isOutflow ? styles.expenseVal : styles.incomeVal}`}
                   >
                     {isOutflow ? '-' : '+'}
                     {formatMoney(item.amount, item.currency)}
