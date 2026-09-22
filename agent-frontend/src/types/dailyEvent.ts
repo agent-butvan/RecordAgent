@@ -74,4 +74,5 @@ export interface DailyDaySummary {
   scheduleCount: number;
   expenseTotal: number;
   headline: string;
+  items?: Array<{ id: string; type: string; title: string }>;
 }

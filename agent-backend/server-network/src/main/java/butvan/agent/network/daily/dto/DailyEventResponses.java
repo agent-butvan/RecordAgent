@@ -47,8 +47,12 @@ public final class DailyEventResponses {
             int completedTodoCount,
             int scheduleCount,
             BigDecimal expenseTotal,
-            String headline) {
+            String headline,
+            List<CalendarItemResponse> items) {
     }
+
+    /** 月历轻量事项，不暴露内部记录及正文。 */
+    public record CalendarItemResponse(String id, String type, String title) {}
 
     /** 待办详情响应。 */
     public record TodoDetailResponse(
@@ -98,7 +102,8 @@ public final class DailyEventResponses {
     public static DaySummaryResponse from(DailyDaySummary summary) {
         return new DaySummaryResponse(
                 summary.date(), summary.eventCount(), summary.todoCount(), summary.completedTodoCount(),
-                summary.scheduleCount(), summary.expenseTotal(), summary.headline());
+                summary.scheduleCount(), summary.expenseTotal(), summary.headline(),
+                summary.items().stream().map(item -> new CalendarItemResponse(item.id(), item.type(), item.title())).toList());
     }
 
     private static Object mapDetails(Object details) {

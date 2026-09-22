@@ -146,6 +146,9 @@ public final class DailyEventModels {
     public record DailyDay(LocalDate date, List<DailyEvent> events) {
     }
 
+    /** 月历事项仅携带标题和类型，不包含正文及完整详情。 */
+    public record CalendarItem(LocalDate date, String id, String type, String title) {}
+
     /** 月历等范围视图需要的轻量日汇总。 */
     public record DailyDaySummary(
             LocalDate date,
@@ -154,6 +157,12 @@ public final class DailyEventModels {
             int completedTodoCount,
             int scheduleCount,
             BigDecimal expenseTotal,
-            String headline) {
+            String headline,
+            List<CalendarItem> items) {
+        /** 兼容基础统计组装，事项在 Service 统一补齐。 */
+        public DailyDaySummary(LocalDate date, int eventCount, int todoCount, int completedTodoCount,
+                int scheduleCount, BigDecimal expenseTotal, String headline) {
+            this(date, eventCount, todoCount, completedTodoCount, scheduleCount, expenseTotal, headline, List.of());
+        }
     }
 }

@@ -548,14 +548,14 @@
 
 .monthStats small { display: block; margin-top: 5px; color: var(--text-muted); font-size: 10px; }
 
-.activityLegend { display: flex; align-items: center; gap: 5px; margin-top: 14px; color: var(--text-muted); font-size: 10px; }
-.activityLegend i { width: 10px; height: 10px; border-radius: 2px; box-shadow: inset 0 0 0 1px #29352d08; }
-.activityLevel0 { background: white; }
-.activityLevel1 { background: #f5f7f6; }
-.activityLevel2 { background: #ebf0ed; }
-.activityLevel3 { background: #dee8e2; }
-.activityLevel4 { background: #cfddd4; }
-.activityNote { margin-left: auto; }
+ .itemLegend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; color: var(--text-muted); font-size: 10px; }
+.itemLegend span { display: inline-flex; align-items: center; gap: 5px; }
+.itemLegend i { display: inline-block; width: 3px; height: 9px; border-radius: 2px; }
+.todoMarker { background: #8fa9ce; }
+.scheduleMarker { background: #b69bc2; }
+.studyMarker { background: #91b6ad; }
+.recordMarker { background: #c9b17c; }
+.expenseMarker { background: #cda08e; }
 .monthStats { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; padding-top: 16px; border-top: 1px solid #edf0ee; }
 .monthStats dd { font-size: 12px; font-weight: 550; }
-@media (max-width: 620px) { .monthStats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .activityNote { display: none; } }
+@media (max-width: 620px) { .monthStats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

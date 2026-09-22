@@ -7,8 +7,6 @@ import type {
 } from '../../types/finance';
 import { formatStudyDuration } from './calendarPresentation';
 import { useStudyRealtime } from '../../context/studyRealtimeState';
-import { calendarActivity } from '../../features/calendar/calendarActivity';
-import { formatLocalDate } from '../../services/dailyEvents';
 import styles from './CalendarDayDetails.module.css';
 const LABELS: Record<FinanceTransactionType, string> = {
   income: '收入',
@@ -89,30 +87,12 @@ export function CalendarDayDetails({
   const groups = new Map<string, FinanceTransaction[]>();
   for (const item of assets)
     groups.set(item.accountId, [...(groups.get(item.accountId) ?? []), item]);
-  const activity = calendarActivity({
-    available:
-      !!entry &&
-      data?.study.status === 'fulfilled' &&
-      data?.records.status === 'fulfilled',
-    future: formatLocalDate(date) > formatLocalDate(new Date()),
-    studySeconds:
-      data?.study.status === 'fulfilled'
-        ? data.study.value.totalDurationSeconds
-        : 0,
-    completedTodos: entry?.todos.filter((item) => item.completed).length ?? 0,
-    records:
-      data?.records.status === 'fulfilled' ? data.records.value.length : 0,
-  });
-  const activityLabel = activity
-    ? `活力 ${activity.score} · 学习 / 完成待办 / 资料`
-    : '活力数据暂不可用';
   return (
     <div className={compact ? styles.compact : styles.full}>
       {!data ? (
         <p className={styles.empty}>正在读取当天记录…</p>
       ) : (
         <>
-          {compact && <p className={styles.activity}>{activityLabel}</p>}
           {failed && (
             <p className={styles.error}>
               部分数据读取失败{' '}

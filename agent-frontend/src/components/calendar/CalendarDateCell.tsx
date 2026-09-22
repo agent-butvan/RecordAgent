@@ -1,5 +1,5 @@
 import type { DailyDaySummary } from '../../types/dailyEvent';
-import { calendarActivity } from '../../features/calendar/calendarActivity';
+import { calendarCellItems } from '../../features/calendar/calendarItems';
 import { formatStudyDuration } from './calendarPresentation';
 import styles from './CalendarDateCell.module.css';
 
@@ -8,7 +8,6 @@ interface Props {
   dateKey: string;
   inMonth: boolean;
   today: boolean;
-  future: boolean;
   selected: boolean;
   available: boolean;
   previewOpen: boolean;
@@ -19,13 +18,12 @@ interface Props {
   onPreview: (anchor: HTMLButtonElement, immediate: boolean) => void;
   onLeave: () => void;
 }
-/** 月历只保留重点摘要，活力底色与今天、选中状态相互独立。 */
+/** 白底日期格展示简短事项标题，以低饱和色条区分来源。 */
 export function CalendarDateCell({
   date,
   dateKey,
   inMonth,
   today,
-  future,
   selected,
   available,
   previewOpen,
@@ -36,38 +34,16 @@ export function CalendarDateCell({
   onPreview,
   onLeave,
 }: Props) {
-  const todos = summary?.todoCount ?? 0;
-  const completed = summary?.completedTodoCount ?? 0;
-  const expense = summary?.expenseTotal ?? 0;
-  const activity = calendarActivity({
-    studySeconds,
-    completedTodos: completed,
-    records: recordCount,
-    available,
-    future,
-  });
-  const headline =
-    studySeconds > 0
-      ? `学习 ${formatStudyDuration(studySeconds)}`
-      : recordCount > 0
-        ? `${recordCount} 篇资料`
-        : summary?.scheduleCount
-          ? `${summary.scheduleCount} 个日程`
-          : expense > 0
-            ? `支出 ¥${expense.toFixed(expense < 10 ? 2 : 0)}`
-            : todos > 0
-              ? `${completed}/${todos} 待办`
-              : '';
-  const meta = [
-    todos > 0 && !headline.includes('待办')
-      ? `待办 ${completed}/${todos}`
-      : null,
-    recordCount > 0 && !headline.includes('资料')
-      ? `资料 ${recordCount}`
-      : null,
-  ]
-    .filter(Boolean)
-    .join(' · ');
+  const items = calendarCellItems(
+    summary,
+    studySeconds > 0 ? formatStudyDuration(studySeconds) : null,
+    recordCount,
+  );
+  const visibleItems = items.slice(0, 3);
+  const hasMore =
+    items.length > 3 ||
+    ((summary?.eventCount ?? 0) > (summary?.items?.length ?? 0) &&
+      items.length >= 3);
   return (
     <button
       type="button"
@@ -75,8 +51,6 @@ export function CalendarDateCell({
         styles.cell,
         !inMonth ? styles.outside : '',
         selected ? styles.selected : '',
-        inMonth && activity ? styles[`level${activity.level}`] : '',
-        inMonth && !activity ? styles.unavailable : '',
       ].join(' ')}
       onMouseEnter={(event) => onPreview(event.currentTarget, false)}
       onMouseLeave={onLeave}
@@ -90,20 +64,23 @@ export function CalendarDateCell({
       aria-current={today ? 'date' : undefined}
       aria-expanded={previewOpen}
       aria-controls={previewOpen ? 'calendar-day-preview' : undefined}
-      aria-label={`${dateKey}，${headline}，${meta}，${activity ? `活力 ${activity.score} 分` : '活力数据暂不可用'}`}
+      aria-label={`${dateKey}，${items.map((item) => item.title).join('，') || '暂无事项'}${!available ? '，部分摘要暂不可用' : ''}`}
     >
       <span className={`${styles.number} ${today ? styles.today : ''}`}>
         {date.getDate()}
       </span>
       {inMonth && (
-        <span className={styles.metrics}>
-          <span className={styles.headline}>{headline}</span>
-          <span className={styles.meta}>{meta}</span>
-        </span>
-      )}
-      {inMonth && !activity && (
-        <span className={styles.unavailableMark} aria-hidden="true">
-          ·
+        <span className={styles.items}>
+          {visibleItems.map((item) => (
+            <span
+              key={item.id}
+              className={`${styles.item} ${styles[item.tone]}`}
+            >
+              {item.title}
+            </span>
+          ))}
+          {hasMore && <span className={styles.more}>更多事项…</span>}
+          {!available && <span className={styles.more}>部分摘要暂不可用</span>}
         </span>
       )}
     </button>

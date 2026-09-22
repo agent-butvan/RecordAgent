@@ -62,7 +62,6 @@ export function CalendarMonthGrid({
               dateKey={key}
               inMonth={date.getMonth() === month}
               today={key === todayKey}
-              future={key > todayKey}
               selected={key === selectedKey}
               available={available}
               summary={summaries[key]}

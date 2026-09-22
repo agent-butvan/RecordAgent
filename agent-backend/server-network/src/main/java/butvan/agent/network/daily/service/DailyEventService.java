@@ -1,5 +1,6 @@
 package butvan.agent.network.daily.service;
 
+import butvan.agent.network.daily.model.DailyEventModels.CalendarItem;
 import butvan.agent.network.daily.model.DailyEventModels.DailyDay;
 import butvan.agent.network.daily.model.DailyEventModels.DailyDaySummary;
 import butvan.agent.network.daily.model.DailyEventModels.DailyEventCommand;
@@ -185,7 +186,12 @@ public class DailyEventService {
                         : new DailyDaySummary(date, current.eventCount() + day.financeExpenseCount(),
                         current.todoCount(), current.completedTodoCount(), current.scheduleCount(),
                         day.total(), current.headline())));
-        return summaries.values().stream().sorted(java.util.Comparator.comparing(DailyDaySummary::date)).toList();
+        var itemsByDate = repository.findCalendarItems(ownerId, from, to, LocalDate.now()).stream()
+                .collect(Collectors.groupingBy(CalendarItem::date));
+        return summaries.values().stream().sorted(java.util.Comparator.comparing(DailyDaySummary::date))
+                .map(day -> new DailyDaySummary(day.date(), day.eventCount(), day.todoCount(), day.completedTodoCount(),
+                        day.scheduleCount(), day.expenseTotal(), day.headline(),
+                        itemsByDate.getOrDefault(day.date(), List.of()))).toList();
     }
 
     /** 使用乐观版本检查修改待办完成状态。 */

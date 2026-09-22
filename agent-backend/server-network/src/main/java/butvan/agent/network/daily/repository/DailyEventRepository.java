@@ -1,5 +1,6 @@
 package butvan.agent.network.daily.repository;
 
+import butvan.agent.network.daily.model.DailyEventModels.CalendarItem;
 import butvan.agent.network.daily.model.DailyEventModels.DailyDaySummary;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -231,4 +232,37 @@ public class DailyEventRepository {
                 BigDecimal.ZERO,
                 resultSet.getString("headline")), from.toString(), to.toString(), ownerId);
     }
+    /** 批量读取每天最多四条事项标题，按日程、待办、学习、手记顺序展示。 */
+    public List<CalendarItem> findCalendarItems(
+            String ownerId, LocalDate from, LocalDate to, LocalDate today) {
+        return jdbcTemplate.query("""
+                WITH RECURSIVE dates(day) AS (
+                    SELECT ? UNION ALL SELECT date(day, '+1 day') FROM dates WHERE day < ?
+                ), ranked AS (
+                    SELECT dates.day, e.id, e.event_type, substr(e.title, 1, 80) AS title,
+                           ROW_NUMBER() OVER (PARTITION BY dates.day ORDER BY
+                               CASE e.event_type WHEN 'schedule' THEN 0 WHEN 'todo' THEN 1
+                                   WHEN 'study' THEN 2 WHEN 'journal' THEN 3 ELSE 4 END,
+                               e.created_at, e.id) AS position
+                    FROM dates
+                    JOIN daily_event e ON e.owner_id = ?
+                    LEFT JOIN todo_detail t ON t.event_id = e.id
+                    WHERE (
+                        (e.event_date = dates.day AND NOT (e.event_type = 'todo' AND COALESCE(t.recurrence, 'none') <> 'none'))
+                        OR (e.event_type = 'todo' AND e.event_date <= dates.day AND dates.day <= ? AND (
+                            t.recurrence = 'daily'
+                            OR (t.recurrence = 'weekly' AND
+                                ((CAST(strftime('%w', dates.day) AS INTEGER) + 6) % 7) + 1 = COALESCE(t.recurrence_weekday, 1))
+                            OR (t.recurrence = 'monthly' AND
+                                CAST(strftime('%d', dates.day) AS INTEGER) = COALESCE(t.recurrence_month_day, 1))
+                        ))
+                    )
+                )
+                SELECT day, id, event_type, title FROM ranked WHERE position <= 4 ORDER BY day, position
+                """, (rs, rowNum) -> new CalendarItem(
+                LocalDate.parse(rs.getString("day")), rs.getString("id"),
+                rs.getString("event_type"), rs.getString("title")),
+                from.toString(), to.toString(), ownerId, today.toString());
+    }
+
 }

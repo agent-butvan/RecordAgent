@@ -49,6 +49,24 @@ class DailyEventServiceIntegrationTest {
     }
 
     @Test
+    void calendarItemsAreBoundedOwnedAndDoNotProjectRecurringTodosIntoFuture() {
+        LocalDate today = LocalDate.now();
+        String owner = "calendar-items-user";
+        var recurring = dailyEventService.create(owner,
+                new TodoCommand(today.minusDays(1), "每日学习", null, "medium", "daily"));
+        for (int i = 0; i < 5; i++) {
+            dailyEventService.create(owner, new TodoCommand(today, "事项" + i, null, "medium"));
+        }
+        dailyEventService.create("other-calendar-owner", new TodoCommand(today, "其他用户的事项", null, "medium"));
+        var days = dailyEventService.getDays(owner, today, today.plusDays(1));
+        var summary = days.stream().filter(day -> day.date().equals(today)).findFirst().orElseThrow();
+        assertEquals(4, summary.items().size());
+        assertEquals(recurring.id(), summary.items().getFirst().id());
+        assertTrue(summary.items().stream().noneMatch(item -> item.title().equals("其他用户的事项")));
+        assertTrue(days.stream().noneMatch(day -> day.date().equals(today.plusDays(1))));
+    }
+
+    @Test
     void userCanCreateAndRetrieveTodoForOneDay() {
         LocalDate date = LocalDate.of(2026, 9, 3);
 

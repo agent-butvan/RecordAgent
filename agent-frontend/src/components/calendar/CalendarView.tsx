@@ -372,9 +372,10 @@ export const CalendarView: React.FC = () => {
                 available={summariesReady && recordsReady && studyStats !== null}
                 summaries={summaries} studyByDate={studyByDate} recordsByDate={recordsByDate}
                 onSelect={date => setSelected(startOfDay(date))} />
-              <div className={styles.activityLegend} aria-label="活力颜色从少到多">
-                <span>活力</span><span>少</span>{[0, 1, 2, 3, 4].map(level => <i key={level} className={styles[`activityLevel${level}`]} />)}<span>多</span>
-                <span className={styles.activityNote}>学习 · 完成待办 · 资料</span>
+              <div className={styles.itemLegend} aria-label="事项类别">
+                <span><i className={styles.todoMarker} />待办</span><span><i className={styles.scheduleMarker} />日程</span>
+                <span><i className={styles.studyMarker} />学习</span><span><i className={styles.recordMarker} />资料</span>
+                <span><i className={styles.expenseMarker} />支出</span>
               </div>
               <section className={styles.monthReview} aria-label="本月摘要">
                 <div className={styles.monthReviewHeading}><h3>本月摘要</h3><span>待办统计截至今天</span></div>

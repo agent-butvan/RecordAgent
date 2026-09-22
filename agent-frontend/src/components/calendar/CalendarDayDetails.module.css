@@ -137,10 +137,5 @@
 .full .document p {
   font-size: 12px;
 }
-.activity {
-  margin-top: 9px;
-  color: var(--text-muted);
-  font-size: 10px;
-}
 
 .compact { font-variant-numeric: tabular-nums; }
