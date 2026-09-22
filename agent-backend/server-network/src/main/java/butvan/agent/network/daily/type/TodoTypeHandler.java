@@ -50,6 +50,11 @@ public class TodoTypeHandler implements DailyEventTypeHandler<TodoCommand> {
 
     @Override
     public void update(String eventId, TodoCommand command) {
+        TodoRecurrenceRule previousRule = findRecurrenceRule(eventId);
+        TodoRecurrenceRule nextRule = new TodoRecurrenceRule(
+                normalizeRecurrence(command.recurrence()),
+                normalizeRecurrenceWeekday(command.recurrence(), command.recurrenceWeekday()),
+                normalizeRecurrenceMonthDay(command.recurrence(), command.recurrenceMonthDay()));
         int updated = jdbcTemplate.update(
                 """
                 UPDATE todo_detail
@@ -59,6 +64,9 @@ public class TodoTypeHandler implements DailyEventTypeHandler<TodoCommand> {
                 normalizeRecurrenceWeekday(command.recurrence(), command.recurrenceWeekday()),
                 normalizeRecurrenceMonthDay(command.recurrence(), command.recurrenceMonthDay()), eventId);
         if (updated != 1) throw new IllegalArgumentException("待办不存在");
+        if (!previousRule.equals(nextRule)) {
+            jdbcTemplate.update("DELETE FROM todo_completion WHERE event_id = ?", eventId);
+        }
     }
 
     /** 修改待办完成状态。 */
@@ -95,7 +103,7 @@ public class TodoTypeHandler implements DailyEventTypeHandler<TodoCommand> {
             case "none" -> occurrenceDate.equals(startDate);
             case "daily" -> true;
             case "weekly" -> occurrenceDate.getDayOfWeek().getValue() == rule.recurrenceWeekday();
-            case "monthly" -> occurrenceDate.getDayOfMonth() == rule.recurrenceMonthDay();
+            case "monthly" -> occurrenceDate.getDayOfMonth() == occurrenceDate.lengthOfMonth();
             default -> false;
         };
     }
@@ -174,9 +182,8 @@ public class TodoTypeHandler implements DailyEventTypeHandler<TodoCommand> {
 
     private Integer normalizeRecurrenceMonthDay(String recurrence, Integer monthDay) {
         if (!"monthly".equals(normalizeRecurrence(recurrence))) return null;
-        int value = monthDay == null ? 1 : monthDay;
-        if (value < 1 || value > 31) throw new IllegalArgumentException("每月重复日期必须在 1 到 31 号之间");
-        return value;
+        if (monthDay != null && monthDay != 31) throw new IllegalArgumentException("每月待办固定在月末");
+        return 31;
     }
 
     private Integer nullableInteger(java.sql.ResultSet resultSet, String column) throws java.sql.SQLException {

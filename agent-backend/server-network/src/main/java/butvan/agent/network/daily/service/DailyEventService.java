@@ -171,16 +171,13 @@ public class DailyEventService {
         if (from == null || to == null || from.isAfter(to)) throw new IllegalArgumentException("日期范围不合法");
         Map<LocalDate, DailyDaySummary> summaries = repository.findDaySummaries(ownerId, from, to).stream()
                 .collect(Collectors.toMap(DailyDaySummary::date, item -> item, (left, right) -> left, LinkedHashMap::new));
-        LocalDate recurringSummaryEnd = to.isAfter(LocalDate.now()) ? LocalDate.now() : to;
-        if (!from.isAfter(recurringSummaryEnd)) {
-            repository.findRecurringTodoSummaries(ownerId, from, recurringSummaryEnd).forEach(recurring ->
-                    summaries.compute(recurring.date(), (date, current) -> current == null
-                            ? recurring
-                            : new DailyDaySummary(date, current.eventCount() + recurring.eventCount(),
-                            current.todoCount() + recurring.todoCount(),
-                            current.completedTodoCount() + recurring.completedTodoCount(), current.scheduleCount(),
-                            current.expenseTotal(), current.headline() == null ? recurring.headline() : current.headline())));
-        }
+        repository.findRecurringTodoSummaries(ownerId, from, to, LocalDate.now()).forEach(recurring ->
+                summaries.compute(recurring.date(), (date, current) -> current == null
+                        ? recurring
+                        : new DailyDaySummary(date, current.eventCount() + recurring.eventCount(),
+                        current.todoCount() + recurring.todoCount(),
+                        current.completedTodoCount() + recurring.completedTodoCount(), current.scheduleCount(),
+                        current.expenseTotal(), current.headline() == null ? recurring.headline() : current.headline())));
         expenseAnalyticsService.analyze(ownerId, from, to).days().stream()
                 .filter(day -> day.total().signum() > 0)
                 .forEach(day -> summaries.compute(day.date(), (date, current) -> current == null
@@ -211,9 +208,7 @@ public class DailyEventService {
                 .map(row -> {
                     LocalDate occurrenceDate = "weekly".equals(row.recurrence())
                             ? weekStart.plusDays(row.recurrenceWeekday() - 1L)
-                            : row.recurrenceMonthDay() <= focusDate.lengthOfMonth()
-                                    ? monthStart.withDayOfMonth(row.recurrenceMonthDay())
-                                    : null;
+                            : monthEnd;
                     if (occurrenceDate == null || occurrenceDate.isBefore(row.effectiveDate())) return null;
                     return new RecurringTodo(
                             row.id(), row.title(), row.version(), row.recurrence(), occurrenceDate, row.completed());

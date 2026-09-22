@@ -83,7 +83,7 @@ public class DailyEventRepository {
                       OR (t.recurrence = 'weekly' AND
                           ((CAST(strftime('%w', ?) AS INTEGER) + 6) % 7) + 1 = COALESCE(t.recurrence_weekday, 1))
                       OR (t.recurrence = 'monthly' AND
-                          CAST(strftime('%d', ?) AS INTEGER) = COALESCE(t.recurrence_month_day, 1))
+                          ? = date(?, 'start of month', '+1 month', '-1 day'))
                     ))
                   )
                 ORDER BY created_at ASC, id ASC
@@ -97,7 +97,8 @@ public class DailyEventRepository {
                 resultSet.getInt("version"),
                 Instant.parse(resultSet.getString("created_at")),
                 Instant.parse(resultSet.getString("updated_at"))), ownerId,
-                date.toString(), date.toString(), date.toString(), date.toString(), date.toString());
+                date.toString(), date.toString(), date.toString(), date.toString(), date.toString(),
+                date.toString());
     }
 
     /** 按所有者读取一条日记录，防止跨用户修改。 */
@@ -246,7 +247,8 @@ public class DailyEventRepository {
     }
 
     /** 查询日期范围内周期待办的逐日轻量汇总，不加载其他类型详情。 */
-    public List<DailyDaySummary> findRecurringTodoSummaries(String ownerId, LocalDate from, LocalDate to) {
+    public List<DailyDaySummary> findRecurringTodoSummaries(
+            String ownerId, LocalDate from, LocalDate to, LocalDate today) {
         return jdbcTemplate.query("""
                 WITH RECURSIVE dates(event_date) AS (
                     SELECT ?
@@ -273,8 +275,9 @@ public class DailyEventRepository {
                     OR (t.recurrence = 'weekly' AND
                         ((CAST(strftime('%w', dates.event_date) AS INTEGER) + 6) % 7) + 1 = COALESCE(t.recurrence_weekday, 1))
                     OR (t.recurrence = 'monthly' AND
-                        CAST(strftime('%d', dates.event_date) AS INTEGER) = COALESCE(t.recurrence_month_day, 1))
+                        dates.event_date = date(dates.event_date, 'start of month', '+1 month', '-1 day'))
                   )
+                  AND (t.recurrence = 'monthly' OR dates.event_date <= ?)
                 GROUP BY dates.event_date
                 ORDER BY dates.event_date
                 """, (resultSet, rowNumber) -> new DailyDaySummary(
@@ -284,7 +287,7 @@ public class DailyEventRepository {
                 resultSet.getInt("completed_count"),
                 0,
                 BigDecimal.ZERO,
-                resultSet.getString("headline")), from.toString(), to.toString(), ownerId);
+                resultSet.getString("headline")), from.toString(), to.toString(), ownerId, today.toString());
     }
     /** 批量读取每天最多四条事项标题，按日程、待办、学习、手记顺序展示。 */
     public List<CalendarItem> findCalendarItems(
@@ -303,12 +306,13 @@ public class DailyEventRepository {
                     LEFT JOIN todo_detail t ON t.event_id = e.id
                     WHERE (
                         (e.event_date = dates.day AND NOT (e.event_type = 'todo' AND COALESCE(t.recurrence, 'none') <> 'none'))
-                        OR (e.event_type = 'todo' AND e.event_date <= dates.day AND dates.day <= ? AND (
+                        OR (e.event_type = 'todo' AND e.event_date <= dates.day
+                            AND (dates.day <= ? OR t.recurrence = 'monthly') AND (
                             t.recurrence = 'daily'
                             OR (t.recurrence = 'weekly' AND
                                 ((CAST(strftime('%w', dates.day) AS INTEGER) + 6) % 7) + 1 = COALESCE(t.recurrence_weekday, 1))
                             OR (t.recurrence = 'monthly' AND
-                                CAST(strftime('%d', dates.day) AS INTEGER) = COALESCE(t.recurrence_month_day, 1))
+                                dates.day = date(dates.day, 'start of month', '+1 month', '-1 day'))
                         ))
                     )
                 )

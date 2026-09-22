@@ -89,6 +89,30 @@ class DailyEventApiIntegrationTest {
                 .andExpect(jsonPath("$.data.details.endTime").doesNotExist());
     }
 
+    @Test
+    void apiCreatesMonthlyTodoOnTheNaturalMonthEnd() throws Exception {
+        mockMvc.perform(post("/agent/daily-events/todos")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "eventDate": "2026-02-10",
+                                  "title": "完成月度总结",
+                                  "priority": "medium",
+                                  "recurrence": "monthly"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.details.recurrenceMonthDay").value(31));
+
+        mockMvc.perform(get("/agent/daily-events/days/2026-02-28"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.events[0].title").value("完成月度总结"));
+
+        mockMvc.perform(get("/agent/daily-events/recurring-todos?date=2026-02-10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].occurrenceDate").value("2026-02-28"));
+    }
+
     private static Path createDatabasePath() {
         try {
             return Files.createTempDirectory("butvan-daily-api-test-").resolve("butvan.db");

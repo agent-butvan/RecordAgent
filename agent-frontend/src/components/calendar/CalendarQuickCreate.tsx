@@ -54,11 +54,6 @@ const WEEKDAY_OPTIONS = ['周一', '周二', '周三', '周四', '周五', '周�
   label,
 }));
 
-const MONTH_DAY_OPTIONS = Array.from({ length: 31 }, (_, index) => ({
-  value: String(index + 1),
-  label: `${index + 1} 号`,
-}));
-
 const valueOf = (formData: FormData, key: string): string => String(formData.get(key) ?? '').trim();
 const optionalNumberOf = (formData: FormData, key: string): number | undefined => {
   const value = valueOf(formData, key);
@@ -96,7 +91,7 @@ export const CalendarQuickCreate: React.FC<CalendarQuickCreateProps> = ({ select
         priority: (valueOf(formData, 'priority') || 'medium') as TodoPriority,
         recurrence: (valueOf(formData, 'recurrence') || 'none') as TodoRecurrence,
         recurrenceWeekday: optionalNumberOf(formData, 'recurrenceWeekday'),
-        recurrenceMonthDay: optionalNumberOf(formData, 'recurrenceMonthDay'),
+        recurrenceMonthDay: todoRecurrence === 'monthly' ? 31 : undefined,
       };
     } else if (activeKind === 'schedule') {
       draft = {
@@ -176,16 +171,7 @@ export const CalendarQuickCreate: React.FC<CalendarQuickCreateProps> = ({ select
                 />
               )}
               {todoRecurrence === 'monthly' && (
-                <Select
-                  name="recurrenceMonthDay"
-                  label="每月日期"
-                  options={MONTH_DAY_OPTIONS}
-                  defaultValue={String(selectedDate.getDate())}
-                  description="当月没有所选日期时，该月不会生成此待办"
-                  fieldSize="md"
-                  fullWidth
-                  containerClassName={styles.recurrenceRule}
-                />
+                <p className={styles.monthlyRuleHint}>每月最后一天显示，并同步到本月待办便签。</p>
               )}
             </>}
 

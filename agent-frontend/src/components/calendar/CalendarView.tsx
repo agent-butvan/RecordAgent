@@ -56,6 +56,7 @@ interface DeleteTarget {
   version: number;
   kind: '待办' | '日程' | '花销' | '手记';
   title: string;
+  recurrence?: 'none' | 'daily' | 'weekly' | 'monthly';
 }
 
 function startOfDay(date: Date): Date {
@@ -76,6 +77,13 @@ function totalExpense(entry: CalendarDayEntry): number {
 
 function totalIncome(entry: CalendarDayEntry): number {
   return entry.incomes.reduce((total, income) => total + income.amount, 0);
+}
+
+function recurringDeleteImpact(recurrence: DeleteTarget['recurrence']): string {
+  if (recurrence === 'monthly') return '，以后每个月都不会再出现';
+  if (recurrence === 'weekly') return '，以后每周都不会再出现';
+  if (recurrence === 'daily') return '，以后每天都不会再出现';
+  return '';
 }
 
 const EMPTY_ENTRY: CalendarDayEntry = { todos: [], expenses: [], incomes: [], schedules: [], journals: [], photos: [], otherRecords: [] };
@@ -263,7 +271,7 @@ export const CalendarView: React.FC = () => {
   };
 
   const requestDelete = (
-    record: { id?: string; version?: number },
+    record: { id?: string; version?: number; recurrence?: 'none' | 'daily' | 'weekly' | 'monthly' },
     kind: DeleteTarget['kind'],
     title: string,
   ) => {
@@ -271,7 +279,7 @@ export const CalendarView: React.FC = () => {
       showMessage('error', `缺少${kind}版本信息，无法安全删除，请刷新后重试`);
       return;
     }
-    setDeleteTarget({ id: record.id, version: record.version, kind, title });
+    setDeleteTarget({ id: record.id, version: record.version, kind, title, recurrence: record.recurrence });
   };
 
   const closeDeleteDialog = () => {
@@ -527,21 +535,25 @@ export const CalendarView: React.FC = () => {
       </Modal>
       <Modal
         open={deleteTarget !== null}
-        title={`删除${deleteTarget?.kind ?? '记录'}？`}
+        title={deleteTarget?.recurrence && deleteTarget.recurrence !== 'none'
+          ? '删除整个重复待办？'
+          : `删除${deleteTarget?.kind ?? '记录'}？`}
         onClose={closeDeleteDialog}
         width={420}
         centered
       >
         <div className={styles.deleteDialogBody}>
           <p className={styles.deleteDescription}>
-            “{deleteTarget?.title}”将被永久删除，此操作无法撤销。
+            “{deleteTarget?.title}”将被永久删除{recurringDeleteImpact(deleteTarget?.recurrence)}，此操作无法撤销。
           </p>
           <div className={styles.deleteDialogActions}>
             <Button type="button" variant="outline" onClick={closeDeleteDialog} disabled={isDeleting} autoFocus>
               取消
             </Button>
             <Button type="button" variant="danger" onClick={() => void confirmDelete()} disabled={isDeleting}>
-              {isDeleting ? '正在删除…' : `删除${deleteTarget?.kind ?? '记录'}`}
+              {isDeleting ? '正在删除…' : deleteTarget?.recurrence && deleteTarget.recurrence !== 'none'
+                ? '删除整个重复待办'
+                : `删除${deleteTarget?.kind ?? '记录'}`}
             </Button>
           </div>
         </div>

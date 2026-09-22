@@ -35,7 +35,7 @@ public final class DailyEventModels {
             this(eventDate, title, time, priority, "none", null, null);
         }
 
-        /** 兼容未指定重复日期的领域调用，由处理器沿用原有周一或每月 1 号规则。 */
+        /** 兼容未指定重复日期的领域调用，由处理器沿用原有周一或自然月末规则。 */
         public TodoCommand(LocalDate eventDate, String title, String time, String priority, String recurrence) {
             this(eventDate, title, time, priority, recurrence, null, null);
         }

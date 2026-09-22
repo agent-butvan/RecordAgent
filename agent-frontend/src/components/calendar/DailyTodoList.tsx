@@ -28,7 +28,7 @@ const recurrenceLabel = (todo: CalendarTodo): string => {
     return todo.recurrenceWeekday ? `每${weekdayLabels[todo.recurrenceWeekday - 1]}` : '每周';
   }
   if (todo.recurrence === 'monthly') {
-    return todo.recurrenceMonthDay ? `每月 ${todo.recurrenceMonthDay} 号` : '每月';
+    return '每月最后一天';
   }
   return '今天';
 };
