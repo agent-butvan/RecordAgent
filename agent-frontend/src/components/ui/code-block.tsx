@@ -10,6 +10,7 @@ import {
   parseLanguageAndFilename,
   resolveLanguage,
 } from "./codeBlockLanguages"
+import styles from "./code-block.module.css"
 
 /* --------------------------------------------------------------------------
  * CodeBlock 组件群
@@ -42,21 +43,18 @@ export function CodeBlock({
 
     return (
       <div
-        className={cn(
-          "not-prose my-3 flex w-full flex-col overflow-clip rounded-xl border border-[#e2e8f0] bg-white text-[#1f2937]",
-          className
-        )}
+        className={cn(styles.container, className)}
         {...props}
       >
         <CodeBlockGroup>
-          <div className="flex items-center gap-2">
-            <span className="flex h-2 w-2 rounded-full bg-[#2563eb]/70" />
-            <span className="text-xs font-semibold text-[#0f172a]">
+          <div className={styles.headerLeft}>
+            <span className={styles.dot} />
+            <span className={styles.displayName}>
               {displayName}
             </span>
             {parsedFilename && (
               <span
-                className="max-w-[240px] truncate font-mono text-[12px] text-[#64748b]"
+                className={styles.filename}
                 title={parsedFilename}
               >
                 {parsedFilename}
@@ -73,10 +71,7 @@ export function CodeBlock({
   // 组合式容器用法
   return (
     <div
-      className={cn(
-        "not-prose my-3 flex w-full flex-col overflow-clip rounded-xl border border-[#e2e8f0] bg-white text-[#1f2937]",
-        className
-      )}
+      className={cn(styles.container, className)}
       {...props}
     >
       {children}
@@ -93,10 +88,7 @@ export function CodeBlockGroup({
 }: CodeBlockGroupProps) {
   return (
     <div
-      className={cn(
-        "flex min-h-[40px] items-center justify-between border-b border-[#f1f5f9] bg-[#f8fafc]/80 px-3.5 py-1.5 text-xs text-[#64748b]",
-        className
-      )}
+      className={cn(styles.header, className)}
       {...props}
     >
       {children}
@@ -161,10 +153,7 @@ export function CodeBlockCode({
     }
   }, [code, resolvedLang, theme])
 
-  const classNames = cn(
-    "w-full overflow-x-auto font-mono text-[13px] leading-[1.65] text-[#1f2937] [&>pre]:m-0 [&>pre]:!bg-transparent [&>pre]:p-3.5 [&>pre]:font-mono [&>pre_code]:font-mono",
-    className
-  )
+  const classNames = cn(styles.codeWrapper, className)
 
   // SSR / 加载等待状态：呈现干净的原始代码段
   return highlightedHtml ? (
@@ -175,7 +164,7 @@ export function CodeBlockCode({
     />
   ) : (
     <div className={classNames} {...props}>
-      <pre className="m-0 p-3.5">
+      <pre>
         <code>{code}</code>
       </pre>
     </div>
@@ -205,14 +194,11 @@ export function CodeBlockCopyButton({
     <button
       type="button"
       onClick={handleCopy}
-      className={cn(
-        "inline-flex h-7 w-7 items-center justify-center rounded-md text-[#64748b] transition-colors duration-150 hover:bg-[#e2e8f0]/60 hover:text-[#0f172a] focus-visible:outline-2 focus-visible:outline-[#2563eb]",
-        className
-      )}
+      className={cn(styles.copyButton, className)}
       title={copied ? "已复制" : "复制代码"}
       aria-label={copied ? "代码已复制" : "复制代码"}
     >
-      {copied ? <Check size={14} className="text-green-600" /> : <Copy size={14} />}
+      {copied ? <Check size={14} className={styles.copiedIcon} /> : <Copy size={14} />}
     </button>
   )
 }
