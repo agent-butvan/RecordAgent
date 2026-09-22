@@ -63,7 +63,6 @@ export function StickyTodoNote({
   const progress = items.length ? (completed / items.length) * 100 : 0;
 
   useEffect(() => {
-    if (!collapsed) return;
     const frame = requestAnimationFrame(() => {
       void animate(x, initialX, { type: 'spring', stiffness: 280, damping: 28 });
       void animate(y, initialY, { type: 'spring', stiffness: 280, damping: 28 });

@@ -1,5 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { fetchRecurringTodos, setDailyTodoCompleted } from '../../services/dailyEvents';
+import { getFeaturePreferences, subscribeFeaturePreferences } from '../../services/featurePreferences';
+import {
+  getCalendarStickyNoteExpansion,
+  setCalendarStickyNoteExpanded,
+  subscribeCalendarStickyNoteExpansion,
+  type CalendarStickyNoteKind,
+} from '../../services/calendarStickyNoteState';
 import type { RecurringTodoSummary } from '../../types/dailyEvent';
 import { useMessage } from '../common/Message';
 import { StickyTodoNote, type StickyTodoItem } from './StickyTodoNote';
@@ -32,7 +39,10 @@ export function CalendarStickyNotes({ focusDate, revision, onChanged }: Calendar
   const [todos, setTodos] = useState<RecurringTodoSummary[]>([]);
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [boardSize, setBoardSize] = useState<BoardSize | null>(null);
-  const [expandedNote, setExpandedNote] = useState<'weekly' | 'monthly' | null>(null);
+  const [calendarPreferences, setCalendarPreferences] = useState(() => getFeaturePreferences().calendar);
+  const [expandedNotes, setExpandedNotes] = useState(() => getCalendarStickyNoteExpansion(
+    getFeaturePreferences().calendar.stickyNotesDefaultExpanded,
+  ));
 
   useLayoutEffect(() => {
     const board = boardRef.current;
@@ -54,7 +64,8 @@ export function CalendarStickyNotes({ focusDate, revision, onChanged }: Calendar
     return () => { active = false; };
   }, [focusDate, revision, showMessage]);
 
-  useEffect(() => setExpandedNote(null), [focusDate]);
+  useEffect(() => subscribeFeaturePreferences((preferences) => setCalendarPreferences(preferences.calendar)), []);
+  useEffect(() => subscribeCalendarStickyNoteExpansion(setExpandedNotes), []);
 
   const weekly = useMemo(() => todos.filter((todo) => todo.recurrence === 'weekly'), [todos]);
   const monthly = useMemo(() => todos.filter((todo) => todo.recurrence === 'monthly'), [todos]);
@@ -91,46 +102,86 @@ export function CalendarStickyNotes({ focusDate, revision, onChanged }: Calendar
     }
   };
 
+  const setExpanded = (kind: CalendarStickyNoteKind, expanded: boolean) => {
+    setExpandedNotes(setCalendarStickyNoteExpanded(
+      kind,
+      expanded,
+      calendarPreferences.stickyNotesDefaultExpanded,
+    ));
+  };
+
   const noteCount = Number(weekly.length > 0) + Number(monthly.length > 0);
   const layout = boardSize ? (() => {
-    const noteWidth = 188;
-    const noteHeight = 62;
+    const compactWidth = 188;
+    const compactHeight = 62;
+    const expandedWidth = 304;
+    const expandedHeight = 382;
     const gap = 10;
-    const bottom = 24;
-    const startY = Math.max(16, boardSize.height - noteCount * noteHeight - (noteCount - 1) * gap - bottom);
+    const edge = 24;
+    const weeklyExpanded = weekly.length > 0 && expandedNotes.weekly;
+    const monthlyExpanded = monthly.length > 0 && expandedNotes.monthly;
+    const compactX = Math.max(16, boardSize.width - compactWidth - edge);
+    const expandedX = Math.max(16, boardSize.width - expandedWidth - edge);
+    const expandedY = Math.max(16, boardSize.height - expandedHeight - edge);
+
+    if (weeklyExpanded && monthlyExpanded) {
+      if (boardSize.width >= expandedWidth * 2 + edge * 2) {
+        const overlap = 24;
+        const firstX = Math.max(16, boardSize.width - (expandedWidth * 2 - overlap) - edge);
+        return {
+          weekly: { x: firstX, y: expandedY },
+          monthly: { x: firstX + expandedWidth - overlap, y: expandedY + 10 },
+        };
+      }
+      const overlap = 28;
+      const firstY = Math.max(16, boardSize.height - (expandedHeight * 2 - overlap) - edge);
+      return {
+        weekly: { x: expandedX, y: firstY },
+        monthly: { x: Math.max(16, expandedX - 10), y: firstY + expandedHeight - overlap },
+      };
+    }
+
+    if (weeklyExpanded || monthlyExpanded) {
+      const compactY = Math.max(16, expandedY - compactHeight - gap);
+      return {
+        weekly: weeklyExpanded ? { x: expandedX, y: expandedY } : { x: compactX, y: compactY },
+        monthly: monthlyExpanded ? { x: expandedX, y: expandedY } : { x: compactX, y: compactY },
+      };
+    }
+
+    const startY = Math.max(16, boardSize.height - noteCount * compactHeight - (noteCount - 1) * gap - edge);
     return {
-      x: Math.max(16, boardSize.width - noteWidth - 24),
-      firstY: startY,
-      secondY: startY + noteHeight + gap,
+      weekly: { x: compactX, y: startY },
+      monthly: { x: compactX, y: startY + (weekly.length > 0 ? compactHeight + gap : 0) },
     };
   })() : null;
 
   return (
     <section className={styles.board} ref={boardRef} aria-label="待办便签">
-      {layout && weekly.length > 0 && <StickyTodoNote
+      {calendarPreferences.showStickyNotes && layout && weekly.length > 0 && <StickyTodoNote
         title="本周待办"
         subtitle="Week Focus"
         tone="yellow"
         items={asStickyItems(weekly, pendingIds)}
-        initialX={layout.x}
-        initialY={layout.firstY}
+        initialX={layout.weekly.x}
+        initialY={layout.weekly.y}
         rotation={-2.4}
-        collapsed={expandedNote !== 'weekly'}
+        collapsed={!expandedNotes.weekly}
         constraintsRef={boardRef}
-        onCollapsedChange={(collapsed) => setExpandedNote(collapsed ? null : 'weekly')}
+        onCollapsedChange={(collapsed) => setExpanded('weekly', !collapsed)}
         onToggle={(item) => { void toggle(item); }}
       />}
-      {layout && monthly.length > 0 && <StickyTodoNote
+      {calendarPreferences.showStickyNotes && layout && monthly.length > 0 && <StickyTodoNote
         title="本月待办"
         subtitle="Month Goals"
         tone="green"
         items={asStickyItems(monthly, pendingIds)}
-        initialX={layout.x}
-        initialY={weekly.length > 0 ? layout.secondY : layout.firstY}
+        initialX={layout.monthly.x}
+        initialY={layout.monthly.y}
         rotation={2.1}
-        collapsed={expandedNote !== 'monthly'}
+        collapsed={!expandedNotes.monthly}
         constraintsRef={boardRef}
-        onCollapsedChange={(collapsed) => setExpandedNote(collapsed ? null : 'monthly')}
+        onCollapsedChange={(collapsed) => setExpanded('monthly', !collapsed)}
         onToggle={(item) => { void toggle(item); }}
       />}
     </section>

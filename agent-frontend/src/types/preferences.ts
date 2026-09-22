@@ -8,7 +8,13 @@ export interface ChatTopBarPreferences {
   showWeather: boolean;
 }
 
+export interface CalendarPreferences {
+  showStickyNotes: boolean;
+  stickyNotesDefaultExpanded: boolean;
+}
+
 export interface FeaturePreferences {
   studyWindowMode: StudyWindowMode;
   chatTopBar: ChatTopBarPreferences;
+  calendar: CalendarPreferences;
 }

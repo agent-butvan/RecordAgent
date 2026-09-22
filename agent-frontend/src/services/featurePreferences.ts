@@ -1,4 +1,5 @@
 import type {
+  CalendarPreferences,
   ChatTopBarPreferences,
   FeaturePreferences,
   StudyWindowMode,
@@ -16,6 +17,10 @@ const DEFAULT_PREFERENCES: FeaturePreferences = {
     showHoliday: false,
     showWeather: false,
   },
+  calendar: {
+    showStickyNotes: true,
+    stickyNotesDefaultExpanded: false,
+  },
 };
 
 function isStudyWindowMode(value: unknown): value is StudyWindowMode {
@@ -27,6 +32,7 @@ export function getFeaturePreferences(): FeaturePreferences {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as Partial<FeaturePreferences>;
     const savedTopBar = saved.chatTopBar;
+    const savedCalendar = saved.calendar;
     return {
       studyWindowMode: isStudyWindowMode(saved.studyWindowMode)
         ? saved.studyWindowMode
@@ -47,6 +53,14 @@ export function getFeaturePreferences(): FeaturePreferences {
         showWeather: typeof savedTopBar?.showWeather === 'boolean'
           ? savedTopBar.showWeather
           : DEFAULT_PREFERENCES.chatTopBar.showWeather,
+      },
+      calendar: {
+        showStickyNotes: typeof savedCalendar?.showStickyNotes === 'boolean'
+          ? savedCalendar.showStickyNotes
+          : DEFAULT_PREFERENCES.calendar.showStickyNotes,
+        stickyNotesDefaultExpanded: typeof savedCalendar?.stickyNotesDefaultExpanded === 'boolean'
+          ? savedCalendar.stickyNotesDefaultExpanded
+          : DEFAULT_PREFERENCES.calendar.stickyNotesDefaultExpanded,
       },
     };
   } catch {
@@ -75,6 +89,18 @@ export function setChatTopBarPreference(
   return saveFeaturePreferences({
     ...current,
     chatTopBar: { ...current.chatTopBar, [key]: visible },
+  });
+}
+
+/** 设置日历展示偏好，并向已打开的日历即时广播。 */
+export function setCalendarPreference(
+  key: keyof CalendarPreferences,
+  value: boolean,
+): FeaturePreferences {
+  const current = getFeaturePreferences();
+  return saveFeaturePreferences({
+    ...current,
+    calendar: { ...current.calendar, [key]: value },
   });
 }
 

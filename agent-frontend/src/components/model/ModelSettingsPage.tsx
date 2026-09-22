@@ -17,11 +17,13 @@ import { SlashCommandSettingsPage } from '../settings/SlashCommandSettingsPage';
 import { DailyContextSettingsPage } from '../settings/DailyContextSettingsPage';
 import {
   getFeaturePreferences,
+  setCalendarPreference,
   setChatTopBarPreference,
   setStudyWindowMode,
   subscribeFeaturePreferences,
 } from '../../services/featurePreferences';
-import type { ChatTopBarPreferences, FeaturePreferences, StudyWindowMode } from '../../types/preferences';
+import { resetCalendarStickyNoteExpansion } from '../../services/calendarStickyNoteState';
+import type { CalendarPreferences, ChatTopBarPreferences, FeaturePreferences, StudyWindowMode } from '../../types/preferences';
 import {
   ArrowLeft,
   CalendarDays,
@@ -153,6 +155,11 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
 
   const handleChatTopBarChange = (key: keyof ChatTopBarPreferences, visible: boolean) => {
     setFeaturePreferencesState(setChatTopBarPreference(key, visible));
+  };
+
+  const handleCalendarPreferenceChange = (key: keyof CalendarPreferences, value: boolean) => {
+    setFeaturePreferencesState(setCalendarPreference(key, value));
+    if (key === 'stickyNotesDefaultExpanded') resetCalendarStickyNoteExpansion(value);
   };
 
   const isFeatureTab = (tab: string): tab is FeatureSettingsTab => (
@@ -361,6 +368,8 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
             onStudyWindowModeChange={handleStudyWindowModeChange}
             chatTopBar={featurePreferences.chatTopBar}
             onChatTopBarChange={handleChatTopBarChange}
+            calendar={featurePreferences.calendar}
+            onCalendarChange={handleCalendarPreferenceChange}
           />
         )}
 

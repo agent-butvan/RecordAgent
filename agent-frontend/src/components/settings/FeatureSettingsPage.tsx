@@ -1,4 +1,4 @@
-import type { ChatTopBarPreferences, StudyWindowMode } from '../../types/preferences';
+import type { CalendarPreferences, ChatTopBarPreferences, StudyWindowMode } from '../../types/preferences';
 import { Select } from '../common/Select';
 import { LeverSwitch } from '../common/LeverSwitch';
 import { SettingsPageLayout } from './SettingsPageLayout';
@@ -34,6 +34,8 @@ interface FeatureSettingsPageProps {
   onStudyWindowModeChange: (mode: StudyWindowMode) => void;
   chatTopBar: ChatTopBarPreferences;
   onChatTopBarChange: (key: keyof ChatTopBarPreferences, visible: boolean) => void;
+  calendar: CalendarPreferences;
+  onCalendarChange: (key: keyof CalendarPreferences, value: boolean) => void;
 }
 
 /** 功能设置统一页面，保持四个业务入口的信息结构与空状态一致。 */
@@ -43,6 +45,8 @@ export function FeatureSettingsPage({
   onStudyWindowModeChange,
   chatTopBar,
   onChatTopBarChange,
+  calendar,
+  onCalendarChange,
 }: FeatureSettingsPageProps) {
   if (tab === 'record') {
     return (
@@ -86,6 +90,18 @@ export function FeatureSettingsPage({
           description="显示今日待办完成情况，点击后查看接下来要处理的事项。"
           checked={chatTopBar.showTodos}
           onChange={(checked) => onChatTopBarChange('showTodos', checked)}
+        />
+        <SettingToggle
+          label="显示周期待办便签"
+          description="在日历右下角显示本周和本月待办便签。关闭后不会影响待办数据。"
+          checked={calendar.showStickyNotes}
+          onChange={(checked) => onCalendarChange('showStickyNotes', checked)}
+        />
+        <SettingToggle
+          label="便签默认展开"
+          description="开启后周、月便签默认完整展开；关闭后默认显示为进度标签。修改后立即应用到两张便签。"
+          checked={calendar.stickyNotesDefaultExpanded}
+          onChange={(checked) => onCalendarChange('stickyNotesDefaultExpanded', checked)}
         />
       </SettingsPageLayout>
     );
