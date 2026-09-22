@@ -48,6 +48,7 @@ import {
   Copy,
   Check,
   RotateCw,
+  X,
 } from 'lucide-react';
 import styles from './ModelSettingsPage.module.css';
 
@@ -137,6 +138,8 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
   // 当前选中的模型 Key（providerId + id）
   const [selectedKey, setSelectedKey] = useState<string>('');
   const [isCreating, setIsCreating] = useState<boolean>(false);
+  // 右侧面板是否展开显示（默认收起）
+  const [isPaneOpen, setIsPaneOpen] = useState<boolean>(false);
 
   // 编辑态/表单受控状态
   const [editName, setEditName] = useState('');
@@ -212,27 +215,20 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
     return allModels.find((m) => `${m.providerId}-${m.id}` === selectedKey) || null;
   }, [allModels, selectedKey]);
 
-  // 初始化或列表变动时同步选中的模型
+  // 列表变动时清理无效选中的模型并收起面板
   useEffect(() => {
     if (isCreating) return;
     if (allModels.length === 0) {
       setSelectedKey('');
+      setIsPaneOpen(false);
       return;
     }
 
-    const currentExists = allModels.some((m) => `${m.providerId}-${m.id}` === selectedKey);
-    if (!currentExists) {
-      // 优先选中当前默认激活模型，否则选中第一个
-      const activeItem = allModels.find(
-        (m) => (m.providerId === activeProviderId || m.providerType === activeProviderId) && m.id === activeModelId
-      );
-      if (activeItem) {
-        setSelectedKey(`${activeItem.providerId}-${activeItem.id}`);
-      } else {
-        setSelectedKey(`${allModels[0].providerId}-${allModels[0].id}`);
-      }
+    if (selectedKey && !allModels.some((m) => `${m.providerId}-${m.id}` === selectedKey)) {
+      setSelectedKey('');
+      setIsPaneOpen(false);
     }
-  }, [allModels, activeProviderId, activeModelId, isCreating, selectedKey]);
+  }, [allModels, isCreating, selectedKey]);
 
   // 选中模型变化时填充右侧编辑表单
   useEffect(() => {
@@ -251,6 +247,13 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
     }
   }, [selectedModel, activeProviderId, activeModelId, isCreating]);
 
+  // 关闭/收起右侧面板
+  const handleClosePane = () => {
+    setIsPaneOpen(false);
+    setIsCreating(false);
+    setSelectedKey('');
+  };
+
   // 开始创建新模型
   const handleStartAdd = () => {
     setIsCreating(true);
@@ -263,27 +266,12 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
     setEditBaseUrl(VENDOR_DEFAULT_URLS[defaultVendor] || '');
     setEditIsDefault(allModels.length === 0);
     setShowApiKey(false);
+    setIsPaneOpen(true);
   };
 
-  // 取消编辑/新建
+  // 取消编辑/新建（收起面板）
   const handleCancel = () => {
-    if (isCreating) {
-      setIsCreating(false);
-      if (allModels.length > 0) {
-        setSelectedKey(`${allModels[0].providerId}-${allModels[0].id}`);
-      }
-    } else if (selectedModel) {
-      // 恢复原数据
-      setEditName(selectedModel.name || selectedModel.id);
-      setEditVendor(selectedModel.providerType || selectedModel.providerId || 'dashscope');
-      setEditModelId(selectedModel.id);
-      setEditApiKey(selectedModel.apiKey || '');
-      setEditBaseUrl(selectedModel.baseUrl || '');
-      const isAct =
-        (selectedModel.providerId === activeProviderId || selectedModel.providerType === activeProviderId) &&
-        selectedModel.id === activeModelId;
-      setEditIsDefault(isAct);
-    }
+    handleClosePane();
   };
 
   // 保存更改或创建模型
@@ -374,6 +362,7 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
     const { providerId, id, name } = selectedModel;
     deleteModelItem(providerId, id);
     setShowDeleteModal(false);
+    handleClosePane();
     showMessage('success', `模型 ${name} 已删除`);
   };
 
@@ -532,7 +521,7 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
                   <div className={styles.tableBody}>
                     {displayedModels.map((item) => {
                       const key = `${item.providerId}-${item.id}`;
-                      const isSelected = !isCreating && selectedKey === key;
+                      const isSelected = isPaneOpen && !isCreating && selectedKey === key;
                       const isDefaultModel =
                         (item.providerId === activeProviderId || item.providerType === activeProviderId) &&
                         item.id === activeModelId;
@@ -550,8 +539,13 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
                           key={key}
                           className={`${styles.tableRow} ${isSelected ? styles.tableRowSelected : ''}`}
                           onClick={() => {
-                            setIsCreating(false);
-                            setSelectedKey(key);
+                            if (isPaneOpen && selectedKey === key && !isCreating) {
+                              handleClosePane();
+                            } else {
+                              setIsCreating(false);
+                              setSelectedKey(key);
+                              setIsPaneOpen(true);
+                            }
                           }}
                         >
                           {/* 模型名称列 */}
@@ -659,21 +653,31 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
               )}
             </div>
 
-            {/* 右侧详情/编辑面板 */}
-            <div className={styles.detailPane}>
-              {isCreating ? (
-                <>
-                  {/* 新建模型头部 */}
-                  <div className={styles.detailHeader}>
-                    <div className={styles.detailIconTile}>
-                      <VendorIcon vendor={editVendor} size={24} />
-                    </div>
-                    <div className={styles.detailHeaderContent}>
-                      <div className={styles.detailHeaderTitleRow}>
-                        <div className={styles.detailHeaderTitle}>
-                          <span>添加新模型</span>
-                        </div>
+            {/* 右侧详情/编辑面板（受控展示/可收起） */}
+            {isPaneOpen && (
+              <div className={styles.detailPane}>
+                {isCreating ? (
+                  <>
+                    {/* 新建模型头部 */}
+                    <div className={styles.detailHeader}>
+                      <div className={styles.detailIconTile}>
+                        <VendorIcon vendor={editVendor} size={24} />
                       </div>
+                      <div className={styles.detailHeaderContent}>
+                        <div className={styles.detailHeaderTitleRow}>
+                          <div className={styles.detailHeaderTitle}>
+                            <span>添加新模型</span>
+                          </div>
+                          <button
+                            type="button"
+                            className={styles.closePaneBtn}
+                            onClick={handleClosePane}
+                            aria-label="收起面板"
+                            title="收起"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
                       <div className={styles.detailHeaderMeta}>
                         <span>配置新的 API 凭据与推理服务</span>
                       </div>
@@ -776,57 +780,69 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
                           {editIsDefault && <Badge variant="primary">默认</Badge>}
                         </div>
 
-                        <div className={styles.headerMoreWrap}>
-                          <button
-                            type="button"
-                            className={styles.headerMoreBtn}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setOpenHeaderMenu(!openHeaderMenu);
-                            }}
-                            aria-label="更多操作"
-                          >
-                            <MoreVertical size={16} />
-                          </button>
+                        <div className={styles.headerActionGroup}>
+                          <div className={styles.headerMoreWrap}>
+                            <button
+                              type="button"
+                              className={styles.headerMoreBtn}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenHeaderMenu(!openHeaderMenu);
+                              }}
+                              aria-label="更多操作"
+                            >
+                              <MoreVertical size={16} />
+                            </button>
 
-                          {openHeaderMenu && (
-                            <div className={styles.menuDropdown} onClick={(e) => e.stopPropagation()}>
-                              {!editIsDefault && (
+                            {openHeaderMenu && (
+                              <div className={styles.menuDropdown} onClick={(e) => e.stopPropagation()}>
+                                {!editIsDefault && (
+                                  <button
+                                    type="button"
+                                    className={styles.menuItem}
+                                    onClick={() => {
+                                      selectActiveModel(selectedModel.providerId, selectedModel.id);
+                                      setEditIsDefault(true);
+                                      setOpenHeaderMenu(false);
+                                      showMessage('success', `已将 ${selectedModel.name} 设为默认模型`);
+                                    }}
+                                  >
+                                    <Check size={14} /> 设为默认模型
+                                  </button>
+                                )}
                                 <button
                                   type="button"
                                   className={styles.menuItem}
                                   onClick={() => {
-                                    selectActiveModel(selectedModel.providerId, selectedModel.id);
-                                    setEditIsDefault(true);
+                                    handleCopyModelId(selectedModel.id);
                                     setOpenHeaderMenu(false);
-                                    showMessage('success', `已将 ${selectedModel.name} 设为默认模型`);
                                   }}
                                 >
-                                  <Check size={14} /> 设为默认模型
+                                  <Copy size={14} /> 复制 Model ID
                                 </button>
-                              )}
-                              <button
-                                type="button"
-                                className={styles.menuItem}
-                                onClick={() => {
-                                  handleCopyModelId(selectedModel.id);
-                                  setOpenHeaderMenu(false);
-                                }}
-                              >
-                                <Copy size={14} /> 复制 Model ID
-                              </button>
-                              <button
-                                type="button"
-                                className={`${styles.menuItem} ${styles.menuItemDanger}`}
-                                onClick={() => {
-                                  setOpenHeaderMenu(false);
-                                  setShowDeleteModal(true);
-                                }}
-                              >
-                                <Trash2 size={14} /> 删除模型
-                              </button>
-                            </div>
-                          )}
+                                <button
+                                  type="button"
+                                  className={`${styles.menuItem} ${styles.menuItemDanger}`}
+                                  onClick={() => {
+                                    setOpenHeaderMenu(false);
+                                    setShowDeleteModal(true);
+                                  }}
+                                >
+                                  <Trash2 size={14} /> 删除模型
+                                </button>
+                              </div>
+                            )}
+                          </div>
+
+                          <button
+                            type="button"
+                            className={styles.closePaneBtn}
+                            onClick={handleClosePane}
+                            aria-label="收起面板"
+                            title="收起"
+                          >
+                            <X size={16} />
+                          </button>
                         </div>
                       </div>
 
@@ -968,13 +984,10 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
                       </Button>
                     </div>
                   </div>
-                </>
-              ) : (
-                <div className={styles.emptyState}>
-                  <p>请在左侧选择或添加模型</p>
-                </div>
-              )}
-            </div>
+                  </>
+                ) : null}
+              </div>
+            )}
 
             {/* 删除确认弹窗 */}
             <Modal

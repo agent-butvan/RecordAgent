@@ -472,6 +472,30 @@
   position: relative;
 }
 
+.headerActionGroup {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.closePaneBtn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.closePaneBtn:hover {
+  background-color: #f1f5f9;
+  color: #1e293b;
+}
+
 .headerMoreBtn {
   background: transparent;
   border: none;
