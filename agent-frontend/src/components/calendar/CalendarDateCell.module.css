@@ -1,46 +1,44 @@
 .cell {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   min-width: 0;
-  min-height: 114px;
-  padding: 8px 6px;
-  border: 1px solid #edf0f5;
-  border-radius: 10px;
+  min-height: 88px;
+  padding: 7px 6px;
+  border: 0;
+  border-radius: 7px;
   background: transparent;
   color: var(--text-secondary);
   text-align: left;
-  align-self: stretch;
   cursor: pointer;
-  transition: background 120ms;
+  transition: background 140ms;
 }
-.cell:hover,
+.cell:hover {
+  background: var(--bg-surface, #f7f8fa);
+}
 .cell:focus-visible {
-  background: #f2f6ff;
-  outline: 2px solid #8eafff;
-  outline-offset: -2px;
-}
-.active {
-  background: #fafbfd;
-}
-.focusDay {
-  background: #f1f7f6;
+  outline: 1px solid var(--accent-blue);
+  outline-offset: -1px;
 }
 .selected {
-  border-color: var(--accent-blue);
-  background: #f2f6ff;
+  outline: 1px solid var(--accent-blue);
+  outline-offset: -1px;
+  background: #f7f9ff;
 }
 .outside {
-  border-color: transparent;
   color: var(--text-muted);
-  opacity: 0.48;
+  opacity: 0.45;
 }
 .number {
   display: flex;
-  width: 23px;
-  height: 23px;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  font-size: 12px;
-  margin-bottom: 6px;
+  font-size: 11px;
+  margin: 0 auto 8px;
 }
 .today {
   background: var(--accent-blue);
@@ -51,36 +49,51 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 10px;
+  min-width: 0;
   font-variant-numeric: tabular-nums;
 }
 .metrics > span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.signals {
   display: flex;
   align-items: center;
   gap: 4px;
-  overflow: hidden;
-  white-space: nowrap;
+  height: 5px;
 }
-.todo {
-  color: #667caa;
-}
-.done,
-.study {
-  color: #2d8063;
-}
-.expense {
-  color: #b36348;
-  font-weight: 600;
-}
-.record {
-  color: #8062a6;
-}
-.schedule {
-  color: #4777b8;
-}
-.metrics progress {
-  width: 25px;
+.signals i {
+  width: 4px;
   height: 4px;
-  border: 0;
-  accent-color: #528fa0;
+  border-radius: 50%;
+}
+.todoDot {
+  background: #94abce;
+}
+.expenseDot {
+  background: #b88b59;
+}
+.studyDot {
+  background: #73a393;
+}
+.recordDot {
+  background: #b09bbe;
+}
+.headline,
+.study {
+  font-size: 10px;
+  line-height: 1.4;
+  font-weight: 500;
+}
+.headline {
+  color: var(--text-secondary);
+}
+.study {
+  color: #628979;
+}
+.meta {
+  font-size: 9px;
+  line-height: 1.4;
+  color: var(--text-muted);
 }

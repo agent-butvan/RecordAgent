@@ -48,7 +48,6 @@ import styles from './CalendarView.module.css';
 const WEEKDAY_LABELS = ['一', '二', '三', '四', '五', '六', '日'];
 const WEEKDAY_FULL = '日一二三四五六';
 const WEEK_STARTS_ON = 1;
-const GRID_SIZE = 42;
 
 interface DeleteTarget {
   id: string;
@@ -110,7 +109,9 @@ export const CalendarView: React.FC = () => {
     const firstOfMonth = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
     const leadingOffset = (firstOfMonth.getDay() - WEEK_STARTS_ON + 7) % 7;
     const gridStart = addDays(firstOfMonth, -leadingOffset);
-    return Array.from({ length: GRID_SIZE }, (_, index) => addDays(gridStart, index));
+    const monthDays = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate();
+    const gridSize = Math.max(35, Math.ceil((leadingOffset + monthDays) / 7) * 7);
+    return Array.from({ length: gridSize }, (_, index) => addDays(gridStart, index));
   }, [cursor]);
 
   useEffect(() => {

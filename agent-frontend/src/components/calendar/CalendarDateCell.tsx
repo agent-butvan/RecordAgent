@@ -39,7 +39,7 @@ export function CalendarDateCell({
   };
   const leave = () => {
     cancel();
-    timer.current = setTimeout(() => setOpen(false), 220);
+    timer.current = setTimeout(() => setOpen(false), 320);
   };
   useEffect(
     () => () => {
@@ -61,15 +61,15 @@ export function CalendarDateCell({
           styles.cell,
           !inMonth ? styles.outside : '',
           selected ? styles.selected : '',
-          active ? styles.active : '',
-          studySeconds >= 3600 ? styles.focusDay : '',
         ].join(' ')}
         onMouseEnter={() => {
           cancel();
-          timer.current = setTimeout(enter, 160);
+          timer.current = setTimeout(enter, 550);
         }}
         onMouseLeave={leave}
-        onFocus={enter}
+        onFocus={(event) => {
+          if (event.currentTarget.matches(':focus-visible')) enter();
+        }}
         onBlur={leave}
         onClick={() => {
           onSelect();
@@ -83,44 +83,37 @@ export function CalendarDateCell({
         <span className={`${styles.number} ${today ? styles.today : ''}`}>
           {date.getDate()}
         </span>
-        {inMonth && (
+        {inMonth && active && (
           <span className={styles.metrics}>
-            {todos > 0 && (
-              <span className={completed === todos ? styles.done : styles.todo}>
-                ✓ {completed}/{todos}
-                <progress
-                  max={todos}
-                  value={completed}
-                  aria-label="待办完成进度"
-                />
-              </span>
-            )}
-            {expense > 0 && (
-              <span className={styles.expense}>
-                −¥{expense.toFixed(expense < 10 ? 2 : 0)}
-              </span>
-            )}
-            {studySeconds > 0 && (
-              <span className={styles.study}>
-                {formatStudyDuration(studySeconds)}
-              </span>
-            )}
-            {recordCount > 0 && (
-              <span className={styles.record}>资料 {recordCount} 篇</span>
-            )}
-            {!!summary?.scheduleCount && (
-              <span className={styles.schedule}>
-                {summary.scheduleCount} 个日程
-              </span>
-            )}
-            {active &&
-              !todos &&
-              !expense &&
-              !studySeconds &&
-              !recordCount &&
-              !summary?.scheduleCount && (
-                <span className={styles.record}>有记录</span>
-              )}
+            <span className={styles.signals} aria-hidden="true">
+              {todos > 0 && <i className={styles.todoDot} />}
+              {expense > 0 && <i className={styles.expenseDot} />}
+              {studySeconds > 0 && <i className={styles.studyDot} />}
+              {recordCount > 0 && <i className={styles.recordDot} />}
+            </span>
+            <span className={studySeconds > 0 ? styles.study : styles.headline}>
+              {studySeconds > 0
+                ? `学习 ${formatStudyDuration(studySeconds)}`
+                : expense > 0
+                  ? `支出 ¥${expense.toFixed(expense < 10 ? 2 : 0)}`
+                  : summary?.scheduleCount
+                    ? `${summary.scheduleCount} 个日程`
+                    : recordCount > 0
+                      ? `${recordCount} 篇资料`
+                      : `${completed}/${todos} 待办`}
+            </span>
+            <span className={styles.meta}>
+              {[
+                todos > 0 ? `${completed}/${todos} 待办` : null,
+                studySeconds > 0 && expense > 0
+                  ? `¥${expense.toFixed(expense < 10 ? 2 : 0)}`
+                  : recordCount > 0
+                    ? `${recordCount} 篇资料`
+                    : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </span>
           </span>
         )}
       </button>

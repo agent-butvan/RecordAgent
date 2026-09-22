@@ -83,25 +83,26 @@ export function CalendarDayPreview({
   useLayoutEffect(() => {
     const place = () => {
       const rect = anchor.getBoundingClientRect();
-      const height = panel.current?.offsetHeight ?? 400;
-      const width = panel.current?.offsetWidth ?? 400;
+      // 按面板上限预留空间，异步内容加载后不翻转方向，避免悬停跳动。
+      const height = Math.min(380, window.innerHeight - 24);
+      const width = panel.current?.offsetWidth ?? 320;
+      // 优先放在日期侧边，保留可直接移入的短间隙；内容变化不改变锚点。
+      const right = rect.right + 6;
+      const left = rect.left - width - 6;
+      const beside = right + width <= window.innerWidth - 12 || left >= 12;
       setPosition({
-        left: Math.max(12, Math.min(rect.left, window.innerWidth - width - 12)),
-        top: Math.max(
-          12,
-          rect.bottom + height + 10 <= window.innerHeight
-            ? rect.bottom + 6
-            : rect.top - height - 6,
-        ),
+        left: beside
+          ? (right + width <= window.innerWidth - 12 ? right : left)
+          : Math.max(12, Math.min(rect.left, window.innerWidth - width - 12)),
+        top: beside
+          ? Math.max(12, Math.min(rect.top, window.innerHeight - height - 12))
+          : Math.max(12, Math.min(rect.bottom + 6, window.innerHeight - height - 12)),
       });
     };
     place();
-    const observer = new ResizeObserver(place);
-    if (panel.current) observer.observe(panel.current);
     window.addEventListener('resize', place);
     window.addEventListener('scroll', place, true);
     return () => {
-      observer.disconnect();
       window.removeEventListener('resize', place);
       window.removeEventListener('scroll', place, true);
     };
@@ -145,7 +146,7 @@ export function CalendarDayPreview({
             {date.getMonth() + 1}月{date.getDate()}日 · 星期
             {'日一二三四五六'[date.getDay()]}
           </strong>
-          <small>每日详情 · 移入查看，移出收起</small>
+          <small>当天记录</small>
         </div>
         <button type="button" onClick={onClose} aria-label="关闭每日详情">
           ×
@@ -234,7 +235,7 @@ export function CalendarDayPreview({
             </>
           )}
           {data.assets.status === 'fulfilled' && (
-            <Section title="资产变动 · 仅显示当天有流水的账户">
+            <Section title="资产变动">
               {groups.size ? (
                 [...groups].map(([accountId, items]) => (
                   <div key={accountId} className={styles.asset}>
