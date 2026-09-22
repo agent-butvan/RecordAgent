@@ -40,12 +40,29 @@
 }
 
 .row {
+  position: relative;
   display: flex;
   justify-content: space-between;
   gap: 8px;
   padding: 3px 0;
   font-size: 11px;
   line-height: 1.5;
+}
+
+.income,
+.expense {
+  padding-left: 9px;
+}
+
+.income::before,
+.expense::before {
+  content: '';
+  position: absolute;
+  top: 9px;
+  left: 0;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
 }
 
 .row span {
@@ -58,6 +75,24 @@
   text-align: right;
   color: var(--text-muted);
   font-size: 10px;
+}
+
+.income::before {
+  background: #78a591;
+}
+
+.income small {
+  color: #4f806b;
+  font-weight: 550;
+}
+
+.expense::before {
+  background: #c38b7b;
+}
+
+.expense small {
+  color: #a86453;
+  font-weight: 550;
 }
 
 .empty {
@@ -138,4 +173,6 @@
   font-size: 12px;
 }
 
-.compact { font-variant-numeric: tabular-nums; }
+.compact {
+  font-variant-numeric: tabular-nums;
+}

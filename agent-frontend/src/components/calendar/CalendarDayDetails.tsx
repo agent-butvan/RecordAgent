@@ -44,9 +44,19 @@ function Section({
   );
 }
 
-function Row({ title, meta }: { title: string; meta?: string }) {
+type RowTone = 'income' | 'expense' | 'neutral';
+
+function Row({
+  title,
+  meta,
+  tone = 'neutral',
+}: {
+  title: string;
+  meta?: string;
+  tone?: RowTone;
+}) {
   return (
-    <div className={styles.row}>
+    <div className={`${styles.row} ${styles[tone]}`}>
       <span>{title}</span>
       <small>{meta}</small>
     </div>
@@ -163,13 +173,22 @@ export function CalendarDayDetails({
                   title={`收支明细 · ${entry.expenses.length + entry.incomes.length} 笔`}
                 >
                   {[
-                    ...entry.expenses.map((item) => ({ ...item, sign: '−' })),
-                    ...entry.incomes.map((item) => ({ ...item, sign: '+' })),
+                    ...entry.expenses.map((item) => ({
+                      ...item,
+                      sign: '−',
+                      tone: 'expense' as const,
+                    })),
+                    ...entry.incomes.map((item) => ({
+                      ...item,
+                      sign: '+',
+                      tone: 'income' as const,
+                    })),
                   ].map((item) => (
                     <Row
                       key={item.id}
                       title={`${item.category} · ${item.note || '无备注'}`}
                       meta={`${item.sign}¥${item.amount.toFixed(2)} · ${item.time}`}
+                      tone={item.tone}
                     />
                   ))}
                   {!entry.expenses.length && !entry.incomes.length && (
@@ -193,6 +212,11 @@ export function CalendarDayDetails({
                         key={item.id}
                         title={`${LABELS[item.transactionType]} · ${item.note || item.category}`}
                         meta={`${decreases.has(item.transactionType) ? '−' : '+'}${item.amount.toFixed(2)} ${item.currency}`}
+                        tone={
+                          decreases.has(item.transactionType)
+                            ? 'expense'
+                            : 'income'
+                        }
                       />
                     ))}
                   </div>
