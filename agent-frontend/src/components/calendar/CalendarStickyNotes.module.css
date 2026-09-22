@@ -1,35 +1,12 @@
 .board {
-  position: relative;
-  min-height: 388px;
-  margin-top: 24px;
-  overflow: hidden;
-  border-radius: 18px;
-  perspective: 1200px;
-}
-
-.board::before {
-  content: '';
   position: absolute;
+  z-index: 60;
   inset: 0;
-  background-image:
-    linear-gradient(rgba(63, 78, 99, 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(63, 78, 99, 0.02) 1px, transparent 1px);
-  background-size: 28px 28px;
-  mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    rgba(0, 0, 0, 0.36),
-    transparent
-  );
+  overflow: hidden;
+  perspective: 1200px;
   pointer-events: none;
 }
 
-@media (max-width: 720px) {
-  .board {
-    min-height: 724px;
-  }
-
-  .board > :nth-child(2) {
-    translate: -292px 330px;
-  }
+.board > * {
+  pointer-events: auto;
 }

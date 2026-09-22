@@ -13,6 +13,7 @@ import butvan.agent.network.daily.model.DailyEventModels.JournalCommand;
 import butvan.agent.network.daily.model.DailyEventModels.JournalDetails;
 import butvan.agent.network.daily.model.DailyEventModels.ExpenseDetails;
 import butvan.agent.network.daily.model.DailyEventModels.IncomeDetails;
+import butvan.agent.network.daily.model.DailyEventModels.RecurringTodo;
 import butvan.agent.network.record.service.RecordJournalProjectionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.DayOfWeek;
+import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import java.util.Map;
 import java.util.ArrayList;
@@ -192,6 +195,31 @@ public class DailyEventService {
                 .map(day -> new DailyDaySummary(day.date(), day.eventCount(), day.todoCount(), day.completedTodoCount(),
                         day.scheduleCount(), day.expenseTotal(), day.headline(),
                         itemsByDate.getOrDefault(day.date(), List.of()))).toList();
+    }
+
+    /** 读取所选日期所在自然周和自然月的真实周期待办。 */
+    @Transactional(readOnly = true)
+    public List<RecurringTodo> getRecurringTodos(String ownerId, LocalDate focusDate) {
+        if (ownerId == null || ownerId.isBlank() || focusDate == null) {
+            throw new IllegalArgumentException("用户与日期不能为空");
+        }
+        LocalDate weekStart = focusDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        LocalDate weekEnd = weekStart.plusDays(6);
+        LocalDate monthStart = focusDate.withDayOfMonth(1);
+        LocalDate monthEnd = focusDate.withDayOfMonth(focusDate.lengthOfMonth());
+        return repository.findRecurringTodos(ownerId, weekStart, weekEnd, monthStart, monthEnd).stream()
+                .map(row -> {
+                    LocalDate occurrenceDate = "weekly".equals(row.recurrence())
+                            ? weekStart.plusDays(row.recurrenceWeekday() - 1L)
+                            : row.recurrenceMonthDay() <= focusDate.lengthOfMonth()
+                                    ? monthStart.withDayOfMonth(row.recurrenceMonthDay())
+                                    : null;
+                    if (occurrenceDate == null || occurrenceDate.isBefore(row.effectiveDate())) return null;
+                    return new RecurringTodo(
+                            row.id(), row.title(), row.version(), row.recurrence(), occurrenceDate, row.completed());
+                })
+                .filter(java.util.Objects::nonNull)
+                .toList();
     }
 
     /** 使用乐观版本检查修改待办完成状态。 */

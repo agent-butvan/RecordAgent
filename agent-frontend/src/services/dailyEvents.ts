@@ -10,6 +10,7 @@ import type {
   ScheduleDailyEvent,
   StudyDailyEvent,
   TodoDailyEvent,
+  RecurringTodoSummary,
 } from '../types/dailyEvent';
 import { getApiBaseUrl, type ApiResponse } from './api';
 
@@ -118,6 +119,13 @@ export async function fetchDailySummaries(from: Date, to: Date): Promise<DailyDa
 export async function fetchDailyDay(date: Date): Promise<DailyDay> {
   const raw = await request<RawDay>(`/agent/daily-events/days/${formatLocalDate(date)}`);
   return { date: raw.date, events: raw.events.map(parseEvent) };
+}
+
+/** 查询所选日期所在自然周和自然月的周期待办便签数据。 */
+export async function fetchRecurringTodos(date: Date): Promise<RecurringTodoSummary[]> {
+  return request<RecurringTodoSummary[]>(
+    `/agent/daily-events/recurring-todos?date=${formatLocalDate(date)}`,
+  );
 }
 
 /** 创建当前日历支持的一种日记录。 */

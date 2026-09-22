@@ -7,6 +7,7 @@ import butvan.agent.network.daily.model.DailyEventModels.ExpenseDetails;
 import butvan.agent.network.daily.model.DailyEventModels.JournalDetails;
 import butvan.agent.network.daily.model.DailyEventModels.IncomeDetails;
 import butvan.agent.network.daily.model.DailyEventModels.ScheduleDetails;
+import butvan.agent.network.daily.model.DailyEventModels.RecurringTodo;
 import butvan.agent.network.daily.model.DailyEventModels.TodoDetails;
 import butvan.agent.network.study.model.StudyModels.StudyDetails;
 
@@ -53,6 +54,16 @@ public final class DailyEventResponses {
 
     /** 月历轻量事项，不暴露内部记录及正文。 */
     public record CalendarItemResponse(String id, String type, String title) {}
+
+    /** 周期便签中的待办响应。 */
+    public record RecurringTodoResponse(
+            String id,
+            String title,
+            int version,
+            String recurrence,
+            LocalDate occurrenceDate,
+            boolean completed) {
+    }
 
     /** 待办详情响应。 */
     public record TodoDetailResponse(
@@ -104,6 +115,12 @@ public final class DailyEventResponses {
                 summary.date(), summary.eventCount(), summary.todoCount(), summary.completedTodoCount(),
                 summary.scheduleCount(), summary.expenseTotal(), summary.headline(),
                 summary.items().stream().map(item -> new CalendarItemResponse(item.id(), item.type(), item.title())).toList());
+    }
+
+    /** 将周期待办转换为便签读取 DTO。 */
+    public static RecurringTodoResponse from(RecurringTodo todo) {
+        return new RecurringTodoResponse(
+                todo.id(), todo.title(), todo.version(), todo.recurrence(), todo.occurrenceDate(), todo.completed());
     }
 
     private static Object mapDetails(Object details) {

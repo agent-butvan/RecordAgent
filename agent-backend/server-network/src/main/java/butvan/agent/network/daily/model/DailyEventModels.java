@@ -149,6 +149,16 @@ public final class DailyEventModels {
     /** 月历事项仅携带标题和类型，不包含正文及完整详情。 */
     public record CalendarItem(LocalDate date, String id, String type, String title) {}
 
+    /** 周期便签使用的待办定义及当前自然周期完成状态。 */
+    public record RecurringTodo(
+            String id,
+            String title,
+            int version,
+            String recurrence,
+            LocalDate occurrenceDate,
+            boolean completed) {
+    }
+
     /** 月历等范围视图需要的轻量日汇总。 */
     public record DailyDaySummary(
             LocalDate date,

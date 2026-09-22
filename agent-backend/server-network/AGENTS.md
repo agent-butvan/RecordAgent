@@ -105,4 +105,5 @@
 - Agent 聊天流必须使用稳定 `runId`；`POST /agent/chat/runs/{runId}/cancel` 只做身份、session 与 DTO 适配，实际取消行为必须委托 `server-agents` 的活动运行注册表。该接口应幂等，响应的 `accepted` 只表示服务端已接管，前端只能以 SSE `cancelled` 或详情同步判定终态。
 - HITL 使用 `POST /agent/chat/permission/decisions` 原子提交当前批次的全部未决工具决定、`POST /agent/chat/permission/resume` 恢复原运行，并由 `GET /agent/chat/{sessionId}/permission/pending` 返回包含全部未决工具的权威快照；恢复请求的 `runId` 必须与审批创建时一致。旧的单条决定接口仅保留兼容，不得作为桌面端主流程。
 - 日历月视图只能读取轻量日期摘要；`GET /agent/daily-events/days` 的 `items` 附带每天最多四条 `{ id, type, title }`，标题最多 80 字符，按日程、待办、学习、手记优先排序，周期待办遵循现有日期规则且不投影到未来；完整手记和类型详情按日加载。悬浮详情按日组合待办、收支、资产流水、学习统计和资料，各来源独立降级。资产变动使用 `GET /agent/finance/transactions/day?date=YYYY-MM-DD`，按当前用户隔离并返回 `TransactionResponse` 列表（无记录返回空列表，缺失或非法日期按参数错误处理）；包含划账和校准，但这两类不得计入收入支出合计。
+- 日历周期便签通过 `GET /agent/daily-events/recurring-todos?date=YYYY-MM-DD` 读取所选日期所在自然周与自然月内已生效的每周、每月待办；响应必须包含真实发生日、当前周期完成状态和乐观锁版本，普通与每日待办不得进入该接口。
 - SQLite 集成测试必须通过公开 Service 或 HTTP 接口验证行为，不得把私有 SQL 实现作为测试契约。

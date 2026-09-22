@@ -63,6 +63,13 @@ class DailyEventApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.events[0].title").value("验证日记录接口"))
                 .andExpect(jsonPath("$.data.events[0].details.completed").value(false));
+
+        mockMvc.perform(get("/agent/daily-events/recurring-todos?date=2026-09-03"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].title").value("验证日记录接口"))
+                .andExpect(jsonPath("$.data[0].recurrence").value("weekly"))
+                .andExpect(jsonPath("$.data[0].occurrenceDate").value("2026-09-06"))
+                .andExpect(jsonPath("$.data[0].completed").value(false));
     }
 
     @Test

@@ -1,49 +1,130 @@
-import { useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { fetchRecurringTodos, setDailyTodoCompleted } from '../../services/dailyEvents';
+import type { RecurringTodoSummary } from '../../types/dailyEvent';
+import { useMessage } from '../common/Message';
 import { StickyTodoNote, type StickyTodoItem } from './StickyTodoNote';
 import styles from './CalendarStickyNotes.module.css';
 
-const WEEK_ITEMS: StickyTodoItem[] = [
-  { id: 'week-leetcode', text: '完成 3 道 LeetCode', done: true },
-  { id: 'week-knowledge', text: '学习 2 个八股文知识点', done: true },
-  { id: 'week-tags', text: '整理资料库标签', done: true },
-  { id: 'week-report', text: '完成 1 篇周报', done: false },
-  { id: 'week-review', text: '复盘本周学习记录', done: false },
-];
+interface CalendarStickyNotesProps {
+  focusDate: Date;
+  revision: number;
+  onChanged: () => Promise<void>;
+}
 
-const MONTH_ITEMS: StickyTodoItem[] = [
-  { id: 'month-calendar', text: '完善 Agent 工作台日历', done: true },
-  { id: 'month-study', text: '累计学习时长 40 小时', done: true },
-  { id: 'month-records', text: '输出 8 篇学习记录', done: true },
-  { id: 'month-blog', text: '完成博客优化', done: false },
-  { id: 'month-java', text: '复习 Java 基础知识树', done: false },
-];
+interface BoardSize {
+  width: number;
+  height: number;
+}
 
-/** 日历便签舞台：复刻参考中的双便签初始位置并约束拖拽边界。 */
-export function CalendarStickyNotes() {
+function asStickyItems(todos: RecurringTodoSummary[], pendingIds: Set<string>): StickyTodoItem[] {
+  return todos.map((todo) => ({
+    id: todo.id,
+    text: todo.title,
+    done: todo.completed,
+    pending: pendingIds.has(todo.id),
+  }));
+}
+
+/** 读取真实周期待办，并在整个日历工作区内提供可拖拽便签。 */
+export function CalendarStickyNotes({ focusDate, revision, onChanged }: CalendarStickyNotesProps) {
+  const { showMessage } = useMessage();
   const boardRef = useRef<HTMLDivElement>(null);
+  const [todos, setTodos] = useState<RecurringTodoSummary[]>([]);
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const [boardSize, setBoardSize] = useState<BoardSize | null>(null);
+
+  useLayoutEffect(() => {
+    const board = boardRef.current;
+    if (!board) return;
+    const measure = () => setBoardSize({ width: board.clientWidth, height: board.clientHeight });
+    const observer = new ResizeObserver(measure);
+    observer.observe(board);
+    measure();
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    fetchRecurringTodos(focusDate)
+      .then((items) => { if (active) setTodos(items); })
+      .catch((error: unknown) => {
+        if (active) showMessage('error', error instanceof Error ? error.message : '读取周期待办失败');
+      });
+    return () => { active = false; };
+  }, [focusDate, revision, showMessage]);
+
+  const weekly = useMemo(() => todos.filter((todo) => todo.recurrence === 'weekly'), [todos]);
+  const monthly = useMemo(() => todos.filter((todo) => todo.recurrence === 'monthly'), [todos]);
+
+  const toggle = async (item: StickyTodoItem) => {
+    const todo = todos.find((candidate) => candidate.id === item.id);
+    if (!todo || pendingIds.has(todo.id)) return;
+    setPendingIds((current) => new Set(current).add(todo.id));
+    try {
+      const updated = await setDailyTodoCompleted(
+        todo.id,
+        !todo.completed,
+        todo.version,
+        new Date(`${todo.occurrenceDate}T00:00:00`),
+      );
+      setTodos((current) => current.map((candidate) => candidate.id === todo.id
+        ? { ...candidate, completed: !todo.completed, version: updated.version }
+        : candidate));
+      try {
+        await onChanged();
+      } catch (error: unknown) {
+        showMessage('error', error instanceof Error
+          ? `待办已更新，但日历刷新失败：${error.message}`
+          : '待办已更新，但日历刷新失败');
+      }
+    } catch (error: unknown) {
+      showMessage('error', error instanceof Error ? error.message : '修改周期待办失败');
+    } finally {
+      setPendingIds((current) => {
+        const next = new Set(current);
+        next.delete(todo.id);
+        return next;
+      });
+    }
+  };
+
+  const noteCount = Number(weekly.length > 0) + Number(monthly.length > 0);
+  const layout = boardSize ? (() => {
+    const noteWidth = 304;
+    const gap = 22;
+    const totalWidth = noteCount === 2 ? noteWidth * 2 + gap : noteWidth;
+    const startX = Math.max(16, (boardSize.width - totalWidth) / 2);
+    return {
+      firstX: Math.min(startX, Math.max(16, boardSize.width - noteWidth - 16)),
+      secondX: Math.min(startX + noteWidth + gap, Math.max(16, boardSize.width - noteWidth - 16)),
+      y: Math.max(64, boardSize.height - 350),
+    };
+  })() : null;
 
   return (
     <section className={styles.board} ref={boardRef} aria-label="待办便签">
-      <StickyTodoNote
+      {layout && weekly.length > 0 && <StickyTodoNote
         title="本周待办"
         subtitle="Week Focus"
         tone="yellow"
-        items={WEEK_ITEMS}
-        initialX={0}
-        initialY={38}
+        items={asStickyItems(weekly, pendingIds)}
+        initialX={layout.firstX}
+        initialY={layout.y}
         rotation={-2.4}
         constraintsRef={boardRef}
-      />
-      <StickyTodoNote
+        onToggle={(item) => { void toggle(item); }}
+      />}
+      {layout && monthly.length > 0 && <StickyTodoNote
         title="本月待办"
         subtitle="Month Goals"
         tone="green"
-        items={MONTH_ITEMS}
-        initialX={292}
-        initialY={50}
+        items={asStickyItems(monthly, pendingIds)}
+        initialX={weekly.length > 0 ? layout.secondX : layout.firstX}
+        initialY={layout.y + 10}
         rotation={2.1}
         constraintsRef={boardRef}
-      />
+        onToggle={(item) => { void toggle(item); }}
+      />}
     </section>
   );
 }

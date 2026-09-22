@@ -4,13 +4,14 @@ import {
   useDragControls,
   useMotionValue,
 } from 'framer-motion';
-import { useEffect, useState, type PointerEvent, type RefObject } from 'react';
+import { useEffect, useRef, useState, type PointerEvent, type RefObject } from 'react';
 import styles from './StickyTodoNote.module.css';
 
 export interface StickyTodoItem {
   id: string;
   text: string;
   done: boolean;
+  pending?: boolean;
 }
 
 export type StickyTodoTone = 'yellow' | 'green' | 'blue';
@@ -24,6 +25,7 @@ interface StickyTodoNoteProps {
   initialY: number;
   rotation?: number;
   constraintsRef: RefObject<HTMLDivElement | null>;
+  onToggle: (item: StickyTodoItem) => void;
 }
 
 let topZIndex = 5;
@@ -37,15 +39,16 @@ export function StickyTodoNote({
   title,
   subtitle,
   tone = 'yellow',
-  items: initialItems,
+  items,
   initialX,
   initialY,
   rotation = 0,
   constraintsRef,
+  onToggle,
 }: StickyTodoNoteProps) {
-  const [items, setItems] = useState(initialItems);
   const [dragging, setDragging] = useState(false);
   const [zIndex, setZIndex] = useState(2);
+  const noteRef = useRef<HTMLElement>(null);
   const x = useMotionValue(initialX);
   const y = useMotionValue(initialY);
   const rotate = useMotionValue(rotation);
@@ -53,7 +56,21 @@ export function StickyTodoNote({
   const completed = items.filter((item) => item.done).length;
   const progress = items.length ? (completed / items.length) * 100 : 0;
 
-  useEffect(() => setItems(initialItems), [initialItems]);
+  useEffect(() => {
+    const board = constraintsRef.current;
+    if (!board) return;
+    const keepInsideBoard = () => {
+      const note = noteRef.current;
+      if (!note) return;
+      x.set(clamp(x.get(), 0, Math.max(0, board.clientWidth - note.offsetWidth)));
+      y.set(clamp(y.get(), 0, Math.max(0, board.clientHeight - note.offsetHeight)));
+    };
+    const observer = new ResizeObserver(keepInsideBoard);
+    observer.observe(board);
+    observer.observe(noteRef.current!);
+    keepInsideBoard();
+    return () => observer.disconnect();
+  }, [constraintsRef, x, y]);
 
   const beginDrag = (event: PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
@@ -74,16 +91,9 @@ export function StickyTodoNote({
     });
   };
 
-  const toggleItem = (id: string) => {
-    setItems((current) =>
-      current.map((item) =>
-        item.id === id ? { ...item, done: !item.done } : item,
-      ),
-    );
-  };
-
   return (
     <motion.article
+      ref={noteRef}
       className={styles.note}
       data-tone={tone}
       style={{ x, y, zIndex }}
@@ -203,7 +213,9 @@ export function StickyTodoNote({
                 className={`${styles.todo} ${item.done ? styles.done : ''}`}
                 key={item.id}
                 type="button"
-                onClick={() => toggleItem(item.id)}
+                onClick={() => onToggle(item)}
+                disabled={item.pending}
+                aria-label={`${item.done ? '取消完成' : '标记完成'}：${item.text}`}
                 initial={{ opacity: 0, y: -6 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: 0.65 + index * 0.045 }}

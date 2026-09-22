@@ -30,6 +30,18 @@ public class DailyEventRepository {
             Instant updatedAt) {
     }
 
+    /** 周期待办定义的内部读取投影。 */
+    public record RecurringTodoRow(
+            String id,
+            String title,
+            int version,
+            LocalDate effectiveDate,
+            String recurrence,
+            Integer recurrenceWeekday,
+            Integer recurrenceMonthDay,
+            boolean completed) {
+    }
+
     private final JdbcTemplate jdbcTemplate;
 
     /** 插入日记录公共字段。 */
@@ -102,6 +114,48 @@ public class DailyEventRepository {
                 resultSet.getInt("version"), Instant.parse(resultSet.getString("created_at")),
                 Instant.parse(resultSet.getString("updated_at"))), ownerId, eventId);
         return rows.stream().findFirst();
+    }
+
+    /** 读取当前周和当前月内已经生效的周期待办定义。 */
+    public List<RecurringTodoRow> findRecurringTodos(
+            String ownerId,
+            LocalDate weekStart,
+            LocalDate weekEnd,
+            LocalDate monthStart,
+            LocalDate monthEnd) {
+        return jdbcTemplate.query("""
+                SELECT e.id, e.title, e.version, e.event_date, t.recurrence,
+                       t.recurrence_weekday, t.recurrence_month_day,
+                       CASE WHEN EXISTS (
+                           SELECT 1 FROM todo_completion c
+                           WHERE c.event_id = e.id
+                             AND c.period_start = CASE t.recurrence
+                               WHEN 'weekly' THEN ?
+                               WHEN 'monthly' THEN ?
+                             END
+                       ) THEN 1 ELSE 0 END AS completed
+                FROM daily_event e
+                JOIN todo_detail t ON t.event_id = e.id
+                WHERE e.owner_id = ?
+                  AND e.event_type = 'todo'
+                  AND t.recurrence IN ('weekly', 'monthly')
+                  AND e.event_date <= CASE t.recurrence
+                    WHEN 'weekly' THEN ?
+                    WHEN 'monthly' THEN ?
+                  END
+                ORDER BY CASE t.recurrence WHEN 'weekly' THEN 0 ELSE 1 END,
+                         e.created_at, e.id
+                """, (resultSet, rowNumber) -> new RecurringTodoRow(
+                resultSet.getString("id"),
+                resultSet.getString("title"),
+                resultSet.getInt("version"),
+                LocalDate.parse(resultSet.getString("event_date")),
+                resultSet.getString("recurrence"),
+                nullableInteger(resultSet, "recurrence_weekday"),
+                nullableInteger(resultSet, "recurrence_month_day"),
+                resultSet.getInt("completed") == 1),
+                weekStart.toString(), monthStart.toString(), ownerId,
+                weekEnd.toString(), monthEnd.toString());
     }
 
     /** 通过来源领域的稳定引用查找同步日记录。 */
@@ -263,6 +317,11 @@ public class DailyEventRepository {
                 LocalDate.parse(rs.getString("day")), rs.getString("id"),
                 rs.getString("event_type"), rs.getString("title")),
                 from.toString(), to.toString(), ownerId, today.toString());
+    }
+
+    private Integer nullableInteger(java.sql.ResultSet resultSet, String column) throws java.sql.SQLException {
+        int value = resultSet.getInt(column);
+        return resultSet.wasNull() ? null : value;
     }
 
 }

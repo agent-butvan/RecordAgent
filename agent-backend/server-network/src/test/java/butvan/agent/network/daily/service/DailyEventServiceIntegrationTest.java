@@ -164,6 +164,29 @@ class DailyEventServiceIntegrationTest {
     }
 
     @Test
+    void recurringTodoNotesUseRealDefinitionsAndPeriodCompletion() {
+        String owner = "recurring-note-user";
+        LocalDate focus = LocalDate.of(2026, 9, 22);
+        DailyEvent weekly = dailyEventService.create(
+                owner, new TodoCommand(LocalDate.of(2026, 9, 1), "完成周复盘", null, "high", "weekly", 5, null));
+        DailyEvent monthly = dailyEventService.create(
+                owner, new TodoCommand(LocalDate.of(2026, 8, 1), "整理月度资料", null, "medium", "monthly", null, 25));
+        dailyEventService.create(
+                owner, new TodoCommand(LocalDate.of(2026, 9, 1), "普通待办", null, "low"));
+
+        var firstRead = dailyEventService.getRecurringTodos(owner, focus);
+        assertEquals(2, firstRead.size());
+        assertEquals(LocalDate.of(2026, 9, 25), firstRead.getFirst().occurrenceDate());
+        assertFalse(firstRead.getFirst().completed());
+
+        dailyEventService.setTodoCompleted(owner, weekly.id(), true, weekly.version(), LocalDate.of(2026, 9, 25));
+        var completedRead = dailyEventService.getRecurringTodos(owner, focus);
+        assertTrue(completedRead.stream().filter(item -> item.id().equals(weekly.id())).findFirst().orElseThrow().completed());
+        assertEquals(LocalDate.of(2026, 9, 25), completedRead.stream()
+                .filter(item -> item.id().equals(monthly.id())).findFirst().orElseThrow().occurrenceDate());
+    }
+
+    @Test
     void recurringTodoRejectsCompletionOutsideConfiguredDate() {
         LocalDate start = LocalDate.of(2026, 9, 1);
         DailyEvent weekly = dailyEventService.create(

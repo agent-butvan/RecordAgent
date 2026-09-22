@@ -274,6 +274,11 @@
   cursor: pointer;
 }
 
+.todo:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
 .check {
   display: grid;
   flex: 0 0 auto;

@@ -76,3 +76,12 @@ export interface DailyDaySummary {
   headline: string;
   items?: Array<{ id: string; type: string; title: string }>;
 }
+
+export interface RecurringTodoSummary {
+  id: string;
+  title: string;
+  version: number;
+  recurrence: 'weekly' | 'monthly';
+  occurrenceDate: string;
+  completed: boolean;
+}
