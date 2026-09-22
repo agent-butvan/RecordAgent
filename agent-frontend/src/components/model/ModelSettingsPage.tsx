@@ -68,8 +68,8 @@ const VENDOR_DEFAULT_URLS: Record<string, string> = {
 };
 
 const VENDOR_NAMES: Record<string, string> = {
-  dashscope: '通义千问',
-  qwen: '通义千问',
+  dashscope: 'DashScope',
+  qwen: 'DashScope',
   deepseek: 'DeepSeek',
   gemini: 'Google Gemini',
   openai: 'OpenAI',
@@ -106,6 +106,7 @@ function formatAbsoluteTime(timestamp?: number): string {
 
 export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, initialTab = 'config' }) => {
   const {
+    providers,
     activeProviderId,
     activeModelId,
     selectActiveModel,
@@ -130,7 +131,7 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
   const [accountStatus, setAccountStatus] = useState<AccountStatus | null>(null);
   const [featurePreferences, setFeaturePreferencesState] = useState<FeaturePreferences>(getFeaturePreferences);
 
-  const allModels = getAllModels();
+  const allModels = useMemo(() => (providers ? getAllModels() : []), [getAllModels, providers]);
 
   // 排序状态
   const [sortOrder, setSortOrder] = useState<'none' | 'asc' | 'desc'>('none');
@@ -230,10 +231,22 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
     }
   }, [allModels, isCreating, selectedKey]);
 
-  // 选中模型变化时填充右侧编辑表单
+  // 记录当前已加载到表单的模型标识，避免非切换选择引起的重复重置
+  const loadedModelKeyRef = React.useRef<string>('');
+
+  // 仅在用户切换选中模型或打开不同模型时填充右侧编辑表单
   useEffect(() => {
-    if (isCreating) return;
-    if (selectedModel) {
+    if (isCreating) {
+      loadedModelKeyRef.current = '';
+      return;
+    }
+    if (!selectedKey || !selectedModel) {
+      loadedModelKeyRef.current = '';
+      return;
+    }
+
+    if (loadedModelKeyRef.current !== selectedKey) {
+      loadedModelKeyRef.current = selectedKey;
       setEditName(selectedModel.name || selectedModel.id);
       setEditVendor(selectedModel.providerType || selectedModel.providerId || 'dashscope');
       setEditModelId(selectedModel.id);
@@ -245,19 +258,22 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
       setEditIsDefault(isAct);
       setShowApiKey(false);
     }
-  }, [selectedModel, activeProviderId, activeModelId, isCreating]);
+  }, [selectedKey, selectedModel, isCreating, activeProviderId, activeModelId]);
 
   // 关闭/收起右侧面板
   const handleClosePane = () => {
     setIsPaneOpen(false);
     setIsCreating(false);
     setSelectedKey('');
+    loadedModelKeyRef.current = '';
+    setShowApiKey(false);
   };
 
   // 开始创建新模型
   const handleStartAdd = () => {
     setIsCreating(true);
     setSelectedKey('');
+    loadedModelKeyRef.current = '';
     const defaultVendor = supportedVendors[0] || 'dashscope';
     setEditVendor(defaultVendor);
     setEditName('');
@@ -301,6 +317,8 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
       }
 
       showMessage('success', '模型配置已添加');
+      loadedModelKeyRef.current = '';
+      setShowApiKey(false);
       setIsCreating(false);
       setSelectedKey(`${editVendor}-${trimmedModelId}`);
     } else if (selectedModel) {
@@ -320,6 +338,8 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
       }
 
       showMessage('success', '模型配置已更新');
+      loadedModelKeyRef.current = '';
+      setShowApiKey(false);
       setSelectedKey(`${editVendor}-${trimmedModelId}`);
     }
   };
@@ -526,7 +546,7 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
                         (item.providerId === activeProviderId || item.providerType === activeProviderId) &&
                         item.id === activeModelId;
                       const vendorKey = (item.providerType || item.providerId || '').toLowerCase();
-                      const vendorDisplayName = VENDOR_NAMES[vendorKey] || item.providerName || vendorKey;
+                      const vendorDisplayName = VENDOR_NAMES[vendorKey] || item.providerName || (vendorKey === 'dashscope' ? 'DashScope' : vendorKey);
                       const record = testRecords[key];
                       const isTestingThis = testingKey === key;
 
@@ -558,7 +578,7 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
                                 <span className={styles.nameText}>{item.name || item.id}</span>
                                 {isDefaultModel && <Badge variant="primary">默认</Badge>}
                               </div>
-                              <span className={styles.subText}>{item.id}</span>
+                              <span className={styles.subText}>{vendorDisplayName}</span>
                             </div>
                           </div>
 
@@ -568,9 +588,8 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
                           {/* 状态列 */}
                           <div className={styles.statusCell}>
                             <span
-                              className={`${styles.statusDot} ${
-                                isConnected ? styles.statusDotConnected : styles.statusDotFailed
-                              }`}
+                              className={`${styles.statusDot} ${isConnected ? styles.statusDotConnected : styles.statusDotFailed
+                                }`}
                             />
                             <span>{isConnected ? '已连接' : '连接失败'}</span>
                           </div>
@@ -678,312 +697,320 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
                             <X size={16} />
                           </button>
                         </div>
-                      <div className={styles.detailHeaderMeta}>
-                        <span>配置新的 API 凭据与推理服务</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 新建模型表单 */}
-                  <div className={styles.detailForm}>
-                    <FormField label="模型名称" htmlFor="create-model-name" required>
-                      <TextInput
-                        id="create-model-name"
-                        value={editName}
-                        onChange={(e) => {
-                          setEditName(e.target.value);
-                          if (!editModelId) setEditModelId(e.target.value);
-                        }}
-                        placeholder="例如 qwen-plus-2025-07-28"
-                      />
-                    </FormField>
-
-                    <FormField label="提供商" htmlFor="create-model-vendor" required>
-                      <Select
-                        id="create-model-vendor"
-                        options={vendorOptions}
-                        value={editVendor}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setEditVendor(v);
-                          if (VENDOR_DEFAULT_URLS[v]) setEditBaseUrl(VENDOR_DEFAULT_URLS[v]);
-                        }}
-                        icon={<VendorIcon vendor={editVendor} size={16} />}
-                        fieldSize="md"
-                        fullWidth
-                      />
-                    </FormField>
-
-                    <FormField label="Model ID" htmlFor="create-model-id" required>
-                      <TextInput
-                        id="create-model-id"
-                        value={editModelId}
-                        onChange={(e) => setEditModelId(e.target.value)}
-                        placeholder="例如 qwen-plus / deepseek-chat"
-                      />
-                    </FormField>
-
-                    <FormField label="API Key" htmlFor="create-model-api-key" required>
-                      <div className={styles.keyInputContainer}>
-                        <TextInput
-                          id="create-model-api-key"
-                          type={showApiKey ? 'text' : 'password'}
-                          value={editApiKey}
-                          onChange={(e) => setEditApiKey(e.target.value)}
-                          placeholder="sk-... / 密钥凭证"
-                          autoComplete="off"
-                        />
-                        <button
-                          type="button"
-                          className={styles.eyeIconBtn}
-                          onClick={() => setShowApiKey(!showApiKey)}
-                          aria-label={showApiKey ? '隐藏 API Key' : '显示 API Key'}
-                        >
-                          {showApiKey ? <EyeOff size={15} /> : <Eye size={15} />}
-                        </button>
-                      </div>
-                    </FormField>
-
-                    <div className={styles.defaultModelRow}>
-                      <div className={styles.defaultModelLabels}>
-                        <span className={styles.defaultModelTitle}>设为默认模型</span>
-                        <span className={styles.defaultModelDesc}>在新对话中默认使用此模型</span>
-                      </div>
-                      <Toggle checked={editIsDefault} onChange={setEditIsDefault} />
-                    </div>
-                  </div>
-
-                  {/* 底部按钮栏 */}
-                  <div className={styles.detailFooter}>
-                    <div />
-                    <div className={styles.footerActionsRight}>
-                      <Button variant="outline" onClick={handleCancel}>
-                        取消
-                      </Button>
-                      <Button variant="primary" className={styles.saveBtn} onClick={handleSave}>
-                        保存并创建
-                      </Button>
-                    </div>
-                  </div>
-                </>
-              ) : selectedModel ? (
-                <>
-                  {/* 选中模型卡片头部 */}
-                  <div className={styles.detailHeader}>
-                    <div className={styles.detailIconTile}>
-                      <VendorIcon vendor={editVendor} size={24} />
-                    </div>
-                    <div className={styles.detailHeaderContent}>
-                      <div className={styles.detailHeaderTitleRow}>
-                        <div className={styles.detailHeaderTitle}>
-                          <span title={selectedModel.name || selectedModel.id}>{selectedModel.name || selectedModel.id}</span>
-                          {editIsDefault && <Badge variant="primary">默认</Badge>}
+                        <div className={styles.detailHeaderMeta}>
+                          <span>配置新的 API 凭据与推理服务</span>
                         </div>
+                      </div>
+                    </div>
 
-                        <div className={styles.headerActionGroup}>
-                          <div className={styles.headerMoreWrap}>
-                            <button
-                              type="button"
-                              className={styles.headerMoreBtn}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setOpenHeaderMenu(!openHeaderMenu);
-                              }}
-                              aria-label="更多操作"
-                            >
-                              <MoreVertical size={16} />
-                            </button>
+                    {/* 新建模型表单 */}
+                    <div className={styles.detailForm}>
+                      <FormField label="模型名称" htmlFor="create-model-name" required>
+                        <TextInput
+                          id="create-model-name"
+                          value={editName}
+                          onChange={(e) => {
+                            setEditName(e.target.value);
+                            if (!editModelId) setEditModelId(e.target.value);
+                          }}
+                          placeholder="例如 qwen-plus-2025-07-28"
+                        />
+                      </FormField>
 
-                            {openHeaderMenu && (
-                              <div className={styles.menuDropdown} onClick={(e) => e.stopPropagation()}>
-                                {!editIsDefault && (
+                      <FormField label="提供商" htmlFor="create-model-vendor" required>
+                        <Select
+                          id="create-model-vendor"
+                          options={vendorOptions}
+                          value={editVendor}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setEditVendor(v);
+                            if (VENDOR_DEFAULT_URLS[v]) setEditBaseUrl(VENDOR_DEFAULT_URLS[v]);
+                          }}
+                          icon={<VendorIcon vendor={editVendor} size={16} />}
+                          fieldSize="md"
+                          fullWidth
+                        />
+                      </FormField>
+
+                      <FormField label="Model ID" htmlFor="create-model-id" required>
+                        <TextInput
+                          id="create-model-id"
+                          value={editModelId}
+                          onChange={(e) => setEditModelId(e.target.value)}
+                          placeholder="例如 qwen-plus / deepseek-chat"
+                        />
+                      </FormField>
+
+                      <FormField label="API Key" htmlFor="create-model-api-key" required>
+                        <div className={styles.keyInputContainer}>
+                          <TextInput
+                            id="create-model-api-key"
+                            type={showApiKey ? 'text' : 'password'}
+                            value={editApiKey}
+                            onChange={(e) => setEditApiKey(e.target.value)}
+                            placeholder="sk-... / 密钥凭证"
+                            autoComplete="off"
+                          />
+                          <button
+                            type="button"
+                            className={styles.eyeIconBtn}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setShowApiKey((prev) => !prev);
+                            }}
+                            aria-label={showApiKey ? '隐藏 API Key' : '显示 API Key'}
+                            title={showApiKey ? '隐藏 API Key' : '显示 API Key'}
+                          >
+                            {showApiKey ? <EyeOff size={15} /> : <Eye size={15} />}
+                          </button>
+                        </div>
+                      </FormField>
+
+                      <div className={styles.defaultModelRow}>
+                        <div className={styles.defaultModelLabels}>
+                          <span className={styles.defaultModelTitle}>设为默认模型</span>
+                          <span className={styles.defaultModelDesc}>在新对话中默认使用此模型</span>
+                        </div>
+                        <Toggle checked={editIsDefault} onChange={setEditIsDefault} />
+                      </div>
+                    </div>
+
+                    {/* 底部按钮栏 */}
+                    <div className={styles.detailFooter}>
+                      <div />
+                      <div className={styles.footerActionsRight}>
+                        <Button variant="outline" onClick={handleCancel}>
+                          取消
+                        </Button>
+                        <Button variant="primary" className={styles.saveBtn} onClick={handleSave}>
+                          保存并创建
+                        </Button>
+                      </div>
+                    </div>
+                  </>
+                ) : selectedModel ? (
+                  <>
+                    {/* 选中模型卡片头部 */}
+                    <div className={styles.detailHeader}>
+                      <div className={styles.detailIconTile}>
+                        <VendorIcon vendor={editVendor} size={24} />
+                      </div>
+                      <div className={styles.detailHeaderContent}>
+                        <div className={styles.detailHeaderTitleRow}>
+                          <div className={styles.detailHeaderTitle}>
+                            <span title={selectedModel.name || selectedModel.id}>{selectedModel.name || selectedModel.id}</span>
+                            {editIsDefault && <Badge variant="primary">默认</Badge>}
+                          </div>
+
+                          <div className={styles.headerActionGroup}>
+                            <div className={styles.headerMoreWrap}>
+                              <button
+                                type="button"
+                                className={styles.headerMoreBtn}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpenHeaderMenu(!openHeaderMenu);
+                                }}
+                                aria-label="更多操作"
+                              >
+                                <MoreVertical size={16} />
+                              </button>
+
+                              {openHeaderMenu && (
+                                <div className={styles.menuDropdown} onClick={(e) => e.stopPropagation()}>
+                                  {!editIsDefault && (
+                                    <button
+                                      type="button"
+                                      className={styles.menuItem}
+                                      onClick={() => {
+                                        selectActiveModel(selectedModel.providerId, selectedModel.id);
+                                        setEditIsDefault(true);
+                                        setOpenHeaderMenu(false);
+                                        showMessage('success', `已将 ${selectedModel.name} 设为默认模型`);
+                                      }}
+                                    >
+                                      <Check size={14} /> 设为默认模型
+                                    </button>
+                                  )}
                                   <button
                                     type="button"
                                     className={styles.menuItem}
                                     onClick={() => {
-                                      selectActiveModel(selectedModel.providerId, selectedModel.id);
-                                      setEditIsDefault(true);
+                                      handleCopyModelId(selectedModel.id);
                                       setOpenHeaderMenu(false);
-                                      showMessage('success', `已将 ${selectedModel.name} 设为默认模型`);
                                     }}
                                   >
-                                    <Check size={14} /> 设为默认模型
+                                    <Copy size={14} /> 复制 Model ID
                                   </button>
-                                )}
-                                <button
-                                  type="button"
-                                  className={styles.menuItem}
-                                  onClick={() => {
-                                    handleCopyModelId(selectedModel.id);
-                                    setOpenHeaderMenu(false);
-                                  }}
-                                >
-                                  <Copy size={14} /> 复制 Model ID
-                                </button>
-                                <button
-                                  type="button"
-                                  className={`${styles.menuItem} ${styles.menuItemDanger}`}
-                                  onClick={() => {
-                                    setOpenHeaderMenu(false);
-                                    setShowDeleteModal(true);
-                                  }}
-                                >
-                                  <Trash2 size={14} /> 删除模型
-                                </button>
-                              </div>
-                            )}
-                          </div>
+                                  <button
+                                    type="button"
+                                    className={`${styles.menuItem} ${styles.menuItemDanger}`}
+                                    onClick={() => {
+                                      setOpenHeaderMenu(false);
+                                      setShowDeleteModal(true);
+                                    }}
+                                  >
+                                    <Trash2 size={14} /> 删除模型
+                                  </button>
+                                </div>
+                              )}
+                            </div>
 
+                            <button
+                              type="button"
+                              className={styles.closePaneBtn}
+                              onClick={handleClosePane}
+                              aria-label="收起面板"
+                              title="收起"
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className={styles.detailHeaderMeta}>
+                          <span>{VENDOR_NAMES[editVendor] || editVendor}</span>
+                          <span>·</span>
+                          <span
+                            className={`${styles.statusDot} ${currentTestRecord ? (currentTestRecord.success ? styles.statusDotConnected : styles.statusDotFailed) : styles.statusDotConnected
+                              }`}
+                          />
+                          <span>{currentTestRecord ? (currentTestRecord.success ? '已连接' : '连接失败') : '已连接'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 详情表单项 */}
+                    <div className={styles.detailForm}>
+                      <FormField label="模型名称" htmlFor="detail-model-name" required>
+                        <TextInput
+                          id="detail-model-name"
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          placeholder="模型显示名称"
+                        />
+                      </FormField>
+
+                      <FormField label="提供商" htmlFor="detail-model-vendor" required>
+                        <Select
+                          id="detail-model-vendor"
+                          options={vendorOptions}
+                          value={editVendor}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setEditVendor(v);
+                            if (VENDOR_DEFAULT_URLS[v]) setEditBaseUrl(VENDOR_DEFAULT_URLS[v]);
+                          }}
+                          icon={<VendorIcon vendor={editVendor} size={16} />}
+                          fieldSize="md"
+                          fullWidth
+                        />
+                      </FormField>
+
+                      <FormField label="Model ID" htmlFor="detail-model-id" required>
+                        <TextInput
+                          id="detail-model-id"
+                          value={editModelId}
+                          onChange={(e) => setEditModelId(e.target.value)}
+                          placeholder="Model ID"
+                        />
+                      </FormField>
+
+                      <FormField label="API Key" htmlFor="detail-model-api-key" required>
+                        <div className={styles.keyInputContainer}>
+                          <TextInput
+                            id="detail-model-api-key"
+                            type={showApiKey ? 'text' : 'password'}
+                            value={editApiKey}
+                            onChange={(e) => setEditApiKey(e.target.value)}
+                            placeholder="sk-... / 密钥凭证"
+                            autoComplete="off"
+                          />
                           <button
                             type="button"
-                            className={styles.closePaneBtn}
-                            onClick={handleClosePane}
-                            aria-label="收起面板"
-                            title="收起"
+                            className={styles.eyeIconBtn}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setShowApiKey((prev) => !prev);
+                            }}
+                            aria-label={showApiKey ? '隐藏 API Key' : '显示 API Key'}
+                            title={showApiKey ? '隐藏 API Key' : '显示 API Key'}
                           >
-                            <X size={16} />
+                            {showApiKey ? <EyeOff size={15} /> : <Eye size={15} />}
                           </button>
                         </div>
-                      </div>
+                      </FormField>
 
-                      <div className={styles.detailHeaderMeta}>
-                        <span>{VENDOR_NAMES[editVendor] || editVendor}</span>
-                        <span>·</span>
-                        <span
-                          className={`${styles.statusDot} ${
-                            currentTestRecord ? (currentTestRecord.success ? styles.statusDotConnected : styles.statusDotFailed) : styles.statusDotConnected
-                          }`}
-                        />
-                        <span>{currentTestRecord ? (currentTestRecord.success ? '已连接' : '连接失败') : '已连接'}</span>
+                      {/* 状态行 */}
+                      <FormField label="状态">
+                        <div className={styles.statusRowWrapper}>
+                          <div className={styles.statusInfoBlock}>
+                            <div className={styles.statusIndicatorText}>
+                              <span
+                                className={`${styles.statusDot} ${currentTestRecord ? (currentTestRecord.success ? styles.statusDotConnected : styles.statusDotFailed) : styles.statusDotConnected
+                                  }`}
+                              />
+                              <span>{currentTestRecord ? (currentTestRecord.success ? '已连接' : '连接失败') : '已连接'}</span>
+                            </div>
+                            <span className={styles.statusSubText}>
+                              最后测试: {formatAbsoluteTime(currentTestRecord?.lastTestedAt)}
+                            </span>
+                          </div>
+
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              handleTestConnection({
+                                providerId: selectedModel.providerId,
+                                providerType: editVendor,
+                                id: editModelId,
+                                baseUrl: editBaseUrl,
+                                apiKey: editApiKey,
+                              })
+                            }
+                            disabled={isCurrentTesting}
+                          >
+                            {isCurrentTesting ? '测试中...' : '测试连接'}
+                          </Button>
+                        </div>
+                      </FormField>
+
+                      {/* 设为默认模型行 */}
+                      <div className={styles.defaultModelRow}>
+                        <div className={styles.defaultModelLabels}>
+                          <span className={styles.defaultModelTitle}>设为默认模型</span>
+                          <span className={styles.defaultModelDesc}>在新对话中默认使用此模型</span>
+                        </div>
+                        <Toggle checked={editIsDefault} onChange={setEditIsDefault} />
                       </div>
                     </div>
-                  </div>
 
-                  {/* 详情表单项 */}
-                  <div className={styles.detailForm}>
-                    <FormField label="模型名称" htmlFor="detail-model-name" required>
-                      <TextInput
-                        id="detail-model-name"
-                        value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
-                        placeholder="模型显示名称"
-                      />
-                    </FormField>
+                    {/* 底部操作栏 */}
+                    <div className={styles.detailFooter}>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className={styles.deleteActionBtn}
+                        icon={<Trash2 size={15} />}
+                        onClick={() => setShowDeleteModal(true)}
+                      >
+                        删除模型
+                      </Button>
 
-                    <FormField label="提供商" htmlFor="detail-model-vendor" required>
-                      <Select
-                        id="detail-model-vendor"
-                        options={vendorOptions}
-                        value={editVendor}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setEditVendor(v);
-                          if (VENDOR_DEFAULT_URLS[v]) setEditBaseUrl(VENDOR_DEFAULT_URLS[v]);
-                        }}
-                        icon={<VendorIcon vendor={editVendor} size={16} />}
-                        fieldSize="md"
-                        fullWidth
-                      />
-                    </FormField>
-
-                    <FormField label="Model ID" htmlFor="detail-model-id" required>
-                      <TextInput
-                        id="detail-model-id"
-                        value={editModelId}
-                        onChange={(e) => setEditModelId(e.target.value)}
-                        placeholder="Model ID"
-                      />
-                    </FormField>
-
-                    <FormField label="API Key" htmlFor="detail-model-api-key" required>
-                      <div className={styles.keyInputContainer}>
-                        <TextInput
-                          id="detail-model-api-key"
-                          type={showApiKey ? 'text' : 'password'}
-                          value={editApiKey}
-                          onChange={(e) => setEditApiKey(e.target.value)}
-                          placeholder="sk-... / 密钥凭证"
-                          autoComplete="off"
-                        />
-                        <button
-                          type="button"
-                          className={styles.eyeIconBtn}
-                          onClick={() => setShowApiKey(!showApiKey)}
-                          aria-label={showApiKey ? '隐藏 API Key' : '显示 API Key'}
-                        >
-                          {showApiKey ? <EyeOff size={15} /> : <Eye size={15} />}
-                        </button>
-                      </div>
-                    </FormField>
-
-                    {/* 状态行 */}
-                    <FormField label="状态">
-                      <div className={styles.statusRowWrapper}>
-                        <div className={styles.statusInfoBlock}>
-                          <div className={styles.statusIndicatorText}>
-                            <span
-                              className={`${styles.statusDot} ${
-                                currentTestRecord ? (currentTestRecord.success ? styles.statusDotConnected : styles.statusDotFailed) : styles.statusDotConnected
-                              }`}
-                            />
-                            <span>{currentTestRecord ? (currentTestRecord.success ? '已连接' : '连接失败') : '已连接'}</span>
-                          </div>
-                          <span className={styles.statusSubText}>
-                            最后测试: {formatAbsoluteTime(currentTestRecord?.lastTestedAt)}
-                          </span>
-                        </div>
-
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            handleTestConnection({
-                              providerId: selectedModel.providerId,
-                              providerType: editVendor,
-                              id: editModelId,
-                              baseUrl: editBaseUrl,
-                              apiKey: editApiKey,
-                            })
-                          }
-                          disabled={isCurrentTesting}
-                        >
-                          {isCurrentTesting ? '测试中...' : '测试连接'}
+                      <div className={styles.footerActionsRight}>
+                        <Button type="button" variant="outline" onClick={handleCancel}>
+                          取消
+                        </Button>
+                        <Button type="button" variant="primary" className={styles.saveBtn} onClick={handleSave}>
+                          保存更改
                         </Button>
                       </div>
-                    </FormField>
-
-                    {/* 设为默认模型行 */}
-                    <div className={styles.defaultModelRow}>
-                      <div className={styles.defaultModelLabels}>
-                        <span className={styles.defaultModelTitle}>设为默认模型</span>
-                        <span className={styles.defaultModelDesc}>在新对话中默认使用此模型</span>
-                      </div>
-                      <Toggle checked={editIsDefault} onChange={setEditIsDefault} />
                     </div>
-                  </div>
-
-                  {/* 底部操作栏 */}
-                  <div className={styles.detailFooter}>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className={styles.deleteActionBtn}
-                      icon={<Trash2 size={15} />}
-                      onClick={() => setShowDeleteModal(true)}
-                    >
-                      删除模型
-                    </Button>
-
-                    <div className={styles.footerActionsRight}>
-                      <Button type="button" variant="outline" onClick={handleCancel}>
-                        取消
-                      </Button>
-                      <Button type="button" variant="primary" className={styles.saveBtn} onClick={handleSave}>
-                        保存更改
-                      </Button>
-                    </div>
-                  </div>
                   </>
                 ) : null}
               </div>

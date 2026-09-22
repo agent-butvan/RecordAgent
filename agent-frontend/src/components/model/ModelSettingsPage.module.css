@@ -205,7 +205,6 @@
   align-items: center;
   padding: 13px 16px;
   border-bottom: 1px solid #f1f5f9;
-  border-left: 3px solid transparent;
   cursor: pointer;
   transition: all 0.15s ease;
   background-color: #ffffff;
@@ -217,7 +216,6 @@
 
 .tableRowSelected {
   background-color: #f0f7ff !important;
-  border-left-color: #2563eb !important;
 }
 
 /* 模型名称列单元格 */
@@ -536,21 +534,31 @@
   width: 100%;
 }
 
+.keyInputContainer input {
+  padding-right: 40px !important;
+}
+
 .eyeIconBtn {
   position: absolute;
-  right: 12px;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
   background: transparent;
   border: none;
   color: #94a3b8;
   cursor: pointer;
-  padding: 4px;
+  padding: 6px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  z-index: 2;
+  border-radius: 4px;
+  transition: color 0.15s ease, background-color 0.15s ease;
 }
 
 .eyeIconBtn:hover {
-  color: #475569;
+  color: #334155;
+  background-color: #f1f5f9;
 }
 
 /* 状态字段左右容器 */
