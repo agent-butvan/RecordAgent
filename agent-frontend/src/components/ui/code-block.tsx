@@ -13,7 +13,7 @@ import {
 import styles from "./code-block.module.css"
 
 /* --------------------------------------------------------------------------
- * CodeBlock 组件群
+ * CodeBlock 组件群 - 参考“新增资料界面”中的卡片风格实现
  * -------------------------------------------------------------------------- */
 
 export type CodeBlockProps = {
@@ -35,7 +35,7 @@ export function CodeBlock({
   theme = "github-light",
   ...props
 }: CodeBlockProps) {
-  // 如果直接传入 code，按完整卡片模式渲染（兼容现有 MarkdownContent 与 MermaidBlock）
+  // 如果直接传入 code，按完整卡片模式渲染（无缝兼容 MarkdownContent 与 MermaidBlock）
   if (code !== undefined) {
     const { language: parsedLang, filename: parsedFilename } = parseLanguageAndFilename(language, filename)
     const resolvedLang = resolveLanguage(parsedLang, code)
@@ -43,26 +43,23 @@ export function CodeBlock({
 
     return (
       <div
-        className={cn(styles.container, className)}
+        className={cn(styles.wrapper, className)}
         {...props}
       >
-        <CodeBlockGroup>
-          <div className={styles.headerLeft}>
-            <span className={styles.dot} />
-            <span className={styles.displayName}>
-              {displayName}
+        <div className={styles.floatingToolbar} contentEditable={false}>
+          {parsedFilename && (
+            <span
+              className={styles.filename}
+              title={parsedFilename}
+            >
+              {parsedFilename}
             </span>
-            {parsedFilename && (
-              <span
-                className={styles.filename}
-                title={parsedFilename}
-              >
-                {parsedFilename}
-              </span>
-            )}
-          </div>
+          )}
+          <span className={styles.langLabel}>
+            {displayName}
+          </span>
           <CodeBlockCopyButton code={code} />
-        </CodeBlockGroup>
+        </div>
         <CodeBlockCode code={code} language={resolvedLang} theme={theme} />
       </div>
     )
@@ -71,7 +68,7 @@ export function CodeBlock({
   // 组合式容器用法
   return (
     <div
-      className={cn(styles.container, className)}
+      className={cn(styles.wrapper, className)}
       {...props}
     >
       {children}
@@ -88,7 +85,7 @@ export function CodeBlockGroup({
 }: CodeBlockGroupProps) {
   return (
     <div
-      className={cn(styles.header, className)}
+      className={cn(styles.floatingToolbar, className)}
       {...props}
     >
       {children}
@@ -153,7 +150,7 @@ export function CodeBlockCode({
     }
   }, [code, resolvedLang, theme])
 
-  const classNames = cn(styles.codeWrapper, className)
+  const classNames = cn(styles.codeArea, className)
 
   // SSR / 加载等待状态：呈现干净的原始代码段
   return highlightedHtml ? (
@@ -194,11 +191,11 @@ export function CodeBlockCopyButton({
     <button
       type="button"
       onClick={handleCopy}
-      className={cn(styles.copyButton, className)}
+      className={cn(styles.copyBtn, className)}
       title={copied ? "已复制" : "复制代码"}
       aria-label={copied ? "代码已复制" : "复制代码"}
     >
-      {copied ? <Check size={14} className={styles.copiedIcon} /> : <Copy size={14} />}
+      {copied ? <Check size={13} className={styles.copiedIcon} /> : <Copy size={13} />}
     </button>
   )
 }
