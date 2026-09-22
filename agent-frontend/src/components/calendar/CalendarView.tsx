@@ -32,6 +32,7 @@ import { TopBar } from '../common/TopBar';
 import { formatStudyDuration } from './calendarPresentation';
 import { CalendarMonthGrid } from './CalendarMonthGrid';
 import { CalendarDayDetails } from './CalendarDayDetails';
+import { CalendarStickyNotes } from './CalendarStickyNotes';
 import { fetchStudyStatistics } from '../../services/studyApi';
 import { fetchRecordDays } from '../../services/recordApi';
 import { useStudyRealtime } from '../../context/studyRealtimeState';
@@ -377,6 +378,7 @@ export const CalendarView: React.FC = () => {
                 <span><i className={styles.studyMarker} />学习</span><span><i className={styles.recordMarker} />资料</span>
                 <span><i className={styles.expenseMarker} />支出</span>
               </div>
+              <CalendarStickyNotes />
               <section className={styles.monthReview} aria-label="本月摘要">
                 <div className={styles.monthReviewHeading}><h3>本月摘要</h3><span>待办统计截至今天</span></div>
                 {overviewError && <p className={styles.monthReviewEmpty}>{overviewError} <button type="button" onClick={() => setOverviewRetry(value => value + 1)}>重试</button></p>}

@@ -1,0 +1,382 @@
+.note {
+  --paper-1: #fff8c8;
+  --paper-2: #fff0a8;
+  --note-edge: #eddc86;
+  --note-tape: #efd876;
+  --note-accent: #3d9c68;
+  --note-shadow: rgba(144, 113, 23, 0.2);
+  --note-line: rgba(86, 71, 23, 0.1);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 304px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.note[data-tone='green'] {
+  --paper-1: #e8f7e8;
+  --paper-2: #dff1df;
+  --note-edge: #c5dec7;
+  --note-tape: #a7d5c5;
+  --note-accent: #329165;
+  --note-shadow: rgba(45, 115, 79, 0.18);
+  --note-line: rgba(46, 86, 61, 0.1);
+}
+
+.note[data-tone='blue'] {
+  --paper-1: #eaf2ff;
+  --paper-2: #dfeaff;
+  --note-edge: #c6d6ee;
+  --note-tape: #b8cdf2;
+  --note-accent: #4d79cf;
+  --note-shadow: rgba(46, 78, 134, 0.18);
+  --note-line: rgba(45, 66, 99, 0.1);
+}
+
+.shell {
+  position: relative;
+  width: 100%;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.paper {
+  position: relative;
+  width: 100%;
+  min-height: 302px;
+  box-sizing: border-box;
+  padding: 30px 28px 25px;
+  color: #20252d;
+  cursor: grab;
+  transform-origin: 50% 8%;
+  will-change: transform, filter;
+  clip-path: polygon(
+    0.7% 0.9%,
+    98.8% 0,
+    100% 94.7%,
+    97.2% 97.5%,
+    96.1% 100%,
+    48% 99.25%,
+    2% 100%,
+    0 97.2%
+  );
+  background:
+    linear-gradient(
+      100deg,
+      rgba(255, 255, 255, 0.28),
+      transparent 27% 74%,
+      rgba(129, 97, 25, 0.035)
+    ),
+    linear-gradient(180deg, var(--paper-1) 0%, var(--paper-2) 100%);
+  box-shadow:
+    0 26px 45px var(--note-shadow),
+    0 9px 18px rgba(25, 35, 48, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+.paper::before {
+  content: '';
+  position: absolute;
+  right: 14px;
+  left: 12px;
+  top: 10px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(105, 83, 29, 0.055);
+  filter: blur(8px);
+  opacity: 0.42;
+  pointer-events: none;
+}
+
+.paper::after {
+  content: '';
+  position: absolute;
+  right: 14px;
+  bottom: -2px;
+  left: 10px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(70, 61, 37, 0.09);
+  filter: blur(5px);
+  opacity: 0.42;
+  pointer-events: none;
+}
+
+.paperGrain {
+  position: absolute;
+  inset: 0;
+  clip-path: inherit;
+  opacity: 0.18;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+
+.tape {
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  top: -11px;
+  width: 76px;
+  height: 27px;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.24),
+      transparent 18% 82%,
+      rgba(80, 70, 35, 0.05)
+    ),
+    var(--note-tape);
+  clip-path: polygon(
+    1% 11%,
+    7% 3%,
+    13% 8%,
+    20% 1%,
+    27% 6%,
+    34% 2%,
+    44% 8%,
+    54% 1%,
+    63% 7%,
+    72% 2%,
+    80% 7%,
+    89% 1%,
+    99% 9%,
+    97% 88%,
+    90% 94%,
+    80% 89%,
+    72% 98%,
+    64% 91%,
+    55% 97%,
+    45% 90%,
+    35% 99%,
+    24% 92%,
+    15% 98%,
+    5% 91%
+  );
+  box-shadow: 0 2px 5px rgba(80, 70, 34, 0.1);
+  backdrop-filter: blur(1px);
+  translate: -50% 0;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.tape::after {
+  content: '';
+  position: absolute;
+  inset: 3px 7px;
+  background: repeating-linear-gradient(
+    100deg,
+    rgba(255, 255, 255, 0.22) 0 1px,
+    transparent 1px 5px
+  );
+  opacity: 0.45;
+}
+
+.curl {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 44px;
+  height: 44px;
+  background: linear-gradient(
+    135deg,
+    transparent 0 49%,
+    rgba(255, 255, 255, 0.45) 50% 60%,
+    var(--note-edge) 61% 100%
+  );
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
+  filter: drop-shadow(-3px -2px 3px rgba(70, 55, 20, 0.06));
+  transform-origin: 100% 100%;
+  pointer-events: none;
+}
+
+.head {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 17px;
+}
+
+.titleLine {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.titleLine h3 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.15;
+  letter-spacing: -0.55px;
+  font-weight: 760;
+}
+
+.subtitle {
+  color: rgba(32, 37, 45, 0.42);
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: 0.035em;
+}
+
+.menu {
+  display: grid;
+  flex: 0 0 auto;
+  width: 27px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(32, 37, 45, 0.56);
+  cursor: pointer;
+  place-items: center;
+}
+
+.menu:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.menu span {
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 1.5px;
+  transform: translateY(-3px);
+}
+
+.list {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.todo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin: 0;
+  padding: 2px 0;
+  border: 0;
+  appearance: none;
+  background: transparent;
+  color: #272c34;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.check {
+  display: grid;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border: 1.45px solid rgba(41, 46, 54, 0.38);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.19);
+  transition: 0.18s ease;
+  place-items: center;
+}
+
+.done .check {
+  border-color: var(--note-accent);
+  background: var(--note-accent);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.todo svg {
+  width: 13px;
+  height: 13px;
+  color: white;
+}
+
+.label {
+  font-size: 14px;
+  font-weight: 560;
+  line-height: 1.4;
+  letter-spacing: -0.12px;
+  transition: opacity 0.16s ease;
+}
+
+.done .label {
+  opacity: 0.72;
+}
+
+.footer {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(37, 43, 51, 0.085);
+}
+
+.bar {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--note-accent);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12) inset;
+}
+
+.count {
+  min-width: 52px;
+  color: rgba(39, 44, 52, 0.52);
+  font-size: 10.5px;
+  font-weight: 650;
+  text-align: right;
+}
+
+.crease {
+  position: absolute;
+  background: var(--note-line);
+  filter: blur(0.2px);
+  opacity: 0.17;
+  pointer-events: none;
+}
+
+.creaseA {
+  right: 22px;
+  top: 78px;
+  width: 92px;
+  height: 1px;
+  transform: rotate(-3deg);
+}
+
+.creaseB {
+  left: 23px;
+  bottom: 46px;
+  width: 56px;
+  height: 1px;
+  transform: rotate(2deg);
+}
+
+.dragging {
+  cursor: grabbing;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .paper,
+  .shell,
+  .tape,
+  .todo,
+  .bar {
+    transition: none !important;
+    animation: none !important;
+  }
+}
