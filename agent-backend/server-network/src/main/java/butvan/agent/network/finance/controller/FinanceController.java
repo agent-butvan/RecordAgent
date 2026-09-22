@@ -59,6 +59,15 @@ public class FinanceController {
                 .stream().map(FinanceDtos::from).toList());
     }
 
+    /** 当前用户的闭区间自然日收支，仅返回汇总数字。 */
+    @ApiLog("查询日期范围收支汇总")
+    @GetMapping("/cashflow-summary")
+    public Result<FinanceDtos.CashflowSummaryResponse> cashflowSummary(
+            @RequestParam java.time.LocalDate from, @RequestParam java.time.LocalDate to) {
+        var summary = financeService.getCashflowSummary(currentUserProvider.currentUserId(), from, to);
+        return Result.success(new FinanceDtos.CashflowSummaryResponse(summary.income(), summary.expense()));
+    }
+
     @ApiLog("查询收支分类")
     @GetMapping("/categories")
     public Result<FinanceDtos.TransactionCategoryOptionsResponse> categories() {

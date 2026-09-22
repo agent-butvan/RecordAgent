@@ -4,6 +4,7 @@ import type {
   CreateFinanceTransactionInput,
   CreateFinanceTransferInput,
   FinanceAccount,
+  FinanceCashflowSummary,
   FinanceChartRange,
   FinanceCategoryOptions,
   FinanceExpenseChart,
@@ -103,4 +104,9 @@ export function createFinanceTransfer(input: CreateFinanceTransferInput): Promis
 /** 按日查询发生变化的资产流水，包含划账与余额校准。 */
 export function fetchFinanceDayTransactions(date: string): Promise<FinanceTransaction[]> {
   return financeRequest<FinanceTransaction[]>(`/agent/finance/transactions/day?date=${encodeURIComponent(date)}`);
+}
+
+/** 月历仅查询收支合计，不加载整月完整流水。 */
+export function fetchFinanceCashflowSummary(from: string, to: string): Promise<FinanceCashflowSummary> {
+  return financeRequest<FinanceCashflowSummary>(`/agent/finance/cashflow-summary?${new URLSearchParams({ from, to })}`);
 }

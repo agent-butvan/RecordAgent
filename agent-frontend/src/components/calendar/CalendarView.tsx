@@ -14,7 +14,7 @@ import {
 } from '@phosphor-icons/react';
 import type { CalendarDayEntry, CalendarJournal, CalendarRecordDraft } from '../../types/calendar';
 import type { DailyDaySummary } from '../../types/dailyEvent';
-import { createFinanceTransaction, fetchFinanceCategories, fetchFinanceOverview } from '../../services/financeApi';
+import { createFinanceTransaction, fetchFinanceCategories, fetchFinanceOverview, fetchFinanceCashflowSummary } from '../../services/financeApi';
 import {
   createDailyRecord,
   deleteDailyEvent,
@@ -24,13 +24,14 @@ import {
   setDailyTodoCompleted,
   updateDailyJournal,
 } from '../../services/dailyEvents';
-import type { CreateFinanceTransactionInput, FinanceAccount, FinanceCategoryOptions } from '../../types/finance';
+import type { CreateFinanceTransactionInput, FinanceAccount, FinanceCategoryOptions, FinanceCashflowSummary } from '../../types/finance';
 import { Button } from '../common/Button';
 import { useMessage } from '../common/Message';
 import { Modal } from '../common/Modal';
 import { TopBar } from '../common/TopBar';
 import { formatStudyDuration } from './calendarPresentation';
-import { CalendarDateCell } from './CalendarDateCell';
+import { CalendarMonthGrid } from './CalendarMonthGrid';
+import { CalendarDayDetails } from './CalendarDayDetails';
 import { fetchStudyStatistics } from '../../services/studyApi';
 import { fetchRecordDays } from '../../services/recordApi';
 import { useStudyRealtime } from '../../context/studyRealtimeState';
@@ -68,10 +69,6 @@ function addDays(date: Date, amount: number): Date {
   return copy;
 }
 
-function isSameDay(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
-
 function totalExpense(entry: CalendarDayEntry): number {
   return entry.expenses.reduce((total, expense) => total + expense.amount, 0);
 }
@@ -88,6 +85,9 @@ export const CalendarView: React.FC = () => {
   const { syncGeneration } = useStudyRealtime();
   const [studyStats, setStudyStats] = useState<StudyStatistics | null>(null);
   const [recordDays, setRecordDays] = useState<RecordDaySummary[]>([]);
+  const [cashflow, setCashflow] = useState<FinanceCashflowSummary | null>(null);
+  const [recordsReady, setRecordsReady] = useState(false);
+  const [summariesReady, setSummariesReady] = useState(false);
   const [overviewError, setOverviewError] = useState('');
   const [overviewRetry, setOverviewRetry] = useState(0);
   const today = useMemo(() => startOfDay(new Date()), []);
@@ -116,17 +116,19 @@ export const CalendarView: React.FC = () => {
 
   useEffect(() => {
     let active = true;
-    setStudyStats(null); setRecordDays([]); setOverviewError('');
+    setStudyStats(null); setRecordDays([]); setOverviewError(''); setCashflow(null); setRecordsReady(false);
     const from = formatLocalDate(new Date(cursor.getFullYear(), cursor.getMonth(), 1));
     const to = formatLocalDate(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0));
     void Promise.allSettled([
       fetchStudyStatistics(from, to, Intl.DateTimeFormat().resolvedOptions().timeZone),
       fetchRecordDays(from, to),
-    ]).then(([study, records]) => {
+      fetchFinanceCashflowSummary(from, to),
+    ]).then(([study, records, finances]) => {
       if (!active) return;
       if (study.status === 'fulfilled') setStudyStats(study.value);
-      if (records.status === 'fulfilled') setRecordDays(records.value);
-      if (study.status === 'rejected' || records.status === 'rejected') setOverviewError('学习或资料摘要读取失败');
+      if (records.status === 'fulfilled') { setRecordDays(records.value); setRecordsReady(true); }
+      if (finances.status === 'fulfilled') setCashflow(finances.value);
+      if ([study, records, finances].some(result => result.status === 'rejected')) setOverviewError('部分月度摘要读取失败');
     });
     return () => { active = false; };
   }, [cursor, syncGeneration, overviewRetry]);
@@ -136,17 +138,13 @@ export const CalendarView: React.FC = () => {
   const monthTodoRecords = monthRecords.filter((record) => record.date <= todayKey);
   const monthTodoTotal = monthTodoRecords.reduce((total, record) => total + record.todoCount, 0);
   const monthTodoCompleted = monthTodoRecords.reduce((total, record) => total + record.completedTodoCount, 0);
-  const monthTodoRate = monthTodoTotal ? Math.round((monthTodoCompleted / monthTodoTotal) * 100) : 0;
   const studyByDate = new Map(studyStats?.days.map(day => [day.date, day.durationSeconds]));
   const recordsByDate = new Map(recordDays.map(day => [day.date, day.count]));
   const monthRecordCount = recordDays.reduce((total, day) => total + day.count, 0);
-  const highestExpense = [...monthRecords].filter(day => day.expenseTotal > 0).sort((a, b) => b.expenseTotal - a.expenseTotal)[0];
-  const longestStudy = [...(studyStats?.days ?? [])].filter(day => day.durationSeconds > 0).sort((a, b) => b.durationSeconds - a.durationSeconds)[0];
-  const monthExpenseTotal = monthRecords.reduce((total, record) => total + record.expenseTotal, 0);
 
   const selectedKey = formatLocalDate(selected);
   const selectedEntry = entries[selectedKey] ?? EMPTY_ENTRY;
-  const selectedJournals = selectedEntry.journals ?? (selectedEntry.journal ? [selectedEntry.journal] : []);
+  const selectedJournals = (selectedEntry.journals ?? (selectedEntry.journal ? [selectedEntry.journal] : [])).filter(journal => journal.source !== 'record');
   const completedCount = selectedEntry.todos.filter((todo) => todo.completed).length;
   const selectedCashflowCount = selectedEntry.expenses.length + selectedEntry.incomes.length;
   const hasDailyRecord = Boolean(
@@ -178,6 +176,7 @@ export const CalendarView: React.FC = () => {
     const last = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
     const items = await fetchDailySummaries(first, last);
     setSummaries(Object.fromEntries(items.map((item) => [item.date, item])));
+    setSummariesReady(true);
   }, [cursor]);
 
   useEffect(() => {
@@ -199,17 +198,18 @@ export const CalendarView: React.FC = () => {
   useEffect(() => {
     let active = true;
     setSummaries({});
+    setSummariesReady(false);
     const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
     const last = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
     fetchDailySummaries(first, last)
       .then((items) => {
-        if (active) setSummaries(Object.fromEntries(items.map((item) => [item.date, item])));
+        if (active) { setSummaries(Object.fromEntries(items.map((item) => [item.date, item]))); setSummariesReady(true); }
       })
       .catch((error: unknown) => {
         if (active) showMessage('error', error instanceof Error ? error.message : '读取月度摘要失败');
       });
     return () => { active = false; };
-  }, [cursor, showMessage]);
+  }, [cursor, showMessage, overviewRetry]);
 
   const refreshSelectedAndMonth = async () => {
     await Promise.all([loadDay(selected), loadMonth()]);
@@ -311,6 +311,7 @@ export const CalendarView: React.FC = () => {
       }
       await loadDay(journalEditorDate);
       await loadMonth();
+      setOverviewRetry(value => value + 1);
       setSelected(journalEditorDate);
       setJournalEditorDate(null);
       setJournalEditorId(null);
@@ -367,40 +368,23 @@ export const CalendarView: React.FC = () => {
               <div className={styles.weekHeader}>
                 {WEEKDAY_LABELS.map((label) => <span key={label}>{label}</span>)}
               </div>
-              <div className={styles.grid}>
-                {days.map(day => {
-                  const dateKey = formatLocalDate(day);
-                  return <CalendarDateCell key={dateKey} date={day} dateKey={dateKey}
-                    inMonth={day.getMonth() === cursor.getMonth()} today={isSameDay(day, today)}
-                    selected={isSameDay(day, selected)} summary={summaries[dateKey]}
-                    studySeconds={studyByDate.get(dateKey)} recordCount={recordsByDate.get(dateKey)}
-                    onSelect={() => setSelected(startOfDay(day))} />;
-                })}
+              <CalendarMonthGrid days={days} month={cursor.getMonth()} selectedKey={selectedKey} todayKey={todayKey}
+                available={summariesReady && recordsReady && studyStats !== null}
+                summaries={summaries} studyByDate={studyByDate} recordsByDate={recordsByDate}
+                onSelect={date => setSelected(startOfDay(date))} />
+              <div className={styles.activityLegend} aria-label="活力颜色从少到多">
+                <span>活力</span><span>少</span>{[0, 1, 2, 3, 4].map(level => <i key={level} className={styles[`activityLevel${level}`]} />)}<span>多</span>
+                <span className={styles.activityNote}>学习 · 完成待办 · 资料</span>
               </div>
-              <div className={styles.legend}>
-                <span><i className={styles.signalSchedule} />日程</span>
-                <span><i className={styles.signalTodo} />待办</span>
-                <span><i className={styles.signalExpense} />支出</span>
-                <span>绿色 · 学习</span><span>紫色 · 资料</span>
-              </div>
-
-              <section className={styles.monthReview} aria-label="月度概览">
-                <div className={styles.monthReviewHeading}><h3>月度概览</h3><span>待办统计截至今天</span></div>
+              <section className={styles.monthReview} aria-label="本月摘要">
+                <div className={styles.monthReviewHeading}><h3>本月摘要</h3><span>待办统计截至今天</span></div>
                 {overviewError && <p className={styles.monthReviewEmpty}>{overviewError} <button type="button" onClick={() => setOverviewRetry(value => value + 1)}>重试</button></p>}
                 <dl className={styles.monthStats}>
-                  <div><dt>待办完成</dt><dd>{monthTodoTotal ? `${monthTodoRate}%` : '—'}</dd><small>{monthTodoCompleted} / {monthTodoTotal} 项</small></div>
-                  <div><dt>本月支出</dt><dd>¥{monthExpenseTotal.toFixed(2)}</dd></div>
-                  <div><dt>累计学习</dt><dd>{studyStats ? formatStudyDuration(studyStats.totalDurationSeconds) : '—'}</dd><small>{studyStats?.studyDays ?? '—'} 天有学习</small></div>
-                  <div><dt>编写资料</dt><dd>{overviewError ? '—' : `${monthRecordCount} 篇`}</dd></div>
+                  <div><dt>学习时长</dt><dd>{studyStats ? formatStudyDuration(studyStats.totalDurationSeconds) : '—'}</dd></div>
+                  <div><dt>完成待办</dt><dd>{summariesReady ? `${monthTodoCompleted} / ${monthTodoTotal}` : '—'}</dd></div>
+                  <div><dt>资料篇数</dt><dd>{recordsReady ? `${monthRecordCount} 篇` : '—'}</dd></div>
+                  <div><dt>收支结余</dt><dd>{cashflow ? `¥${(cashflow.income - cashflow.expense).toFixed(2)}` : '—'}</dd></div>
                 </dl>
-                <div className={styles.monthHighlights}>
-                  <p>值得回看的日子</p>
-                  <div className={styles.highlightList}>
-                    {highestExpense && <button type="button" className={styles.highlightItem} onClick={() => setSelected(new Date(`${highestExpense.date}T00:00:00`))}><span className={styles.highlightDate}>{highestExpense.date.slice(-2)}</span><span className={styles.highlightText}>最高支出 · ¥{highestExpense.expenseTotal.toFixed(2)}</span><CaretRightIcon size={13} /></button>}
-                    {longestStudy && <button type="button" className={styles.highlightItem} onClick={() => setSelected(new Date(`${longestStudy.date}T00:00:00`))}><span className={styles.highlightDate}>{longestStudy.date.slice(-2)}</span><span className={styles.highlightText}>最专注 · {formatStudyDuration(longestStudy.durationSeconds)}</span><CaretRightIcon size={13} /></button>}
-                  </div>
-                  {!highestExpense && !longestStudy && <p className={styles.monthReviewEmpty}>记录支出或学习后，这里会标记值得回看的日子。</p>}
-                </div>
               </section>
             </section>
 
@@ -487,10 +471,10 @@ export const CalendarView: React.FC = () => {
                 </div>}
               </section>}
 
-              {Boolean(selectedEntry.otherRecords?.length) && <section className={styles.recordSection}>
+              {Boolean(selectedEntry.otherRecords?.some(record => record.type !== '学习')) && <section className={styles.recordSection}>
                 <div className={styles.sectionHeading}><NotePencilIcon size={15} aria-hidden="true" /><h3>其他记录</h3></div>
                 <div className={styles.scheduleList}>
-                  {selectedEntry.otherRecords?.map((record) => <div key={record.id} className={styles.scheduleItem}>
+                  {selectedEntry.otherRecords?.filter(record => record.type !== '学习').map((record) => <div key={record.id} className={styles.scheduleItem}>
                     <span className={`${styles.scheduleDot} ${styles.scheduleViolet}`} />
                     <span className={styles.scheduleTime}>{record.type}</span>
                     <span className={styles.scheduleBody}><strong>{record.title}</strong></span>
@@ -499,9 +483,10 @@ export const CalendarView: React.FC = () => {
               </section>}
             </div> : <div className={styles.emptyDay}>
               <CalendarDotsIcon size={20} aria-hidden="true" />
-              <strong>给这一天留下一点什么</strong>
-              <p>待办、日程、花销、手记和图片都会在这里汇总。</p>
+              <strong>暂无待办、日程或收支记录</strong>
+              <p>学习、资料和资产变动在下方独立汇总。</p>
             </div>}
+            <CalendarDayDetails key={selectedKey} date={selected} revision={overviewRetry} />
           </section>
           </div>
         </div>

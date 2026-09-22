@@ -108,3 +108,6 @@ export interface FinanceTransferResponse {
   fromTransaction: FinanceTransaction;
   toTransaction: FinanceTransaction;
 }
+
+/** 任意自然日期间的轻量收支汇总。 */
+export interface FinanceCashflowSummary { income: number; expense: number; }
