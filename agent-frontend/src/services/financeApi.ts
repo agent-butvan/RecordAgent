@@ -99,3 +99,8 @@ export function updateFinanceTransaction(
 export function createFinanceTransfer(input: CreateFinanceTransferInput): Promise<FinanceTransferResponse> {
   return financeRequest<FinanceTransferResponse>('/agent/finance/transfers', jsonInit(input));
 }
+
+/** 按日查询发生变化的资产流水，包含划账与余额校准。 */
+export function fetchFinanceDayTransactions(date: string): Promise<FinanceTransaction[]> {
+  return financeRequest<FinanceTransaction[]>(`/agent/finance/transactions/day?date=${encodeURIComponent(date)}`);
+}

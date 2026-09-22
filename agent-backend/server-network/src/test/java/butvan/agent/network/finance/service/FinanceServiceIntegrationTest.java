@@ -194,6 +194,9 @@ class FinanceServiceIntegrationTest {
         assertEquals("adjustment", increase.source());
         assertEquals("余额校准", increase.category());
         assertEquals("对账补差", increase.note());
+        assertEquals(2, financeService.getDayTransactions(ownerId, LocalDate.now()).size());
+        assertEquals(0, financeService.getDayTransactions("unrelated-owner", LocalDate.now()).size());
+        assertEquals(0, financeService.getDayTransactions(ownerId, LocalDate.now().minusDays(1)).size());
     }
 
     @Test

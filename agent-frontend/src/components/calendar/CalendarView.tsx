@@ -29,7 +29,13 @@ import { Button } from '../common/Button';
 import { useMessage } from '../common/Message';
 import { Modal } from '../common/Modal';
 import { TopBar } from '../common/TopBar';
-import { CalendarDayPreview } from './CalendarDayPreview';
+import { formatStudyDuration } from './calendarPresentation';
+import { CalendarDateCell } from './CalendarDateCell';
+import { fetchStudyStatistics } from '../../services/studyApi';
+import { fetchRecordDays } from '../../services/recordApi';
+import { useStudyRealtime } from '../../context/studyRealtimeState';
+import type { StudyStatistics } from '../../types/study';
+import type { RecordDaySummary } from '../../types/record';
 import { CalendarQuickCreate } from './CalendarQuickCreate';
 import { DailyCashflowList } from './DailyCashflowList';
 import { DailyRecordDeleteButton } from './DailyRecordDeleteButton';
@@ -75,24 +81,16 @@ function totalIncome(entry: CalendarDayEntry): number {
   return entry.incomes.reduce((total, income) => total + income.amount, 0);
 }
 
-function hasEntryContent(entry: CalendarDayEntry): boolean {
-  return Boolean(
-    entry.todos.length
-    || entry.expenses.length
-    || entry.incomes.length
-    || entry.schedules.length
-    || entry.journals?.length
-    || entry.journal
-    || entry.photos.length
-    || entry.otherRecords?.length,
-  );
-}
-
 const EMPTY_ENTRY: CalendarDayEntry = { todos: [], expenses: [], incomes: [], schedules: [], journals: [], photos: [], otherRecords: [] };
 
-/** 日记录原型：月历负责浏览，每日详情聚合待办、花销、手记、图片和日程。 */
+/** 日历工作区：轻量月度摘要与按需加载的每日详情。 */
 export const CalendarView: React.FC = () => {
   const { showMessage } = useMessage();
+  const { syncGeneration } = useStudyRealtime();
+  const [studyStats, setStudyStats] = useState<StudyStatistics | null>(null);
+  const [recordDays, setRecordDays] = useState<RecordDaySummary[]>([]);
+  const [overviewError, setOverviewError] = useState('');
+  const [overviewRetry, setOverviewRetry] = useState(0);
   const today = useMemo(() => startOfDay(new Date()), []);
   const [cursor, setCursor] = useState(today);
   const [selected, setSelected] = useState(today);
@@ -115,12 +113,34 @@ export const CalendarView: React.FC = () => {
     return Array.from({ length: GRID_SIZE }, (_, index) => addDays(gridStart, index));
   }, [cursor]);
 
+  useEffect(() => {
+    let active = true;
+    setStudyStats(null); setRecordDays([]); setOverviewError('');
+    const from = formatLocalDate(new Date(cursor.getFullYear(), cursor.getMonth(), 1));
+    const to = formatLocalDate(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0));
+    void Promise.allSettled([
+      fetchStudyStatistics(from, to, Intl.DateTimeFormat().resolvedOptions().timeZone),
+      fetchRecordDays(from, to),
+    ]).then(([study, records]) => {
+      if (!active) return;
+      if (study.status === 'fulfilled') setStudyStats(study.value);
+      if (records.status === 'fulfilled') setRecordDays(records.value);
+      if (study.status === 'rejected' || records.status === 'rejected') setOverviewError('学习或资料摘要读取失败');
+    });
+    return () => { active = false; };
+  }, [cursor, syncGeneration, overviewRetry]);
+
   const monthRecords = useMemo(() => Object.values(summaries), [summaries]);
   const todayKey = formatLocalDate(today);
   const monthTodoRecords = monthRecords.filter((record) => record.date <= todayKey);
   const monthTodoTotal = monthTodoRecords.reduce((total, record) => total + record.todoCount, 0);
   const monthTodoCompleted = monthTodoRecords.reduce((total, record) => total + record.completedTodoCount, 0);
   const monthTodoRate = monthTodoTotal ? Math.round((monthTodoCompleted / monthTodoTotal) * 100) : 0;
+  const studyByDate = new Map(studyStats?.days.map(day => [day.date, day.durationSeconds]));
+  const recordsByDate = new Map(recordDays.map(day => [day.date, day.count]));
+  const monthRecordCount = recordDays.reduce((total, day) => total + day.count, 0);
+  const highestExpense = [...monthRecords].filter(day => day.expenseTotal > 0).sort((a, b) => b.expenseTotal - a.expenseTotal)[0];
+  const longestStudy = [...(studyStats?.days ?? [])].filter(day => day.durationSeconds > 0).sort((a, b) => b.durationSeconds - a.durationSeconds)[0];
   const monthExpenseTotal = monthRecords.reduce((total, record) => total + record.expenseTotal, 0);
 
   const selectedKey = formatLocalDate(selected);
@@ -173,10 +193,11 @@ export const CalendarView: React.FC = () => {
         if (active) setIsDayLoading(false);
       });
     return () => { active = false; };
-  }, [selected, showMessage]);
+  }, [selected, showMessage, syncGeneration]);
 
   useEffect(() => {
     let active = true;
+    setSummaries({});
     const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
     const last = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
     fetchDailySummaries(first, last)
@@ -191,6 +212,7 @@ export const CalendarView: React.FC = () => {
 
   const refreshSelectedAndMonth = async () => {
     await Promise.all([loadDay(selected), loadMonth()]);
+    setOverviewRetry(value => value + 1);
   };
 
   const openFinanceTransactionModal = async () => {
@@ -339,108 +361,45 @@ export const CalendarView: React.FC = () => {
             <section className={styles.monthPanel} aria-label="月历">
               <div className={styles.monthTitleRow}>
                 <h2>{cursor.getFullYear()}年{cursor.getMonth() + 1}月</h2>
-                <span>月视图</span>
+                <span>悬停预览 · 点击选择</span>
               </div>
               <div className={styles.weekHeader}>
                 {WEEKDAY_LABELS.map((label) => <span key={label}>{label}</span>)}
               </div>
               <div className={styles.grid}>
-                {days.map((day, index) => {
-                  const inMonth = day.getMonth() === cursor.getMonth();
-                  const isToday = isSameDay(day, today);
-                  const isSelected = isSameDay(day, selected);
+                {days.map(day => {
                   const dateKey = formatLocalDate(day);
-                  const entry = entries[dateKey];
-                  const summary = summaries[dateKey];
-                  const hasContent = Boolean(summary?.eventCount || (entry && hasEntryContent(entry)));
-                  const showPreview = Boolean(inMonth && entry && hasEntryContent(entry));
-                  const completedTodos = summary?.completedTodoCount
-                    ?? entry?.todos.filter((todo) => todo.completed).length
-                    ?? 0;
-                  const todoCount = summary?.todoCount ?? entry?.todos.length ?? 0;
-                  const scheduleCount = summary?.scheduleCount ?? entry?.schedules.length ?? 0;
-                  const expenseTotal = summary?.expenseTotal ?? (entry ? totalExpense(entry) : 0);
-                  const dayPreview = summary?.headline
-                    ?? entry?.schedules[0]?.title
-                    ?? entry?.todos.find((todo) => !todo.completed)?.title
-                    ?? entry?.otherRecords?.[0]?.title
-                    ?? (entry?.expenses.length ? `支出 ¥${totalExpense(entry).toFixed(0)}` : entry?.journal ? '写下手记' : '记录照片');
-                  const dayMeta = [
-                    scheduleCount ? `${scheduleCount} 个日程` : null,
-                    todoCount ? `${completedTodos}/${todoCount} 待办` : null,
-                    expenseTotal ? `¥${expenseTotal.toFixed(0)}` : null,
-                  ].filter(Boolean).slice(0, 2).join(' · ');
-                  const previewId = `calendar-day-preview-${dateKey}`;
-                  return (
-                    <button
-                      key={dateKey}
-                      type="button"
-                      className={[styles.dayCell, inMonth ? '' : styles.dayCellOutside, isToday ? styles.dayCellToday : '', isSelected ? styles.dayCellSelected : ''].join(' ')}
-                      onClick={() => setSelected(startOfDay(day))}
-                      aria-pressed={isSelected}
-                      aria-describedby={showPreview ? previewId : undefined}
-                      aria-label={`${day.getMonth() + 1}月${day.getDate()}日${hasContent ? '，有日记录' : ''}`}
-                    >
-                      <span className={styles.dayNumber}>{day.getDate()}</span>
-                      {hasContent && <span className={styles.dayContent}>
-                        <span className={styles.daySignals} aria-hidden="true">
-                          {scheduleCount ? <i className={styles.signalSchedule} /> : null}
-                          {todoCount ? <i className={styles.signalTodo} /> : null}
-                          {expenseTotal ? <i className={styles.signalExpense} /> : null}
-                        </span>
-                        <span className={styles.dayPreview}>{dayPreview}</span>
-                        <span className={styles.dayMeta}>{dayMeta}</span>
-                      </span>}
-                      {entry && showPreview && (
-                        <CalendarDayPreview
-                          id={previewId}
-                          date={day}
-                          entry={entry}
-                          alignRight={index % 7 >= 5}
-                        />
-                      )}
-                    </button>
-                  );
+                  return <CalendarDateCell key={dateKey} date={day} dateKey={dateKey}
+                    inMonth={day.getMonth() === cursor.getMonth()} today={isSameDay(day, today)}
+                    selected={isSameDay(day, selected)} summary={summaries[dateKey]}
+                    studySeconds={studyByDate.get(dateKey)} recordCount={recordsByDate.get(dateKey)}
+                    onSelect={() => setSelected(startOfDay(day))} />;
                 })}
               </div>
               <div className={styles.legend}>
                 <span><i className={styles.signalSchedule} />日程</span>
                 <span><i className={styles.signalTodo} />待办</span>
-                <span><i className={styles.signalExpense} />花销</span>
+                <span><i className={styles.signalExpense} />支出</span>
+                <span>绿色 · 学习</span><span>紫色 · 资料</span>
               </div>
 
-              <section className={styles.monthReview} aria-label="本月回顾">
-                <div className={styles.monthReviewHeading}>
-                  <h3>本月回顾</h3>
-                  <span>{monthRecords.length} 天有记录</span>
-                </div>
-                {monthRecords.length ? <>
-                  <dl className={styles.monthStats}>
-                    <div><dt>记录天数</dt><dd>{monthRecords.length}</dd></div>
-                    <div><dt>待办完成</dt><dd>{monthTodoRate}%</dd></div>
-                    <div><dt>本月支出</dt><dd>¥{monthExpenseTotal.toFixed(2)}</dd></div>
-                  </dl>
-                  <div className={styles.monthHighlights}>
-                    <p>本月足迹</p>
-                    <div className={styles.highlightList}>
-                      {monthRecords.slice(0, 4).map((record) => {
-                        const recordDate = new Date(`${record.date}T00:00:00`);
-                        return (
-                          <button
-                            type="button"
-                            key={record.date}
-                            className={`${styles.highlightItem} ${isSameDay(recordDate, selected) ? styles.highlightItemActive : ''}`}
-                            onClick={() => setSelected(startOfDay(recordDate))}
-                          >
-                            <span className={styles.highlightDate}>{String(recordDate.getDate()).padStart(2, '0')}</span>
-                            <span className={styles.highlightText}>{record.headline}</span>
-                            <CaretRightIcon size={13} aria-hidden="true" />
-                          </button>
-                        );
-                      })}
-                    </div>
+              <section className={styles.monthReview} aria-label="月度概览">
+                <div className={styles.monthReviewHeading}><h3>月度概览</h3><span>待办统计截至今天</span></div>
+                {overviewError && <p className={styles.monthReviewEmpty}>{overviewError} <button type="button" onClick={() => setOverviewRetry(value => value + 1)}>重试</button></p>}
+                <dl className={styles.monthStats}>
+                  <div><dt>待办完成</dt><dd>{monthTodoTotal ? `${monthTodoRate}%` : '—'}</dd><small>{monthTodoCompleted} / {monthTodoTotal} 项</small></div>
+                  <div><dt>本月支出</dt><dd>¥{monthExpenseTotal.toFixed(2)}</dd></div>
+                  <div><dt>累计学习</dt><dd>{studyStats ? formatStudyDuration(studyStats.totalDurationSeconds) : '—'}</dd><small>{studyStats?.studyDays ?? '—'} 天有学习</small></div>
+                  <div><dt>编写资料</dt><dd>{overviewError ? '—' : `${monthRecordCount} 篇`}</dd></div>
+                </dl>
+                <div className={styles.monthHighlights}>
+                  <p>值得回看的日子</p>
+                  <div className={styles.highlightList}>
+                    {highestExpense && <button type="button" className={styles.highlightItem} onClick={() => setSelected(new Date(`${highestExpense.date}T00:00:00`))}><span className={styles.highlightDate}>{highestExpense.date.slice(-2)}</span><span className={styles.highlightText}>最高支出 · ¥{highestExpense.expenseTotal.toFixed(2)}</span><CaretRightIcon size={13} /></button>}
+                    {longestStudy && <button type="button" className={styles.highlightItem} onClick={() => setSelected(new Date(`${longestStudy.date}T00:00:00`))}><span className={styles.highlightDate}>{longestStudy.date.slice(-2)}</span><span className={styles.highlightText}>最专注 · {formatStudyDuration(longestStudy.durationSeconds)}</span><CaretRightIcon size={13} /></button>}
                   </div>
-                </> : <p className={styles.monthReviewEmpty}>这个月还没有留下记录。</p>}
+                  {!highestExpense && !longestStudy && <p className={styles.monthReviewEmpty}>记录支出或学习后，这里会标记值得回看的日子。</p>}
+                </div>
               </section>
             </section>
 

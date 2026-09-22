@@ -1,0 +1,86 @@
+.cell {
+  min-width: 0;
+  min-height: 114px;
+  padding: 8px 6px;
+  border: 1px solid #edf0f5;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-secondary);
+  text-align: left;
+  align-self: stretch;
+  cursor: pointer;
+  transition: background 120ms;
+}
+.cell:hover,
+.cell:focus-visible {
+  background: #f2f6ff;
+  outline: 2px solid #8eafff;
+  outline-offset: -2px;
+}
+.active {
+  background: #fafbfd;
+}
+.focusDay {
+  background: #f1f7f6;
+}
+.selected {
+  border-color: var(--accent-blue);
+  background: #f2f6ff;
+}
+.outside {
+  border-color: transparent;
+  color: var(--text-muted);
+  opacity: 0.48;
+}
+.number {
+  display: flex;
+  width: 23px;
+  height: 23px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.today {
+  background: var(--accent-blue);
+  color: white;
+  font-weight: 650;
+}
+.metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.metrics > span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.todo {
+  color: #667caa;
+}
+.done,
+.study {
+  color: #2d8063;
+}
+.expense {
+  color: #b36348;
+  font-weight: 600;
+}
+.record {
+  color: #8062a6;
+}
+.schedule {
+  color: #4777b8;
+}
+.metrics progress {
+  width: 25px;
+  height: 4px;
+  border: 0;
+  accent-color: #528fa0;
+}

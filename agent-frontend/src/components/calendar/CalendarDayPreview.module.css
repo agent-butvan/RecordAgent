@@ -1,144 +1,119 @@
 .preview {
-  position: absolute;
-  top: calc(100% + 7px);
-  left: 0;
-  z-index: 30;
-  width: 236px;
-  display: flex;
-  flex-direction: column;
-  padding: 13px 14px 11px;
-  border-radius: 12px;
-  background: #ffffff;
-  box-shadow: 0 12px 32px rgba(24, 35, 51, 0.14), 0 2px 8px rgba(24, 35, 51, 0.08);
+  position: fixed;
+  z-index: 1000;
+  width: min(420px, calc(100vw - 24px));
+  max-height: min(620px, calc(100vh - 24px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 18px;
+  border: 1px solid var(--border-color, #e6eaf0);
+  border-radius: 16px;
+  background: var(--bg-app, white);
   color: var(--text-primary);
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(-4px);
-  visibility: hidden;
-  transition:
-    opacity 140ms cubic-bezier(0.16, 1, 0.3, 1),
-    transform 140ms cubic-bezier(0.16, 1, 0.3, 1),
-    visibility 140ms;
+  box-shadow: 0 18px 60px #18233325;
+  text-align: left;
 }
-
-.alignRight {
-  right: 0;
-  left: auto;
-}
-
-:global(button:hover) > .preview,
-:global(button:focus-visible) > .preview {
-  opacity: 1;
-  transform: translateY(0);
-  visibility: visible;
-}
-
-.heading,
-.item {
-  min-width: 0;
-  display: grid;
-  align-items: center;
-}
-
 .heading {
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
 }
-
 .heading strong {
-  overflow: hidden;
-  font-size: 12px;
-  font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 14px;
 }
-
-.heading small,
-.hint,
-.item em {
+.heading small {
+  display: block;
+  font-size: 11px;
   color: var(--text-muted);
-  font-size: 9px;
-  font-style: normal;
-  font-weight: 500;
-  white-space: nowrap;
+  margin-top: 6px;
 }
-
+.heading button {
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 22px;
+  cursor: pointer;
+}
 .summary {
   display: flex;
-  gap: 11px;
-  margin-top: 7px;
-  color: var(--text-secondary);
-  font-size: 9px;
+  gap: 12px;
+  margin-top: 16px;
+}
+.summary span {
+  flex: 1;
+  padding: 10px;
+  background: #fcf1ef;
+  border-radius: 8px;
+  font-size: 11px;
+  color: #a34b3e;
+}
+.summary span + span {
+  color: #2d8063;
+  background: #edf7f2;
+}
+.summary b {
+  display: block;
+  margin-top: 4px;
+  font-size: 16px;
   font-variant-numeric: tabular-nums;
 }
-
-.items {
+.section {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color, #edf0f4);
+}
+.section h4 {
+  margin: 0 0 8px;
+  font-size: 12px;
+}
+.row {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 13px;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 0;
+  font-size: 12px;
+  line-height: 1.5;
 }
-
-.item {
-  grid-template-columns: 28px minmax(0, 1fr) auto;
-  gap: 7px;
+.row span {
+  overflow-wrap: anywhere;
 }
-
-.tag {
-  width: 28px;
-  padding: 3px 0;
-  border-radius: var(--radius-sm);
-  font-size: 9px;
-  font-weight: 600;
-  text-align: center;
+.row small {
+  flex-shrink: 0;
+  max-width: 48%;
+  text-align: right;
+  color: var(--text-muted);
+  font-size: 11px;
 }
-
-.tagSchedule {
-  background: #eef4ff;
-  color: #3d5f8f;
+.empty {
+  margin: 8px 0;
+  font-size: 12px;
+  color: var(--text-muted);
 }
-
-.tagTodo {
-  background: #f3f0fa;
-  color: #66527f;
+.asset {
+  padding: 10px;
+  background: var(--bg-surface);
+  border-radius: 8px;
+  margin-top: 6px;
 }
-
-.tagExpense {
-  background: #faf0ef;
-  color: #93443d;
+.asset strong,
+.document strong {
+  font-size: 12px;
 }
-
-.tagIncome {
-  background: #edf6f1;
-  color: #31725a;
+.document {
+  margin-top: 10px;
 }
-
-.tagNeutral {
-  background: #eef1f5;
+.document p {
+  margin: 4px 0;
+  font-size: 12px;
+  line-height: 1.6;
   color: var(--text-secondary);
+  overflow-wrap: anywhere;
 }
-
-.item > span {
-  overflow: hidden;
-  color: var(--text-secondary);
-  font-size: 10px;
-  font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.error {
+  color: #aa493d;
+  font-size: 12px;
 }
-
-.hint {
-  margin-top: 12px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .preview {
-    transition: none;
-  }
-}
-
-@media (max-width: 620px) {
-  .preview {
-    display: none;
-  }
+.error button {
+  color: inherit;
+  cursor: pointer;
 }

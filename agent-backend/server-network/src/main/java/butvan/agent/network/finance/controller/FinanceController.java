@@ -51,6 +51,14 @@ public class FinanceController {
                 .map(FinanceDtos::from).toList());
     }
 
+    /** 当前用户指定自然日的资产流水；无记录日期返回空列表，非法日期返回参数错误。 */
+    @ApiLog("查询当日资产变动")
+    @GetMapping("/transactions/day")
+    public Result<List<TransactionResponse>> dayTransactions(@RequestParam java.time.LocalDate date) {
+        return Result.success(financeService.getDayTransactions(currentUserProvider.currentUserId(), date)
+                .stream().map(FinanceDtos::from).toList());
+    }
+
     @ApiLog("查询收支分类")
     @GetMapping("/categories")
     public Result<FinanceDtos.TransactionCategoryOptionsResponse> categories() {

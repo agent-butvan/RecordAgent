@@ -116,6 +116,14 @@ public class FinanceService {
         return transactions.stream().sorted(newestFirst).toList();
     }
 
+    /** 按日读取资产变动，包含划账与校准，不混入无账户的旧日历花销。 */
+    @Transactional(readOnly = true)
+    public List<FinanceTransaction> getDayTransactions(String ownerId, LocalDate date) {
+        requireOwner(ownerId);
+        if (date == null) throw new IllegalArgumentException("日期不能为空");
+        return repository.findDayTransactions(ownerId, date);
+    }
+
     /** 查询用户使用过的收入与支出分类。 */
     @Transactional(readOnly = true)
     public Map<String, List<String>> getTransactionCategories(String ownerId) {

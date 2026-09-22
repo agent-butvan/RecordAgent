@@ -77,102 +77,10 @@
 }
 
 .grid {
-  gap: 2px;
+  gap: 5px;
 }
 
-.dayCell {
-  position: relative;
-  min-height: 82px;
-  padding: 8px;
-  border: none;
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--text-secondary);
-  text-align: left;
-  transition: background-color var(--transition-fast), color var(--transition-fast);
-}
-
-.dayCell:hover {
-  z-index: 20;
-  background: var(--bg-surface);
-}
-
-.dayCell:focus-visible {
-  z-index: 20;
-}
-
-.dayCellOutside {
-  color: var(--text-muted);
-  opacity: 0.46;
-}
-
-.dayCellSelected {
-  position: relative;
-  z-index: 1;
-  outline: 1px solid var(--accent-blue);
-  outline-offset: -1px;
-  background: #f6f9ff;
-}
-
-.dayNumber {
-  width: 22px;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-inline: auto;
-  border-radius: 50%;
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-}
-
-.dayCellToday .dayNumber {
-  background: var(--accent-blue);
-  color: var(--text-inverse);
-  font-weight: 650;
-}
-
-.dayContent {
-  display: block;
-  margin-top: 9px;
-}
-
-.daySignals {
-  display: flex;
-  gap: 4px;
-}
-
-.daySignals i,
-.legend i {
-  width: 5px;
-  height: 5px;
-  display: inline-block;
-  border-radius: 50%;
-}
-
-.dayPreview {
-  display: block;
-  overflow: hidden;
-  margin-top: 5px;
-  color: var(--text-secondary);
-  font-size: 10px;
-  font-weight: 500;
-  line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.dayMeta {
-  display: block;
-  overflow: hidden;
-  margin-top: 3px;
-  color: var(--text-muted);
-  font-size: 9px;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+.legend i { width: 5px; height: 5px; display: inline-block; border-radius: 50%; }
 
 .signalSchedule,
 .signalTodo {
@@ -230,7 +138,7 @@
 
 .monthStats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 24px;
   margin-top: 18px;
 }
@@ -723,19 +631,6 @@
     padding: 20px 16px 26px;
   }
 
-  .dayCell {
-    min-height: 58px;
-    padding: 6px;
-  }
-
-  .dayContent {
-    margin-top: 6px;
-  }
-
-  .dayPreview {
-    display: none;
-  }
-
   .legend {
     gap: 10px;
   }
@@ -756,3 +651,5 @@
     height: 78px;
   }
 }
+
+.monthStats small { display: block; margin-top: 5px; color: var(--text-muted); font-size: 10px; }
