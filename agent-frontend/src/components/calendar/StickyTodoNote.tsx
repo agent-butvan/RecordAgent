@@ -1,4 +1,5 @@
 import {
+  AnimatePresence,
   animate,
   motion,
   useDragControls,
@@ -24,7 +25,9 @@ interface StickyTodoNoteProps {
   initialX: number;
   initialY: number;
   rotation?: number;
+  collapsed: boolean;
   constraintsRef: RefObject<HTMLDivElement | null>;
+  onCollapsedChange: (collapsed: boolean) => void;
   onToggle: (item: StickyTodoItem) => void;
 }
 
@@ -43,18 +46,30 @@ export function StickyTodoNote({
   initialX,
   initialY,
   rotation = 0,
+  collapsed,
   constraintsRef,
+  onCollapsedChange,
   onToggle,
 }: StickyTodoNoteProps) {
   const [dragging, setDragging] = useState(false);
   const [zIndex, setZIndex] = useState(2);
   const noteRef = useRef<HTMLElement>(null);
+  const draggedRef = useRef(false);
   const x = useMotionValue(initialX);
   const y = useMotionValue(initialY);
   const rotate = useMotionValue(rotation);
   const dragControls = useDragControls();
   const completed = items.filter((item) => item.done).length;
   const progress = items.length ? (completed / items.length) * 100 : 0;
+
+  useEffect(() => {
+    if (!collapsed) return;
+    const frame = requestAnimationFrame(() => {
+      void animate(x, initialX, { type: 'spring', stiffness: 280, damping: 28 });
+      void animate(y, initialY, { type: 'spring', stiffness: 280, damping: 28 });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [collapsed, initialX, initialY, x, y]);
 
   useEffect(() => {
     const board = constraintsRef.current;
@@ -74,10 +89,11 @@ export function StickyTodoNote({
 
   const beginDrag = (event: PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
-    if ((event.target as HTMLElement).closest('button')) return;
+    if (!collapsed && (event.target as HTMLElement).closest('button')) return;
     topZIndex += 1;
     setZIndex(topZIndex);
     setDragging(true);
+    draggedRef.current = false;
     dragControls.start(event);
   };
 
@@ -89,12 +105,13 @@ export function StickyTodoNote({
       damping: 9,
       mass: 0.75,
     });
+    window.setTimeout(() => { draggedRef.current = false; }, 0);
   };
 
   return (
     <motion.article
       ref={noteRef}
-      className={styles.note}
+      className={`${styles.note} ${collapsed ? styles.collapsed : ''}`}
       data-tone={tone}
       style={{ x, y, zIndex }}
       drag
@@ -104,6 +121,7 @@ export function StickyTodoNote({
       dragElastic={0}
       dragMomentum={false}
       onDrag={(_, info) => {
+        if (Math.abs(info.offset.x) + Math.abs(info.offset.y) > 3) draggedRef.current = true;
         rotate.set(
           rotation +
             clamp(info.velocity.x / 135, -7, 7) +
@@ -115,6 +133,7 @@ export function StickyTodoNote({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ delay: 0.12, duration: 0.15 }}
+      layout
     >
       <motion.div
         className={styles.shell}
@@ -192,78 +211,88 @@ export function StickyTodoNote({
           <span className={`${styles.crease} ${styles.creaseA}`} />
           <span className={`${styles.crease} ${styles.creaseB}`} />
 
-          <motion.header
-            className={styles.head}
-            initial={{ opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.28, delay: 0.55 }}
-          >
-            <div className={styles.titleLine}>
-              <h3>{title}</h3>
-              {subtitle && <span className={styles.subtitle}>{subtitle}</span>}
-            </div>
-            <button className={styles.menu} aria-label="更多" type="button">
-              <span>•••</span>
-            </button>
-          </motion.header>
-
-          <div className={styles.list}>
-            {items.map((item, index) => (
+          <AnimatePresence mode="wait" initial={false}>
+            {collapsed ? (
               <motion.button
-                className={`${styles.todo} ${item.done ? styles.done : ''}`}
-                key={item.id}
+                key="compact"
                 type="button"
-                onClick={() => onToggle(item)}
-                disabled={item.pending}
-                aria-label={`${item.done ? '取消完成' : '标记完成'}：${item.text}`}
-                initial={{ opacity: 0, y: -6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.65 + index * 0.045 }}
+                className={styles.compact}
+                onClick={() => { if (!draggedRef.current) onCollapsedChange(false); }}
+                aria-label={`展开${title}，已完成 ${completed}/${items.length}`}
+                initial={{ opacity: 0, scale: 0.94 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.96 }}
               >
-                <motion.span
-                  className={styles.check}
-                  animate={
-                    item.done ? { scale: [0.88, 1.12, 1] } : { scale: 1 }
-                  }
-                  transition={{ duration: 0.22 }}
-                >
-                  {item.done && (
-                    <motion.svg viewBox="0 0 20 20" fill="none">
-                      <motion.path
-                        d="M5 10.2 8.2 13.25 15 6.7"
-                        stroke="currentColor"
-                        strokeWidth="2.2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        initial={{ pathLength: 0, opacity: 0 }}
-                        animate={{ pathLength: 1, opacity: 1 }}
-                        transition={{ duration: 0.18 }}
-                      />
-                    </motion.svg>
-                  )}
-                </motion.span>
-                <span className={styles.label}>{item.text}</span>
+                <span className={styles.compactTitle}>{title.replace('待办', '')}</span>
+                <strong>{completed}/{items.length}</strong>
+                <span className={styles.compactTrack} aria-hidden="true">
+                  <motion.span animate={{ width: `${progress}%` }} />
+                </span>
+                <span className={styles.compactHint}>展开</span>
               </motion.button>
-            ))}
-          </div>
-
-          <motion.footer
-            className={styles.footer}
-            initial={{ opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.28, delay: 0.83 }}
-          >
-            <div className={styles.track}>
+            ) : (
               <motion.div
-                className={styles.bar}
-                animate={{ width: `${progress}%` }}
-                transition={{ duration: 0.45, ease: 'easeOut' }}
-              />
-            </div>
-            <div className={styles.count}>
-              {completed}/{items.length} 已完成
-            </div>
-          </motion.footer>
+                key="detail"
+                className={styles.detail}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 5 }}
+              >
+                <header className={styles.head}>
+                  <div className={styles.titleLine}>
+                    <h3>{title}</h3>
+                    {subtitle && <span className={styles.subtitle}>{subtitle}</span>}
+                  </div>
+                  <button className={styles.menu} aria-label={`收起${title}`} type="button" onClick={() => onCollapsedChange(true)}>
+                    <span>−</span>
+                  </button>
+                </header>
+
+                <div className={styles.list}>
+                  {items.map((item, index) => (
+                    <motion.button
+                      className={`${styles.todo} ${item.done ? styles.done : ''}`}
+                      key={item.id}
+                      type="button"
+                      onClick={() => onToggle(item)}
+                      disabled={item.pending}
+                      aria-label={`${item.done ? '取消完成' : '标记完成'}：${item.text}`}
+                      initial={{ opacity: 0, y: -6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.24, delay: index * 0.035 }}
+                    >
+                      <motion.span
+                        className={styles.check}
+                        animate={item.done ? { scale: [0.88, 1.12, 1] } : { scale: 1 }}
+                        transition={{ duration: 0.22 }}
+                      >
+                        {item.done && <motion.svg viewBox="0 0 20 20" fill="none">
+                          <motion.path
+                            d="M5 10.2 8.2 13.25 15 6.7"
+                            stroke="currentColor"
+                            strokeWidth="2.2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            initial={{ pathLength: 0, opacity: 0 }}
+                            animate={{ pathLength: 1, opacity: 1 }}
+                            transition={{ duration: 0.18 }}
+                          />
+                        </motion.svg>}
+                      </motion.span>
+                      <span className={styles.label}>{item.text}</span>
+                    </motion.button>
+                  ))}
+                </div>
+
+                <footer className={styles.footer}>
+                  <div className={styles.track}>
+                    <motion.div className={styles.bar} animate={{ width: `${progress}%` }} transition={{ duration: 0.45, ease: 'easeOut' }} />
+                  </div>
+                  <div className={styles.count}>{completed}/{items.length} 已完成</div>
+                </footer>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <motion.div
             className={styles.curl}

@@ -32,6 +32,7 @@ export function CalendarStickyNotes({ focusDate, revision, onChanged }: Calendar
   const [todos, setTodos] = useState<RecurringTodoSummary[]>([]);
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [boardSize, setBoardSize] = useState<BoardSize | null>(null);
+  const [expandedNote, setExpandedNote] = useState<'weekly' | 'monthly' | null>(null);
 
   useLayoutEffect(() => {
     const board = boardRef.current;
@@ -52,6 +53,8 @@ export function CalendarStickyNotes({ focusDate, revision, onChanged }: Calendar
       });
     return () => { active = false; };
   }, [focusDate, revision, showMessage]);
+
+  useEffect(() => setExpandedNote(null), [focusDate]);
 
   const weekly = useMemo(() => todos.filter((todo) => todo.recurrence === 'weekly'), [todos]);
   const monthly = useMemo(() => todos.filter((todo) => todo.recurrence === 'monthly'), [todos]);
@@ -90,14 +93,15 @@ export function CalendarStickyNotes({ focusDate, revision, onChanged }: Calendar
 
   const noteCount = Number(weekly.length > 0) + Number(monthly.length > 0);
   const layout = boardSize ? (() => {
-    const noteWidth = 304;
-    const gap = 22;
-    const totalWidth = noteCount === 2 ? noteWidth * 2 + gap : noteWidth;
-    const startX = Math.max(16, (boardSize.width - totalWidth) / 2);
+    const noteWidth = 188;
+    const noteHeight = 62;
+    const gap = 10;
+    const bottom = 24;
+    const startY = Math.max(16, boardSize.height - noteCount * noteHeight - (noteCount - 1) * gap - bottom);
     return {
-      firstX: Math.min(startX, Math.max(16, boardSize.width - noteWidth - 16)),
-      secondX: Math.min(startX + noteWidth + gap, Math.max(16, boardSize.width - noteWidth - 16)),
-      y: Math.max(64, boardSize.height - 350),
+      x: Math.max(16, boardSize.width - noteWidth - 24),
+      firstY: startY,
+      secondY: startY + noteHeight + gap,
     };
   })() : null;
 
@@ -108,10 +112,12 @@ export function CalendarStickyNotes({ focusDate, revision, onChanged }: Calendar
         subtitle="Week Focus"
         tone="yellow"
         items={asStickyItems(weekly, pendingIds)}
-        initialX={layout.firstX}
-        initialY={layout.y}
+        initialX={layout.x}
+        initialY={layout.firstY}
         rotation={-2.4}
+        collapsed={expandedNote !== 'weekly'}
         constraintsRef={boardRef}
+        onCollapsedChange={(collapsed) => setExpandedNote(collapsed ? null : 'weekly')}
         onToggle={(item) => { void toggle(item); }}
       />}
       {layout && monthly.length > 0 && <StickyTodoNote
@@ -119,10 +125,12 @@ export function CalendarStickyNotes({ focusDate, revision, onChanged }: Calendar
         subtitle="Month Goals"
         tone="green"
         items={asStickyItems(monthly, pendingIds)}
-        initialX={weekly.length > 0 ? layout.secondX : layout.firstX}
-        initialY={layout.y + 10}
+        initialX={layout.x}
+        initialY={weekly.length > 0 ? layout.secondY : layout.firstY}
         rotation={2.1}
+        collapsed={expandedNote !== 'monthly'}
         constraintsRef={boardRef}
+        onCollapsedChange={(collapsed) => setExpandedNote(collapsed ? null : 'monthly')}
         onToggle={(item) => { void toggle(item); }}
       />}
     </section>
