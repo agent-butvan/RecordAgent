@@ -20,6 +20,10 @@
           "sidecar": true
         }
       ]
-    }
+    },
+    "notification:allow-is-permission-granted",
+    "notification:allow-request-permission",
+    "notification:allow-notify",
+    "notification:allow-show"
   ]
 }

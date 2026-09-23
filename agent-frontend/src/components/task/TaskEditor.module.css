@@ -1,0 +1,13 @@
+.form { display:flex; flex-direction:column; gap:18px; max-height:72vh; overflow:auto; padding:4px 2px 16px; }
+.group { display:flex; flex-direction:column; gap:14px; border:1px solid #e8e8ec; border-radius:14px; padding:16px; margin:0; }
+.group legend { color:#34343d; font-weight:600; font-size:14px; padding:0 6px; }
+.form textarea { font:inherit; border:1px solid #dddde3; border-radius:9px; padding:10px; resize:vertical; width:100%; box-sizing:border-box; }
+.checks { display:flex; gap:14px; flex-wrap:wrap; }
+.check { display:flex; align-items:center; gap:7px; font-size:13px; cursor:pointer; }
+.check input { accent-color:#333; }
+.columns { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.hint { color:#74747e; font-size:12px; line-height:1.7; margin:0; }
+.error { color:#b3261e; font-size:13px; margin:0; }
+.actions { display:flex; justify-content:flex-end; gap:10px; }
+.preview { border-radius:12px; background:#f7f7f9; padding:16px; font-size:13px; }
+.preview pre { white-space:pre-wrap; word-break:break-word; font:inherit; line-height:1.8; }

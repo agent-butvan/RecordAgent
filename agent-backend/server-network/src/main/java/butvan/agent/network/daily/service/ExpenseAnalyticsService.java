@@ -143,6 +143,13 @@ public class ExpenseAnalyticsService {
                 ownerId);
     }
 
+    /** 为日报提供已去重的支出事实，调用方按币种与截止时间分组。 */
+    @Transactional(readOnly = true)
+    public List<ExpenseEntry> reportExpenses(String ownerId, LocalDate date) {
+        validate(ownerId, date, date);
+        return findExpenses(ownerId, date, date);
+    }
+
     private List<ExpenseEntry> findExpenses(String ownerId, LocalDate from, LocalDate to) {
         return jdbcTemplate.query("""
                 SELECT id, expense_date, expense_time, category, note, amount_minor, currency, source, created_at
