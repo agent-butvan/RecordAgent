@@ -119,7 +119,9 @@ pub fn setup(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
             "task-quit" => app.exit(0),
             _ => {}
         });
-    if let Some(icon) = app.default_window_icon() { tray = tray.icon(icon.clone()); }
+    // 菜单栏使用独立的单色图标；macOS 根据明暗模式为模板图标着色。
+    let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/menu-bar-icon.png"))?;
+    tray = tray.icon(icon).icon_as_template(true);
     tray.build(app)?;
     let handle = app.clone();
     std::thread::spawn(move || loop {
