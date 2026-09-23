@@ -25,6 +25,22 @@ pub fn run() {
       }
       #[cfg(desktop)]
       task_desktop::setup(app.handle())?;
+      #[cfg(target_os = "macos")]
+      {
+        use objc2::AnyThread;
+        use objc2_app_kit::{NSApplication, NSImage};
+        use objc2_foundation::NSData;
+        let icon_bytes = include_bytes!("../icons/icon.png");
+        let data = NSData::with_bytes(icon_bytes);
+        if let Some(ns_image) = NSImage::initWithData(NSImage::alloc(), &data) {
+          if let Some(mtm) = objc2::MainThreadMarker::new() {
+            let ns_app = NSApplication::sharedApplication(mtm);
+            unsafe {
+              ns_app.setApplicationIconImage(Some(&ns_image));
+            }
+          }
+        }
+      }
       Ok(())
     });
 
