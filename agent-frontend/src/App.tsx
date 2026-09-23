@@ -1,3 +1,6 @@
+import { AutomationProvider } from './context/AutomationContext';
+import { TaskPage } from './components/task/TaskPage';
+import { TaskReminderWindow } from './components/task/TaskReminderWindow';
 import type { RecordEntry, RecordType } from './types/record';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ModelProviderContext } from './context/ModelContext';
@@ -135,7 +138,7 @@ export const MainLayout: React.FC<{
   const [activeSessionId, setActiveSessionId] = useState<string>('');
   const [recordInitialType, setRecordInitialType] = useState<RecordType>('quick');
   const [recordTarget, setRecordTarget] = useState<RecordEntry | null | undefined>(undefined);
-  const [activeFeature, setActiveFeature] = useState<'chat' | 'calendar' | 'finance' | 'record' | 'study'>('chat');
+  const [activeFeature, setActiveFeature] = useState<'chat' | 'calendar' | 'finance' | 'record' | 'study' | 'task'>('chat');
   const [pendingPermissions, setPendingPermissions] = useState<Record<string, PendingPermissionState>>({});
   const [isPermissionSubmitting, setIsPermissionSubmitting] = useState(false);
   const [subagentTasks, setSubagentTasks] = useState<TaskDto[]>([]);
@@ -147,6 +150,7 @@ export const MainLayout: React.FC<{
   const [streamingSessionIds, setStreamingSessionIds] = useState<Set<string>>(() => new Set());
   const [stoppingSessionIds, setStoppingSessionIds] = useState<Set<string>>(() => new Set());
   const activeChatRunsRef = useRef<Map<string, ActiveChatRun>>(new Map());
+  const lastRoutingNoticeRef = useRef<{ code: string; shownAt: number } | null>(null);
   const [sessionLoadErrors, setSessionLoadErrors] = useState<Record<string, string>>({});
   const activeSessionIdRef = useRef(activeSessionId);
 
@@ -867,6 +871,17 @@ export const MainLayout: React.FC<{
           (message) => markAssistantTerminal(message, 'CANCELLED'));
         void syncSessionDetail(currentSessionId);
       },
+      (notice) => {
+        const previous = lastRoutingNoticeRef.current;
+        const now = Date.now();
+        if (previous?.code === notice.code && now - previous.shownAt < 60_000) return;
+        lastRoutingNoticeRef.current = { code: notice.code, shownAt: now };
+        const requestHint = notice.requestId ? `（请求 ID：${notice.requestId}）` : '';
+        const retryHint = notice.retryAfterMillis && notice.retryAfterMillis > 0
+          ? `建议 ${Math.ceil(notice.retryAfterMillis / 1_000)} 秒后重试 Jev。`
+          : '';
+        showMessage('info', `${notice.message}${retryHint}${requestHint}`, { duration: 8_000 });
+      },
     );
   };
 
@@ -1066,7 +1081,9 @@ export const MainLayout: React.FC<{
             onOpenSettings={() => { setSettingsTab('config'); setIsSettingsOpen(true); }}
             onOpenAccountSettings={() => { setSettingsTab('account'); setIsSettingsOpen(true); }}
           />
-          {activeFeature === 'calendar' ? (
+          {activeFeature === 'task' ? (
+            <TaskPage onOpenSettings={() => { setSettingsTab('task'); setIsSettingsOpen(true); }} />
+          ) : activeFeature === 'calendar' ? (
             <CalendarView />
           ) : activeFeature === 'finance' ? (
             <FinancePage />
@@ -1197,11 +1214,15 @@ const PrimaryApp: React.FC = () => {
 
 export const App: React.FC = () => (
   <MessageProvider>
-    <StudyRealtimeProvider>
-      {new URLSearchParams(window.location.search).get('view') === 'study-widget'
-        ? <SystemStudyWindow />
-        : <PrimaryApp />}
-    </StudyRealtimeProvider>
+    <AutomationProvider>
+    {new URLSearchParams(window.location.search).get('view') === 'task-reminder'
+      ? <TaskReminderWindow />
+      : <StudyRealtimeProvider>
+          {new URLSearchParams(window.location.search).get('view') === 'study-widget'
+            ? <SystemStudyWindow />
+            : <PrimaryApp />}
+        </StudyRealtimeProvider>}
+    </AutomationProvider>
   </MessageProvider>
 );
 

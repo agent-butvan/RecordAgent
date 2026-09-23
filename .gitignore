@@ -1,21 +1,42 @@
 # macOS
 .DS_Store
 
-# 本地教程文档不入库；正式发布指南与 Slash Command 架构说明作为交付契约随代码维护。
+# 文档默认不入库；任务模块需求与实施状态作为代码交付契约保留。
 docs/*
-!docs/
-!docs/RELEASE.md
-!docs/Slash-Command-架构与使用说明.md
-!docs/assets/
-!docs/assets/butvan-agent-architecture.json
-!docs/assets/butvan-agent-architecture.html
-!docs/assets/butvan-agent-architecture.png
+!docs/任务模块产品需求与操作说明.md
+!docs/任务模块实施计划.md
+
+# 运行态与环境配置（防泄露与本地状态隔离）
+.env
+.env.*
+!.env.example
+.agentscope/
+.butvan-agent/
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 本地数据库与日志
+*.db
+*.sqlite
+*.sqlite3
+*.log
+logs/
+
+# IDE 与编辑器配置
+.idea/
+*.iws
+*.iml
+*.ipr
 
 # 本地工具状态与缓存（不提交）
 .codex/
 .dsh-plugins/
 .impeccable/critique/
 .impeccable/review/
+.impeccable/config.local.json
 
 # 后端启动器构建产物
 scripts/backend-launcher/target/

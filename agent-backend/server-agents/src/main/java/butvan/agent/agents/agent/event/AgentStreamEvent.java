@@ -11,7 +11,7 @@ import java.util.List;
  * <p>业务层只负责产生此事件，Controller 再将其转换为 SSE，避免 AgentScope 与 Spring Web
  * 相互耦合。</p>
  */
-public sealed interface AgentStreamEvent permits AgentStreamEvent.RunStarted, AgentStreamEvent.Completed, AgentStreamEvent.Cancelled, AgentStreamEvent.Failed, AgentStreamEvent.PermissionRequired, AgentStreamEvent.SubagentProgress, AgentStreamEvent.TextDelta, AgentStreamEvent.ThinkingDelta, AgentStreamEvent.ToolCall, AgentStreamEvent.ToolResult
+public sealed interface AgentStreamEvent permits AgentStreamEvent.RunStarted, AgentStreamEvent.Completed, AgentStreamEvent.Cancelled, AgentStreamEvent.Failed, AgentStreamEvent.PermissionRequired, AgentStreamEvent.RoutingNotice, AgentStreamEvent.SubagentProgress, AgentStreamEvent.TextDelta, AgentStreamEvent.ThinkingDelta, AgentStreamEvent.ToolCall, AgentStreamEvent.ToolResult
 {
 
     /**
@@ -137,6 +137,39 @@ public sealed interface AgentStreamEvent permits AgentStreamEvent.RunStarted, Ag
         @Override
         public boolean isTerminal() {
             return true;
+        }
+    }
+
+    /**
+     * 可恢复的工具路由提示；该事件不会结束 SSE，也不会把 assistant 标记为失败。
+     *
+     * @param code 稳定错误码
+     * @param message 可直接展示的脱敏中文提示
+     * @param requestId 外部服务请求 ID；可能为空
+     * @param retryable 是否属于可重试错误
+     * @param retryAfterMillis 服务端建议等待毫秒数；未提供时为空
+     */
+    record RoutingNotice(
+            String code,
+            String message,
+            String requestId,
+            boolean retryable,
+            Long retryAfterMillis
+    ) implements AgentStreamEvent {
+        @Override
+        public String eventName() {
+            return "routing_notice";
+        }
+
+        @Override
+        public Object payload() {
+            Map<String, Object> data = new java.util.LinkedHashMap<>();
+            data.put("code", code == null ? "unknown" : code);
+            data.put("message", message == null ? "Jev 暂不可用，已自动降级。" : message);
+            data.put("requestId", requestId == null ? "" : requestId);
+            data.put("retryable", retryable);
+            data.put("retryAfterMillis", retryAfterMillis);
+            return data;
         }
     }
 

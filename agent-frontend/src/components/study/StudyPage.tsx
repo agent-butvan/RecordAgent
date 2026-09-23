@@ -1,3 +1,4 @@
+import { TopBarAction } from '../common/TopBarAction';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowRightIcon, BookOpenIcon, CaretLeftIcon, CaretRightIcon, ClockCounterClockwiseIcon, PlayIcon } from '@phosphor-icons/react';
 import { createManualStudySession, deleteStudySession, fetchStudyCategories, fetchStudySessions, fetchStudyStatistics, finishStudySession, startStudySession, updateStudySession } from '../../services/studyApi';
@@ -152,15 +153,16 @@ export function StudyPage() {
   };
 
   return <main className={styles.workspace}>
-    <TopBar title="记录" subtitle="本地数据" icon={<BookOpenIcon size={15} />} actions={<div className={styles.topActions}>
-      <button type="button" className={styles.textAction} onClick={openManual}>补卡</button>
-      <Button type="button" variant="primary" size="sm" icon={<PlayIcon size={13} weight="fill" />}
-        onClick={() => { setStartError(null); setStartModalOpen(true); }} disabled={Boolean(active)}>{active ? '学习中' : '开始学习'}</Button>
-    </div>} />
+    <TopBar title="记录" subtitle="学习与专注" icon={<BookOpenIcon size={15} />} actions={<>
+      <TopBarAction variant="outline" onClick={openManual}>补卡</TopBarAction>
+      <TopBarAction variant="primary" icon={<PlayIcon size={13} weight="fill" />}
+        onClick={() => { setStartError(null); setStartModalOpen(true); }} disabled={Boolean(active)}>{active ? '学习中' : '开始学习'}</TopBarAction>
+    </>} />
     <div className={styles.page}><div className={styles.content}>
+      <header className={styles.pageHeading}><div><h1>让专注有迹可循</h1><p>记录每一次投入，看见日积月累的进步。</p></div><span className={styles.pageDate}>{formatTimelineDate(todayKey, todayKey)}</span></header>
       <section className={styles.overview} aria-label="学习概览">
         <div className={styles.todayBlock}><span>今天已学习</span><strong>{formatDuration(todaySeconds)}</strong><small>{todayStat?.sessionCount ?? 0} 段已完成记录</small></div>
-        <dl className={styles.periodStats}><div><dt>近 7 天</dt><dd>{formatDuration(liveWeekTotal)}</dd></div><div><dt>本月累计</dt><dd>{formatDuration(liveMonthTotal)}</dd></div><div><dt>学习天数</dt><dd>{monthStats?.studyDays ?? 0} 天</dd></div></dl>
+        <dl className={styles.periodStats}><div><dt>近 7 天</dt><dd>{formatDuration(liveWeekTotal)}</dd></div><div><dt>本月累计</dt><dd>{formatDuration(liveMonthTotal)}</dd></div><div><dt>本月学习天数</dt><dd>{monthStats?.studyDays ?? 0} 天</dd></div></dl>
       </section>
       <div className={styles.mainLayout}><div className={styles.primaryColumn}>
         {active && <section className={styles.section}><Heading title="正在学习" subtitle="这段时间会持续计入今天的学习记录" />
@@ -172,14 +174,14 @@ export function StudyPage() {
           <label className={styles.datePicker} title="选择日期"><span>{timelineDate.slice(5).replace('-', '.')}</span><input type="date" value={timelineDate} max={todayKey} aria-label="选择轨迹日期" onChange={(event) => { if (event.target.value) setTimelineDate(event.target.value); }} /></label>
           <button type="button" className={styles.dateArrow} aria-label="后一天" title="后一天" disabled={timelineDate >= todayKey} onClick={() => setTimelineDate((date) => shiftDateKey(date, 1))}><CaretRightIcon size={13} /></button>
         </div>} />
-          {timelineLoading ? <div className={styles.compactEmpty}>正在读取这一天的轨迹…</div> : timelineError ? <div className={styles.timelineError} role="alert"><span>{timelineError}</span><button type="button" onClick={() => setTimelineRefresh((value) => value + 1)}>重试</button></div> : timelineDaySessions.length ? <StudyTimeline sessions={timelineDaySessions} dateKey={timelineDate} now={now} /> : <div className={styles.compactEmpty}>{timelineDate === todayKey ? '今天还没有轨迹。开始学习后，时间会在这里留下痕迹。' : '这一天没有学习轨迹。'}</div>}
+          {timelineLoading ? <div className={styles.compactEmpty}>正在读取这一天的轨迹…</div> : timelineError ? <div className={styles.timelineError} role="alert"><span>{timelineError}</span><button type="button" onClick={() => setTimelineRefresh((value) => value + 1)}>重试</button></div> : timelineDaySessions.length ? <StudyTimeline sessions={timelineDaySessions} dateKey={timelineDate} now={now} /> : <div className={styles.timelineEmpty}><ClockCounterClockwiseIcon size={22} /><div><strong>{timelineDate === todayKey ? '今天的专注，从这里开始' : '这一天还没有学习记录'}</strong><p>{timelineDate === todayKey ? '开始一次学习，自动记录你的时间轨迹。' : '可以通过补卡，记录这一天的投入。'}</p></div><Button size="sm" variant="ghost" onClick={timelineDate === todayKey ? () => { setStartError(null); setStartModalOpen(true); } : openManual} disabled={timelineDate === todayKey && Boolean(active)}>{timelineDate === todayKey ? (active ? '学习中' : '开始学习') : '补卡'}</Button></div>}
         </section>
         <section className={styles.section}><Heading title="最近记录" subtitle="最近完成的学习片段" side={completedSessions.length > 0 ? <button className={styles.linkButton} type="button" onClick={() => setHistoryOpen(true)}>查看全部<ArrowRightIcon size={12} /></button> : undefined} />
-          {loading ? <div className={styles.loading}>正在读取学习记录…</div> : completedSessions.length ? <RecentSessions sessions={completedSessions.slice(0, 3)} onSelect={openEdit} /> : <div className={styles.empty}><ClockCounterClockwiseIcon size={19} /><strong>还没有学习记录</strong><span>开始一次学习，或使用右上角补卡。</span></div>}
+          {loading ? <div className={styles.loading}>正在读取学习记录…</div> : completedSessions.length ? <RecentSessions sessions={completedSessions.slice(0, 4)} onSelect={openEdit} /> : <div className={styles.empty}><ClockCounterClockwiseIcon size={19} /><strong>还没有学习记录</strong><span>开始一次学习，或使用右上角补卡。</span></div>}
         </section>
       </div><aside className={styles.insightColumn}>
-        <section className={styles.sideSection}><Heading title="近 7 天节奏" subtitle="每天的有效学习时长" /><div className={styles.chart}>{weekStats?.days.map((day) => { const duration = liveDayDuration(day); return <div className={styles.chartDay} key={day.date}><strong>{duration ? Math.round(duration / 60) : '—'}</strong><div className={styles.barArea}><i className={day.date === todayKey ? styles.todayBar : ''} style={{ height: `${Math.max(duration ? 7 : 0, duration / chartMax * 100)}%` }} /></div><span>{weekday(day.date)}</span></div>; })}</div><dl className={styles.smallStats}><div><dt>日均时长</dt><dd>{formatDuration(liveWeekAverage)}</dd></div><div><dt>学习天数</dt><dd>{weekStats?.studyDays ?? 0} / 7 天</dd></div><div><dt>较上周</dt><dd>{weekChange === null ? '暂无对比' : `${weekChange >= 0 ? '↑' : '↓'} ${Math.abs(weekChange)}%`}</dd></div><div><dt>完成次数</dt><dd>{weekStats?.sessionCount ?? 0} 次</dd></div></dl></section>
-        <section className={styles.sideSection}><Heading title="本周观察" /><p className={styles.insight}>这周已经学习 <em>{weekStats?.studyDays ?? 0} 天</em>{weekChange !== null && <>，相比上周{weekChange >= 0 ? '增加' : '减少'}了 <em>{formatDuration(Math.abs(liveWeekTotal - previousTotal))}</em></>}。{topCategory ? <>最近投入最多的是“<em>{topCategory}</em>”。</> : '完成第一段学习后，这里会生成观察。'}</p></section>
+        <section className={styles.sideSection}><Heading title="近 7 天节奏" subtitle="每日学习时长 · 分钟" /><div className={styles.chart}>{weekStats?.days.map((day) => { const duration = liveDayDuration(day); return <div className={styles.chartDay} key={day.date} role="img" aria-label={`${day.date}，${formatDuration(duration)}`}><strong>{duration ? Math.round(duration / 60) : '—'}</strong><div className={styles.barArea}><i className={day.date === todayKey ? styles.todayBar : ''} style={{ height: `${duration / chartMax * 100}%` }} /></div><span>{weekday(day.date)}</span></div>; })}</div><dl className={styles.smallStats}><div><dt>日均时长</dt><dd>{formatDuration(liveWeekAverage)}</dd></div><div><dt>学习天数</dt><dd>{weekStats?.studyDays ?? 0} / 7 天</dd></div><div><dt>较前 7 天</dt><dd>{weekChange === null ? '暂无对比' : `${weekChange >= 0 ? '↑' : '↓'} ${Math.abs(weekChange)}%`}</dd></div><div><dt>完成次数</dt><dd>{weekStats?.sessionCount ?? 0} 次</dd></div></dl></section>
+        <section className={styles.sideSection}><Heading title="近期观察" /><p className={styles.insight}>近 7 天学习了 <em>{weekStats?.studyDays ?? 0} 天</em>{weekChange !== null && <>，相比前 7 天{weekChange >= 0 ? '增加' : '减少'}了 <em>{formatDuration(Math.abs(liveWeekTotal - previousTotal))}</em></>}。{topCategory ? <>最近投入最多的是“<em>{topCategory}</em>”。</> : '完成第一段学习后，这里会生成观察。'}</p></section>
       </aside></div>
       <section className={styles.heatmapSection}><Heading title="学习热力图" subtitle="最近一年 · 颜色按每日学习时长加深" side={heatmapStats ? <span className={styles.heatmapSummary}>{heatmapStats.studyDays} 个学习日 · {formatDuration(heatmapStats.totalDurationSeconds)}</span> : undefined} />
         {heatmapStats ? <StudyHeatmap days={heatmapStats.days} to={todayKey} /> : heatmapError ? <div className={styles.heatmapError}><span>{heatmapError}</span><button type="button" onClick={() => void reload()}>重新加载</button></div> : <div className={styles.heatmapLoading}>正在生成学习热力图…</div>}
@@ -194,19 +196,12 @@ export function StudyPage() {
 }
 
 function RecentSessions({ sessions, onSelect }: { sessions: StudySession[]; onSelect: (session: StudySession) => void }) {
-  const [latest, ...previous] = sessions;
-  return <div className={styles.recentPreview}>
-    <button type="button" className={styles.latestSession} onClick={() => onSelect(latest)}>
-      <span className={styles.latestDate}>{new Intl.DateTimeFormat('zh-CN', { month: 'short', day: 'numeric' }).format(new Date(latest.startedAt))}</span>
-      <strong>{latest.content}</strong>
-      <span className={styles.latestMeta}>{latest.category} · {formatClock(latest.startedAt)} — {latest.endedAt ? formatClock(latest.endedAt) : ''}</span>
-      <b>{formatDuration(latest.durationSeconds)}</b>
-    </button>
-    {previous.length > 0 && <div className={styles.previousSessions}>{previous.map((session) => <button type="button" key={session.id} onClick={() => onSelect(session)}>
-      <span><time dateTime={session.startedAt}>{new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric' }).format(new Date(session.startedAt))}</time><em>{session.category}</em></span>
-      <strong>{session.content}</strong>
-      <b>{formatDuration(session.durationSeconds)}</b>
-    </button>)}</div>}
+  return <div className={styles.recentList}>
+    {sessions.map((session) => <button type="button" className={styles.sessionRow} key={session.id} onClick={() => onSelect(session)}>
+      <time className={styles.sessionDate} dateTime={session.startedAt}>{new Intl.DateTimeFormat('zh-CN', { month: 'short', day: 'numeric' }).format(new Date(session.startedAt))}</time>
+      <div className={styles.sessionContent}><strong>{session.content || '自由学习'}</strong><span><em>{session.category}</em>{formatClock(session.startedAt)} — {session.endedAt ? formatClock(session.endedAt) : ''}</span></div>
+      <b>{formatDuration(session.durationSeconds)}</b><CaretRightIcon size={12} aria-hidden="true" />
+    </button>)}
   </div>;
 }
 

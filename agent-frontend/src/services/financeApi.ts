@@ -4,6 +4,7 @@ import type {
   CreateFinanceTransactionInput,
   CreateFinanceTransferInput,
   FinanceAccount,
+  FinanceCashflowSummary,
   FinanceChartRange,
   FinanceCategoryOptions,
   FinanceExpenseChart,
@@ -98,4 +99,14 @@ export function updateFinanceTransaction(
 /** 在两个资产账户之间进行划账并同步调整双方余额。 */
 export function createFinanceTransfer(input: CreateFinanceTransferInput): Promise<FinanceTransferResponse> {
   return financeRequest<FinanceTransferResponse>('/agent/finance/transfers', jsonInit(input));
+}
+
+/** 按日查询发生变化的资产流水，包含划账与余额校准。 */
+export function fetchFinanceDayTransactions(date: string): Promise<FinanceTransaction[]> {
+  return financeRequest<FinanceTransaction[]>(`/agent/finance/transactions/day?date=${encodeURIComponent(date)}`);
+}
+
+/** 月历仅查询收支合计，不加载整月完整流水。 */
+export function fetchFinanceCashflowSummary(from: string, to: string): Promise<FinanceCashflowSummary> {
+  return financeRequest<FinanceCashflowSummary>(`/agent/finance/cashflow-summary?${new URLSearchParams({ from, to })}`);
 }

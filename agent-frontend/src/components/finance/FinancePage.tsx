@@ -1,3 +1,4 @@
+import { TopBarAction } from '../common/TopBarAction';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowClockwiseIcon, ArrowsLeftRightIcon, CaretRightIcon, PencilSimpleIcon, PlusIcon, SparkleIcon, WalletIcon } from '@phosphor-icons/react';
 import { createFinanceAccount, createFinanceBalanceAdjustment, createFinanceTransaction, createFinanceTransfer, fetchFinanceCategories, fetchFinanceExpenseChart, fetchFinanceOverview, fetchFinanceTransactions, updateFinanceTransaction } from '../../services/financeApi';
@@ -192,23 +193,22 @@ export const FinancePage: React.FC = () => {
 
   return <main className={styles.workspace}>
     <TopBar icon={<WalletIcon size={16} />} title="财务" subtitle="本地数据" actions={<>
-      <button type="button" className={styles.iconButton} title="刷新财务数据" aria-label="刷新财务数据"
+      <TopBarAction iconOnly title="刷新财务数据" aria-label="刷新财务数据"
         onClick={() => void Promise.all([load(), loadChart(chartRange)])} disabled={isLoading || isChartLoading}>
         <ArrowClockwiseIcon size={14} className={isLoading || isChartLoading ? styles.spinning : ''} />
-      </button>
-      <Button type="button" variant="outline" size="sm" icon={<PlusIcon size={13} weight="bold" />} onClick={openAccountModal}>添加账户</Button>
-      <Button
+      </TopBarAction>
+      <TopBarAction type="button" variant="outline" icon={<PlusIcon size={13} weight="bold" />} onClick={openAccountModal}>添加账户</TopBarAction>
+      <TopBarAction
         type="button"
         variant="outline"
-        size="sm"
         icon={<ArrowsLeftRightIcon size={13} weight="bold" />}
         onClick={() => setIsTransferModalOpen(true)}
         disabled={(overview?.accounts.length ?? 0) < 2}
         title={(overview?.accounts.length ?? 0) < 2 ? '至少需要两个资产账户才能划账' : '在账户之间划转资金'}
       >
         划账
-      </Button>
-      <Button type="button" variant="primary" size="sm" onClick={openTransactionModal} disabled={!overview?.accounts.length}>记一笔</Button>
+      </TopBarAction>
+      <TopBarAction type="button" variant="primary" onClick={openTransactionModal} disabled={!overview?.accounts.length}>记一笔</TopBarAction>
     </>} />
 
     <div className={styles.page}><div className={styles.content}>

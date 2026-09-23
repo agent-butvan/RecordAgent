@@ -1,0 +1,12 @@
+.board {
+  position: absolute;
+  z-index: 60;
+  inset: 0;
+  overflow: hidden;
+  perspective: 1200px;
+  pointer-events: none;
+}
+
+.board > * {
+  pointer-events: auto;
+}

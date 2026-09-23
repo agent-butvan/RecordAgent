@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
 import { CheckIcon } from '@phosphor-icons/react';
 import {
   ArrowUpRight,
@@ -54,119 +53,80 @@ interface ResourceState<T> {
   reload: () => void;
 }
 
-/** 财务各分类对应的柔和色彩标签规范（与财务功能模块一致） */
-const CATEGORY_TAG_STYLES: Record<string, { bg: string; color: string }> = {
-  餐饮: { bg: '#fff7ed', color: '#c2410c' },
-  交通: { bg: '#eff6ff', color: '#1d4ed8' },
-  购物: { bg: '#fff1f2', color: '#be123c' },
-  居住: { bg: '#faf5ff', color: '#7e22ce' },
-  娱乐: { bg: '#fdf4ff', color: '#a21caf' },
-  学习: { bg: '#f0fdf4', color: '#15803d' },
-  医疗: { bg: '#fef2f2', color: '#b91c1c' },
-  理财收益: { bg: '#ecfdf5', color: '#047857' },
-  收益: { bg: '#ecfdf5', color: '#047857' },
-  工资: { bg: '#ecfdf5', color: '#047857' },
-  奖金: { bg: '#ecfdf5', color: '#047857' },
-  报销: { bg: '#f0f9ff', color: '#0369a1' },
-  转入: { bg: '#f0f9ff', color: '#0369a1' },
-  兼职: { bg: '#fefce8', color: '#a16207' },
-  余额校准: { bg: '#fffbeb', color: '#a16207' },
-  其他: { bg: '#f8fafc', color: '#475569' },
-};
-
-function getCategoryTagStyle(category: string, type?: string) {
-  if (CATEGORY_TAG_STYLES[category]) {
-    return CATEGORY_TAG_STYLES[category];
-  }
-  if (type === 'income' || type === 'yield') {
-    return { bg: '#ecfdf5', color: '#047857' };
-  }
-  let hash = 0;
-  for (let i = 0; i < category.length; i++) {
-    hash = category.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const hues = [215, 160, 275, 345, 30, 195, 290];
-  const h = hues[Math.abs(hash) % hues.length];
-  return {
-    bg: `hsl(${h}, 85%, 96%)`,
-    color: `hsl(${h}, 70%, 35%)`,
-  };
-}
-
-/** 根据天气状态匹配不同的天气图标与各具层次的蓝色调 */
+/** 天气以小面积语义色区分晴、雨、雷暴与阴天。 */
 function getWeatherVisual(condition: string = '', size = 13) {
   const c = condition.trim();
   if (c.includes('雷')) {
     return {
       icon: <CloudLightning size={size} />,
-      color: '#4338ca', // 雷暴深电蓝
+      className: styles.weatherStorm,
       label: condition || '雷阵雨',
     };
   }
   if (c.includes('暴雨') || c.includes('大雨')) {
     return {
       icon: <CloudRain size={size} />,
-      color: '#1d4ed8', // 暴雨深蓝
+      className: styles.weatherRain,
       label: condition || '大雨',
     };
   }
   if (c.includes('雨')) {
     return {
       icon: <CloudDrizzle size={size} />,
-      color: '#2563eb', // 细雨/小雨湛蓝
+      className: styles.weatherRain,
       label: condition || '小雨',
     };
   }
   if (c.includes('雪')) {
     return {
       icon: <CloudSnow size={size} />,
-      color: '#06b6d4', // 冰雪霜蓝
+      className: styles.weatherCool,
       label: condition || '雪',
     };
   }
   if (c.includes('阴')) {
     return {
       icon: <Cloud size={size} />,
-      color: '#475569', // 阴天钢灰蓝
+      className: styles.weatherCloud,
       label: condition || '阴',
     };
   }
   if (c.includes('多云')) {
     return {
       icon: <CloudSun size={size} />,
-      color: '#0284c7', // 多云海天蓝
+      className: styles.weatherCloud,
       label: condition || '多云',
     };
   }
   if (c.includes('晴')) {
     return {
       icon: <Sun size={size} />,
-      color: '#0ea5e9', // 晴空澄碧天蓝
+      className: styles.weatherSun,
       label: condition || '晴',
     };
   }
   if (c.includes('风')) {
     return {
       icon: <Wind size={size} />,
-      color: '#0891b2', // 清风青蓝
+      className: styles.weatherCool,
       label: condition || '有风',
     };
   }
   if (c.includes('雾') || c.includes('霾')) {
     return {
       icon: <CloudFog size={size} />,
-      color: '#64748b', // 雾霭青灰
+      className: styles.weatherCloud,
       label: condition || '雾霾',
     };
   }
   return {
     icon: <CloudSun size={size} />,
-    color: '#0284c7',
+    className: styles.weatherCloud,
     label: condition || '多云',
   };
 }
 
-/** 聊天顶栏的个人信息入口；支持分段切换、直接打勾待办、彩色财务标签及层次蓝色天气 */
+/** 聊天顶栏的个人信息入口；统一轻量浮窗，通过顶栏切换模块并直接完成待办 */
 export function ChatTopBarInformation({ onOpenFeature }: ChatTopBarInformationProps) {
   const [preferences, setPreferences] = useState(getFeaturePreferences);
   const [activeModule, setActiveModule] = useState<TopBarModuleId | null>(null);
@@ -230,7 +190,10 @@ export function ChatTopBarInformation({ onOpenFeature }: ChatTopBarInformationPr
       if (!rootRef.current?.contains(event.target as Node)) setActiveModule(null);
     };
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setActiveModule(null);
+      if (event.key === 'Escape') {
+        rootRef.current?.querySelector<HTMLButtonElement>('[aria-expanded="true"]')?.focus();
+        setActiveModule(null);
+      }
     };
     document.addEventListener('pointerdown', closeOnOutsidePress);
     window.addEventListener('keydown', closeOnEscape);
@@ -251,31 +214,6 @@ export function ChatTopBarInformation({ onOpenFeature }: ChatTopBarInformationPr
   const toggle = (module: TopBarModuleId) => {
     setActiveModule((current) => current === module ? null : module);
   };
-
-  const enabledModules: { id: TopBarModuleId; label: string; icon: React.ReactNode; badge?: string }[] = [];
-  if (visible.showDate || visible.showHoliday) {
-    enabledModules.push({ id: 'date', label: '日期', icon: <CalendarDays size={13} /> });
-  }
-  if (visible.showTodos) {
-    const todos = todoResource.data ? overviewTodos(todoResource.data) : [];
-    const remaining = todos.filter((t) => !t.details.completed).length;
-    enabledModules.push({
-      id: 'todos',
-      label: '待办',
-      icon: <ListChecks size={13} />,
-      badge: remaining > 0 ? String(remaining) : undefined,
-    });
-  }
-  if (visible.showFinance) {
-    enabledModules.push({ id: 'finance', label: '财务', icon: <WalletCards size={13} /> });
-  }
-  if (visible.showWeather) {
-    enabledModules.push({
-      id: 'weather',
-      label: '天气',
-      icon: <span style={{ color: weatherVisual.color, display: 'inline-flex' }}>{weatherVisual.icon}</span>,
-    });
-  }
 
   return (
     <div ref={rootRef} className={styles.root} aria-label="今日概况">
@@ -319,7 +257,7 @@ export function ChatTopBarInformation({ onOpenFeature }: ChatTopBarInformationPr
           <InformationTrigger
             moduleId="weather"
             icon={
-              <span style={{ color: weatherVisual.color, display: 'inline-flex' }}>
+              <span className={`${styles.weatherIcon} ${weatherVisual.className}`}>
                 {weatherVisual.icon}
               </span>
             }
@@ -338,36 +276,17 @@ export function ChatTopBarInformation({ onOpenFeature }: ChatTopBarInformationPr
           className={styles.popover}
           role="dialog"
           aria-modal="false"
-          aria-label="顶栏详细面板"
+          aria-label={`${activeModule === 'date' ? '日期' : activeModule === 'todos' ? '待办' : activeModule === 'finance' ? '财务' : '天气'}详情`}
         >
-          {/* 弹窗顶部分段控制器与快捷关闭 */}
-          <div className={styles.popoverNav}>
-            <div className={styles.segmentedGroup} role="tablist">
-              {enabledModules.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={activeModule === item.id}
-                  className={`${styles.tabItem} ${activeModule === item.id ? styles.tabItemActive : ''}`}
-                  onClick={() => setActiveModule(item.id)}
-                >
-                  {item.icon}
-                  <span>{item.label}</span>
-                  {item.badge && <span className={styles.tabBadge}>{item.badge}</span>}
-                </button>
-              ))}
-            </div>
-            <button
-              type="button"
-              className={styles.closeBtn}
-              onClick={() => setActiveModule(null)}
-              aria-label="关闭详情面板"
-              title="关闭（Esc）"
-            >
-              <X size={13} />
-            </button>
-          </div>
+          <button
+            type="button"
+            className={styles.closeBtn}
+            onClick={() => setActiveModule(null)}
+            aria-label="关闭详情面板"
+            title="关闭（Esc）"
+          >
+            <X size={13} />
+          </button>
 
           {/* 模块主体内容渲染 */}
           <div className={styles.popoverBody}>
@@ -652,7 +571,7 @@ function WeatherDetail({ resource }: { resource: ResourceState<DailyContextSumma
     <div aria-labelledby="topbar-weather-title">
       <div className={styles.cardHeader}>
         <div className={styles.cardTitleBlock}>
-          <span style={{ color: weatherVisual.color, display: 'inline-flex' }}>
+          <span className={`${styles.weatherIcon} ${weatherVisual.className}`}>
             {weatherVisual.icon}
           </span>
           <div>
@@ -670,7 +589,7 @@ function WeatherDetail({ resource }: { resource: ResourceState<DailyContextSumma
             <span>{weather.locationName}</span>
           </div>
           <span className={styles.weatherConditionTag}>
-            <span style={{ color: weatherVisual.color, display: 'inline-flex' }}>
+            <span className={`${styles.weatherIcon} ${weatherVisual.className}`}>
               {weatherVisual.icon}
             </span>
             <span>{weather.condition}</span>
@@ -679,7 +598,7 @@ function WeatherDetail({ resource }: { resource: ResourceState<DailyContextSumma
 
         <div className={styles.weatherHeroMain}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ color: weatherVisual.color, display: 'inline-flex' }}>
+            <span className={`${styles.weatherIcon} ${weatherVisual.className}`}>
               {getWeatherVisual(weather.condition, 32).icon}
             </span>
             <div className={styles.weatherDegree}>
@@ -750,7 +669,7 @@ function WeatherDetail({ resource }: { resource: ResourceState<DailyContextSumma
 }
 
 /* ============================
-   Todos 待办详情组件（支持直接打勾与手绘划线动效）
+   Todos 待办详情组件（支持直接勾选完成）
    ============================ */
 function TodoDetail({
   resource,
@@ -817,7 +736,7 @@ function TodoDetail({
           <div>
             <h2 id="topbar-todo-title" className={styles.cardTitle}>今日待办</h2>
             <p className={styles.cardSubtitle}>
-              {localTodos.length ? `共 ${localTodos.length} 项，已完成 ${completedCount} 项` : '今日暂无安排'}
+              {localTodos.length ? `已完成 ${completedCount} / ${localTodos.length} 项` : '今日暂无安排'}
             </p>
           </div>
         </div>
@@ -829,11 +748,7 @@ function TodoDetail({
 
       <ResourceBody resource={resource} empty="今天还没有待办事项。">
         {localTodos.length > 0 && (
-          <div className={styles.todoProgressBanner}>
-            <div className={styles.todoProgressText}>
-              <strong>任务进度</strong>
-              <span>{completedCount}/{localTodos.length} ({percent}%)</span>
-            </div>
+          <div className={styles.todoProgressBanner} role="progressbar" aria-label="今日待办完成进度" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}>
             <div className={styles.progressBarTrack}>
               <div
                 className={styles.progressBarFill}
@@ -871,29 +786,7 @@ function TodoDetail({
                       <span className={todo.details.completed ? styles.todoTitleDone : styles.todoTitle}>
                         {todo.title}
                       </span>
-                      <motion.svg
-                        viewBox="0 0 340 32"
-                        preserveAspectRatio="none"
-                        className={styles.strike}
-                        aria-hidden="true"
-                      >
-                        <motion.path
-                          d="M 8 16.5 C 49 7, 89 12, 128 16 C 169 21, 215 8, 258 14 C 288 18, 314 11, 334 15"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeLinecap="round"
-                          strokeWidth="2"
-                          initial={false}
-                          animate={{
-                            pathLength: todo.details.completed ? 1 : 0,
-                            opacity: todo.details.completed ? 1 : 0,
-                          }}
-                          transition={{
-                            pathLength: { duration: 0.52, ease: 'easeInOut' },
-                            opacity: { duration: 0.01, delay: todo.details.completed ? 0 : 0.52 },
-                          }}
-                        />
-                      </motion.svg>
+
                     </span>
                   </div>
                 </div>
@@ -904,7 +797,7 @@ function TodoDetail({
                       {todo.details.time}
                     </span>
                   )}
-                  <span
+                  {todo.details.priority === 'high' && !todo.details.completed && <span
                     className={
                       todo.details.priority === 'high'
                         ? styles.priorityHigh
@@ -914,7 +807,7 @@ function TodoDetail({
                     }
                   >
                     {priorityLabel(todo.details.priority)}
-                  </span>
+                  </span>}
                 </div>
               </div>
             ))}
@@ -926,7 +819,7 @@ function TodoDetail({
 }
 
 /* ============================
-   Finance 财务详情组件（无灰底、彩色标签）
+   Finance 财务详情组件（收支通过文字与正负号区分）
    ============================ */
 function FinanceDetail({
   date,
@@ -989,11 +882,11 @@ function FinanceDetail({
 
         {/* 本月汇总与结余条（无灰色背景） */}
         <div className={styles.monthSummaryBar}>
-          <span>月支出 <strong style={{ color: '#dc2626' }}>{formatMoney(monthExpense)}</strong></span>
-          <span>月收入 <strong style={{ color: '#16a34a' }}>{formatMoney(monthIncome)}</strong></span>
+          <span>月支出 <strong>{formatMoney(monthExpense)}</strong></span>
+          <span>月收入 <strong>{formatMoney(monthIncome)}</strong></span>
           <span>
             净结余{' '}
-            <strong style={{ color: monthBalance >= 0 ? '#16a34a' : '#dc2626' }}>
+            <strong>
               {formatMoney(monthBalance)}
             </strong>
           </span>
@@ -1004,9 +897,6 @@ function FinanceDetail({
         {transactions.length > 0 ? (
           <div className={styles.transactionList}>
             {transactions.map((item) => {
-              const tagStyle = getCategoryTagStyle(item.category, item.transactionType);
-              const isAdjustment = item.transactionType === 'adjustment_increase'
-                || item.transactionType === 'adjustment_decrease';
               const isOutflow = item.transactionType === 'expense'
                 || item.transactionType === 'transfer_out'
                 || item.transactionType === 'adjustment_decrease';
@@ -1015,7 +905,6 @@ function FinanceDetail({
                   <div className={styles.transactionLeft}>
                     <span
                       className={styles.categoryTag}
-                      style={{ backgroundColor: tagStyle.bg, color: tagStyle.color }}
                     >
                       {item.category || '其它'}
                     </span>
@@ -1025,10 +914,7 @@ function FinanceDetail({
                     </div>
                   </div>
                   <span
-                    className={styles.transactionAmount}
-                    style={{
-                      color: isAdjustment ? '#a16207' : isOutflow ? '#dc2626' : '#16a34a',
-                    }}
+                    className={`${styles.transactionAmount} ${isOutflow ? styles.expenseVal : styles.incomeVal}`}
                   >
                     {isOutflow ? '-' : '+'}
                     {formatMoney(item.amount, item.currency)}

@@ -23,6 +23,18 @@ interface ModelContextType {
     description?: string;
     supportsReasoning?: boolean;
   }) => void;
+  updateModelItem: (
+    oldTarget: { providerId: string; modelId: string },
+    params: {
+      vendor: string;
+      baseUrl?: string;
+      apiKey?: string;
+      modelId: string;
+      name: string;
+      description?: string;
+      supportsReasoning?: boolean;
+    }
+  ) => void;
   deleteModelItem: (providerId: string, modelId: string) => void;
   testConnectionByUrl: (baseUrl: string, apiKey: string, type: string) => Promise<{ success: boolean; message: string }>;
   getActiveModel: () => ModelItem | undefined;
@@ -220,6 +232,107 @@ export const ModelProviderContext: React.FC<{ children: React.ReactNode }> = ({ 
     }
   };
 
+  const updateModelItem = (
+    oldTarget: { providerId: string; modelId: string },
+    params: {
+      vendor: string;
+      baseUrl?: string;
+      apiKey?: string;
+      modelId: string;
+      name: string;
+      description?: string;
+      supportsReasoning?: boolean;
+    }
+  ) => {
+    const { providerId: oldProviderId, modelId: oldModelId } = oldTarget;
+    const { vendor: newVendor, baseUrl, apiKey, modelId: newModelId, name, description, supportsReasoning } = params;
+
+    setProviders((prev) => {
+      // 1. 如果供应商没有变化
+      if (oldProviderId === newVendor) {
+        return prev.map((p) => {
+          if (p.id === oldProviderId || p.type === oldProviderId) {
+            const updatedModels = p.models.map((m) => {
+              if (m.id === oldModelId) {
+                return {
+                  ...m,
+                  id: newModelId,
+                  name: name || newModelId,
+                  description: description !== undefined ? description : m.description,
+                  supportsReasoning: supportsReasoning !== undefined ? supportsReasoning : m.supportsReasoning,
+                };
+              }
+              return m;
+            });
+            return {
+              ...p,
+              baseUrl: baseUrl !== undefined ? baseUrl : p.baseUrl,
+              apiKey: apiKey !== undefined ? apiKey : p.apiKey,
+              models: updatedModels,
+            };
+          }
+          return p;
+        });
+      }
+
+      // 2. 如果供应商变化：从旧 provider 中移除，添加到新 provider 中
+      const modelToMove: ModelItem = {
+        id: newModelId,
+        name: name || newModelId,
+        providerId: newVendor,
+        description: description || '',
+        supportsReasoning: !!supportsReasoning,
+      };
+
+      const cleanedProviders = prev
+        .map((p) => {
+          if (p.id === oldProviderId || p.type === oldProviderId) {
+            return {
+              ...p,
+              models: p.models.filter((m) => m.id !== oldModelId),
+            };
+          }
+          return p;
+        })
+        .filter((p) => p.models.length > 0);
+
+      const targetProviderIndex = cleanedProviders.findIndex((p) => p.id === newVendor || p.type === newVendor);
+      if (targetProviderIndex >= 0) {
+        return cleanedProviders.map((p, idx) => {
+          if (idx === targetProviderIndex) {
+            const exists = p.models.some((m) => m.id === newModelId);
+            const models = exists
+              ? p.models.map((m) => (m.id === newModelId ? modelToMove : m))
+              : [...p.models, modelToMove];
+            return {
+              ...p,
+              baseUrl: baseUrl !== undefined ? baseUrl : p.baseUrl,
+              apiKey: apiKey !== undefined ? apiKey : p.apiKey,
+              models,
+            };
+          }
+          return p;
+        });
+      } else {
+        const newProvider: ModelProvider = {
+          id: newVendor,
+          name: newVendor.toUpperCase(),
+          type: newVendor as any,
+          baseUrl: baseUrl || '',
+          apiKey: apiKey || '',
+          isEnabled: true,
+          models: [modelToMove],
+        };
+        return [...cleanedProviders, newProvider];
+      }
+    });
+
+    if (activeProviderId === oldProviderId && activeModelId === oldModelId) {
+      setActiveProviderId(newVendor);
+      setActiveModelId(newModelId);
+    }
+  };
+
   const deleteModelItem = (providerId: string, modelId: string) => {
     setProviders((prev) => {
       const updated = prev.map((p) => {
@@ -308,6 +421,7 @@ export const ModelProviderContext: React.FC<{ children: React.ReactNode }> = ({ 
         setMaxTokens,
         updateProvider,
         addModelItem,
+        updateModelItem,
         deleteModelItem,
         testConnectionByUrl,
         getActiveModel,

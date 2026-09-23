@@ -1,5 +1,6 @@
 package butvan.agent.network.daily.repository;
 
+import butvan.agent.network.daily.model.DailyEventModels.CalendarItem;
 import butvan.agent.network.daily.model.DailyEventModels.DailyDaySummary;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -27,6 +28,18 @@ public class DailyEventRepository {
             int version,
             Instant createdAt,
             Instant updatedAt) {
+    }
+
+    /** 周期待办定义的内部读取投影。 */
+    public record RecurringTodoRow(
+            String id,
+            String title,
+            int version,
+            LocalDate effectiveDate,
+            String recurrence,
+            Integer recurrenceWeekday,
+            Integer recurrenceMonthDay,
+            boolean completed) {
     }
 
     private final JdbcTemplate jdbcTemplate;
@@ -70,7 +83,7 @@ public class DailyEventRepository {
                       OR (t.recurrence = 'weekly' AND
                           ((CAST(strftime('%w', ?) AS INTEGER) + 6) % 7) + 1 = COALESCE(t.recurrence_weekday, 1))
                       OR (t.recurrence = 'monthly' AND
-                          CAST(strftime('%d', ?) AS INTEGER) = COALESCE(t.recurrence_month_day, 1))
+                          ? = date(?, 'start of month', '+1 month', '-1 day'))
                     ))
                   )
                 ORDER BY created_at ASC, id ASC
@@ -84,7 +97,8 @@ public class DailyEventRepository {
                 resultSet.getInt("version"),
                 Instant.parse(resultSet.getString("created_at")),
                 Instant.parse(resultSet.getString("updated_at"))), ownerId,
-                date.toString(), date.toString(), date.toString(), date.toString(), date.toString());
+                date.toString(), date.toString(), date.toString(), date.toString(), date.toString(),
+                date.toString());
     }
 
     /** 按所有者读取一条日记录，防止跨用户修改。 */
@@ -101,6 +115,48 @@ public class DailyEventRepository {
                 resultSet.getInt("version"), Instant.parse(resultSet.getString("created_at")),
                 Instant.parse(resultSet.getString("updated_at"))), ownerId, eventId);
         return rows.stream().findFirst();
+    }
+
+    /** 读取当前周和当前月内已经生效的周期待办定义。 */
+    public List<RecurringTodoRow> findRecurringTodos(
+            String ownerId,
+            LocalDate weekStart,
+            LocalDate weekEnd,
+            LocalDate monthStart,
+            LocalDate monthEnd) {
+        return jdbcTemplate.query("""
+                SELECT e.id, e.title, e.version, e.event_date, t.recurrence,
+                       t.recurrence_weekday, t.recurrence_month_day,
+                       CASE WHEN EXISTS (
+                           SELECT 1 FROM todo_completion c
+                           WHERE c.event_id = e.id
+                             AND c.period_start = CASE t.recurrence
+                               WHEN 'weekly' THEN ?
+                               WHEN 'monthly' THEN ?
+                             END
+                       ) THEN 1 ELSE 0 END AS completed
+                FROM daily_event e
+                JOIN todo_detail t ON t.event_id = e.id
+                WHERE e.owner_id = ?
+                  AND e.event_type = 'todo'
+                  AND t.recurrence IN ('weekly', 'monthly')
+                  AND e.event_date <= CASE t.recurrence
+                    WHEN 'weekly' THEN ?
+                    WHEN 'monthly' THEN ?
+                  END
+                ORDER BY CASE t.recurrence WHEN 'weekly' THEN 0 ELSE 1 END,
+                         e.created_at, e.id
+                """, (resultSet, rowNumber) -> new RecurringTodoRow(
+                resultSet.getString("id"),
+                resultSet.getString("title"),
+                resultSet.getInt("version"),
+                LocalDate.parse(resultSet.getString("event_date")),
+                resultSet.getString("recurrence"),
+                nullableInteger(resultSet, "recurrence_weekday"),
+                nullableInteger(resultSet, "recurrence_month_day"),
+                resultSet.getInt("completed") == 1),
+                weekStart.toString(), monthStart.toString(), ownerId,
+                weekEnd.toString(), monthEnd.toString());
     }
 
     /** 通过来源领域的稳定引用查找同步日记录。 */
@@ -191,7 +247,8 @@ public class DailyEventRepository {
     }
 
     /** 查询日期范围内周期待办的逐日轻量汇总，不加载其他类型详情。 */
-    public List<DailyDaySummary> findRecurringTodoSummaries(String ownerId, LocalDate from, LocalDate to) {
+    public List<DailyDaySummary> findRecurringTodoSummaries(
+            String ownerId, LocalDate from, LocalDate to, LocalDate today) {
         return jdbcTemplate.query("""
                 WITH RECURSIVE dates(event_date) AS (
                     SELECT ?
@@ -218,8 +275,9 @@ public class DailyEventRepository {
                     OR (t.recurrence = 'weekly' AND
                         ((CAST(strftime('%w', dates.event_date) AS INTEGER) + 6) % 7) + 1 = COALESCE(t.recurrence_weekday, 1))
                     OR (t.recurrence = 'monthly' AND
-                        CAST(strftime('%d', dates.event_date) AS INTEGER) = COALESCE(t.recurrence_month_day, 1))
+                        dates.event_date = date(dates.event_date, 'start of month', '+1 month', '-1 day'))
                   )
+                  AND (t.recurrence = 'monthly' OR dates.event_date <= ?)
                 GROUP BY dates.event_date
                 ORDER BY dates.event_date
                 """, (resultSet, rowNumber) -> new DailyDaySummary(
@@ -229,6 +287,45 @@ public class DailyEventRepository {
                 resultSet.getInt("completed_count"),
                 0,
                 BigDecimal.ZERO,
-                resultSet.getString("headline")), from.toString(), to.toString(), ownerId);
+                resultSet.getString("headline")), from.toString(), to.toString(), ownerId, today.toString());
     }
+    /** 批量读取每天最多四条事项标题，按日程、待办、学习、手记顺序展示。 */
+    public List<CalendarItem> findCalendarItems(
+            String ownerId, LocalDate from, LocalDate to, LocalDate today) {
+        return jdbcTemplate.query("""
+                WITH RECURSIVE dates(day) AS (
+                    SELECT ? UNION ALL SELECT date(day, '+1 day') FROM dates WHERE day < ?
+                ), ranked AS (
+                    SELECT dates.day, e.id, e.event_type, substr(e.title, 1, 80) AS title,
+                           ROW_NUMBER() OVER (PARTITION BY dates.day ORDER BY
+                               CASE e.event_type WHEN 'schedule' THEN 0 WHEN 'todo' THEN 1
+                                   WHEN 'study' THEN 2 WHEN 'journal' THEN 3 ELSE 4 END,
+                               e.created_at, e.id) AS position
+                    FROM dates
+                    JOIN daily_event e ON e.owner_id = ?
+                    LEFT JOIN todo_detail t ON t.event_id = e.id
+                    WHERE (
+                        (e.event_date = dates.day AND NOT (e.event_type = 'todo' AND COALESCE(t.recurrence, 'none') <> 'none'))
+                        OR (e.event_type = 'todo' AND e.event_date <= dates.day
+                            AND (dates.day <= ? OR t.recurrence = 'monthly') AND (
+                            t.recurrence = 'daily'
+                            OR (t.recurrence = 'weekly' AND
+                                ((CAST(strftime('%w', dates.day) AS INTEGER) + 6) % 7) + 1 = COALESCE(t.recurrence_weekday, 1))
+                            OR (t.recurrence = 'monthly' AND
+                                dates.day = date(dates.day, 'start of month', '+1 month', '-1 day'))
+                        ))
+                    )
+                )
+                SELECT day, id, event_type, title FROM ranked WHERE position <= 4 ORDER BY day, position
+                """, (rs, rowNum) -> new CalendarItem(
+                LocalDate.parse(rs.getString("day")), rs.getString("id"),
+                rs.getString("event_type"), rs.getString("title")),
+                from.toString(), to.toString(), ownerId, today.toString());
+    }
+
+    private Integer nullableInteger(java.sql.ResultSet resultSet, String column) throws java.sql.SQLException {
+        int value = resultSet.getInt(column);
+        return resultSet.wasNull() ? null : value;
+    }
+
 }

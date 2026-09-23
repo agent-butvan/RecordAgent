@@ -145,6 +145,7 @@ public class AgentService {
             );
             // 当前 AgentRun 独享的运行上下文；以类型作为决策的读取键
             context.put(ToolRoutingDecision.class, routingDecision);
+            emitRoutingNotice(routingDecision, streamSession);
             synchronizeToolRoutingState(userId, request.sessionId(), routingDecision);
             // 当前 SSE 运行会话；路由期间用户也可能发出取消请求
             if (streamSession.isCancelled()) {
@@ -213,6 +214,26 @@ public class AgentService {
         if (toolRoutingStateSynchronizer.apply(state, decision)) {
             agent.getDelegate().saveAgentState(userId, sessionId);
         }
+    }
+
+    /** Jev 降级时发送非终态提示，使聊天继续执行且桌面端可以告知用户。 */
+    private void emitRoutingNotice(
+            ToolRoutingDecision decision,
+            AgentStreamSession streamSession
+    ) {
+        if (decision == null
+                || decision.status() != ToolRoutingDecision.Status.FALLBACK
+                || decision.failure() == null) {
+            return;
+        }
+        var failure = decision.failure();
+        putEvent(streamSession, new AgentStreamEvent.RoutingNotice(
+                failure.code().payloadValue(),
+                failure.message(),
+                failure.requestId(),
+                failure.retryable(),
+                failure.retryAfterMillis()
+        ));
     }
 
     /**

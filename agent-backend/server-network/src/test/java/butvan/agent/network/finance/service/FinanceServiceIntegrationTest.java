@@ -158,6 +158,13 @@ class FinanceServiceIntegrationTest {
         assertEquals(new BigDecimal("80.00"), chart.totalIncome());
         assertEquals(new BigDecimal("80.00"), assertInstanceOf(IncomeDetails.class, incomeEvent.details()).amount());
         assertEquals(2, chartDay.categories().size());
+        var summary = financeService.getCashflowSummary(ownerId, today, today);
+        assertEquals(new BigDecimal("80.00"), summary.income());
+        assertEquals(new BigDecimal("42.50"), summary.expense());
+        assertEquals(0, financeService.getCashflowSummary("another-owner", today, today).income().signum());
+        assertEquals(0, financeService.getCashflowSummary(ownerId, today.minusDays(1), today.minusDays(1)).income().signum());
+        assertThrows(IllegalArgumentException.class, () -> financeService.getCashflowSummary(ownerId, today, today.minusDays(1)));
+        assertThrows(IllegalArgumentException.class, () -> financeService.getCashflowSummary(ownerId, today.minusDays(367), today));
     }
 
     @Test
@@ -194,6 +201,12 @@ class FinanceServiceIntegrationTest {
         assertEquals("adjustment", increase.source());
         assertEquals("余额校准", increase.category());
         assertEquals("对账补差", increase.note());
+        var summary = financeService.getCashflowSummary(ownerId, LocalDate.now(), LocalDate.now());
+        assertEquals(0, summary.income().signum());
+        assertEquals(0, summary.expense().signum());
+        assertEquals(2, financeService.getDayTransactions(ownerId, LocalDate.now()).size());
+        assertEquals(0, financeService.getDayTransactions("unrelated-owner", LocalDate.now()).size());
+        assertEquals(0, financeService.getDayTransactions(ownerId, LocalDate.now().minusDays(1)).size());
     }
 
     @Test

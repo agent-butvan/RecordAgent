@@ -12,6 +12,9 @@ public final class FinanceModels {
     private FinanceModels() {
     }
 
+    /** 日期范围内的真实收支，排除划账及余额校准。 */
+    public record CashflowSummary(BigDecimal income, BigDecimal expense) {}
+
     /** 用户持有的一个资金账户。 */
     public record FinanceAccount(
             String id, String name, String accountType, String currency, BigDecimal balance,

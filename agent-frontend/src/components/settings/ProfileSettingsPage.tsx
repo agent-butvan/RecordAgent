@@ -90,8 +90,8 @@ export function ProfileSettingsPage({ accountStatus, onAccountStatusChange }: Pr
     <section className={styles.page} aria-labelledby="profile-title">
       <header className={styles.topBar}>
         <h1 id="profile-title">个人资料</h1>
-        <Button variant="outline" icon={<RefreshCw size={14} />} onClick={() => void load()} disabled={loading}>
-          刷新统计
+        <Button variant="ghost" icon={<RefreshCw size={14} />} onClick={() => void load()} disabled={loading}>
+          {loading ? '正在刷新' : '刷新统计'}
         </Button>
       </header>
 
