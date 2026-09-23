@@ -1,0 +1,10 @@
+{
+  "identifier": "task-reminder",
+  "description": "任务确认窗口仅允许基本窗口能力",
+  "windows": [
+    "task-reminder"
+  ],
+  "permissions": [
+    "core:default"
+  ]
+}
