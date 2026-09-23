@@ -3,7 +3,7 @@ import type { AutomationPreview, AutomationSpec, AutomationTask } from '../../ty
 import { newAutomation, scheduleText } from '../../features/automation/presentation';
 import { previewAutomation, saveAutomation } from '../../services/automationApi';
 import { Button } from '../common/Button';
-import { Modal } from '../common/Modal';
+import { X } from 'lucide-react';
 import { FormField } from '../common/FormField';
 import { TextInput } from '../common/TextInput';
 import { Select } from '../common/Select';
@@ -34,7 +34,7 @@ export function TaskEditor({ task, copy, onClose, activitySupported }: Props) {
   const checkbox = (key: 'desktop' | 'email' | 'confirm' | 'sound' | 'expense' | 'todo' | 'study', label: string, disabled = false) =>
     <label className={styles.check}><input type="checkbox" checked={spec[key]} disabled={disabled || busy} onChange={e => update(key, e.target.checked)} />{label}</label>;
   const localOnce = spec.onceAt ? new Date(new Date(spec.onceAt).getTime() - new Date(spec.onceAt).getTimezoneOffset() * 60000).toISOString().slice(0,16) : '';
-  return <Modal open title={task && !copy ? '编辑任务' : '新建任务'} onClose={() => { if (!busy) onClose(); }} width={680}>
+  return <div className={styles.drawer} role="dialog" aria-modal="false" aria-label={task && !copy ? '编辑任务' : '新建任务'}><header className={styles.drawerHeader}><div><span>{task && !copy ? '编辑' : '新建'}</span><h2>{task && !copy ? '编辑任务' : '创建任务'}</h2></div><button type="button" aria-label="关闭任务编辑" disabled={busy} onClick={onClose}><X size={20} /></button></header>
     <form className={styles.form} onSubmit={save}>
       <fieldset disabled={busy} className={styles.group}><legend>基本信息</legend>
         <Select label="任务模板" value={spec.kind} disabled={Boolean(task && !copy)} options={[
@@ -64,5 +64,5 @@ export function TaskEditor({ task, copy, onClose, activitySupported }: Props) {
       {preview && <section className={styles.preview}><strong>{preview.title}</strong><p>下次执行：{preview.nextAt ? new Date(preview.nextAt).toLocaleString('zh-CN') : '等待使用状态触发'}</p><pre>{preview.content}</pre></section>}
       <div className={styles.actions}><Button type="button" variant="outline" disabled={busy} onClick={() => void inspect()}>预览（不发送）</Button><Button type="submit" variant="primary" disabled={busy}>{busy ? '处理中…' : '保存任务'}</Button></div>
     </form>
-  </Modal>;
+  </div>;
 }

@@ -3,14 +3,14 @@ import type { SaveTaskMailSettings } from '../../types/automation';
 import { fetchTaskMailSettings, saveTaskMailSettings, testTaskMail } from '../../services/automationApi';
 import { getTaskBackground, isTaskDesktop, requestTaskNotificationPermission, setTaskBackground } from '../../services/taskDesktop';
 import { SettingsGroup, SettingsRow } from '../settings/SettingsGroup';
-import { Modal } from '../common/Modal';
+import { SettingsPageLayout } from '../settings/SettingsPageLayout';
 import { TextInput } from '../common/TextInput';
 import { Button } from '../common/Button';
 import { useMessage } from '../common/Message';
 import { EmailBindingModal } from '../account/EmailBindingModal';
 import styles from './TaskSettings.module.css';
 
-export function TaskSettings({ onClose }: { onClose: () => void }) {
+export function TaskSettings() {
   const [form, setForm] = useState<SaveTaskMailSettings | null>(null);
   const [recipient, setRecipient] = useState<string | null>(null);
   const [background, setBackground] = useState(false);
@@ -31,7 +31,7 @@ export function TaskSettings({ onClose }: { onClose: () => void }) {
     setBusy(true); setError(''); try { await work(); } catch (e) { setError(e instanceof Error ? e.message : '操作失败'); } finally { setBusy(false); }
   }
   const field = (key: 'host' | 'username' | 'from' | 'password', label: string) => <SettingsRow label={label} labelFor={`mail-${key}`} control={<TextInput id={`mail-${key}`} type={key === 'password' ? 'password' : 'text'} autoComplete={key === 'password' ? 'new-password' : 'off'} value={form?.[key] ?? ''} disabled={busy} onChange={e => setForm(f => f ? {...f,[key]:e.target.value} : f)} />} />;
-  return <Modal open title="任务设置" width={700} onClose={() => { if (!busy) onClose(); }}><div className={styles.body}>
+  return <SettingsPageLayout title="任务设置" description="管理任务通知、邮箱与后台运行。"><div className={styles.body}>
     <SettingsGroup title="桌面提醒" description="应用完全退出后，定时任务与邮件发送停止。">
       <SettingsRow label="系统通知权限" description="由你主动授权，系统专注模式仍可能抑制通知" control={<Button disabled={busy || !isTaskDesktop()} onClick={() => void action(async () => { const granted = await requestTaskNotificationPermission(); showMessage(granted ? 'success' : 'info', granted ? '系统通知已允许' : '通知尚未允许，请检查系统设置'); })}>开启通知</Button>} />
       <SettingsRow label="关闭主窗口后在后台运行" description="可从菜单栏图标重新打开或彻底退出" control={<input aria-label="后台运行" type="checkbox" checked={background} disabled={busy || !isTaskDesktop()} onChange={e => { const value = e.target.checked; void action(async () => { await setTaskBackground(value); setBackground(value); showMessage('success','后台设置已保存'); }); }} />} />
@@ -48,5 +48,5 @@ export function TaskSettings({ onClose }: { onClose: () => void }) {
     {error && <p role="alert" className={styles.error}>{error}<Button variant="ghost" onClick={() => void load()}>重新读取</Button></p>}
     <div className={styles.actions}><Button variant="outline" disabled={busy || !recipient} onClick={() => void action(async () => { const result = await testTaskMail(); showMessage(result.status === 'SUBMITTED' ? 'success' : 'error', result.status === 'SUBMITTED' ? '测试邮件已提交，请检查收件箱' : result.message); })}>发送测试邮件</Button><Button variant="primary" disabled={busy || !form} onClick={() => void action(async () => { if (form) { await saveTaskMailSettings(form); setForm({...form,password:''}); showMessage('success','邮件设置已保存'); } })}>保存邮件设置</Button></div>
     {binding && <EmailBindingModal open onClose={() => { setBinding(false); void load(); }} onBound={() => { setBinding(false); void load(); }} />}
-  </div></Modal>;
+  </div></SettingsPageLayout>;
 }

@@ -16,6 +16,7 @@ import { PersonalContextSettingsPage } from '../settings/PersonalContextSettings
 import { ProfileSettingsPage } from '../settings/ProfileSettingsPage';
 import { SlashCommandSettingsPage } from '../settings/SlashCommandSettingsPage';
 import { DailyContextSettingsPage } from '../settings/DailyContextSettingsPage';
+import { TaskSettings } from '../task/TaskSettings';
 import {
   getFeaturePreferences,
   setCalendarPreference,
@@ -39,6 +40,7 @@ import {
   Command,
   BrainCircuit,
   CloudSun,
+  Bell,
   ChevronsUpDown,
   MoreHorizontal,
   MoreVertical,
@@ -470,6 +472,7 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
           <div className={styles.groupLabel}>功能</div>
           {[
             { id: 'calendar', label: '日历', icon: CalendarDays },
+            { id: 'task', label: '任务', icon: Bell },
             { id: 'finance', label: '财务', icon: WalletCards },
             { id: 'library', label: '资料', icon: Library },
             { id: 'record', label: '记录', icon: NotebookPen },
@@ -1044,6 +1047,8 @@ export const ModelSettingsPage: React.FC<ModelSettingsPageProps> = ({ onBack, in
         )}
 
         {activeTab === 'usage' && <TokenUsageSettingsPage />}
+
+        {activeTab === 'task' && <TaskSettings />}
 
         {activeTab === 'context' && <PersonalContextSettingsPage />}
 

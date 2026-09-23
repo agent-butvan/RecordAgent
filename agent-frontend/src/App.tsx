@@ -1082,7 +1082,7 @@ export const MainLayout: React.FC<{
             onOpenAccountSettings={() => { setSettingsTab('account'); setIsSettingsOpen(true); }}
           />
           {activeFeature === 'task' ? (
-            <TaskPage />
+            <TaskPage onOpenSettings={() => { setSettingsTab('task'); setIsSettingsOpen(true); }} />
           ) : activeFeature === 'calendar' ? (
             <CalendarView />
           ) : activeFeature === 'finance' ? (
