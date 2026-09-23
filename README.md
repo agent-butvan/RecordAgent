@@ -58,13 +58,29 @@ Jev 路由是一个可选优化：它先判断本轮可能需要哪些能力组�
 | 个人上下文 | 画像、记忆召回、维护提案与显式确认 | Model Call 前临时注入 |
 | Token 用量 | 轮次、模型调用、输入归因与年度活动统计 | 原始记录 + SQLite 读模型 |
 
-聊天输入框还提供一层本地 Slash Command 路由。像 `/status`、`/today`、`/spending` 这类确定性查询不必调用模型；`/daily-review`、`/finance-review` 等分析命令则会先确认数据范围，再把受控上下文交给 Agent。完整命令见 [Slash Command 架构与使用说明](docs/Slash-Command-架构与使用说明.md)。
+聊天输入框还提供一层本地 Slash Command 路由。像 `/status`、`/today`、`/spending` 这类确定性查询不必调用模型；`/daily-review`、`/finance-review` 等分析命令则会先确认数据范围，再把受控上下文交给 Agent。
 
 ## 一次请求是怎么走完的
 
-[![ButvanAgent 本地优先架构](docs/assets/butvan-agent-architecture.png)](docs/assets/butvan-agent-architecture.html)
-
-> 点击架构图可打开交互版本，切换明暗主题、聚焦节点、追踪关系并导出图片。
+```mermaid
+flowchart LR
+    U[用户输入] --> F[React 桌面界面]
+    F -->|REST / SSE| N[Spring Boot 协议层]
+    N --> A[AgentScope 编排层]
+    A --> C[个人上下文组装]
+    A --> R[能力组路由]
+    C --> M[模型调用]
+    R --> S[Tool Schema 选择]
+    S --> M
+    M -->|需要工具| P{权限判断}
+    P -->|ALLOW| T[本地或业务 Tool]
+    P -->|ASK| H[用户审批]
+    P -->|DENY| E[受控失败结果]
+    H --> T
+    T --> A
+    A -->|事件流| F
+    N --> D[(SQLite / JSONL / 本地文件)]
+```
 
 这里有三个刻意保留的设计决定：
 
@@ -178,7 +194,7 @@ ButvanAgent 的默认用户数据根目录是：
 
 ### Tavily 联网搜索
 
-联网搜索默认关闭。需要在 `~/.butvan-agent/config.json` 中配置 `webSearch` 节点后才会启用，具体字段与验证方式见本地文档 `docs/tavily-web-search.md`。
+联网搜索默认关闭。需要在 `~/.butvan-agent/config.json` 中配置 `webSearch` 节点后才会启用。
 
 ### Jev Tool Schema 路由
 
@@ -208,7 +224,6 @@ ButvanAgent/
 │   ├── server-feishu/           # 飞书渠道适配
 │   └── scripts/                 # 后端 sidecar 组装
 ├── scripts/                     # 桌面打包、版本同步与 sidecar 验证
-├── docs/                        # 架构、接入教程、调研与发布说明
 ├── AGENTS.md                    # 全仓工程契约（DOX）
 ├── CONTEXT.md                   # 领域术语与数据口径
 ├── DESIGN.md                    # 视觉系统
@@ -264,7 +279,7 @@ node scripts/sync-version.mjs --check
 
 脚本会完成版本检查、后端 fat jar、最小 JRE、平台启动器和 Tauri 安装包组装。构建结果位于 `agent-frontend/src-tauri/target/<profile>/bundle/`。
 
-发布使用完整 SemVer tag 驱动，根目录 `VERSION` 是唯一版本源。CI 先校验版本，再构建并验证各平台 sidecar，最后上传到草稿 GitHub Release。详细步骤见 [桌面端发布指南](docs/RELEASE.md)。
+发布使用完整 SemVer tag 驱动，根目录 `VERSION` 是唯一版本源。CI 先校验版本，再构建并验证各平台 sidecar，最后上传到草稿 GitHub Release。
 
 ## 开发约定
 
@@ -296,10 +311,6 @@ node scripts/sync-version.mjs --check
 - [项目规格](PROJECT.md)：产品能力与技术基线。
 - [领域术语](CONTEXT.md)：日记录、学习时段、模型调用、Token 用量等统一口径。
 - [设计系统](DESIGN.md)：零阴影、小圆角、细描边的桌面视觉规范。
-- [Slash Command 架构与使用说明](docs/Slash-Command-架构与使用说明.md)：命令分类、上下文与隐私边界。
-- [桌面端发布指南](docs/RELEASE.md)：版本、CI、签名与 Release 流程。
-
-仓库中还保留了多篇实现教程和调研笔记。它们记录的不只是“最终代码怎么写”，也包括为什么选择当前方案、踩过哪些坑，以及哪些边界暂时没有跨过去。
 
 ## License
 
