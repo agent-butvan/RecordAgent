@@ -18,6 +18,9 @@ public final class FinanceDtos {
     private FinanceDtos() {
     }
 
+    /** 月历使用的轻量收支汇总响应。 */
+    public record CashflowSummaryResponse(BigDecimal income, BigDecimal expense) {}
+
     public record CreateAccountRequest(
             String name, String accountType, String currency, BigDecimal initialBalance,
             boolean interestEnabled, BigDecimal annualRatePercent) {

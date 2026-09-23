@@ -1,0 +1,178 @@
+.summary {
+  display: flex;
+  gap: 16px;
+  margin-top: 10px;
+}
+
+.summary span {
+  flex: 1;
+  padding: 10px;
+  background: #fcf1ef;
+  border-radius: 8px;
+  font-size: 11px;
+  color: #a34b3e;
+}
+
+.summary span + span {
+  color: #2d8063;
+  background: #edf7f2;
+}
+
+.summary b {
+  display: inline;
+  margin-top: 4px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  margin-left: 4px;
+  font-weight: 600;
+}
+
+.section {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-color, #edf0f4);
+}
+
+.section h4 {
+  margin: 0 0 8px;
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
+.row {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.income,
+.expense {
+  padding-left: 9px;
+}
+
+.income::before,
+.expense::before {
+  content: '';
+  position: absolute;
+  top: 9px;
+  left: 0;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+}
+
+.row span {
+  overflow-wrap: anywhere;
+}
+
+.row small {
+  flex-shrink: 0;
+  max-width: 48%;
+  text-align: right;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.income::before {
+  background: #78a591;
+}
+
+.income small {
+  color: #4f806b;
+  font-weight: 550;
+}
+
+.expense::before {
+  background: #c38b7b;
+}
+
+.expense small {
+  color: #a86453;
+  font-weight: 550;
+}
+
+.empty {
+  margin: 4px 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.asset {
+  padding: 4px 0;
+  background: transparent;
+  border-radius: 0;
+  margin-top: 4px;
+}
+
+.asset strong,
+.document strong {
+  font-size: 11px;
+  font-weight: 550;
+}
+
+.document {
+  margin-top: 6px;
+}
+
+.document p {
+  margin: 4px 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.error {
+  color: #aa493d;
+  font-size: 12px;
+}
+
+.error button {
+  color: inherit;
+  cursor: pointer;
+}
+
+.summary span,
+.summary span + span {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 10px;
+}
+
+.section summary {
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 550;
+  color: var(--text-secondary);
+  padding: 2px 0;
+}
+.section summary:focus-visible {
+  outline: 1px solid #748779;
+  outline-offset: 3px;
+}
+.section[open] summary {
+  margin-bottom: 7px;
+}
+.full .section {
+  margin-top: 22px;
+  padding-top: 16px;
+}
+.full .section h4 {
+  font-size: 12px;
+}
+.full .row {
+  font-size: 12px;
+  padding: 6px 0;
+}
+.full .document p {
+  font-size: 12px;
+}
+
+.compact {
+  font-variant-numeric: tabular-nums;
+}

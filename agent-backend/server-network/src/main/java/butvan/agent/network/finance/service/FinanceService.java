@@ -5,6 +5,7 @@ import butvan.agent.network.finance.model.FinanceModels.ExpenseCategoryAmount;
 import butvan.agent.network.finance.model.FinanceModels.ExpenseChart;
 import butvan.agent.network.finance.model.FinanceModels.ExpenseChartDay;
 import butvan.agent.network.finance.model.FinanceModels.FinanceAccount;
+import butvan.agent.network.finance.model.FinanceModels.CashflowSummary;
 import butvan.agent.network.finance.model.FinanceModels.FinanceOverview;
 import butvan.agent.network.finance.model.FinanceModels.FinanceTransaction;
 import butvan.agent.network.finance.repository.FinanceRepository;
@@ -114,6 +115,29 @@ public class FinanceService {
                 .thenComparing(FinanceTransaction::createdAt)
                 .reversed();
         return transactions.stream().sorted(newestFirst).toList();
+    }
+
+    /** 按日读取资产变动，包含划账与校准，不混入无账户的旧日历花销。 */
+    @Transactional(readOnly = true)
+    public List<FinanceTransaction> getDayTransactions(String ownerId, LocalDate date) {
+        requireOwner(ownerId);
+        if (date == null) throw new IllegalArgumentException("日期不能为空");
+        return repository.findDayTransactions(ownerId, date);
+    }
+
+    /** 查询最多一年内的轻量收支汇总，与财务图表复用统计来源。 */
+    @Transactional(readOnly = true)
+    public CashflowSummary getCashflowSummary(
+            String ownerId, LocalDate from, LocalDate to) {
+        requireOwner(ownerId);
+        if (from == null || to == null || from.isAfter(to)
+                || java.time.temporal.ChronoUnit.DAYS.between(from, to) > 366) {
+            throw new IllegalArgumentException("日期范围不合法，最多查询一年");
+        }
+        BigDecimal income = repository.findDailyIncomeTotals(ownerId, from, to.plusDays(1)).stream()
+                .map(DailyIncomeTotal::amount).reduce(BigDecimal.ZERO, BigDecimal::add);
+        return new CashflowSummary(
+                income, expenseAnalyticsService.analyze(ownerId, from, to).totalExpense());
     }
 
     /** 查询用户使用过的收入与支出分类。 */

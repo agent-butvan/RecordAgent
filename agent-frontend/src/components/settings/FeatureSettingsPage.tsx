@@ -1,7 +1,8 @@
-import type { ChatTopBarPreferences, StudyWindowMode } from '../../types/preferences';
+import type { CalendarPreferences, ChatTopBarPreferences, StudyWindowMode } from '../../types/preferences';
 import { Select } from '../common/Select';
 import { LeverSwitch } from '../common/LeverSwitch';
 import { SettingsPageLayout } from './SettingsPageLayout';
+import { SettingsGroup, SettingsRow } from './SettingsGroup';
 import styles from './FeatureSettingsPage.module.css';
 
 export type FeatureSettingsTab = 'calendar' | 'finance' | 'library' | 'record';
@@ -34,6 +35,8 @@ interface FeatureSettingsPageProps {
   onStudyWindowModeChange: (mode: StudyWindowMode) => void;
   chatTopBar: ChatTopBarPreferences;
   onChatTopBarChange: (key: keyof ChatTopBarPreferences, visible: boolean) => void;
+  calendar: CalendarPreferences;
+  onCalendarChange: (key: keyof CalendarPreferences, value: boolean) => void;
 }
 
 /** 功能设置统一页面，保持四个业务入口的信息结构与空状态一致。 */
@@ -43,31 +46,30 @@ export function FeatureSettingsPage({
   onStudyWindowModeChange,
   chatTopBar,
   onChatTopBarChange,
+  calendar,
+  onCalendarChange,
 }: FeatureSettingsPageProps) {
   if (tab === 'record') {
     return (
       <SettingsPageLayout title="记录" description="">
-        <div className={styles.settingGroup}>
-          <div className={styles.settingCopy}>
-            <label htmlFor="study-window-mode">学习小窗</label>
-            <p>默认仅在记录页面显示。选择小窗后，每次开始学习都会自动展示。</p>
-          </div>
-          <Select
-            id="study-window-mode"
-            fieldSize="md"
-            value={studyWindowMode}
-            onChange={(event) => onStudyWindowModeChange(event.target.value as StudyWindowMode)}
-            options={[
-              { label: '仅记录页面', value: 'page' },
-              { label: '应用内右下角', value: 'in-app' },
-              { label: '系统桌面右下角', value: 'desktop' },
-            ]}
+        <SettingsGroup title="学习计时">
+          <SettingsRow
+            label="学习小窗"
+            labelFor="study-window-mode"
+            description="选择小窗后，每次开始学习都会自动展示；关闭或隐藏小窗不会结束当前学习。"
+            control={<Select
+              id="study-window-mode"
+              fieldSize="md"
+              value={studyWindowMode}
+              onChange={(event) => onStudyWindowModeChange(event.target.value as StudyWindowMode)}
+              options={[
+                { label: '仅记录页面', value: 'page' },
+                { label: '应用内右下角', value: 'in-app' },
+                { label: '系统桌面右下角', value: 'desktop' },
+              ]}
+            />}
           />
-        </div>
-
-        <p className={styles.note}>
-          应用内小窗和系统小窗均可在非按钮区域拖动，并可从右下角调整大小。关闭或隐藏小窗不会结束当前学习。
-        </p>
+        </SettingsGroup>
       </SettingsPageLayout>
     );
   }
@@ -75,18 +77,35 @@ export function FeatureSettingsPage({
   if (tab === 'calendar') {
     return (
       <SettingsPageLayout title="日历" description={FEATURE_CONTENT.calendar.description}>
-        <SettingToggle
-          label="在聊天顶栏显示日期"
-          description="显示今天的日期和星期，点击后展开完整日期信息。"
-          checked={chatTopBar.showDate}
-          onChange={(checked) => onChatTopBarChange('showDate', checked)}
-        />
-        <SettingToggle
-          label="在聊天顶栏显示待办"
-          description="显示今日待办完成情况，点击后查看接下来要处理的事项。"
-          checked={chatTopBar.showTodos}
-          onChange={(checked) => onChatTopBarChange('showTodos', checked)}
-        />
+        <SettingsGroup title="聊天顶栏" description="控制日历信息在聊天页面中的快捷展示。">
+          <SettingToggle
+            label="显示日期"
+            description="显示今天的日期和星期，点击后展开完整日期信息。"
+            checked={chatTopBar.showDate}
+            onChange={(checked) => onChatTopBarChange('showDate', checked)}
+          />
+          <SettingToggle
+            label="显示待办"
+            description="显示今日待办完成情况，点击后查看接下来要处理的事项。"
+            checked={chatTopBar.showTodos}
+            onChange={(checked) => onChatTopBarChange('showTodos', checked)}
+          />
+        </SettingsGroup>
+
+        <SettingsGroup title="周期待办便签" description="管理日历右下角本周、本月待办便签的展示方式。">
+          <SettingToggle
+            label="显示便签"
+            description="关闭后隐藏全部周期待办便签，不会影响待办数据。"
+            checked={calendar.showStickyNotes}
+            onChange={(checked) => onCalendarChange('showStickyNotes', checked)}
+          />
+          <SettingToggle
+            label="默认展开"
+            description="开启后周、月便签默认完整展开；修改后立即应用到两张便签。"
+            checked={calendar.stickyNotesDefaultExpanded}
+            onChange={(checked) => onCalendarChange('stickyNotesDefaultExpanded', checked)}
+          />
+        </SettingsGroup>
       </SettingsPageLayout>
     );
   }
@@ -94,12 +113,14 @@ export function FeatureSettingsPage({
   if (tab === 'finance') {
     return (
       <SettingsPageLayout title="财务" description={FEATURE_CONTENT.finance.description}>
-        <SettingToggle
-          label="在聊天顶栏显示财务摘要"
-          description="显示今日收入和支出，点击后查看本月汇总与最近流水。"
-          checked={chatTopBar.showFinance}
-          onChange={(checked) => onChatTopBarChange('showFinance', checked)}
-        />
+        <SettingsGroup title="聊天顶栏">
+          <SettingToggle
+            label="显示财务摘要"
+            description="显示今日收入和支出，点击后查看本月汇总与最近流水。"
+            checked={chatTopBar.showFinance}
+            onChange={(checked) => onChatTopBarChange('showFinance', checked)}
+          />
+        </SettingsGroup>
       </SettingsPageLayout>
     );
   }
@@ -127,12 +148,10 @@ function SettingToggle({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <div className={styles.settingGroup}>
-      <div className={styles.settingCopy}>
-        <span className={styles.settingLabel}>{label}</span>
-        <p>{description}</p>
-      </div>
-      <LeverSwitch checked={checked} onChange={onChange} label={label} showLabel={false} />
-    </div>
+    <SettingsRow
+      label={label}
+      description={description}
+      control={<LeverSwitch checked={checked} onChange={onChange} label={label} showLabel={false} />}
+    />
   );
 }

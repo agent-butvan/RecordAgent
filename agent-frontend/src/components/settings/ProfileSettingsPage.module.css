@@ -323,7 +323,6 @@
   grid-template-columns: minmax(180px, 0.8fr) minmax(320px, 1.2fr);
   gap: 36px;
   padding: 22px 0;
-  border-block: 1px solid var(--border-subtle);
 }
 
 .details > dl {

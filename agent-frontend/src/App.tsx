@@ -1,3 +1,6 @@
+import { AutomationProvider } from './context/AutomationContext';
+import { TaskPage } from './components/task/TaskPage';
+import { TaskReminderWindow } from './components/task/TaskReminderWindow';
 import type { RecordEntry, RecordType } from './types/record';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ModelProviderContext } from './context/ModelContext';
@@ -135,7 +138,7 @@ export const MainLayout: React.FC<{
   const [activeSessionId, setActiveSessionId] = useState<string>('');
   const [recordInitialType, setRecordInitialType] = useState<RecordType>('quick');
   const [recordTarget, setRecordTarget] = useState<RecordEntry | null | undefined>(undefined);
-  const [activeFeature, setActiveFeature] = useState<'chat' | 'calendar' | 'finance' | 'record' | 'study'>('chat');
+  const [activeFeature, setActiveFeature] = useState<'chat' | 'calendar' | 'finance' | 'record' | 'study' | 'task'>('chat');
   const [pendingPermissions, setPendingPermissions] = useState<Record<string, PendingPermissionState>>({});
   const [isPermissionSubmitting, setIsPermissionSubmitting] = useState(false);
   const [subagentTasks, setSubagentTasks] = useState<TaskDto[]>([]);
@@ -1078,7 +1081,9 @@ export const MainLayout: React.FC<{
             onOpenSettings={() => { setSettingsTab('config'); setIsSettingsOpen(true); }}
             onOpenAccountSettings={() => { setSettingsTab('account'); setIsSettingsOpen(true); }}
           />
-          {activeFeature === 'calendar' ? (
+          {activeFeature === 'task' ? (
+            <TaskPage onOpenSettings={() => { setSettingsTab('task'); setIsSettingsOpen(true); }} />
+          ) : activeFeature === 'calendar' ? (
             <CalendarView />
           ) : activeFeature === 'finance' ? (
             <FinancePage />
@@ -1209,11 +1214,15 @@ const PrimaryApp: React.FC = () => {
 
 export const App: React.FC = () => (
   <MessageProvider>
-    <StudyRealtimeProvider>
-      {new URLSearchParams(window.location.search).get('view') === 'study-widget'
-        ? <SystemStudyWindow />
-        : <PrimaryApp />}
-    </StudyRealtimeProvider>
+    <AutomationProvider>
+    {new URLSearchParams(window.location.search).get('view') === 'task-reminder'
+      ? <TaskReminderWindow />
+      : <StudyRealtimeProvider>
+          {new URLSearchParams(window.location.search).get('view') === 'study-widget'
+            ? <SystemStudyWindow />
+            : <PrimaryApp />}
+        </StudyRealtimeProvider>}
+    </AutomationProvider>
   </MessageProvider>
 );
 

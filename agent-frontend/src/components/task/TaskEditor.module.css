@@ -1,0 +1,20 @@
+.drawer { width:min(440px,48vw); flex:none; display:flex; flex-direction:column; border-left:1px solid #e8eaec; background:#fff; min-height:0; animation:slideIn .22s ease-out; }
+@keyframes slideIn { from { transform:translateX(28px); opacity:.6; } to { transform:translateX(0); opacity:1; } }
+.drawerHeader { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; padding:24px 24px 20px; border-bottom:1px solid #f0f1f2; }
+.drawerHeader span { color:#8b8e93; font-size:13px; }
+.drawerHeader h2 { font-size:19px; font-weight:600; margin:8px 0 0; }
+.drawerHeader button { border:0; background:transparent; color:#777; cursor:pointer; padding:4px; }
+.form { display:flex; flex-direction:column; gap:20px; overflow:auto; padding:24px; }
+.group { display:flex; flex-direction:column; gap:14px; border:0; border-top:1px solid #eceef0; padding:20px 0 0; margin:0; min-width:0; }
+.group legend { color:#7a7e84; font-weight:500; font-size:13px; padding:0 8px 0 0; }
+.form textarea { font:inherit; border:1px solid #dddde3; border-radius:10px; padding:12px; resize:vertical; width:100%; box-sizing:border-box; }
+.checks { display:flex; gap:12px; flex-wrap:wrap; }
+.check { display:flex; align-items:center; gap:7px; font-size:13px; cursor:pointer; }
+.check input { accent-color:#333; }
+.columns { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.hint { color:#74747e; font-size:12px; line-height:1.7; margin:0; }
+.error { color:#b3261e; font-size:13px; margin:0; }
+.actions { display:flex; justify-content:flex-end; gap:10px; padding-bottom:8px; }
+.preview { border-radius:12px; background:#f7f7f9; padding:16px; font-size:13px; }
+.preview pre { white-space:pre-wrap; word-break:break-word; font:inherit; line-height:1.8; }
+@media (max-width:760px) { .drawer { width:min(100%,440px); position:absolute; right:0; top:0; bottom:0; z-index:5; box-shadow:-12px 0 36px #0001; } }

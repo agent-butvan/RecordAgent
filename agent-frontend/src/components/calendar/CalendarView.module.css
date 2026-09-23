@@ -1,4 +1,5 @@
 .workspace {
+  position: relative;
   flex: 1;
   height: 100vh;
   min-width: 0;
@@ -62,8 +63,7 @@
   font-size: 11px;
 }
 
-.weekHeader,
-.grid {
+.weekHeader {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
 }
@@ -74,132 +74,6 @@
   font-size: 11px;
   font-weight: 550;
   text-align: center;
-}
-
-.grid {
-  gap: 2px;
-}
-
-.dayCell {
-  position: relative;
-  min-height: 82px;
-  padding: 8px;
-  border: none;
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--text-secondary);
-  text-align: left;
-  transition: background-color var(--transition-fast), color var(--transition-fast);
-}
-
-.dayCell:hover {
-  z-index: 20;
-  background: var(--bg-surface);
-}
-
-.dayCell:focus-visible {
-  z-index: 20;
-}
-
-.dayCellOutside {
-  color: var(--text-muted);
-  opacity: 0.46;
-}
-
-.dayCellSelected {
-  position: relative;
-  z-index: 1;
-  outline: 1px solid var(--accent-blue);
-  outline-offset: -1px;
-  background: #f6f9ff;
-}
-
-.dayNumber {
-  width: 22px;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-inline: auto;
-  border-radius: 50%;
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-}
-
-.dayCellToday .dayNumber {
-  background: var(--accent-blue);
-  color: var(--text-inverse);
-  font-weight: 650;
-}
-
-.dayContent {
-  display: block;
-  margin-top: 9px;
-}
-
-.daySignals {
-  display: flex;
-  gap: 4px;
-}
-
-.daySignals i,
-.legend i {
-  width: 5px;
-  height: 5px;
-  display: inline-block;
-  border-radius: 50%;
-}
-
-.dayPreview {
-  display: block;
-  overflow: hidden;
-  margin-top: 5px;
-  color: var(--text-secondary);
-  font-size: 10px;
-  font-weight: 500;
-  line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.dayMeta {
-  display: block;
-  overflow: hidden;
-  margin-top: 3px;
-  color: var(--text-muted);
-  font-size: 9px;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.signalSchedule,
-.signalTodo {
-  background: #4f75ad;
-}
-
-.signalTodo {
-  opacity: 0.58;
-}
-
-.signalExpense {
-  background: #b77936;
-}
-
-.legend {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-top: 15px;
-  color: var(--text-muted);
-  font-size: 10px;
-}
-
-.legend span {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
 }
 
 .monthReview {
@@ -222,7 +96,6 @@
 }
 
 .monthReviewHeading > span,
-.monthHighlights > p,
 .monthReviewEmpty {
   color: var(--text-muted);
   font-size: 10px;
@@ -230,7 +103,7 @@
 
 .monthStats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 24px;
   margin-top: 18px;
 }
@@ -253,70 +126,6 @@
   font-variant-numeric: tabular-nums;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.monthHighlights {
-  margin-top: 24px;
-}
-
-.highlightList {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px 14px;
-  margin-top: 8px;
-}
-
-.highlightItem {
-  min-width: 0;
-  height: 36px;
-  display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: center;
-  padding: 0 7px 0 0;
-  border: none;
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--text-secondary);
-  text-align: left;
-  transition: background-color var(--transition-fast), color var(--transition-fast);
-}
-
-.highlightItem:hover,
-.highlightItemActive {
-  background: var(--bg-surface);
-  color: var(--text-primary);
-}
-
-.highlightDate {
-  width: 24px;
-  height: 24px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-sm);
-  background: #eef1f5;
-  color: var(--text-secondary);
-  font-size: 9px;
-  font-weight: 650;
-  font-variant-numeric: tabular-nums;
-}
-
-.highlightItemActive .highlightDate {
-  background: #e7efff;
-  color: var(--accent-blue);
-}
-
-.highlightText {
-  overflow: hidden;
-  font-size: 11px;
-  font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.highlightItem svg {
-  color: var(--text-muted);
 }
 
 .monthReviewEmpty {
@@ -723,22 +532,6 @@
     padding: 20px 16px 26px;
   }
 
-  .dayCell {
-    min-height: 58px;
-    padding: 6px;
-  }
-
-  .dayContent {
-    margin-top: 6px;
-  }
-
-  .dayPreview {
-    display: none;
-  }
-
-  .legend {
-    gap: 10px;
-  }
 
   .monthReview {
     margin-top: 26px;
@@ -748,11 +541,22 @@
     gap: 12px;
   }
 
-  .highlightList {
-    grid-template-columns: 1fr;
-  }
 
   .photoGrid img {
     height: 78px;
   }
 }
+
+.monthStats small { display: block; margin-top: 5px; color: var(--text-muted); font-size: 10px; }
+
+ .itemLegend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; color: var(--text-muted); font-size: 10px; }
+.itemLegend span { display: inline-flex; align-items: center; gap: 5px; }
+.itemLegend i { display: inline-block; width: 3px; height: 9px; border-radius: 2px; }
+.todoMarker { background: #8fa9ce; }
+.scheduleMarker { background: #b69bc2; }
+.studyMarker { background: #91b6ad; }
+.recordMarker { background: #c9b17c; }
+.expenseMarker { background: #cda08e; }
+.monthStats { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; padding-top: 16px; border-top: 1px solid #edf0ee; }
+.monthStats dd { font-size: 12px; font-weight: 550; }
+@media (max-width: 620px) { .monthStats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

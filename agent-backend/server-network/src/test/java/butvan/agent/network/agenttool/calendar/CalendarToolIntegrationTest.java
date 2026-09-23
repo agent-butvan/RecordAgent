@@ -24,6 +24,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 
@@ -122,18 +123,20 @@ class CalendarToolIntegrationTest {
     }
 
     @Test
-    void weeklyAndMonthlyRulesRequireTheirOccurrenceField() {
+    void weeklyRequiresAWeekdayAndMonthlyDefaultsToMonthEnd() {
         ToolResult<?> missingWeekday = calendarTool.create(new CreateRequest(
                 "todo", "2026-11-01", "每周任务", null, "medium",
                 new RecurrenceInput("weekly", null, null),
                 null, null, null, null, "calendar-missing-weekday"));
-        ToolResult<?> missingMonthDay = calendarTool.create(new CreateRequest(
+        ToolResult<?> monthEnd = calendarTool.create(new CreateRequest(
                 "todo", "2026-11-01", "每月任务", null, "medium",
                 new RecurrenceInput("monthly", null, null),
                 null, null, null, null, "calendar-missing-month-day"));
 
         assertEquals("INVALID_ARGUMENT", missingWeekday.error().code());
-        assertEquals("INVALID_ARGUMENT", missingMonthDay.error().code());
+        assertTrue(monthEnd.success());
+        CalendarItem item = assertInstanceOf(CalendarItem.class, monthEnd.data());
+        assertEquals(LocalDate.of(2026, 11, 30), item.occurrenceDate());
     }
 
     private static Path createDatabasePath() {

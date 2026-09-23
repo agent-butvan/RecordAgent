@@ -139,6 +139,16 @@
   max-width: calc((100% - 24px) / 3);
 }
 
+.monthlyRuleHint {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
 .field {
   min-width: 0;
   display: flex;

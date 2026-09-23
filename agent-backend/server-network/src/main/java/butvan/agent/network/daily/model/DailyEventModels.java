@@ -35,7 +35,7 @@ public final class DailyEventModels {
             this(eventDate, title, time, priority, "none", null, null);
         }
 
-        /** 兼容未指定重复日期的领域调用，由处理器沿用原有周一或每月 1 号规则。 */
+        /** 兼容未指定重复日期的领域调用，由处理器沿用原有周一或自然月末规则。 */
         public TodoCommand(LocalDate eventDate, String title, String time, String priority, String recurrence) {
             this(eventDate, title, time, priority, recurrence, null, null);
         }
@@ -146,6 +146,19 @@ public final class DailyEventModels {
     public record DailyDay(LocalDate date, List<DailyEvent> events) {
     }
 
+    /** 月历事项仅携带标题和类型，不包含正文及完整详情。 */
+    public record CalendarItem(LocalDate date, String id, String type, String title) {}
+
+    /** 周期便签使用的待办定义及当前自然周期完成状态。 */
+    public record RecurringTodo(
+            String id,
+            String title,
+            int version,
+            String recurrence,
+            LocalDate occurrenceDate,
+            boolean completed) {
+    }
+
     /** 月历等范围视图需要的轻量日汇总。 */
     public record DailyDaySummary(
             LocalDate date,
@@ -154,6 +167,12 @@ public final class DailyEventModels {
             int completedTodoCount,
             int scheduleCount,
             BigDecimal expenseTotal,
-            String headline) {
+            String headline,
+            List<CalendarItem> items) {
+        /** 兼容基础统计组装，事项在 Service 统一补齐。 */
+        public DailyDaySummary(LocalDate date, int eventCount, int todoCount, int completedTodoCount,
+                int scheduleCount, BigDecimal expenseTotal, String headline) {
+            this(date, eventCount, todoCount, completedTodoCount, scheduleCount, expenseTotal, headline, List.of());
+        }
     }
 }

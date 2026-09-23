@@ -39,7 +39,7 @@ interface PromptInputProps {
 
 /**
  * AI 对话输入框：可组合前置标签、自动增高文本域与底部工具条。
- * 工具条左侧保留附件占位与 AI 模型选择，右侧为语音听写与发送按钮。
+ * 工具条左侧保留附件占位、审批模式与 Jev 开关，右侧为 AI 模型选择、语音听写与发送按钮。
  */
 export const PromptInput: React.FC<PromptInputProps> = ({
   value,
@@ -199,11 +199,11 @@ export const PromptInput: React.FC<PromptInputProps> = ({
           >
             Jev
           </button>
-
-          <ModelSelector onOpenSettings={onOpenSettings} />
         </div>
 
         <div className={styles.toolbarRight}>
+          <ModelSelector onOpenSettings={onOpenSettings} />
+
           <button
             type="button"
             className={`${styles.iconBtn} ${isDictating ? styles.micBtnActive : ''}`}

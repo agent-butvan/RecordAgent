@@ -175,6 +175,23 @@ public class FinanceRepository {
                 rs.getString("source"), Instant.parse(rs.getString("created_at"))), ownerId);
     }
 
+    /** 查询指定日期实际发生变动的资产流水。 */
+    public List<FinanceTransaction> findDayTransactions(String ownerId, LocalDate date) {
+        return jdbcTemplate.query("""
+                SELECT t.id, t.account_id, a.name AS account_name, t.transaction_date, t.transaction_time,
+                       t.transaction_type, t.category, t.note, t.amount_minor, t.currency, t.source, t.created_at
+                FROM finance_transaction t
+                JOIN finance_account a ON a.id = t.account_id
+                WHERE t.owner_id = ? AND t.transaction_date = ?
+                ORDER BY t.transaction_date DESC, t.transaction_time DESC, t.created_at DESC
+                """, (rs, rowNum) -> new FinanceTransaction(
+                rs.getString("id"), rs.getString("account_id"), rs.getString("account_name"),
+                LocalDate.parse(rs.getString("transaction_date")), LocalTime.parse(rs.getString("transaction_time")),
+                rs.getString("transaction_type"), rs.getString("category"), rs.getString("note"),
+                BigDecimal.valueOf(rs.getLong("amount_minor"), 2), rs.getString("currency"),
+                rs.getString("source"), Instant.parse(rs.getString("created_at"))), ownerId, date.toString());
+    }
+
     /** 聚合指定月份的收入、支出与自动收益。 */
     public MonthTotals summarizeMonth(String ownerId, LocalDate monthStart, LocalDate nextMonthStart) {
         return jdbcTemplate.queryForObject("""

@@ -82,6 +82,20 @@ class FinanceApiIntegrationTest {
         String transactionId = new com.fasterxml.jackson.databind.ObjectMapper()
                 .readTree(transactionJson).path("data").path("id").asText();
 
+        mockMvc.perform(get("/agent/finance/transactions/day").param("date", "2026-09-03"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value(transactionId))
+                .andExpect(jsonPath("$.data[0].accountId").value(accountId));
+        mockMvc.perform(get("/agent/finance/transactions/day").param("date", "2000-01-01"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isEmpty());
+
+        mockMvc.perform(get("/agent/finance/cashflow-summary")
+                        .param("from", "2026-09-03").param("to", "2026-09-03"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.income").value(500.00))
+                .andExpect(jsonPath("$.data.expense").value(0));
+
         mockMvc.perform(get("/agent/finance/categories"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.income", hasItem("稿费")))

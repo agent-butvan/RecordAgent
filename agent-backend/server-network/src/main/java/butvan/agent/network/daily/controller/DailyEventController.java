@@ -12,6 +12,7 @@ import butvan.agent.network.daily.dto.DailyEventResponses;
 import butvan.agent.network.daily.dto.DailyEventResponses.DayResponse;
 import butvan.agent.network.daily.dto.DailyEventResponses.DaySummaryResponse;
 import butvan.agent.network.daily.dto.DailyEventResponses.EventResponse;
+import butvan.agent.network.daily.dto.DailyEventResponses.RecurringTodoResponse;
 import butvan.agent.network.daily.model.DailyEventModels.ExpenseCommand;
 import butvan.agent.network.daily.model.DailyEventModels.JournalCommand;
 import butvan.agent.network.daily.model.DailyEventModels.ScheduleCommand;
@@ -59,6 +60,15 @@ public class DailyEventController {
     @GetMapping("/days/{date}")
     public Result<DayResponse> day(@PathVariable LocalDate date) {
         return Result.success(DailyEventResponses.from(dailyEventService.getDay(currentUserId(), date)));
+    }
+
+    /** 查询所选日期所在自然周和自然月的周期待办。 */
+    @ApiLog("查询周期待办便签")
+    @GetMapping("/recurring-todos")
+    public Result<List<RecurringTodoResponse>> recurringTodos(@RequestParam LocalDate date) {
+        return Result.success(dailyEventService.getRecurringTodos(currentUserId(), date).stream()
+                .map(DailyEventResponses::from)
+                .toList());
     }
 
     /** 创建待办日记录。 */

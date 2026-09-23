@@ -63,6 +63,13 @@ class DailyEventApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.events[0].title").value("验证日记录接口"))
                 .andExpect(jsonPath("$.data.events[0].details.completed").value(false));
+
+        mockMvc.perform(get("/agent/daily-events/recurring-todos?date=2026-09-03"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].title").value("验证日记录接口"))
+                .andExpect(jsonPath("$.data[0].recurrence").value("weekly"))
+                .andExpect(jsonPath("$.data[0].occurrenceDate").value("2026-09-06"))
+                .andExpect(jsonPath("$.data[0].completed").value(false));
     }
 
     @Test
@@ -80,6 +87,30 @@ class DailyEventApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.details.startTime").doesNotExist())
                 .andExpect(jsonPath("$.data.details.endTime").doesNotExist());
+    }
+
+    @Test
+    void apiCreatesMonthlyTodoOnTheNaturalMonthEnd() throws Exception {
+        mockMvc.perform(post("/agent/daily-events/todos")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "eventDate": "2026-02-10",
+                                  "title": "完成月度总结",
+                                  "priority": "medium",
+                                  "recurrence": "monthly"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.details.recurrenceMonthDay").value(31));
+
+        mockMvc.perform(get("/agent/daily-events/days/2026-02-28"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.events[0].title").value("完成月度总结"));
+
+        mockMvc.perform(get("/agent/daily-events/recurring-todos?date=2026-02-10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].occurrenceDate").value("2026-02-28"));
     }
 
     private static Path createDatabasePath() {

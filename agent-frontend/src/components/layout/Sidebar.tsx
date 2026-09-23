@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
+  Bell,
   SquarePen,
   Search,
   X,
@@ -77,8 +78,8 @@ function sortByUpdatedDesc(a: ChatSession, b: ChatSession): number {
 }
 
 interface SidebarProps {
-  activeFeature: 'chat' | 'calendar' | 'finance' | 'record' | 'study';
-  onSelectFeature: (feature: 'chat' | 'calendar' | 'finance' | 'record' | 'study') => void;
+  activeFeature: 'chat' | 'calendar' | 'finance' | 'record' | 'study' | 'task';
+  onSelectFeature: (feature: 'chat' | 'calendar' | 'finance' | 'record' | 'study' | 'task') => void;
   /** 用户头像 URL；未配置时使用邮箱前两位作为默认头像 */
   avatarUrl?: string;
   projects: Project[];
@@ -490,6 +491,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <StudentIcon size={14} />
             <span>记录</span>
+          </button>
+          <button type="button" className={`${styles.featureTab} ${activeFeature === 'task' ? styles.featureTabActive : ''}`}
+            onClick={() => onSelectFeature('task')} aria-current={activeFeature === 'task' ? 'page' : undefined}>
+            <Bell size={14} /><span>任务</span>
           </button>
         </nav>
 
