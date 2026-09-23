@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="agent-frontend/src-tauri/icons/128x128.png" width="96" alt="ButvanAgent 图标" />
+  <img src="agent-frontend/src-tauri/icons/icon.png" width="96" alt="ButvanAgent 图标" />
   <h1>ButvanAgent</h1>
   <p>一个本地优先、面向真实工作流的桌面 Agent 工作台。</p>
   <p>

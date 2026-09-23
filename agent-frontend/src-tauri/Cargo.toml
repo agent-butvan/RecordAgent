@@ -1,5 +1,5 @@
 [package]
-name = "butvan-agent"
+name = "RecordAgent"
 version = "0.1.0"
 description = "Butvan Agent Desktop Application"
 authors = ["butvan"]
